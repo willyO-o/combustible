@@ -7,13 +7,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 
 #[Fillable([
+    'ci',
     'nombres',
     'paterno',
     'materno',
     'foto',
-    'ci',
-    'nro_licencia',
-    'categoria',
     'celular',
     'direccion',
     'fecha_nacimiento',

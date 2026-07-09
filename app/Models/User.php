@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'id_rol'])]
+#[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -30,8 +30,22 @@ class User extends Authenticatable
         ];
     }
 
-    public function rol()
+    public function roles()
     {
-        return $this->belongsTo(Rol::class, 'id_rol');
+        // vincular con la tabla rol_usuario
+        return $this->belongsToMany(Rol::class, 'rol_usuario', 'id_user', 'id_rol')->withTimestamps();
+    }
+
+
+
+    static function boot(): void
+    {
+        parent::boot();
+
+        static::created(function ($user) {
+            $user->roles()->attach(1); // Asignar el rol con ID 2 al usuario recién creado
+        });
+
+        //
     }
 }

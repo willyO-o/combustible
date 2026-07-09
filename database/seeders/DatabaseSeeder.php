@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\Rol;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -17,9 +18,37 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+
+        Rol::updateOrCreate([
+            'rol' => 'ADMINISTRADOR',
+        ], [
+            'estado_rol' => 'ACTIVO',
+        ]);
+        Rol::updateOrCreate([
+            'rol' => 'USUARIO',
+        ], [
+            'estado_rol' => 'ACTIVO',
+        ]);
+
+
+        $user =User::factory()->create([
+            'name' => 'Admin User',
+            'email' => 'admin@gmail.com',
+            'password' => bcrypt('admin123'),
+        ]);
+
+        $user->roles()->attach(1); // Asignar el rol con ID 1 al usuario recién creado
+
+
+
+        // Ejecutar seeders de datos parametricos
+        $this->call([
+            TipoCombustibleSeeder::class,
+            TipoMantenimientoSeeder::class,
+            TipoVehiculoSeeder::class,
+            ConductorSeeder::class,
+            GrifoSeeder::class,
+            VehiculoSeeder::class,
         ]);
     }
 }

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('conductor', function (Blueprint $table) {
             $table->id();
+            $table->string('ci', 20)->unique();
             $table->string('nombres', 150);
             $table->string('paterno', 150)->nullable();
             $table->string('materno', 150)->nullable();
