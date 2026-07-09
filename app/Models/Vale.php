@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+//soft delete
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'nro_vale',
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 
 class Vale extends Model
 {
+    use SoftDeletes;
     protected $table = 'vale';
 
 

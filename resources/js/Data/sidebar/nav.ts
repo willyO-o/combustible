@@ -31,6 +31,21 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     menutitle: 'MAIN'
   },
   {
+    menutitle: 'GESTIÓN'
+  },
+  {
+    title: 'Conductores', icon: Svgicons.Conductoricon, type: 'link', path: '/conductores', active: false, selected: false, dirchange: false,
+  },
+  {
+    title: 'Grifos', icon: Svgicons.Grifoicon, type: 'link', path: '/grifos', active: false, selected: false, dirchange: false,
+  },
+  {
+    title: 'Vehículos', icon: Svgicons.Vehiculoicon, type: 'link', path: '/vehiculos', active: false, selected: false, dirchange: false,
+  },
+  {
+    title: 'Vales', icon: Svgicons.Valeicon, type: 'link', path: '/vales', active: false, selected: false, dirchange: false,
+  },
+  {
     title: "Dashboards", icon: Svgicons.Dashboardicon, type: "sub", active: false, dirchange: false, children: [
 
       { path: "/dashboards/sales", icon: Svgicons.Salesicon, type: "link", active: true, selected: false, dirchange: false, title: "Sales" },

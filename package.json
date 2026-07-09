@@ -21,6 +21,7 @@
         "vue": "^3.4.0"
     },
     "dependencies": {
+        "@vueform/multiselect": "^2.6.11",
         "bootstrap": "^5.3.8",
         "pinia": "^3.0.4",
         "vue3-colorpicker": "^2.3.0",
