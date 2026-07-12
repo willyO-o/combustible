@@ -10,7 +10,7 @@
                 <!-- Start::header-element -->
                 <div class="header-element">
                     <div class="horizontal-logo">
-                        <Link href="/dashboards/sales" class="header-logo">
+                        <Link href="/dashboard" class="header-logo">
                             <img src="/images/brand-logos/desktop-logo.png" alt="logo" class="desktop-logo">
                             <img src="/images/brand-logos/toggle-logo.png" alt="logo" class="toggle-logo">
                             <img src="/images/brand-logos/desktop-dark.png" alt="logo" class="desktop-dark">
@@ -510,9 +510,9 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Tooltip } from 'bootstrap';
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar';
 import 'vue3-perfect-scrollbar/style.css';
-import { Languages, Notifications, notificationNotes as initialNotificationNotes } from '@/data/header';
+import { Languages, Notifications, notificationNotes as initialNotificationNotes } from '@/Data/header';
 import { switcherStore } from '@/stores/switcher';
-import { MENUITEMS } from '@/data/sidebar/nav';
+import { MENUITEMS } from '@/Data/sidebar/nav';
 import { useAuthStore } from '@/stores/auth';
 import Quantity from '@/UI/quantity.vue';
 

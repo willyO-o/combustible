@@ -16,7 +16,7 @@ class VehiculoController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Vehiculo::with(['tipoCombustible', 'tipoVehiculo']);
+        $query = Vehiculo::with(['tipoCombustible', 'tipoVehiculo','conductorAsignado']);
 
         if ($request->filled('nro_placa')) {
             $query->where('nro_placa', 'like', '%' . $request->nro_placa . '%');

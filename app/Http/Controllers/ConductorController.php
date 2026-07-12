@@ -14,7 +14,7 @@ class ConductorController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Conductor::query();
+        $query = Conductor::query()->with('asignacioneActivas'); // Cargar las asignaciones activas para cada conductor
 
         if ($request->filled('ci')) {
             $query->where('ci', 'like', '%' . $request->ci . '%');

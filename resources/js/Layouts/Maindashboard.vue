@@ -58,7 +58,7 @@ onBeforeUnmount(() => {
 
         <!-- Start::app-content -->
         <div class="main-content app-content">
-            <div :class="['container-fluid', 'page-container', customClass]">
+            <div :class="['container-fluid', 'page-container', customClass]" class="pb-4" >
 
                 <slot />
 

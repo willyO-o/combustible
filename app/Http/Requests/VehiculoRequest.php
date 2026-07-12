@@ -23,7 +23,7 @@ class VehiculoRequest extends FormRequest
             'estado_vehiculo'     => ['required', Rule::in(['ACTIVO', 'RETIRADO', 'VENDIDO'])],
             'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
             'id_tipo_vehiculo'    => ['required', 'integer', 'exists:tipo_vehiculo,id'],
-            'fotografia'          => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'fotografia'          => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:2048'],
         ];
     }
 

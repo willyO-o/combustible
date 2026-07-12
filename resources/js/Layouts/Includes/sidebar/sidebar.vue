@@ -5,7 +5,7 @@
 
     <!-- Start::main-sidebar-header -->
     <div class="main-sidebar-header">
-        <Link href="/dashboards/sales" class="header-logo">
+        <Link href="/dashboard" class="header-logo">
             <img src="/images/brand-logos/desktop-logo.png" alt="logo" class="desktop-logo">
             <img src="/images/brand-logos/toggle-dark.png" alt="logo" class="toggle-dark">
             <img src="/images/brand-logos/desktop-dark.png" alt="logo" class="desktop-dark">
@@ -164,7 +164,7 @@
 
 <script setup>
 import { onBeforeMount, onMounted, reactive, ref, watchEffect, computed } from 'vue';
-import { MENUITEMS as staticMenuData } from '@/data/sidebar/nav.ts';
+import { MENUITEMS as staticMenuData } from '@/Data/sidebar/nav.ts';
 import { Link, usePage } from '@inertiajs/vue3';
 import {  PerfectScrollbar} from 'vue3-perfect-scrollbar';
 import 'vue3-perfect-scrollbar/style.css';

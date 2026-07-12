@@ -68,7 +68,7 @@ function submit() {
             </Link>
         </div>
 
-        <form @submit.prevent="submit" enctype="multipart/form-data">
+        <form @submit.prevent="submit" enctype="multipart/form-data" >
             <div class="row g-4">
                 <!-- Foto -->
                 <div class="col-xl-3">

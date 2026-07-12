@@ -91,7 +91,7 @@ function submit() {
                                     type="file"
                                     class="form-control"
                                     :class="{ 'is-invalid': form.errors.fotografia }"
-                                    accept="image/jpeg,image/png,image/webp"
+                                    accept=".jpg,.jpeg,.png,.webp,.avif"
                                     @change="onFotoChange"
                                 />
                                 <div v-if="form.errors.fotografia" class="invalid-feedback">{{ form.errors.fotografia }}</div>

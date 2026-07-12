@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 
@@ -61,6 +61,14 @@ const estadoBadge = (estado) => {
 
 const fotoUrl = (foto) =>
     foto ? `/storage/${foto}` : '/images/faces/1.jpg'
+
+
+
+onMounted(() => {
+    console.log(props.conductores);
+
+})
+
 </script>
 
 <template>
@@ -168,10 +176,9 @@ const fotoUrl = (foto) =>
                             <tr>
                                 <th>Foto</th>
                                 <th>CI</th>
-                                <th>Nombres</th>
-                                <th>Ap. Paterno</th>
-                                <th>Ap. Materno</th>
+                                <th>Nombre Completo</th>
                                 <th>Celular</th>
+                                <th>Vehiculos Asignados</th>
                                 <th>Estado</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
@@ -185,7 +192,7 @@ const fotoUrl = (foto) =>
                             </tr>
                             <tr v-for="conductor in conductores.data" :key="conductor.id">
                                 <td>
-                                    <span class="avatar avatar-sm">
+                                    <span class="avatar avatar-lg">
                                         <img
                                             :src="fotoUrl(conductor.foto)"
                                             :alt="conductor.nombres"
@@ -195,10 +202,20 @@ const fotoUrl = (foto) =>
                                     </span>
                                 </td>
                                 <td><span class="fw-medium">{{ conductor.ci }}</span></td>
-                                <td>{{ conductor.nombres }}</td>
-                                <td>{{ conductor.paterno ?? '—' }}</td>
-                                <td>{{ conductor.materno ?? '—' }}</td>
-                                <td>{{ conductor.celular ?? '—' }}</td>
+                                <td>{{ conductor.nombres }} {{ conductor.paterno ?? '—' }} {{ conductor.materno ?? '—' }}</td>
+                                <td> {{  conductor.celular ?? '—' }} </td>
+
+                                <td>
+                                    <ul>
+                                        <li v-for="vehiculo in conductor.asignacione_activas" :key="vehiculo.id">
+                                            {{ vehiculo.nro_placa }} ({{ vehiculo.marca }})
+                                        </li>
+
+                                        <li v-if="conductor.asignacione_activas.length === 0" class="text-danger">
+                                            No asignado
+                                        </li>
+                                    </ul>
+                                </td>
                                 <td>
                                     <span class="badge" :class="estadoBadge(conductor.estado_conductor)">
                                         {{ conductor.estado_conductor }}

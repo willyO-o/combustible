@@ -6,7 +6,7 @@ export const switcherStore = defineStore('switcher', {
         direction: 'ltr',               // ltr, rtl
         navigationStyles: 'vertical',   // vertical, horizontal
         menuStyles: '',                 // menu-click, menu-hover, icon-click, icon-hover
-        layoutStyles: 'double-menu',   // double-menu, detached, icon-overlay, icontext-menu, closed-menu, default-menu
+        layoutStyles: 'default-menu',   // double-menu, detached, icon-overlay, icontext-menu, closed-menu, default-menu
         pageStyles: 'flat',          // regular, classic, modern,flat
         widthStyles: 'fullwidth',       // fullwidth, boxed
         menuPosition: 'fixed',          // fixed, scrollable
@@ -93,7 +93,7 @@ export const switcherStore = defineStore('switcher', {
             } else {
                 this.$state.navigationStyles = 'vertical';
                 this.$state.menuStyles = "";
-                this.$state.layoutStyles = "double-menu";
+                this.$state.layoutStyles = "default-menu";
                 html.setAttribute('data-nav-layout', 'vertical');
                 html.setAttribute('data-vertical-style', 'overlay');
                 html.removeAttribute('data-nav-style');
@@ -462,13 +462,13 @@ export const switcherStore = defineStore('switcher', {
             this.navigationStylesFn('vertical');
 
             // reseting the layout styles
-            this.layoutStylesFn('double-menu')
+            this.layoutStylesFn('default-menu');
 
 
             // resetting the menu Colot
             this.menuColorFn('transparent');
 
-            // restting the header color 
+            // restting the header color
 
             this.headerColorFn('transparent')
 

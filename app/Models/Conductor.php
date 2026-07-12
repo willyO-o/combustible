@@ -26,7 +26,8 @@ class Conductor extends Model
 
 
 
-    protected function casts(){
+    protected function casts()
+    {
         return [
             'fecha_nacimiento' => 'date',
         ];
@@ -37,6 +38,15 @@ class Conductor extends Model
     {
         return $this->hasMany(Asignacion::class, 'id_conductor');
     }
+
+    public function asignacioneActivas()
+    {
+        return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
+            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'detalle'])
+            ->wherePivot('estado_asignacion', 'ACTIVO');
+    }
+
+
 
     public function vales()
     {

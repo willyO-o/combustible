@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('id_grifo')->constrained('grifo')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('id_tipo_combustible')->constrained('tipo_combustible')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('id_conductor')->constrained('conductor')->onDelete('restrict')->onUpdate('cascade');
-            $table->foreignId('id_vale')->constrained('vale')->onDelete('restrict')->onUpdate('cascade');
+            $table->foreignId('id_vale')->nullable()->constrained('vale')->onDelete('restrict')->onUpdate('cascade');
             $table->string('nro_factura', 50)->nullable();
             $table->enum('tipo_carga', ['VALE', 'PREPAGO'])->default('VALE');
             $table->string('estado_carga', 30)->nullable();

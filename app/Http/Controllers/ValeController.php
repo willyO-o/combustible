@@ -21,7 +21,7 @@ class ValeController extends Controller
 
     public function searchVehiculos(Request $request): JsonResponse
     {
-        $q = $request->get('q', '');
+        $q = $request->input('q', '');
 
         $vehiculos = Vehiculo::where('estado_vehiculo', 'ACTIVO')
             ->where(function ($query) use ($q) {
@@ -40,7 +40,7 @@ class ValeController extends Controller
 
     public function searchConductores(Request $request): JsonResponse
     {
-        $q = $request->get('q', '');
+        $q = $request->input('q', '');
 
         $conductores = Conductor::where('estado_conductor', 'ACTIVO')
             ->where(function ($query) use ($q) {
@@ -61,7 +61,7 @@ class ValeController extends Controller
 
     public function searchGrifos(Request $request): JsonResponse
     {
-        $q = $request->get('q', '');
+        $q = $request->input('q', '');
 
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
             ->where(function ($query) use ($q) {

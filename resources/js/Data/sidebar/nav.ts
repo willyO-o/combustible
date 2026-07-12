@@ -31,6 +31,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     menutitle: 'MAIN'
   },
   {
+    title: 'Dashboard', icon: Svgicons.Dashboardicon, type: 'link', path: '/dashboard', active: true, selected: true, dirchange: false,
+  },
+  {
     menutitle: 'GESTIÓN'
   },
   {
@@ -44,6 +47,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
   {
     title: 'Vales', icon: Svgicons.Valeicon, type: 'link', path: '/vales', active: false, selected: false, dirchange: false,
+  },
+  {
+    title: 'Cargas Combustible', icon: Svgicons.CargaIcon, type: 'link', path: '/cargas', active: false, selected: false, dirchange: false,
   },
   {
     title: "Dashboards", icon: Svgicons.Dashboardicon, type: "sub", active: false, dirchange: false, children: [

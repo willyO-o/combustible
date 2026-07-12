@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\GrifoController;
 use App\Http\Controllers\ProfileController;
@@ -43,6 +44,12 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('vales', ValeController::class)
         ->parameters(['vales' => 'vale']);
+
+    // Cargas de Combustible
+    Route::get('/cargas-combustible/vehiculo-info/{id}', [CargaCombustibleController::class, 'vehiculoInfo'])->name('cargas.vehiculo-info');
+    Route::get('/search/vales-carga',                    [CargaCombustibleController::class, 'searchVales'])->name('search.vales-carga');
+    Route::resource('cargas', CargaCombustibleController::class)
+        ->parameters(['cargas' => 'carga']);
 });
 
 require __DIR__.'/auth.php';
