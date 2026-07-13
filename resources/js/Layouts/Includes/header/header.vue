@@ -29,7 +29,7 @@
                 <!-- End::header-element -->
 
                 <div class="header-element header-search d-md-block d-none">
-                    <div class="autoComplete_wrapper">
+                    <div class="autoComplete_wrapper d-none">
                         <!-- Start::header-link -->
                         <input type="text" class="header-search-bar form-control bg-white" id="header-search"
                             :value="search" @input="handleToChange" placeholder="Search" spellcheck=false
@@ -90,7 +90,7 @@
                 <!-- End::header-element -->
 
                 <!-- Start::header-element -->
-                <li class="header-element country-selector dropdown d-sm-block d-none">
+                <li class="header-element country-selector dropdown  d-none">
                     <!-- Start::header-link|dropdown-toggle -->
                     <a href="javascript:void(0);" class="header-link dropdown-toggle" data-bs-auto-close="outside"
                         data-bs-toggle="dropdown">
@@ -129,7 +129,7 @@
                 <!-- End::header-element -->
 
                 <!-- Start::header-element -->
-                <li class="header-element header-theme-mode">
+                <li class="header-element header-theme-mode ">
                     <!-- Start::header-link|layout-setting -->
                     <a href="javascript:void(0);" class="header-link layout-setting">
                         <span class="light-layout" @click="colorthemeFn('dark')">
@@ -176,7 +176,7 @@
                 <!-- End::header-element -->
 
                 <!-- Start::header-element -->
-                <li class="header-element cart-dropdown dropdown">
+                <li class="header-element cart-dropdown dropdown d-none">
                     <!-- Start::header-link|dropdown-toggle -->
                     <a href="javascript:void(0);" class="header-link dropdown-toggle" data-bs-auto-close="outside"
                         data-bs-toggle="dropdown">
@@ -423,7 +423,7 @@
                         </ul>
                     </li>
                     <li>
-                        <Link href="#!" class="dropdown-item d-flex align-items-center"><i
+                        <Link href="#!" class="dropdown-item d-flex align-items-center" @click.prevent="logout"><i
                                 class="ti ti-logout me-2 fs-18"></i>Log Out</Link>
                     </li>
                 </ul>
@@ -516,7 +516,7 @@ import { MENUITEMS } from '@/Data/sidebar/nav';
 import { useAuthStore } from '@/stores/auth';
 import Quantity from '@/UI/quantity.vue';
 
-import { Link } from '@inertiajs/vue3';
+import { Link ,router} from '@inertiajs/vue3';
 
 // Stores
 const switcher = switcherStore();
@@ -660,6 +660,17 @@ const uniqueSuggestions = computed(() => {
 // Tooltip lifecycle
 let pop: Tooltip | null = null;
 
+
+
+const logout = () => {
+    //cerrar sesion en router post logoutd de laravel bezee
+
+    router.post('/logout', {}, {
+        onSuccess: () => {
+            logUserOut();
+        },
+    })
+};
 onMounted(() => {
     document.addEventListener('fullscreenchange', fullscreenChanged, { passive: true });
     document.body.addEventListener('click', handleClickOutside, { passive: true });

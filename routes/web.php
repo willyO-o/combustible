@@ -4,6 +4,10 @@ use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\GrifoController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TipoCombustibleController;
+use App\Http\Controllers\TipoMantenimientoController;
+use App\Http\Controllers\TipoVehiculoController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValeController;
 use App\Http\Controllers\VehiculoController;
 use Illuminate\Foundation\Application;
@@ -11,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
+    return redirect()->route('login');
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
@@ -33,6 +38,21 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('conductores', ConductorController::class)
         ->parameters(['conductores' => 'conductor']);
+
+    Route::resource('tipos-combustible', TipoCombustibleController::class)
+        ->parameters(['tipos-combustible' => 'tipoCombustible']);
+
+    Route::resource('tipos-mantenimiento', TipoMantenimientoController::class)
+        ->parameters(['tipos-mantenimiento' => 'tipoMantenimiento']);
+
+    Route::resource('tipos-vehiculo', TipoVehiculoController::class)
+        ->parameters(['tipos-vehiculo' => 'tipoVehiculo']);
+
+    // Usuarios
+    Route::get('usuarios/{usuario}/password',  [UserController::class, 'editPassword'])->name('usuarios.edit-password');
+    Route::put('usuarios/{usuario}/password',  [UserController::class, 'updatePassword'])->name('usuarios.update-password');
+    Route::resource('usuarios', UserController::class)
+        ->parameters(['usuarios' => 'usuario']);
 
     Route::resource('grifos', GrifoController::class)
         ->parameters(['grifos' => 'grifo']);

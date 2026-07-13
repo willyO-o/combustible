@@ -134,7 +134,8 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
                                 <th>Grifo</th>
                                 <th>Combustible</th>
                                 <th class="text-end">Litros</th>
-                                <th class="text-end">Precio</th>
+                                <th class="text-end">P/U (Bs)</th>
+                                <th class="text-end">Precio Total (Bs)</th>
                                 <th>Tipo</th>
                                 <th>Estado</th>
                                 <th>Respaldos</th>
@@ -165,6 +166,7 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
                                 </td>
                                 <td class="text-end fw-medium">{{ Number(carga.litros).toFixed(2) }}</td>
                                 <td class="text-end fw-medium">Bs {{ Number(carga.precio).toFixed(2) }}</td>
+                                <td class="text-end fw-medium">Bs {{ (Number(carga.litros) * Number(carga.precio)).toFixed(2) }}</td>
                                 <td>
                                     <span class="badge" :class="tipoBadge(carga.tipo_carga)">{{ carga.tipo_carga }}</span>
                                 </td>

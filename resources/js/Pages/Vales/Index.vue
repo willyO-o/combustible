@@ -155,7 +155,8 @@ const formatDate = (date) => {
                                 <th>Conductor</th>
                                 <th>Grifo</th>
                                 <th class="text-end">Litros</th>
-                                <th class="text-end">Precio (Bs)</th>
+                                <th class="text-end">P/U (Bs)</th>
+                                <th class="text-end">Precio Total (Bs)</th>
                                 <th>Estado</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
@@ -186,6 +187,7 @@ const formatDate = (date) => {
                                 </td>
                                 <td class="text-end fw-medium">{{ Number(vale.litros).toFixed(2) }}</td>
                                 <td class="text-end fw-medium">{{ Number(vale.precio).toFixed(2) }}</td>
+                                <td class="text-end fw-medium">{{ (Number(vale.litros) * Number(vale.precio)).toFixed(2) }}</td>
                                 <td>
                                     <span class="badge" :class="estadoBadge(vale.estado_vale)">
                                         {{ vale.estado_vale }}
