@@ -44,8 +44,8 @@ class CargaCombustibleController extends Controller
     /** Búsqueda de vales PENDIENTE (opcional filtrar por vehículo) */
     public function searchVales(Request $request): JsonResponse
     {
-        $q          = $request->get('q', '');
-        $idVehiculo = $request->get('id_vehiculo');
+        $q          = $request->input('q', '');
+        $idVehiculo = $request->input('id_vehiculo');
 
         $query = Vale::where('estado_vale', 'PENDIENTE');
 

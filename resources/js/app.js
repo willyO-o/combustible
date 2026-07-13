@@ -8,6 +8,7 @@ import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 
 import { createPinia } from 'pinia';
+import VueApexCharts from 'vue3-apexcharts';
 
 import Vue3ColorPicker from 'vue3-colorpicker';
 import 'vue3-colorpicker/style.css';
@@ -29,6 +30,7 @@ createInertiaApp({
             .use(createPinia())
 
             .use(Vue3ColorPicker)
+            .component('Apexchart', VueApexCharts)
             .mount(el);
     },
     progress: {

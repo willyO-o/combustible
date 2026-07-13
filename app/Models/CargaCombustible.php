@@ -62,4 +62,51 @@ class CargaCombustible extends Model
     {
         return $this->hasMany(RespaldoDigital::class, 'id_carga_combustible');
     }
+
+
+    static function reporteCargaCombustibleMes($anio = null)
+    {
+        if (!$anio) {
+            $anio = now()->year;
+        }
+
+        $months = [
+            1 => 'Enero',
+            2 => 'Febrero',
+            3 => 'Marzo',
+            4 => 'Abril',
+            5 => 'Mayo',
+            6 => 'Junio',
+            7 => 'Julio',
+            8 => 'Agosto',
+            9 => 'Septiembre',
+            10 => 'Octubre',
+            11 => 'Noviembre',
+            12 => 'Diciembre',
+        ];
+
+        // reporte agrupado por meses de enero a diciembre, con total de litros y total de precio si el mes no tiene registros, debe aparecer con total 0 el formato deve ser un array [["mes" => 1, "total_litros" => 0, "total_precio" => 0], ["mes" => 2, "total_litros" => 0, "total_precio" => 0], ...]
+        return self::selectRaw('MONTH(fecha_carga) as mes, SUM(litros) as total_litros, ROUND(SUM(precio * litros), 2) as total_precio')
+            ->whereYear('fecha_carga', $anio)
+            ->groupByRaw('MONTH(fecha_carga)')
+            ->orderByRaw('MONTH(fecha_carga)')
+            ->get()
+            ->mapWithKeys(function ($item)  use ($months) {
+                return [$item->mes => [
+                    'mes' => $months[$item->mes],
+                    'total_litros' => $item->total_litros,
+                    'total_precio' => $item->total_precio,
+                ]];
+            })
+            ->union(collect(range(1, 12))->mapWithKeys(function ($mes) use ($months) {
+                return [$mes => [
+                    'mes' => $months[$mes],
+                    'total_litros' => 0,
+                    'total_precio' => 0,
+                ]];
+            })->except(self::selectRaw('MONTH(fecha_carga) as mes')->whereYear('fecha_carga', $anio)->pluck('mes')->toArray()))
+            ->sortKeys()
+            ->values()
+            ->toArray();
+    }
 }

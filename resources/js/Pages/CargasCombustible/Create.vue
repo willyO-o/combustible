@@ -199,7 +199,7 @@ function submit() {
                                         Vehículo <span class="text-danger">*</span>
                                     </label>
                                     <Multiselect
-                                        @change="()=> console.log('vehiculo changed')"
+                                        @select="(opt)=> console.log(opt)"
                                         v-model="form.id_vehiculo"
                                         :options="buscarVehiculos"
                                         value-prop="id"
