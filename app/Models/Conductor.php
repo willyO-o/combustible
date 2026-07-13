@@ -33,6 +33,24 @@ class Conductor extends Model
         ];
     }
 
+    protected $appends = ['edad', 'f_nacimiento_formatted'];
+
+    public function getFNacimientoFormattedAttribute()
+    {
+        if ($this->fecha_nacimiento) {
+            return $this->fecha_nacimiento->format('d/m/Y');
+        }
+        return null;
+    }
+
+    public function getEdadAttribute()
+    {
+        if ($this->fecha_nacimiento) {
+            return $this->fecha_nacimiento->age;
+        }
+        return null;
+    }
+
     // Relaciones
     public function asignaciones()
     {
@@ -44,6 +62,14 @@ class Conductor extends Model
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
             ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'detalle'])
             ->wherePivot('estado_asignacion', 'ACTIVO');
+    }
+
+    public function historialAsignacionesVehiculos()
+    {
+        return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
+            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle'])
+            ->wherePivot('estado_asignacion' , '!=', 'ACTIVO')
+            ->orderByPivot('fecha_asignacion', 'desc');
     }
 
 

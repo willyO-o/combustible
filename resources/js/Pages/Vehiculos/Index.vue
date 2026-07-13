@@ -225,6 +225,10 @@ onMounted(() => {
 
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
+                                        <Link :href="route('vehiculos.show', vehiculo.id)"
+                                            class="btn btn-sm btn-icon btn-primary-light" title="Editar">
+                                            <i class="ri-eye-line"></i>
+                                        </Link>
                                         <Link :href="route('vehiculos.edit', vehiculo.id)"
                                             class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>

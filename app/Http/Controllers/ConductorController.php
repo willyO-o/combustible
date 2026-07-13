@@ -63,6 +63,17 @@ class ConductorController extends Controller
             ->with('success', 'Conductor registrado exitosamente.');
     }
 
+    public function show(Conductor $conductor): Response
+    {
+        $historialAsignaciones = $conductor->historialAsignacionesVehiculos()->get();
+        $conductor->load('asignacioneActivas'); // Cargar las asignaciones activas para el conductor
+
+        return Inertia::render('Conductores/Show', [
+            'conductor' => $conductor,
+            'historialAsignaciones' => $historialAsignaciones,
+        ]);
+    }
+
     public function edit(Conductor $conductor): Response
     {
         return Inertia::render('Conductores/Edit', [

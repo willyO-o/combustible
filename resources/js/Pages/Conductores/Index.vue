@@ -11,7 +11,7 @@ const props = defineProps({
 
 // Filtros reactivos inicializados con los valores que llegan del servidor
 const filters = ref({
-    ci:      props.filters?.ci      ?? '',
+    ci: props.filters?.ci ?? '',
     nombres: props.filters?.nombres ?? '',
     paterno: props.filters?.paterno ?? '',
     celular: props.filters?.celular ?? '',
@@ -27,7 +27,7 @@ watch(
             router.get(
                 route('conductores.index'),
                 {
-                    ci:      val.ci      || undefined,
+                    ci: val.ci || undefined,
                     nombres: val.nombres || undefined,
                     paterno: val.paterno || undefined,
                     celular: val.celular || undefined,
@@ -52,7 +52,7 @@ const confirmDelete = (conductor) => {
 
 const estadoBadge = (estado) => {
     const map = {
-        ACTIVO:   'bg-success-transparent text-success',
+        ACTIVO: 'bg-success-transparent text-success',
         INACTIVO: 'bg-warning-transparent text-warning',
         RETIRADO: 'bg-danger-transparent text-danger',
     }
@@ -72,6 +72,7 @@ onMounted(() => {
 </script>
 
 <template>
+
     <Head title="Conductores" />
 
     <Maindashboard>
@@ -80,7 +81,9 @@ onMounted(() => {
             <div>
                 <nav>
                     <ol class="breadcrumb mb-1">
-                        <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
+                        <li class="breadcrumb-item">
+                            <Link :href="route('dashboard')">Inicio</Link>
+                        </li>
                         <li class="breadcrumb-item active" aria-current="page">Conductores</li>
                     </ol>
                 </nav>
@@ -112,47 +115,26 @@ onMounted(() => {
                 <div class="row g-3">
                     <div class="col-sm-6 col-xl-3">
                         <label class="form-label">Carnet de Identidad</label>
-                        <input
-                            v-model="filters.ci"
-                            type="text"
-                            class="form-control"
-                            placeholder="Buscar por CI..."
-                        />
+                        <input v-model="filters.ci" type="text" class="form-control" placeholder="Buscar por CI..." />
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <label class="form-label">Nombres</label>
-                        <input
-                            v-model="filters.nombres"
-                            type="text"
-                            class="form-control"
-                            placeholder="Buscar por nombres..."
-                        />
+                        <input v-model="filters.nombres" type="text" class="form-control"
+                            placeholder="Buscar por nombres..." />
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <label class="form-label">Apellido Paterno</label>
-                        <input
-                            v-model="filters.paterno"
-                            type="text"
-                            class="form-control"
-                            placeholder="Buscar por apellido..."
-                        />
+                        <input v-model="filters.paterno" type="text" class="form-control"
+                            placeholder="Buscar por apellido..." />
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <label class="form-label">Celular</label>
-                        <input
-                            v-model="filters.celular"
-                            type="text"
-                            class="form-control"
-                            placeholder="Buscar por celular..."
-                        />
+                        <input v-model="filters.celular" type="text" class="form-control"
+                            placeholder="Buscar por celular..." />
                     </div>
                 </div>
                 <div class="mt-3 d-flex justify-content-end">
-                    <button
-                        type="button"
-                        class="btn btn-outline-secondary btn-wave"
-                        @click="clearFilters"
-                    >
+                    <button type="button" class="btn btn-outline-secondary btn-wave" @click="clearFilters">
                         <i class="ri-refresh-line me-1"></i> Limpiar filtros
                     </button>
                 </div>
@@ -193,17 +175,14 @@ onMounted(() => {
                             <tr v-for="conductor in conductores.data" :key="conductor.id">
                                 <td>
                                     <span class="avatar avatar-lg">
-                                        <img
-                                            :src="fotoUrl(conductor.foto)"
-                                            :alt="conductor.nombres"
-                                            class="rounded-circle"
-                                            style="width:36px;height:36px;object-fit:cover;"
-                                        />
+                                        <img :src="fotoUrl(conductor.foto)" :alt="conductor.nombres"
+                                            class="rounded-circle" style="width:36px;height:36px;object-fit:cover;" />
                                     </span>
                                 </td>
                                 <td><span class="fw-medium">{{ conductor.ci }}</span></td>
-                                <td>{{ conductor.nombres }} {{ conductor.paterno ?? '—' }} {{ conductor.materno ?? '—' }}</td>
-                                <td> {{  conductor.celular ?? '—' }} </td>
+                                <td>{{ conductor.nombres }} {{ conductor.paterno ?? '—' }} {{ conductor.materno ?? '—'
+                                    }}</td>
+                                <td> {{ conductor.celular ?? '—' }} </td>
 
                                 <td>
                                     <ul>
@@ -223,19 +202,16 @@ onMounted(() => {
                                 </td>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
-                                        <Link
-                                            :href="route('conductores.edit', conductor.id)"
-                                            class="btn btn-sm btn-icon btn-info-light"
-                                            title="Editar"
-                                        >
+                                        <Link :href="route('conductores.show', conductor.id)"
+                                            class="btn btn-sm btn-icon btn-primary-light" title="Ver">
+                                            <i class="ri-eye-line"></i>
+                                        </Link>
+                                        <Link :href="route('conductores.edit', conductor.id)"
+                                            class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-icon btn-danger-light"
-                                            title="Eliminar"
-                                            @click="confirmDelete(conductor)"
-                                        >
+                                        <button type="button" class="btn btn-sm btn-icon btn-danger-light"
+                                            title="Eliminar" @click="confirmDelete(conductor)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>
                                     </div>
@@ -254,19 +230,10 @@ onMounted(() => {
                 </div>
                 <nav v-if="conductores.last_page > 1">
                     <ul class="pagination pagination-sm mb-0">
-                        <li
-                            v-for="link in conductores.links"
-                            :key="link.label"
-                            class="page-item"
-                            :class="{ active: link.active, disabled: !link.url }"
-                        >
-                            <Link
-                                v-if="link.url"
-                                :href="link.url"
-                                class="page-link"
-                                preserve-state
-                                v-html="link.label"
-                            />
+                        <li v-for="link in conductores.links" :key="link.label" class="page-item"
+                            :class="{ active: link.active, disabled: !link.url }">
+                            <Link v-if="link.url" :href="link.url" class="page-link" preserve-state
+                                v-html="link.label" />
                             <span v-else class="page-link" v-html="link.label" />
                         </li>
                     </ul>

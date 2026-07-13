@@ -11,10 +11,10 @@
                 <div class="header-element">
                     <div class="horizontal-logo">
                         <Link href="/dashboard" class="header-logo">
-                            <img src="/images/brand-logos/desktop-logo.png" alt="logo" class="desktop-logo">
-                            <img src="/images/brand-logos/toggle-logo.png" alt="logo" class="toggle-logo">
-                            <img src="/images/brand-logos/desktop-dark.png" alt="logo" class="desktop-dark">
-                            <img src="/images/brand-logos/toggle-dark.png" alt="logo" class="toggle-dark">
+                            <img src="/images/logo/logo-plus-metals.webp" alt="logo" class="desktop-logo">
+                            <img src="/images/logo/logo-min.png" alt="logo" class="toggle-logo">
+                            <img src="/images/logo/logo-plus-metals.webp" alt="logo" class="desktop-dark">
+                            <img src="/images/logo/logo-min.png" alt="logo" class="toggle-dark">
                         </Link>
                     </div>
                 </div>

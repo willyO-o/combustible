@@ -63,14 +63,14 @@ const estadoBadge = (estado) =>
                 <nav>
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
-                        <li class="breadcrumb-item active" aria-current="page">Grifos</li>
+                        <li class="breadcrumb-item active" aria-current="page">Surtidores</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Grifos</h1>
+                <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Surtidores</h1>
             </div>
             <div>
                 <Link :href="route('grifos.create')" class="btn btn-primary btn-wave">
-                    <i class="ri-add-line me-1"></i> Nuevo Grifo
+                    <i class="ri-add-line me-1"></i> Nuevo Surtidor
                 </Link>
             </div>
         </div>
@@ -140,7 +140,7 @@ const estadoBadge = (estado) =>
         <div class="card custom-card">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <div class="card-title">
-                    Grifos
+                    Surtidores
                     <span class="badge bg-primary-transparent text-primary ms-2">
                         {{ grifos.total }} registros
                     </span>
@@ -165,7 +165,7 @@ const estadoBadge = (estado) =>
                             <tr v-if="grifos.data.length === 0">
                                 <td colspan="8" class="text-center py-4 text-muted">
                                     <i class="ri-gas-station-line fs-3 d-block mb-2"></i>
-                                    No se encontraron grifos
+                                    No se encontraron surtidores que coincidan con los filtros aplicados.
                                 </td>
                             </tr>
                             <tr v-for="(grifo, idx) in grifos.data" :key="grifo.id">

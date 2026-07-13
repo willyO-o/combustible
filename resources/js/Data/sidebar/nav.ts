@@ -54,7 +54,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Vehículos', icon: Svgicons.Vehiculoicon, type: 'link', path: '/vehiculos', active: false, selected: false, dirchange: false,
   },
   {
-    title: 'Grifos', icon: Svgicons.Grifoicon, type: 'link', path: '/grifos', active: false, selected: false, dirchange: false,
+    title: 'Surtidores', icon: Svgicons.Grifoicon, type: 'link', path: '/grifos', active: false, selected: false, dirchange: false,
   },
   {
     title: 'Tipos de Combustible', icon: Svgicons.TipoCombustibleIcon, type: 'link', path: '/tipos-combustible', active: false, selected: false, dirchange: false,

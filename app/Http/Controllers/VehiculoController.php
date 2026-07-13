@@ -69,6 +69,14 @@ class VehiculoController extends Controller
             ->with('success', 'Vehículo registrado exitosamente.');
     }
 
+    public function show(Vehiculo $vehiculo): Response
+    {
+        // $historialAsignaciones = $vehiculo->historialAsignacionesConductores()->get();
+        return Inertia::render('Vehiculos/Show', [
+            'vehiculo'             => $vehiculo->load(['tipoCombustible', 'tipoVehiculo']),
+            'historialAsignaciones' => [],
+        ]);
+    }
     public function edit(Vehiculo $vehiculo): Response
     {
         return Inertia::render('Vehiculos/Edit', [

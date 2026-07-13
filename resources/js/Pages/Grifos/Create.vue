@@ -17,7 +17,7 @@ function submit() {
 </script>
 
 <template>
-    <Head title="Nuevo Grifo" />
+    <Head title="Nuevo Surtidor" />
 
     <Maindashboard>
         <!-- Breadcrumb -->
@@ -26,11 +26,11 @@ function submit() {
                 <nav>
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
-                        <li class="breadcrumb-item"><Link :href="route('grifos.index')">Grifos</Link></li>
+                        <li class="breadcrumb-item"><Link :href="route('grifos.index')">Surtidores</Link></li>
                         <li class="breadcrumb-item active">Nuevo</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Registrar Grifo</h1>
+                <h1 class="page-title fw-medium fs-18 mb-0">Registrar Surtidor</h1>
             </div>
             <Link :href="route('grifos.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver
@@ -40,7 +40,7 @@ function submit() {
         <form @submit.prevent="submit">
             <div class="card custom-card">
                 <div class="card-header">
-                    <div class="card-title">Datos del Grifo</div>
+                    <div class="card-title">Datos del Surtidor</div>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
@@ -163,7 +163,7 @@ function submit() {
                 >
                     <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
                     <i v-else class="ri-save-line me-1"></i>
-                    {{ form.processing ? 'Guardando...' : 'Guardar Grifo' }}
+                    {{ form.processing ? 'Guardando...' : 'Guardar Surtidor' }}
                 </button>
             </div>
         </form>
