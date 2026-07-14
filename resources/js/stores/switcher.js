@@ -11,11 +11,11 @@ export const switcherStore = defineStore('switcher', {
         widthStyles: 'fullwidth',       // fullwidth, boxed
         menuPosition: 'fixed',          // fixed, scrollable
         headerPosition: 'fixed',        // fixed, scrollable
-        menuColor: 'transparent',                  // light, dark, color, gradient, transparent
-        headerColor: 'transparent',                // light, dark, color, gradient, transparent
-        themePrimary: '',               // '58, 88, 146', '92, 144, 163', '161, 90, 223', '78, 172, 76', '223, 90, 90'
+        menuColor: 'dark',                  // light, dark, color, gradient, transparent
+        headerColor: 'light',                // light, dark, color, gradient, transparent
+        themePrimary: '22, 119, 167',               //'22, 119, 167'   '58, 88, 146', '92, 144, 163', '161, 90, 223', '78, 172, 76', '223, 90, 90'
         themeBackground: '',
-        backgroundImage: 'bg-img1',          // bg-img1, bg-img2, bg-img3, bg-img4, bg-img5, bg-img6
+        backgroundImage: 'bgimg4',          // bg-img1, bg-img2, bg-img3, bg-img4, bg-img5, bg-img6
     }),
     getters: {
 
@@ -448,7 +448,7 @@ export const switcherStore = defineStore('switcher', {
             html.removeAttribute('data-page-style');
 
             // removing theme styles
-            html.removeAttribute('data-bg-img');
+            html.setAttribute('data-bg-img', 'bgimg4');
 
             // clear primary & bg color
             html.style.removeProperty(`--primary-rgb`);
@@ -466,11 +466,12 @@ export const switcherStore = defineStore('switcher', {
 
 
             // resetting the menu Colot
-            this.menuColorFn('transparent');
+            this.menuColorFn('dark');
 
             // restting the header color
 
-            this.headerColorFn('transparent')
+            this.headerColorFn('light');
+
 
             // to reset horizontal menu scroll
             mainMenuEle ? mainMenuEle.style.marginLeft = "0px" : '';

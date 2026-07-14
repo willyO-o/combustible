@@ -484,7 +484,7 @@
                                             <li id="autoComplete_result_0" class="list-group-item"
                                                 v-for="(e, index) in uniqueSuggestions.slice(0, 7)" :key="index">
                                                 <Link :href="`${e.path}/`" class="search-result-item"
-                                                    @click="handleSuggestionClick(suggestion.title)">
+                                                    @click="handleSuggestionClick('Sugestion Title')">
                                                     {{ e.title }}
                                                 </Link>
                                             </li>
@@ -657,8 +657,7 @@ const uniqueSuggestions = computed(() => {
     );
 });
 
-// Tooltip lifecycle
-let pop: Tooltip | null = null;
+let pop = null;
 
 
 
