@@ -1,18 +1,18 @@
-import us_flag from "@/Assets/images/flags/us_flag.jpg"
-import spain_flag from "@/Assets/images/flags/spain_flag.jpg"
-import french_flag from "@/Assets/images/flags/french_flag.jpg"
-import uae_flag from "@/Assets/images/flags/uae_flag.jpg"
-import germany_flag from "@/Assets/images/flags/germany_flag.jpg"
-import china_flag from "@/Assets/images/flags/china_flag.jpg"
-import italy_flag from "@/Assets/images/flags/italy_flag.jpg"
-import russia_flag from "@/Assets/images/flags/russia_flag.jpg"
-import e_13 from "@/Assets/images/ecommerce/png/13.png"
-import e_15 from "@/Assets/images/ecommerce/png/15.png"
-import e_19 from "@/Assets/images/ecommerce/png/19.png"
-import e_11 from "@/Assets/images/ecommerce/png/11.png"
-import e_6 from "@/Assets/images/ecommerce/png/6.png"
-import face1 from "@/Assets/images/faces/1.jpg";
-import face12 from "@/Assets/images/faces/12.jpg";
+const us_flag = "/images/flags/us_flag.jpg";
+const spain_flag = "/images/flags/spain_flag.jpg";
+const french_flag = "/images/flags/french_flag.jpg";
+const uae_flag = "/images/flags/uae_flag.jpg";
+const germany_flag = "/images/flags/germany_flag.jpg";
+const china_flag = "/images/flags/china_flag.jpg";
+const italy_flag = "/images/flags/italy_flag.jpg";
+const russia_flag = "/images/flags/russia_flag.jpg";
+const e_13 = "/images/ecommerce/png/13.png";
+const e_15 = "/images/ecommerce/png/15.png";
+const e_19 = "/images/ecommerce/png/19.png";
+const e_11 = "/images/ecommerce/png/11.png";
+const e_6 = "/images/ecommerce/png/6.png";
+const face1 = "/images/faces/1.jpg";
+const face12 = "/images/faces/12.jpg";
 
 interface LanguageType {
     name: string;

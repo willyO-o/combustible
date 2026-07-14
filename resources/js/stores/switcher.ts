@@ -15,7 +15,7 @@ export const switcherStore = defineStore('switcher', {
         headerColor: 'transparent',                // light, dark, color, gradient, transparent
         themePrimary: '',               // '58, 88, 146', '92, 144, 163', '161, 90, 223', '78, 172, 76', '223, 90, 90'
         themeBackground: '',
-        backgroundImage: '',
+        backgroundImage: 'bg-img1',          // bg-img1, bg-img2, bg-img3, bg-img4, bg-img5, bg-img6
     }),
     getters: {
 

@@ -4,7 +4,7 @@ import { MENUITEMS as staticMenuData } from '@/Data/sidebar/nav.ts';
 import { Link, usePage } from '@inertiajs/vue3';
 import {  PerfectScrollbar} from 'vue3-perfect-scrollbar';
 import 'vue3-perfect-scrollbar/style.css';
-import media80 from "@/Assets/images/media/media-80.png"
+// import media80 from "@/Assets/images/media/media-80.png"
 import { switcherStore } from '@/stores/switcher';
 import RecursiveMenu from '@/UI/recursiveMenu.vue';
 
@@ -13,6 +13,9 @@ const currentUrl = computed(() => {
   const url = page.url.split('?')[0]
   return url.endsWith('/') ? url.slice(0, -1) : url
 })
+
+const media80 = "/images/media/media-80.png";
+
 
 const menuData = reactive(staticMenuData);
 

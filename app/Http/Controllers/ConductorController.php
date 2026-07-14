@@ -30,11 +30,11 @@ class ConductorController extends Controller
         }
 
         $conductores = $query
-            ->orderBy('nombres')
+            ->orderBy('id', 'desc')
             ->paginate(10)
             ->withQueryString();
 
-        return Inertia::render('Conductores/Index', [
+        return inertia('Conductores/Index', [
             'conductores' => $conductores,
             'filters'     => $request->only(['ci', 'nombres', 'paterno', 'celular']),
             'flash'       => [

@@ -1,11 +1,13 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { Tooltip } from 'bootstrap';
-import bg_img1 from "@/Assets/images/menu-bg-images/bg-img1.jpg"
-import bg_img2 from "@/Assets/images/menu-bg-images/bg-img2.jpg"
-import bg_img3 from "@/Assets/images/menu-bg-images/bg-img3.jpg"
-import bg_img4 from "@/Assets/images/menu-bg-images/bg-img4.jpg"
-import bg_img5 from "@/Assets/images/menu-bg-images/bg-img5.jpg"
+// import bg_img1 from "@/Assets/images/menu-bg-images/bg-img1.jpg"
+// import bg_img2 from "@/Assets/images/menu-bg-images/bg-img2.jpg"
+// import bg_img3 from "@/Assets/images/menu-bg-images/bg-img3.jpg"
+// import bg_img4 from "@/Assets/images/menu-bg-images/bg-img4.jpg"
+// import bg_img5 from "@/Assets/images/menu-bg-images/bg-img5.jpg"
+
+
 import { switcherStore } from '@/stores/switcher';
 import { MENUITEMS } from '@/Data/sidebar/nav';
 
@@ -14,6 +16,14 @@ const MENU = reactive(MENUITEMS);
 const switcher = reactive(switcherStore());
 const dynamicPrimaryColor = ref('black');
 const dynamicBackgroundColor = ref('black');
+
+
+const bg_img1 = "/images/menu-bg-images/bg-img1.jpg";
+const bg_img2 = "/images/menu-bg-images/bg-img2.jpg";
+const bg_img3 = "/images/menu-bg-images/bg-img3.jpg";
+const bg_img4 = "/images/menu-bg-images/bg-img4.jpg";
+const bg_img5 = "/images/menu-bg-images/bg-img5.jpg";
+
 
 // Tooltip
 let tooltipInstance = null;

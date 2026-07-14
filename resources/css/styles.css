@@ -4,12 +4,12 @@
 
 Project                            :   Vyzor - Vue3 Premium Bootstrap Admin & Dashboard Template
 Create Date                        :   08-August-2025
-Author & Copyright Ownership       :   Spruko Technologies Private Limited 
+Author & Copyright Ownership       :   Spruko Technologies Private Limited
 Author URL                         :   https://themeforest.net/user/spruko
 Support	                           :   https://support.spruko.com/
 License Details                    :   https://spruko.com/licenses-details
 ------------------------------------------------------------------*/
-/* Table Of Content 
+/* Table Of Content
 switcher
 accordion
 alerts
@@ -767,7 +767,7 @@ typography
   --menu-bg: #202025;
 }
 [data-menu-styles=dark][data-theme-mode=light][data-bg-img=bgimg1] {
-  --menu-bg: url(/images/menu-bg-images/bg-img2.jpg);
+  --menu-bg: url(/images/menu-bg-images/bg-img1.jpg);
 }
 [data-menu-styles=dark][data-theme-mode=light][data-bg-img=bgimg2] {
   --menu-bg: url(/images/menu-bg-images/bg-img2.jpg);

@@ -1,7 +1,9 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+
+import { showToast, confirm , showError} from '@/Utils/alertUtil.js'
 
 const props = defineProps({
     conductores: Object,
@@ -44,10 +46,22 @@ function clearFilters() {
 }
 
 // Confirmación de borrado
-const confirmDelete = (conductor) => {
-    if (confirm(`¿Eliminar al conductor ${conductor.nombres} ${conductor.paterno ?? ''}?`)) {
-        router.delete(route('conductores.destroy', conductor.id))
-    }
+const confirmDelete = async (conductor) => {
+    const confirmar = await confirm(`¿Eliminar al conductor ${conductor.nombres} ${conductor.paterno ?? ''}?`, "Confirmación", "Si, eliminar");
+    if (!confirmar) return;
+
+    router.delete(route('conductores.destroy', conductor.id),
+        {
+            _method: 'DELETE',
+        },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                showToast('Conductor eliminado')
+            },
+        },
+    )
+
 }
 
 const estadoBadge = (estado) => {
@@ -63,11 +77,30 @@ const fotoUrl = (foto) =>
     foto ? `/storage/${foto}` : '/images/faces/1.jpg'
 
 
+const cambiarEstado = async (conductorId, nuevoEstado) => {
+    const confirmar = await confirm(`¿Desea cambiar el estado del conductor a <b>${nuevoEstado}</b>?`, "Confirmación", "Si, cambiar");
+    if (!confirmar) return;
 
-onMounted(() => {
-    console.log(props.conductores);
+    router.put(route('conductores.update', conductorId),
+        {
+            _method: 'PUT',
+            estado_conductor: nuevoEstado
+        },
+        {
+            //prevenir scroll,
+            preserveScroll: true,
+            onSuccess: () => {
+                showToast('Estado del conductor cambiado', 'success')
+            },
+            onError: (error)  => {
+                showError(error);
+            }
+        })
 
-})
+
+}
+
+
 
 </script>
 
@@ -156,6 +189,7 @@ onMounted(() => {
                     <table class="table table-hover text-nowrap mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th>#</th>
                                 <th>Foto</th>
                                 <th>CI</th>
                                 <th>Nombre Completo</th>
@@ -172,7 +206,8 @@ onMounted(() => {
                                     No se encontraron conductores
                                 </td>
                             </tr>
-                            <tr v-for="conductor in conductores.data" :key="conductor.id">
+                            <tr v-for="(conductor, index) in conductores.data" :key="conductor.id">
+                                <td>{{ index + 1 }}</td>
                                 <td>
                                     <span class="avatar avatar-lg">
                                         <img :src="fotoUrl(conductor.foto)" :alt="conductor.nombres"
@@ -181,7 +216,7 @@ onMounted(() => {
                                 </td>
                                 <td><span class="fw-medium">{{ conductor.ci }}</span></td>
                                 <td>{{ conductor.nombres }} {{ conductor.paterno ?? '—' }} {{ conductor.materno ?? '—'
-                                    }}</td>
+                                }}</td>
                                 <td> {{ conductor.celular ?? '—' }} </td>
 
                                 <td>
@@ -196,22 +231,45 @@ onMounted(() => {
                                     </ul>
                                 </td>
                                 <td>
-                                    <span class="badge" :class="estadoBadge(conductor.estado_conductor)">
+                                    <!-- <span class="badge btn " :class="estadoBadge(conductor.estado_conductor)"
+                                        @click="cambiarEstado(conductor.id)">
                                         {{ conductor.estado_conductor }}
-                                    </span>
+                                    </span> -->
+                                    <div class="btn-list">
+                                        <div class="btn-group">
+                                            <button
+                                                :class="`btn btn- ${estadoBadge(conductor.estado_conductor)} dropdown-toggle`"
+                                                type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                {{ conductor.estado_conductor }}
+                                            </button>
+                                            <ul :class="`dropdown-menu `">
+                                                <li v-if="conductor.estado_conductor !== 'ACTIVO'"><a
+                                                        @click="cambiarEstado(conductor.id, 'ACTIVO')"
+                                                        class="dropdown-item" href="javascript:void(0);">Activo</a></li>
+                                                <li v-if="conductor.estado_conductor !== 'INACTIVO'"><a
+                                                        @click="cambiarEstado(conductor.id, 'INACTIVO')"
+                                                        class="dropdown-item" href="javascript:void(0);">Inactivo</a>
+                                                </li>
+                                                <li v-if="conductor.estado_conductor !== 'RETIRADO'"><a
+                                                        @click="cambiarEstado(conductor.id, 'RETIRADO')"
+                                                        class="dropdown-item" href="javascript:void(0);">Retirado</a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
                                         <Link :href="route('conductores.show', conductor.id)"
-                                            class="btn btn-sm btn-icon btn-primary-light" title="Ver">
+                                            class="btn btn-sm btn-icon btn-light" title="Ver">
                                             <i class="ri-eye-line"></i>
                                         </Link>
                                         <Link :href="route('conductores.edit', conductor.id)"
-                                            class="btn btn-sm btn-icon btn-info-light" title="Editar">
+                                            class="btn btn-sm btn-icon btn-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
-                                        <button type="button" class="btn btn-sm btn-icon btn-danger-light"
-                                            title="Eliminar" @click="confirmDelete(conductor)">
+                                        <button type="button" class="btn btn-sm btn-icon btn-light" title="Eliminar"
+                                            @click="confirmDelete(conductor)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>
                                     </div>
