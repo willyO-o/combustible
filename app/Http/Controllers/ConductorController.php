@@ -14,23 +14,24 @@ class ConductorController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Conductor::query()->with('asignacioneActivas'); // Cargar las asignaciones activas para cada conductor
+        $query = Conductor::query()->with('asignacioneActivas')
+        ->join('persona','persona.id', '=', 'conductor.id'); // Cargar las asignaciones activas para cada conductor
 
         if ($request->filled('ci')) {
-            $query->where('ci', 'like', '%' . $request->ci . '%');
+            $query->where('persona.ci', 'like', '%' . $request->ci . '%');
         }
         if ($request->filled('nombres')) {
-            $query->where('nombres', 'like', '%' . $request->nombres . '%');
+            $query->where('persona.nombres', 'like', '%' . $request->nombres . '%');
         }
         if ($request->filled('paterno')) {
-            $query->where('paterno', 'like', '%' . $request->paterno . '%');
+            $query->where('persona.paterno', 'like', '%' . $request->paterno . '%');
         }
         if ($request->filled('celular')) {
-            $query->where('celular', 'like', '%' . $request->celular . '%');
+            $query->where('persona.celular', 'like', '%' . $request->celular . '%');
         }
 
         $conductores = $query
-            ->orderBy('id', 'desc')
+            ->orderBy('persona.id', 'desc')
             ->paginate(10)
             ->withQueryString();
 

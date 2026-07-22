@@ -20,10 +20,10 @@ class DashboardController extends Controller
 
 
         $vales['total'] = CargaCombustible::whereNotNull('id_vale')->count();
-        $vales['porcentaje'] = "+" . (CargaCombustible::whereNotNull('id_vale')
+        $vales['porcentaje'] = $vales['total'] ? "+" . (CargaCombustible::whereNotNull('id_vale')
             ->whereMonth('fecha_carga', now()->subMonth()->month)
             ->whereYear('fecha_carga', now()->subMonth()->year)
-            ->count() / $vales['total'] * 100) . "%";
+            ->count() / $vales['total'] * 100) . "%" : "+0%";
 
 
             // dd($vales['total'], $vales['porcentaje'], now()->subMonth()->month, now()->subMonth()->year);
@@ -31,9 +31,9 @@ class DashboardController extends Controller
         $cargas['total'] = CargaCombustible::whereMonth('fecha_carga', now()->month)
             ->whereYear('fecha_carga', now()->year)
             ->count();
-        $cargas['porcentaje'] = "+" . (CargaCombustible::whereMonth('fecha_carga', now()->subMonth()->month)
+        $cargas['porcentaje'] = $cargas['total'] ? "+" . (CargaCombustible::whereMonth('fecha_carga', now()->subMonth()->month)
             ->whereYear('fecha_carga', now()->subMonth()->year)
-            ->count() / $cargas['total'] * 100) . "%";
+            ->count() / $cargas['total'] * 100) . "%" : "+0%";
 
         $vehiculos['total'] = Vehiculo::count();
 

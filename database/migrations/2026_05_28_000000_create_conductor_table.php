@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        //
-        Schema::table('asignacion', function (Blueprint $table) {
-            $table->date('fecha_culminacion')->nullable()->after('detalle');
+        Schema::create('conductor', function (Blueprint $table) {
+            $table->foreignId('id')->constrained('persona')->onDelete('restrict');
+            $table->enum('estado_conductor', ['ACTIVO', 'INACTIVO', 'RETIRADO'])->default('ACTIVO');
+            $table->timestamps();
+            $table->softDeletes();
         });
     }
 
@@ -22,9 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
-        Schema::table('asignacion', function (Blueprint $table) {
-            $table->dropColumn('fecha_culminacion');
-        });
+        Schema::dropIfExists('conductor');
     }
 };

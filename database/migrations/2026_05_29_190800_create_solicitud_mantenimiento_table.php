@@ -31,6 +31,7 @@ return new class extends Migration
 
             // Datos del vehículo al momento de la solicitud
             $table->integer('kilometraje_actual')->nullable();
+            $table->integer('horometro')->nullable();
             $table->dateTime('fecha_solicitud');
 
             // Estado del flujo

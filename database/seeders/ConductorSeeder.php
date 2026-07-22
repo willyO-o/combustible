@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Conductor;
+use App\Models\Persona;
 use Illuminate\Database\Seeder;
 
 class ConductorSeeder extends Seeder
@@ -12,7 +13,7 @@ class ConductorSeeder extends Seeder
      */
     public function run(): void
     {
-        $conductores = [
+        $personas = [
             [
                 'nombres' => 'Juan',
                 'paterno' => 'García',
@@ -22,7 +23,7 @@ class ConductorSeeder extends Seeder
                 'celular' => '7123456789',
                 'direccion' => 'Av. Principal 123',
                 'fecha_nacimiento' => '1990-05-15',
-                'estado_conductor' => 'ACTIVO',
+                'estado_persona' => 'ACTIVO',
             ],
             [
                 'nombres' => 'María',
@@ -33,7 +34,7 @@ class ConductorSeeder extends Seeder
                 'celular' => '7123456790',
                 'direccion' => 'Calle 5ta 456',
                 'fecha_nacimiento' => '1992-08-20',
-                'estado_conductor' => 'ACTIVO',
+                'estado_persona' => 'ACTIVO',
             ],
             [
                 'nombres' => 'Carlos',
@@ -44,7 +45,7 @@ class ConductorSeeder extends Seeder
                 'celular' => '7123456791',
                 'direccion' => 'Pasaje 2 789',
                 'fecha_nacimiento' => '1988-12-10',
-                'estado_conductor' => 'ACTIVO',
+                'estado_persona' => 'ACTIVO',
             ],
             [
                 'nombres' => 'Ana',
@@ -55,7 +56,7 @@ class ConductorSeeder extends Seeder
                 'celular' => '7123456792',
                 'direccion' => 'Boulevard Central 321',
                 'fecha_nacimiento' => '1995-03-25',
-                'estado_conductor' => 'ACTIVO',
+                'estado_persona' => 'ACTIVO',
             ],
             [
                 'nombres' => 'Roberto',
@@ -66,12 +67,12 @@ class ConductorSeeder extends Seeder
                 'celular' => '7123456793',
                 'direccion' => 'Avenida Este 654',
                 'fecha_nacimiento' => '1985-07-08',
-                'estado_conductor' => 'ACTIVO',
+                'estado_persona' => 'ACTIVO',
             ],
         ];
 
-        foreach ($conductores as $conductor) {
-            Conductor::updateOrCreate(
+        foreach ($personas as $conductor) {
+            $persona = Persona::updateOrCreate(
                 ['ci' => $conductor['ci']],
                 [
                     'nombres' => $conductor['nombres'],
@@ -82,7 +83,14 @@ class ConductorSeeder extends Seeder
                     'celular' => $conductor['celular'],
                     'direccion' => $conductor['direccion'],
                     'fecha_nacimiento' => $conductor['fecha_nacimiento'],
-                    'estado_conductor' => $conductor['estado_conductor'],
+                    'estado_persona' => $conductor['estado_persona'],
+                ]
+            );
+
+            Conductor::updateOrCreate(
+                ['id' => $persona->id],
+                [
+                    'estado_conductor' => 'ACTIVO',
                 ]
             );
         }

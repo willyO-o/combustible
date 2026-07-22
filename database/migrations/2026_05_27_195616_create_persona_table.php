@@ -11,19 +11,23 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('conductor', function (Blueprint $table) {
+        Schema::create('persona', function (Blueprint $table) {
             $table->id();
             $table->string('ci', 20)->unique();
             $table->string('nombres', 150);
             $table->string('paterno', 150)->nullable();
             $table->string('materno', 150)->nullable();
-            $table->string('foto', 250);
+            $table->string('foto', 250)->nullable();
             $table->string('celular', 20)->nullable();
             $table->string('direccion', 250)->nullable();
             $table->date('fecha_nacimiento')->nullable();
-            $table->enum('estado_conductor', ['ACTIVO', 'INACTIVO', 'RETIRADO'])->default('ACTIVO');
+            $table->enum('estado_persona', ['ACTIVO', 'INACTIVO', 'RETIRADO'])->default('ACTIVO');
             $table->timestamps();
             $table->softDeletes();
+        });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreignId('id_persona')->nullable()->constrained('persona')->onDelete('restrict');
         });
     }
 
@@ -32,6 +36,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('conductor');
+        Schema::dropIfExists('persona');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['id_persona']);
+            $table->dropColumn('id_persona');
+        });
     }
 };

@@ -14,11 +14,11 @@ return new class extends Migration
         Schema::create('documento_conductor', function (Blueprint $table) {
             $table->id();
             $table->foreignId('id_conductor')->constrained('conductor')->onDelete('cascade');
-            $table->enum('tipo_documento', ['LICENCIA_DE_CONDUCIR','CI','CERTIFICADO_MEDICO',' OTRO'])->default('LICENCIA_DE_CONDUCIR');
-            $table->string('numero_documento', 100);
+            $table->enum('tipo_documento', ['LICENCIA_DE_CONDUCIR','CI','CERTIFICADO_MEDICO','OTRO'])->default('LICENCIA_DE_CONDUCIR');
+            $table->string('numero_documento', 100)->nullable();
             $table->string('categoria', 10)->nullable();
-            $table->date('fecha_emision');
-            $table->date('fecha_vencimiento');
+            $table->date('fecha_emision')->nullable();
+            $table->date('fecha_vencimiento')->nullable();
             $table->string('archivo')->nullable();
             $table->enum('estado_documento', ['VIGENTE', 'VENCIDO', 'OBSERVADO'])->default('VIGENTE');
             $table->text('observacion')->nullable();

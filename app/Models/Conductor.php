@@ -7,15 +7,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 
 #[Fillable([
-    'ci',
-    'nombres',
-    'paterno',
-    'materno',
-    'foto',
-    'celular',
-    'direccion',
-    'fecha_nacimiento',
-    'estado_conductor'
+    'id',
+    'estado_conductor',
 ])]
 
 class Conductor extends Model
@@ -24,16 +17,11 @@ class Conductor extends Model
 
     protected $table = 'conductor';
 
+    // protected $primaryKey = 'id_persona';
 
 
-    protected function casts()
-    {
-        return [
-            'fecha_nacimiento' => 'date',
-        ];
-    }
+    public $incrementing = false;
 
-    protected $appends = ['edad', 'f_nacimiento_formatted'];
 
     public function getFNacimientoFormattedAttribute()
     {
@@ -52,6 +40,11 @@ class Conductor extends Model
     }
 
     // Relaciones
+    public function persona()
+    {
+        return $this->belongsTo(Persona::class, 'id_persona');
+    }
+
     public function asignaciones()
     {
         return $this->hasMany(Asignacion::class, 'id_conductor');
@@ -68,7 +61,7 @@ class Conductor extends Model
     {
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
             ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle'])
-            ->wherePivot('estado_asignacion' , '!=', 'ACTIVO')
+            ->wherePivot('estado_asignacion', '!=', 'ACTIVO')
             ->orderByPivot('fecha_asignacion', 'desc');
     }
 
