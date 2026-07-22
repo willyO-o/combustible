@@ -3,6 +3,7 @@
 use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\GrifoController;
+use App\Http\Controllers\MantenimientoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TipoCombustibleController;
 use App\Http\Controllers\TipoMantenimientoController;
@@ -73,6 +74,29 @@ Route::middleware('auth')->group(function () {
     Route::get('/search/vales-carga',                    [CargaCombustibleController::class, 'searchVales'])->name('search.vales-carga');
     Route::resource('cargas', CargaCombustibleController::class)
         ->parameters(['cargas' => 'carga']);
+
+    // ── Mantenimiento de vehículos (flujo 3 pasos) ────────────────────────────
+    // Paso 1: Solicitudes (Chofer registra solicitud/alarma)
+    Route::prefix('mantenimiento')->name('mantenimiento.')->group(function () {
+        // Solicitudes
+        Route::get('solicitudes',               [MantenimientoController::class, 'indexSolicitudes'])->name('solicitudes.index');
+        Route::get('solicitudes/crear',         [MantenimientoController::class, 'createSolicitud'])->name('solicitudes.create');
+        Route::post('solicitudes',              [MantenimientoController::class, 'storeSolicitud'])->name('solicitudes.store');
+        Route::get('solicitudes/{solicitud}',   [MantenimientoController::class, 'showSolicitud'])->name('solicitudes.show');
+
+        // Órdenes de trabajo (Paso 2 – Jefe de Transportes)
+        Route::get('ordenes',                   [MantenimientoController::class, 'indexOrdenes'])->name('ordenes.index');
+        Route::get('ordenes/crear',             [MantenimientoController::class, 'createOrden'])->name('ordenes.create');
+        Route::post('ordenes',                  [MantenimientoController::class, 'storeOrden'])->name('ordenes.store');
+        Route::get('ordenes/{orden}',           [MantenimientoController::class, 'showOrden'])->name('ordenes.show');
+        Route::get('ordenes/{orden}/editar',    [MantenimientoController::class, 'editOrden'])->name('ordenes.edit');
+        Route::put('ordenes/{orden}',           [MantenimientoController::class, 'updateOrden'])->name('ordenes.update');
+        Route::patch('ordenes/{orden}/estado',  [MantenimientoController::class, 'cambiarEstadoOrden'])->name('ordenes.estado');
+
+        // Ejecución / registro de trabajo realizado (Paso 3 – Jefe de Transportes)
+        Route::get('ordenes/{orden}/ejecucion', [MantenimientoController::class, 'createEjecucion'])->name('ordenes.ejecucion.create');
+        Route::post('ordenes/{orden}/ejecucion',[MantenimientoController::class, 'storeEjecucion'])->name('ordenes.ejecucion.store');
+    });
 });
 
 require __DIR__.'/auth.php';
