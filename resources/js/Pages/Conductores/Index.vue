@@ -221,11 +221,11 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
 
                                 <td>
                                     <ul>
-                                        <li v-for="vehiculo in conductor.asignacione_activas" :key="vehiculo.id">
+                                        <li v-for="vehiculo in conductor.asignaciones_activas" :key="vehiculo.id">
                                             {{ vehiculo.nro_placa }} ({{ vehiculo.marca }})
                                         </li>
 
-                                        <li v-if="conductor.asignacione_activas.length === 0" class="text-danger">
+                                        <li v-if="conductor.asignaciones_activas.length === 0" class="text-danger">
                                             No asignado
                                         </li>
                                     </ul>

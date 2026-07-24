@@ -50,11 +50,16 @@ class Conductor extends Model
         return $this->hasMany(Asignacion::class, 'id_conductor');
     }
 
-    public function asignacioneActivas()
+    public function asignacionesActivas()
     {
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
-            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'detalle'])
-            ->wherePivot('estado_asignacion', 'ACTIVO');
+            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle'])
+            // verifica que la asignación esté activa y que la fecha de culminación sea nula o mayor a la fecha actual
+            ->wherePivot('estado_asignacion', 'ACTIVO')
+            ->where(function ($query) {
+                $query->whereNull('asignacion.fecha_culminacion')
+                    ->orWhere('asignacion.fecha_culminacion', '>', now());
+            });;
     }
 
     public function historialAsignacionesVehiculos()

@@ -34,7 +34,12 @@ class Persona extends Model
     }
 
     //agregar campos para foto en appends
-    protected $appends = ['foto_url', 'edad', 'f_nacimiento_formatted'];
+    protected $appends = ['foto_url', 'edad', 'f_nacimiento_formatted', 'nombre_completo'];
+
+    public function getNombreCompletoAttribute()
+    {
+        return "{$this->nombres} {$this->paterno} {$this->materno}";
+    }
 
     public function getEdadAttribute()
     {
@@ -58,6 +63,18 @@ class Persona extends Model
 
     public function conductor()
     {
-        return $this->hasOne(Conductor::class, 'id_persona');
+        return $this->hasOne(Conductor::class, 'id');
+    }
+
+    public function vehiculosAsignados()
+    {
+        return $this->hasManyThrough(
+            Vehiculo::class,      // Modelo final que queremos obtener
+            Asignacion::class,     // Modelo intermedio
+            'id_conductor',         // Llave foránea en la tabla Asignacion
+            'id',                  // Llave primaria en la tabla Vehiculo
+            'id',                  // Llave primaria en la tabla Persona
+            'id_vehiculo'         // Llave foránea en la tabla Asignacion que apunta al Vehiculo
+        )->where('asignacion.estado_asignacion', 'ACTIVO');
     }
 }

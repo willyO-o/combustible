@@ -34,6 +34,13 @@ class User extends Authenticatable
         ];
     }
 
+    public function persona()
+    {
+        return $this->hasOne(Persona::class, 'id', 'id_persona');
+    }
+
+
+
 
 
 
@@ -48,4 +55,6 @@ class User extends Authenticatable
 
         //
     }
+
+
 }

@@ -107,16 +107,30 @@ class CargaCombustibleController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('CargasCombustible/Create', [
-            'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
-                ->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']),
-            'grifos' => Grifo::where('estado_grifo', 'ACTIVO')
+        $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
+                ->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']);
+
+        $grifos = Grifo::where('estado_grifo', 'ACTIVO')
                 ->orderBy('razon_social')
                 ->get(['id', 'razon_social', 'ciudad'])
                 ->map(fn($g) => [
                     'id'    => $g->id,
                     'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : ''),
-                ]),
+                ]);
+
+        // verificar si el rol es conductor y obtener el conductor asignado al usuario autenticado
+        $conductor = null;
+        if(auth()->user()->hasRole('conductor')) {
+            $conductor = auth()->user()->persona;
+            $conductor->load('conductor.asignacionesActivas');
+        }
+
+        // dd($conductor->conductor->asignacioneActivas);
+
+        return Inertia::render('CargasCombustible/Create', [
+            'tiposCombustible' => $tiposCombustible,
+            'grifos' => $grifos,
+            'conductor' => $conductor
         ]);
     }
 
