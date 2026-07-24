@@ -13,6 +13,7 @@ import VueApexCharts from 'vue3-apexcharts';
 import Vue3ColorPicker from 'vue3-colorpicker';
 import 'vue3-colorpicker/style.css';
 import 'vue3-toastify/dist/index.css';
+import can from '@/Directives/can';
 
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -32,6 +33,7 @@ createInertiaApp({
 
             .use(Vue3ColorPicker)
             .component('Apexchart', VueApexCharts)
+            .directive('can', can)
             .mount(el);
     },
     progress: {

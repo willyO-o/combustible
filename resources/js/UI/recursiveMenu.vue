@@ -1,5 +1,5 @@
 <template>
-    <a href="javascript:void(0)" class="side-menu__item" :class="`${menuData?.selected ? 'active' : ''}`"
+    <a href="javascript:void(0)" class="side-menu__item"  :class="`${menuData?.selected ? 'active' : ''}`"
         @click="toggleSubmenu($event, menuData, undefined, level > 1)"
         @mouseover="HoverToggleInnerMenuFn($event, menuData)">
         <span v-if='menuData?.icon' v-html="menuData.icon">
@@ -16,14 +16,14 @@
         :class="`${menuData.active ? 'double-menu-active' : ''} child${level} ${menuData?.dirchange ? 'force-left' : ''}`"
         :style="menuData.active ? 'display : block' : ''">
         <li v-if="level <= 1" class="slide side-menu__label1">
-            <a href="javascript:void(0)">{{ menuData.title }}</a>
+            <a href="javascript:void(0)">{{ menuData.title }} </a>
         </li>
 
         <li v-for="(firstLevelMenuItem, subIndex) in menuData.children" :key="subIndex"
             :class="`
             ${firstLevelMenuItem.menuTitle ? 'slide__category' : ''} ${firstLevelMenuItem?.type == 'empty' ? 'slide' : ''} ${firstLevelMenuItem?.type == 'link' ? 'slide' : ''} ${firstLevelMenuItem?.type == 'sub' ? 'slide has-sub' : ''} ${firstLevelMenuItem?.active ? 'open' : ''} ${firstLevelMenuItem?.selected ? 'active' : ''}`">
             <template v-if="firstLevelMenuItem?.type === 'link'">
-                <Link :href="firstLevelMenuItem?.path" class="side-menu__item"
+                <Link   :href="firstLevelMenuItem?.path" class="side-menu__item"
                     :class="`${firstLevelMenuItem?.selected ? 'active' : ''}`">
                     <span v-html="firstLevelMenuItem.icon"></span> {{ firstLevelMenuItem.title }}<span
                         v-if="firstLevelMenuItem.badge" :class="`badge ${firstLevelMenuItem.badgeColor} ms-1`">{{

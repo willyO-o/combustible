@@ -33,6 +33,10 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                'permissions' => fn () => $request->user()
+                    ? $request->user()->getAllPermissions()->pluck('name')->values()
+                    : [],
+                'is_super_admin' => fn () => $request->user()?->hasRole('super-admin') ?? false,
             ],
         ];
     }

@@ -556,10 +556,10 @@ onBeforeMount(() => {
             <ul class="main-menu">
                 <li v-for="(mainmenuItem, index) in menuData" :key="index" :class="`${mainmenuItem?.menutitle ? 'slide__category' : ''} ${mainmenuItem?.type == 'link'? 'slide' : ''} ${mainmenuItem?.type == 'empty'? 'slide' : ''} ${mainmenuItem?.type == 'sub' ? 'slide has-sub' : ''} ${mainmenuItem?.active ? 'open' : ''} ${mainmenuItem?.selected ? 'active' : ''}`">
                     <template v-if="mainmenuItem?.menutitle">
-                        <span class="category-name">{{ mainmenuItem.menutitle }}</span>
+                        <span class="category-name" v-can="mainmenuItem?.permission">{{ mainmenuItem.menutitle }}</span>
                     </template>
                     <template v-if="mainmenuItem?.type === 'link'">
-                        <Link :href="mainmenuItem.path" class="side-menu__item" :class="`${mainmenuItem.selected ? 'active' : ''}`">
+                        <Link :href="mainmenuItem.path" v-can="mainmenuItem?.permission" class="side-menu__item" :class="`${mainmenuItem.selected ? 'active' : ''}`">
                             <span v-if='mainmenuItem.icon' v-html="mainmenuItem.icon">
                             </span>
                             <span class="side-menu__label">{{ mainmenuItem.title }}
@@ -568,7 +568,7 @@ onBeforeMount(() => {
                         </Link>
                     </template>
                     <template v-if="mainmenuItem?.type === 'empty'">
-                        <a href="javascript:;" class="side-menu__item">
+                        <a href="javascript:;" class="side-menu__item" v-can="mainmenuItem?.permission">
                             <span v-if='mainmenuItem.icon' v-html="mainmenuItem.icon">
                             </span>
                             <span class="side-menu__label">{{ mainmenuItem.title }}
@@ -577,7 +577,7 @@ onBeforeMount(() => {
                           </a>
                     </template>
                     <template v-if="mainmenuItem?.type === 'sub'">
-                        <RecursiveMenu :menuData="mainmenuItem" :toggleSubmenu="toggleSubmenu" :HoverToggleInnerMenuFn="HoverToggleInnerMenuFn" :level="level + 1" />
+                        <RecursiveMenu  :menuData="mainmenuItem" :toggleSubmenu="toggleSubmenu" :HoverToggleInnerMenuFn="HoverToggleInnerMenuFn" :level="level + 1" />
                     </template>
                 </li>
                 <li>
