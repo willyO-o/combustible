@@ -35,22 +35,23 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Dashboard', icon: Svgicons.Dashboardicon, type: 'link', path: '/dashboard', active: true, selected: true, dirchange: false, permission: 'dashboard.ver',
   },
   {
-    menutitle: 'GESTIÓN', permission: ['dashboard.ver', 'vales.ver', 'cargas.ver', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
+    menutitle: 'GESTIÓN', permission: ['dashboard.ver', 'vales.ver', 'cargas-combustible.ver', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
   },
 
   {
     title: 'Vales', icon: Svgicons.Valeicon, type: 'link', path: '/vales', active: false, selected: false, dirchange: false, permission: 'vales.ver',
   },
   {
-    title: 'Cargas Combustible', icon: Svgicons.CargaIcon, type: 'link', path: '/cargas', active: false, selected: false, dirchange: false, permission: 'cargas.ver',
+    title: 'Cargas Combustible', icon: Svgicons.CargaIcon, type: 'link', path: '/cargas', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.ver',
   },
 
   {
-    title: 'Mantenimiento', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false,
+    title: 'Mantenimiento', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver', 'mantenimiento.ver','cargas-combustible.ver'],
     children: [
       { path: '/mantenimiento/solicitudes', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Solicitudes', permission: 'mantenimiento.solicitudes.ver' },
       { path: '/mantenimiento/ordenes',    icon: Svgicons.OrdenMantenimientoIcon,      type: 'link', active: false, selected: false, dirchange: false, title: 'Órdenes de Trabajo', permission: 'mantenimiento.ordenes.ver' },
       { path: '/mantenimiento/ordenes',    icon: Svgicons.OrdenMantenimientoIcon,      type: 'link', active: false, selected: false, dirchange: false, title: 'Órdenes de Trabajo', permission: 'mantenimiento.ver' },
+      { path: '/cargas',    icon: Svgicons.OrdenMantenimientoIcon,      type: 'link', active: false, selected: false, dirchange: false, title: 'Cargas Combustible', permission: 'cargas-combustible.ver' },
     ],
   },
   {

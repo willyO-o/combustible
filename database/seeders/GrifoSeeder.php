@@ -14,6 +14,14 @@ class GrifoSeeder extends Seeder
     {
         $grifos = [
             [
+                'razon_social' => 'Grifo Local PlusMetals',
+                'nit' => '000000',
+                'direccion' => 'Av. Principal 100',
+                'ciudad' => 'Oruro',
+                'telefono' => '2-2123456',
+                'estado_grifo' => 'ACTIVO',
+            ],
+            [
                 'razon_social' => 'Gasolinera Central S.A.',
                 'nit' => '123456789-0',
                 'direccion' => 'Av. Principal 100',

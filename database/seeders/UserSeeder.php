@@ -137,6 +137,9 @@ class UserSeeder extends Seeder
             'guard_name' => 'web',
         ]);
 
+        // El super-admin recibe automáticamente todos los permisos existentes.
+        $superAdminRole->syncPermissions(Permission::all());
+
         $superAdminUser = User::firstOrCreate([
             'email' => 'super-admin@gmail.com',
         ], [

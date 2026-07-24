@@ -24,7 +24,9 @@ const page = usePage();
 
 function updateVisibility(element, binding) {
     const requiredPermissions = normalizePermissions(binding.value);
-    const isSuperAdmin = page.props?.auth?.is_super_admin === true;
+    const auth = page.props?.auth ?? {};
+    const isSuperAdmin = auth.is_super_admin === true
+        || (Array.isArray(auth.roles) && auth.roles.includes('super-admin'));
 
     // El super-admin no requiere permisos individuales, incluso cuando el
     // elemento de navegación todavía no declara una propiedad permission.
