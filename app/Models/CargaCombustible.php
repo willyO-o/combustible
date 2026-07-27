@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'litros',
     'precio',
     'kilometraje',
+    'horometro',
     'id_vehiculo',
     'id_grifo',
     'id_tipo_combustible',
@@ -17,7 +18,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'id_vale',
     'nro_factura',
     'tipo_carga',
-    'estado_carga'
+    'estado_carga',
+    'id_usuario',
+
 ])]
 
 class CargaCombustible extends Model
@@ -28,6 +31,7 @@ class CargaCombustible extends Model
     {
         return [
             'fecha_carga' => 'date',
+            'id_usuario' => 'integer',
         ];
     }
 

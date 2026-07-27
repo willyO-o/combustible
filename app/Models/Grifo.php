@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'direccion',
     'ciudad',
     'telefono',
-    'estado_grifo'
+    'estado_grifo',
+    'es_principal',
 ])]
 
 
@@ -22,6 +23,12 @@ class Grifo extends Model
     protected $table = 'grifo';
 
 
+     protected function casts()
+    {
+        return [
+            'es_principal' => 'boolean',
+        ];
+    }
 
     // Relaciones
     public function vales()

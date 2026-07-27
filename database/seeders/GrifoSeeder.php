@@ -20,6 +20,7 @@ class GrifoSeeder extends Seeder
                 'ciudad' => 'Oruro',
                 'telefono' => '2-2123456',
                 'estado_grifo' => 'ACTIVO',
+                'es_principal' => true,
             ],
             [
                 'razon_social' => 'Gasolinera Central S.A.',

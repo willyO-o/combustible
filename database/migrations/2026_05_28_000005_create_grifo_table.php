@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('ciudad', 100)->nullable();
             $table->string('telefono', 20)->nullable();
             $table->enum('estado_grifo', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
+            $table->boolean('es_principal')->default(false);
             $table->timestamps();
             $table->softDeletes();
         });

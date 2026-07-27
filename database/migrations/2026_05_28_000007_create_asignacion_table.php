@@ -19,6 +19,10 @@ return new class extends Migration
             $table->date('fecha_culminacion')->nullable();
             $table->enum('estado_asignacion', ['ACTIVO', 'INACTIVO', 'REASIGNADO'])->default('ACTIVO');
             $table->text('detalle')->nullable();
+            $table->bigInteger('id_usuario')->nullable();
+            $table->decimal('kilometraje_inicial', 12, 2)->nullable();
+            $table->decimal('horometro_inicial', 12, 2)->nullable();
+
             $table->timestamps();
             $table->softDeletes();
         });

@@ -5,13 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 
-#[Fillable(['id_vehiculo', 'id_conductor', 'fecha_asignacion','fecha_culminacion', 'estado_asignacion', 'detalle'])]
+#[Fillable([
+    'id_vehiculo',
+    'id_conductor',
+    'fecha_asignacion',
+    'fecha_culminacion',
+    'estado_asignacion',
+    'detalle',
+    'kilometraje_inicial',
+    'horometro_inicial',
+    'id_usuario',
+])]
 class Asignacion extends Model
 {
     protected $table = 'asignacion';
 
 
-    protected function casts(){
+    protected function casts()
+    {
         return [
             'fecha_asignacion' => 'date',
             'fecha_culminacion' => 'date',

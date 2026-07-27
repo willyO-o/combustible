@@ -22,6 +22,7 @@ return new class extends Migration
             $table->foreignId('id_grifo')->constrained('grifo')->onDelete('restrict')->onUpdate('cascade');
             $table->enum('estado_vale', ['PENDIENTE', 'USADO', 'ANULADO'])->default('PENDIENTE');
             $table->foreignId('id_user')->nullable()->constrained('users')->onDelete('restrict')->onUpdate('cascade');
+            $table->foreignId('id_tipo_combustible')->constrained('tipo_combustible')->onDelete('restrict')->onUpdate('cascade');
             $table->timestamps();
             $table->softDeletes();
 

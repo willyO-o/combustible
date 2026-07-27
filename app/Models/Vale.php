@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'id_conductor',
     'id_grifo',
     'estado_vale',
+    'id_tipo_combustible',
+    'id_user',
 ])]
 
 class Vale extends Model

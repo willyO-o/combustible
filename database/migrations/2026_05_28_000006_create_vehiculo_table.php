@@ -20,6 +20,8 @@ return new class extends Migration
             $table->foreignId('id_tipo_combustible')->constrained('tipo_combustible')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('id_tipo_vehiculo')->constrained('tipo_vehiculo')->onDelete('restrict')->onUpdate('cascade');
             $table->string('fotografia', 250)->nullable();
+            $table->text('detalles')->nullable();
+            $table->enum('tipo_medicion', ['ODOMETRO', 'HOROMETRO'])->default('ODOMETRO');
             $table->timestamps();
             $table->softDeletes();
         });

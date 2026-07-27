@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'id_tipo_combustible',
     'id_tipo_vehiculo',
     'fotografia',
+    'detalles',
+    'tipo_medicion',
 ])]
 class Vehiculo extends Model
 {

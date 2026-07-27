@@ -14,7 +14,7 @@ class ConductorController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Conductor::query()->with('asignacioneActivas')
+        $query = Conductor::query()->with('asignacionesActivas')
         ->join('persona','persona.id', '=', 'conductor.id'); // Cargar las asignaciones activas para cada conductor
 
         if ($request->filled('ci')) {

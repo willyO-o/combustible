@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
             GrifoSeeder::class,
             VehiculoSeeder::class,
             UserSeeder::class,
+            AsignacionSeeder::class,
         ]);
     }
 }

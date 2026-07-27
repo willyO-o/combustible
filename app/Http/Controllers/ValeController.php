@@ -7,6 +7,7 @@ use App\Models\Conductor;
 use App\Models\Grifo;
 use App\Models\Vale;
 use App\Models\Vehiculo;
+use App\Models\TipoCombustible;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,69 +16,7 @@ use Inertia\Response;
 
 class ValeController extends Controller
 {
-    /* ------------------------------------------------------------------ */
-    /*  Endpoints JSON para selects con búsqueda                           */
-    /* ------------------------------------------------------------------ */
 
-    public function searchVehiculos(Request $request): JsonResponse
-    {
-        $q = $request->input('q', '');
-
-        $vehiculos = Vehiculo::where('estado_vehiculo', 'ACTIVO')
-            ->where(function ($query) use ($q) {
-                $query->where('nro_placa', 'like', "%{$q}%")
-                      ->orWhere('marca', 'like', "%{$q}%");
-            })
-            ->limit(20)
-            ->get(['id', 'nro_placa', 'marca', 'anio'])
-            ->map(fn($v) => [
-                'id'    => $v->id,
-                'label' => "{$v->nro_placa}" . ($v->marca ? " — {$v->marca}" : '') . ($v->anio ? " ({$v->anio})" : ''),
-            ]);
-
-        return response()->json($vehiculos);
-    }
-
-    public function searchConductores(Request $request): JsonResponse
-    {
-        $q = $request->input('q', '');
-
-        $conductores = Conductor::where('estado_conductor', 'ACTIVO')
-            ->where(function ($query) use ($q) {
-                $query->where('ci', 'like', "%{$q}%")
-                      ->orWhere('nombres', 'like', "%{$q}%")
-                      ->orWhere('paterno', 'like', "%{$q}%")
-                      ->orWhere('materno', 'like', "%{$q}%");
-            })
-            ->limit(20)
-            ->get(['id', 'ci', 'nombres', 'paterno', 'materno'])
-            ->map(fn($c) => [
-                'id'    => $c->id,
-                'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}") . " (CI: {$c->ci})",
-            ]);
-
-        return response()->json($conductores);
-    }
-
-    public function searchGrifos(Request $request): JsonResponse
-    {
-        $q = $request->input('q', '');
-
-        $grifos = Grifo::where('estado_grifo', 'ACTIVO')
-            ->where(function ($query) use ($q) {
-                $query->where('razon_social', 'like', "%{$q}%")
-                      ->orWhere('nit', 'like', "%{$q}%")
-                      ->orWhere('ciudad', 'like', "%{$q}%");
-            })
-            ->limit(20)
-            ->get(['id', 'razon_social', 'nit', 'ciudad'])
-            ->map(fn($g) => [
-                'id'    => $g->id,
-                'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : '') . " (NIT: {$g->nit})",
-            ]);
-
-        return response()->json($grifos);
-    }
 
     /* ------------------------------------------------------------------ */
     /*  CRUD                                                               */
@@ -123,8 +62,18 @@ class ValeController extends Controller
     {
         $nextNroVale = (Vale::withTrashed()->max('nro_vale') ?? 0) + 1;
 
+        $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
+            ->orderBy('tipo_combustible', 'asc')
+            ->get(['id', 'tipo_combustible'])
+            ->map(fn($t) => [
+                'id'    => $t->id,
+                'label' => $t->tipo_combustible,
+            ]);
+
+        $nextNroVale = str_pad($nextNroVale, 6, '0', STR_PAD_LEFT);
         return Inertia::render('Vales/Create', [
             'nextNroVale' => $nextNroVale,
+            'tiposCombustible' => $tiposCombustible,
         ]);
     }
 
@@ -163,5 +112,73 @@ class ValeController extends Controller
 
         return redirect()->route('vales.index')
             ->with('success', "Vale #{$vale->nro_vale} eliminado exitosamente.");
+    }
+
+
+        /* ------------------------------------------------------------------ */
+    /*  Endpoints JSON para selects con búsqueda                           */
+    /* ------------------------------------------------------------------ */
+
+    public function searchVehiculos(Request $request): JsonResponse
+    {
+        $q = $request->input('q', '');
+
+        $vehiculos = Vehiculo::where('estado_vehiculo', 'ACTIVO')
+            ->where(function ($query) use ($q) {
+                $query->where('nro_placa', 'like', "%{$q}%")
+                      ->orWhere('marca', 'like', "%{$q}%");
+            })
+            ->limit(20)
+            ->get(['id', 'nro_placa', 'marca', 'anio','id_tipo_combustible'])
+            ->map(fn($v) => [
+                'id'    => $v->id,
+                'label' => "{$v->nro_placa}" . ($v->marca ? " — {$v->marca}" : '') . ($v->anio ? " ({$v->anio})" : ''),
+                'meta'  => [
+                    'id_tipo_combustible' => $v->id_tipo_combustible,
+                ],
+            ]);
+
+        return response()->json($vehiculos);
+    }
+
+    public function searchConductores(Request $request): JsonResponse
+    {
+        $q = $request->input('q', '');
+
+        $conductores = Conductor::where('estado_conductor', 'ACTIVO')
+            ->where(function ($query) use ($q) {
+                $query->where('ci', 'like', "%{$q}%")
+                      ->orWhere('nombres', 'like', "%{$q}%")
+                      ->orWhere('paterno', 'like', "%{$q}%")
+                      ->orWhere('materno', 'like', "%{$q}%");
+            })
+            ->limit(20)
+            ->get(['id', 'ci', 'nombres', 'paterno', 'materno'])
+            ->map(fn($c) => [
+                'id'    => $c->id,
+                'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}") . " (CI: {$c->ci})",
+            ]);
+
+        return response()->json($conductores);
+    }
+
+    public function searchGrifos(Request $request): JsonResponse
+    {
+        $q = $request->input('q', '');
+
+        $grifos = Grifo::where('estado_grifo', 'ACTIVO')
+            ->where(function ($query) use ($q) {
+                $query->where('razon_social', 'like', "%{$q}%")
+                      ->orWhere('nit', 'like', "%{$q}%")
+                      ->orWhere('ciudad', 'like', "%{$q}%");
+            })
+            ->limit(20)
+            ->get(['id', 'razon_social', 'nit', 'ciudad'])
+            ->map(fn($g) => [
+                'id'    => $g->id,
+                'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : '') . " (NIT: {$g->nit})",
+            ]);
+
+        return response()->json($grifos);
     }
 }

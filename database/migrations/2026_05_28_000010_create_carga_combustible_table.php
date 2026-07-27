@@ -16,7 +16,8 @@ return new class extends Migration
             $table->date('fecha_carga');
             $table->decimal('litros', 10, 2);
             $table->decimal('precio', 10, 2);
-            $table->integer('kilometraje')->nullable();
+            $table->decimal('kilometraje', 12, 2)->nullable();
+            $table->decimal('horometro', 12, 2)->nullable();
             $table->foreignId('id_vehiculo')->constrained('vehiculo')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('id_grifo')->constrained('grifo')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('id_tipo_combustible')->constrained('tipo_combustible')->onDelete('restrict')->onUpdate('cascade');
@@ -25,6 +26,7 @@ return new class extends Migration
             $table->string('nro_factura', 50)->nullable();
             $table->enum('tipo_carga', ['VALE', 'PREPAGO'])->default('VALE');
             $table->string('estado_carga', 30)->nullable();
+            $table->integer('id_usuario')->nullable();
             $table->timestamps();
 
 
