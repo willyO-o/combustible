@@ -213,10 +213,7 @@ onMounted(() => {
                                 <td>
                                     <span v-if="vehiculo.conductor_asignado" class="fw-semibold">
                                         <i class="ri-user-line me-1"></i>
-                                        {{ vehiculo.conductor_asignado.nombres }} {{ vehiculo.conductor_asignado.paterno
-                                        }}
-                                        {{ vehiculo.conductor_asignado.materno }}
-
+                                        {{ vehiculo.conductor_asignado.persona.nombre_completo }}
                                     </span>
                                     <span v-else class="text-muted">
                                         N/A

@@ -49,6 +49,7 @@ class AsignacionSeeder extends Seeder
                     'id_conductor' => $asignacion['id_conductor'],
                     'fecha_asignacion' => $asignacion['fecha_asignacion'],
                     'estado_asignacion' => $asignacion['estado_asignacion'],
+                    'horometro_inicial' => $asignacion['horometro_inicial'],
                 ]
             );
         }

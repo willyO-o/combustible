@@ -127,8 +127,28 @@ class UserSeeder extends Seeder
             'cargas-combustible.ver',
             'cargas-combustible.registrar',
         ]);
+
+        $conductorUser2 = User::firstOrCreate([
+            'email' => 'conductor2@gmail.com',
+        ], [
+            'name' => 'Conductor User 2',
+            'password' => bcrypt('conductor123'),
+            'id_persona' => 2, // Asignar el ID de la persona correspondiente
+        ]);
+        $conductorUser2->assignRole($conductorRole);
+
+        $conductorUser3 = User::firstOrCreate([
+            'email' => 'conductor3@gmail.com',
+        ], [
+            'name' => 'Conductor User 3',
+            'password' => bcrypt('conductor123'),
+            'id_persona' => 3, // Asignar el ID de la persona correspondiente
+        ]);
+        $conductorUser3->assignRole($conductorRole);
+
         // Asignar rol de administrador al usuario administrador
         $adminUser->assignRole($adminRole);
+
 
 
 

@@ -26,6 +26,7 @@ class Vale extends Model
     protected $table = 'vale';
 
 
+    protected $appends = ['nro','fecha_emision_f'];
 
     protected function casts(): array
     {
@@ -34,6 +35,14 @@ class Vale extends Model
         ];
     }
 
+    public function getNroAttribute()
+    {
+        return str_pad($this->nro_vale, 6, '0', STR_PAD_LEFT);
+    }
+    public function getFechaEmisionFAttribute()
+    {
+        return $this->fecha_emision ? $this->fecha_emision->format('d/m/Y') : null;
+    }
     // Relaciones
     public function vehiculo()
     {

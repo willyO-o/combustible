@@ -54,7 +54,7 @@ class CargaCombustible extends Model
 
     public function conductor()
     {
-        return $this->belongsTo(Conductor::class, 'id_conductor');
+        return $this->belongsTo(Conductor::class, 'id');
     }
 
     public function vale()
@@ -66,6 +66,17 @@ class CargaCombustible extends Model
     {
         return $this->hasMany(RespaldoDigital::class, 'id_carga_combustible');
     }
+
+    // asigar id usuario al crear una carga de combustible
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            $model->id_usuario = auth()->id();
+        });
+    }
+
 
 
     static function reporteCargaCombustibleMes($anio = null)

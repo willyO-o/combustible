@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Rules\GreaterThanPreviousReading;
 
 class CargaCombustibleRequest extends FormRequest
 {
@@ -18,11 +19,12 @@ class CargaCombustibleRequest extends FormRequest
             'fecha_carga'         => ['required', 'date'],
             'litros'              => ['required', 'numeric', 'min:0.01', 'max:9999.99'],
             'precio'              => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
-            'kilometraje'         => ['nullable', 'integer', 'min:0'],
+            'kilometraje'         => ['nullable', 'integer', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
+            'horometro'           => ['nullable', 'integer', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
             'id_vehiculo'         => ['required', 'integer', 'exists:vehiculo,id'],
             'id_grifo'            => ['required', 'integer', 'exists:grifo,id'],
             'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
-            'id_conductor'        => ['required', 'integer', 'exists:conductor,id'],
+            'id_conductor'        => [ auth()->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
             'id_vale'             => ['nullable', 'integer', 'exists:vale,id'],
             'nro_factura'         => ['nullable', 'string', 'max:50'],
             'tipo_carga'          => ['required', Rule::in(['VALE', 'PREPAGO'])],

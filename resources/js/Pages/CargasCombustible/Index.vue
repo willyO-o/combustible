@@ -156,7 +156,7 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
                                     <small v-if="carga.vehiculo?.marca" class="text-muted d-block">{{ carga.vehiculo.marca }}</small>
                                 </td>
                                 <td>
-                                    {{ carga.conductor ? `${carga.conductor.nombres} ${carga.conductor.paterno ?? ''}`.trim() : '—' }}
+                                    {{ carga.conductor ? `${carga.conductor.persona.nombres} ${carga.conductor.persona.paterno ?? ''}  ${carga.conductor.persona.materno ?? ''}`.trim() : '—' }}
                                 </td>
                                 <td>{{ carga.grifo?.razon_social ?? '—' }}</td>
                                 <td>

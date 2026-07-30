@@ -9,6 +9,7 @@ const props = defineProps({
     tiposCombustible: Array,
     grifos: Array,
     conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
+    valesConductor: Array, // [{ id, nro_vale, fecha_emision, litros }] vales PENDIENTE del conductor (si hay uno)
 })
 
 
@@ -64,7 +65,7 @@ watch(() => form.id_vehiculo, async (val) => {
         } else {
             conductorAutoFill.value = null
         }
-    } catch (error){
+    } catch (error) {
         // no critical
 
 
@@ -77,7 +78,10 @@ watch(() => form.id_vehiculo, async (val) => {
 /*  Cuando se selecciona un vale → tipo_carga = VALE                  */
 /* ------------------------------------------------------------------ */
 watch(() => form.id_vale, (val) => {
-    if (val) form.tipo_carga = 'VALE'
+    if (!val) return
+
+    form.tipo_carga = 'VALE'
+
 })
 
 /* ------------------------------------------------------------------ */
@@ -174,11 +178,41 @@ function submit() {
 }
 
 
+
+const valeSeleccionado = (e) => {
+    //obtener los datos del item seleccionado
+
+    const selectedValeId = e.target.value
+
+    form.litros = ''
+    form.precio = ''
+    form.id_grifo = ''
+    if (!props.valesConductor) return
+
+    const selectedVale = props.valesConductor.find(vale => vale.id == selectedValeId)
+    if (!selectedVale) return
+
+
+    form.litros = selectedVale.litros
+    form.precio = selectedVale.precio
+    form.id_grifo = selectedVale.id_grifo
+
+
+
+
+}
+
+
+
+
 const optionVehiculos = ref([])
+
+
+
 
 onMounted(() => {
     // Si hay un conductor asignado desde el servidor, auto-seleccionarlo
-    console.log('props.conductor', props.conductor);
+    // console.log('props.conductor', props.conductor);
 
     if (props.conductor) {
         form.id_conductor = props.conductor.id
@@ -241,6 +275,14 @@ onMounted(() => {
                         <div class="card-body">
                             <div class="row g-3">
 
+                                <div v-if="props.conductor" class="col-12">
+                                    <h6>
+                                        Conductor asignado:
+                                        {{ props.conductor.nombre_completo ?? '—' }}
+                                    </h6>
+
+                                </div>
+
                                 <div class="col-12">
                                     <label class="form-label fw-medium">
                                         Vehículo <span class="text-danger">*</span>
@@ -283,7 +325,7 @@ onMounted(() => {
                                 </div>
 
                                 <!-- Conductor (auto-llenado desde asignación activa) -->
-                                <div class="col-12">
+                                <div class="col-12" v-if="!props.conductor">
                                     <label class="form-label fw-medium">
                                         Conductor <span class="text-danger">*</span>
                                         <span v-if="conductorAutoFill"
@@ -297,14 +339,12 @@ onMounted(() => {
                                     </label>
 
 
-                                    <Multiselect v-if="props.conductor" v-model="form.id_conductor"
-                                        :options="[{ id: props.conductor.id, label: props.conductor.nombre_completo }]"
-                                        value-prop="id" label="label" disabled
-                                        placeholder="Conductor asignado al vehículo" />
 
-                                    <Multiselect v-else v-model="form.id_conductor" :options="buscarConductores"
-                                        value-prop="id" label="label" :searchable="true" :min-chars="2" :delay="300"
-                                        :resolve-on-load="false" placeholder="Buscar por CI, nombre o apellido..."
+
+                                    <Multiselect v-if="!props.conductor" v-model="form.id_conductor"
+                                        :options="buscarConductores" value-prop="id" label="label" :searchable="true"
+                                        :min-chars="2" :delay="300" :resolve-on-load="false"
+                                        placeholder="Buscar por CI, nombre o apellido..."
                                         no-options-text="Escriba para buscar" no-results-text="Sin resultados"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
 
@@ -325,6 +365,74 @@ onMounted(() => {
                     </div>
                 </div>
 
+                <!-- ====== GRIFO & VALE ====== -->
+                <div class="col-xl-6">
+                    <div class="card custom-card h-100">
+                        <div class="card-header">
+                            <div class="card-title"><i class="ri-gas-station-line me-2"></i> Vale y Grifo </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+
+                                <!-- Vale (opcional, búsqueda async) -->
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">
+                                        Nro de Vale <span class="text-muted small">(Si aplica)</span>
+                                    </label>
+                                    <Multiselect v-if="!props.conductor" v-model="form.id_vale" :options="buscarVales"
+                                        value-prop="id" label="label" :searchable="true" :min-chars="1" :delay="300"
+                                        :resolve-on-load="false"
+                                        placeholder="Buscar vale por número (mín. 1 caracter)..."
+                                        no-options-text="Escriba el número de vale"
+                                        no-results-text="Sin vales PENDIENTE" :can-clear="true"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_vale }" />
+                                    <select v-else v-model="form.id_vale" class="form-select"
+                                        :class="{ 'is-invalid': form.errors.id_vale }" @change="valeSeleccionado">
+                                        <option value="">— Seleccionar —</option>
+                                        <option v-for="vale in valesConductor" :key="vale.id" :value="vale.id">
+                                            Vale #{{ vale.nro }} — {{ vale.litros }} Lt ({{ vale.fecha_emision_f }})
+                                        </option>
+                                    </select>
+
+                                    <small class="text-muted">
+                                        <i class="ri-information-line me-1"></i>
+                                        Solo vales PENDIENTE. Si hay vehículo seleccionado, filtra por ese vehículo.
+                                    </small>
+                                    <div v-if="form.errors.id_vale" class="text-danger small mt-1">{{
+                                        form.errors.id_vale }}</div>
+                                </div>
+
+                                <!-- Tipo de carga -->
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">Tipo de Carga <span
+                                            class="text-danger">*</span></label>
+                                    <select v-model="form.tipo_carga" class="form-select"
+                                        :class="{ 'is-invalid': form.errors.tipo_carga }" :disabled="!!form.id_vale">
+                                        <option value="VALE">VALE</option>
+                                        <option value="PREPAGO">PREPAGO</option>
+                                    </select>
+                                    <small v-if="form.id_vale" class="text-info">
+                                        <i class="ri-information-line me-1"></i>Bloqueado: hay un vale seleccionado
+                                    </small>
+                                </div>
+
+
+
+                                <!-- Grifo (estático, cargado desde servidor) -->
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">Grifo <span class="text-danger">*</span></label>
+                                    <Multiselect v-model="form.id_grifo" :options="grifos" value-prop="id" label="label"
+                                        :searchable="true" :filter-results="true" placeholder="Buscar grifo..."
+                                        no-options-text="Sin grifos activos" no-results-text="Sin resultados"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_grifo }" />
+                                    <div v-if="form.errors.id_grifo" class="text-danger small mt-1">{{
+                                        form.errors.id_grifo }}</div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- ====== DATOS DE CARGA ====== -->
                 <div class="col-xl-6">
                     <div class="card custom-card h-100">
@@ -412,66 +520,6 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <!-- ====== GRIFO & VALE ====== -->
-                <div class="col-xl-6">
-                    <div class="card custom-card h-100">
-                        <div class="card-header">
-                            <div class="card-title"><i class="ri-gas-station-line me-2"></i>Grifo & Vale</div>
-                        </div>
-                        <div class="card-body">
-                            <div class="row g-3">
-
-                                <!-- Vale (opcional, búsqueda async) -->
-                                <div class="col-12">
-                                    <label class="form-label fw-medium">
-                                        Nro de Vale <span class="text-muted small">(Si aplica)</span>
-                                    </label>
-                                    <Multiselect v-model="form.id_vale" :options="buscarVales" value-prop="id"
-                                        label="label" :searchable="true" :min-chars="1" :delay="300"
-                                        :resolve-on-load="false"
-                                        placeholder="Buscar vale por número (mín. 1 caracter)..."
-                                        no-options-text="Escriba el número de vale"
-                                        no-results-text="Sin vales PENDIENTE" :can-clear="true"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_vale }" />
-                                    <small class="text-muted">
-                                        <i class="ri-information-line me-1"></i>
-                                        Solo vales PENDIENTE. Si hay vehículo seleccionado, filtra por ese vehículo.
-                                    </small>
-                                    <div v-if="form.errors.id_vale" class="text-danger small mt-1">{{
-                                        form.errors.id_vale }}</div>
-                                </div>
-
-                                <!-- Tipo de carga -->
-                                <div class="col-12">
-                                    <label class="form-label fw-medium">Tipo de Carga <span
-                                            class="text-danger">*</span></label>
-                                    <select v-model="form.tipo_carga" class="form-select"
-                                        :class="{ 'is-invalid': form.errors.tipo_carga }" :disabled="!!form.id_vale">
-                                        <option value="VALE">VALE</option>
-                                        <option value="PREPAGO">PREPAGO</option>
-                                    </select>
-                                    <small v-if="form.id_vale" class="text-info">
-                                        <i class="ri-information-line me-1"></i>Bloqueado: hay un vale seleccionado
-                                    </small>
-                                </div>
-
-
-
-                                <!-- Grifo (estático, cargado desde servidor) -->
-                                <div class="col-12">
-                                    <label class="form-label fw-medium">Grifo <span class="text-danger">*</span></label>
-                                    <Multiselect v-model="form.id_grifo" :options="grifos" value-prop="id" label="label"
-                                        :searchable="true" :filter-results="true" placeholder="Buscar grifo..."
-                                        no-options-text="Sin grifos activos" no-results-text="Sin resultados"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_grifo }" />
-                                    <div v-if="form.errors.id_grifo" class="text-danger small mt-1">{{
-                                        form.errors.id_grifo }}</div>
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- ====== RESPALDOS DIGITALES ====== -->
                 <div class="col-xl-6">

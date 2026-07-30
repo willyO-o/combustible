@@ -4,13 +4,13 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 
 const props = defineProps({
-    vales:   Object,
+    vales: Object,
     filters: Object,
-    flash:   Object,
+    flash: Object,
 })
 
 const filters = ref({
-    nro_vale:    props.filters?.nro_vale    ?? '',
+    nro_vale: props.filters?.nro_vale ?? '',
     fecha_desde: props.filters?.fecha_desde ?? '',
     fecha_hasta: props.filters?.fecha_hasta ?? '',
     estado_vale: props.filters?.estado_vale ?? '',
@@ -25,7 +25,7 @@ watch(
             router.get(
                 route('vales.index'),
                 {
-                    nro_vale:    val.nro_vale    || undefined,
+                    nro_vale: val.nro_vale || undefined,
                     fecha_desde: val.fecha_desde || undefined,
                     fecha_hasta: val.fecha_hasta || undefined,
                     estado_vale: val.estado_vale || undefined,
@@ -50,8 +50,8 @@ function confirmDelete(vale) {
 const estadoBadge = (estado) => {
     const map = {
         PENDIENTE: 'bg-warning-transparent text-warning',
-        USADO:     'bg-success-transparent text-success',
-        ANULADO:   'bg-danger-transparent text-danger',
+        USADO: 'bg-success-transparent text-success',
+        ANULADO: 'bg-danger-transparent text-danger',
     }
     return map[estado] ?? 'bg-secondary-transparent text-secondary'
 }
@@ -63,6 +63,7 @@ const formatDate = (date) => {
 </script>
 
 <template>
+
     <Head title="Vales" />
 
     <Maindashboard>
@@ -71,13 +72,15 @@ const formatDate = (date) => {
             <div>
                 <nav>
                     <ol class="breadcrumb mb-1">
-                        <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
+                        <li class="breadcrumb-item">
+                            <Link :href="route('dashboard')">Inicio</Link>
+                        </li>
                         <li class="breadcrumb-item active">Vales</li>
                     </ol>
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Vales</h1>
             </div>
-            <Link :href="route('vales.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'vales.create'" :href="route('vales.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nuevo Vale
             </Link>
         </div>
@@ -101,12 +104,8 @@ const formatDate = (date) => {
                 <div class="row g-3">
                     <div class="col-sm-6 col-xl-3">
                         <label class="form-label">Nro. Vale</label>
-                        <input
-                            v-model="filters.nro_vale"
-                            type="number"
-                            class="form-control"
-                            placeholder="Buscar por nro..."
-                        />
+                        <input v-model="filters.nro_vale" type="number" class="form-control"
+                            placeholder="Buscar por nro..." />
                     </div>
                     <div class="col-sm-6 col-xl-2">
                         <label class="form-label">Fecha desde</label>
@@ -170,24 +169,29 @@ const formatDate = (date) => {
                             </tr>
                             <tr v-for="vale in vales.data" :key="vale.id">
                                 <td>
-                                    <span class="badge bg-primary fs-12 fw-semibold">#{{ vale.nro_vale }}</span>
+                                    <span class="badge bg-primary fs-12 fw-semibold">{{ vale.nro }}</span>
                                 </td>
                                 <td>{{ formatDate(vale.fecha_emision) }}</td>
                                 <td>
                                     <span class="fw-medium">{{ vale.vehiculo?.nro_placa ?? '—' }}</span>
-                                    <small v-if="vale.vehiculo?.marca" class="text-muted d-block">{{ vale.vehiculo.marca }}</small>
+                                    <small v-if="vale.vehiculo?.marca" class="text-muted d-block">{{ vale.vehiculo.marca
+                                        }}</small>
                                 </td>
                                 <td>
-                                    <span>{{ vale.conductor ? `${vale.conductor.nombres} ${vale.conductor.paterno ?? ''}`.trim() : '—' }}</span>
-                                    <small v-if="vale.conductor" class="text-muted d-block">CI: {{ vale.conductor.ci }}</small>
+                                    <span>{{ vale.conductor ? `${vale.conductor.persona.nombre_completo}`.trim() : '—'
+                                        }}</span>
+                                    <small v-if="vale.conductor" class="text-muted d-block">CI: {{
+                                        vale.conductor.persona.ci }}</small>
                                 </td>
                                 <td>
                                     <span>{{ vale.grifo?.razon_social ?? '—' }}</span>
-                                    <small v-if="vale.grifo?.ciudad" class="text-muted d-block">{{ vale.grifo.ciudad }}</small>
+                                    <small v-if="vale.grifo?.ciudad" class="text-muted d-block">{{ vale.grifo.ciudad
+                                        }}</small>
                                 </td>
                                 <td class="text-end fw-medium">{{ Number(vale.litros).toFixed(2) }}</td>
                                 <td class="text-end fw-medium">{{ Number(vale.precio).toFixed(2) }}</td>
-                                <td class="text-end fw-medium">{{ (Number(vale.litros) * Number(vale.precio)).toFixed(2) }}</td>
+                                <td class="text-end fw-medium">{{ (Number(vale.litros) * Number(vale.precio)).toFixed(2)
+                                    }}</td>
                                 <td>
                                     <span class="badge" :class="estadoBadge(vale.estado_vale)">
                                         {{ vale.estado_vale }}
@@ -195,19 +199,12 @@ const formatDate = (date) => {
                                 </td>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
-                                        <Link
-                                            :href="route('vales.edit', vale.id)"
-                                            class="btn btn-sm btn-icon btn-info-light"
-                                            title="Editar"
-                                        >
+                                        <Link :href="route('vales.edit', vale.id)"
+                                            class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-icon btn-danger-light"
-                                            title="Eliminar"
-                                            @click="confirmDelete(vale)"
-                                        >
+                                        <button type="button" class="btn btn-sm btn-icon btn-danger-light"
+                                            title="Eliminar" @click="confirmDelete(vale)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>
                                     </div>
@@ -226,19 +223,10 @@ const formatDate = (date) => {
                 </div>
                 <nav v-if="vales.last_page > 1">
                     <ul class="pagination pagination-sm mb-0">
-                        <li
-                            v-for="link in vales.links"
-                            :key="link.label"
-                            class="page-item"
-                            :class="{ active: link.active, disabled: !link.url }"
-                        >
-                            <Link
-                                v-if="link.url"
-                                :href="link.url"
-                                class="page-link"
-                                preserve-state
-                                v-html="link.label"
-                            />
+                        <li v-for="link in vales.links" :key="link.label" class="page-item"
+                            :class="{ active: link.active, disabled: !link.url }">
+                            <Link v-if="link.url" :href="link.url" class="page-link" preserve-state
+                                v-html="link.label" />
                             <span v-else class="page-link" v-html="link.label" />
                         </li>
                     </ul>

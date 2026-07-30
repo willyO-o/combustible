@@ -44,6 +44,10 @@ class Conductor extends Model
     {
         return $this->belongsTo(Persona::class, 'id');
     }
+    public function user()
+    {
+        return $this->hasOne(User::class, 'id_persona', 'id');
+    }
 
     public function asignaciones()
     {

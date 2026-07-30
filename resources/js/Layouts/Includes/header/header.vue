@@ -372,7 +372,7 @@
                 aria-labelledby="mainHeaderProfile">
                 <div class="p-3 bg-primary text-fixed-white">
                     <div class="d-flex align-items-center justify-content-between">
-                        <p class="mb-0 fs-16">Profile</p>
+                        <p class="mb-0 fs-16">Perfil</p>
                         <a href="javascript:void(0);" class="text-fixed-white"><i class="ti ti-settings-cog"></i></a>
                     </div>
                 </div>
@@ -385,8 +385,10 @@
                             </span>
                         </div>
                         <div>
-                            <span class="d-block fw-semibold lh-1">Tom Phillip</span>
-                            <span class="text-muted fs-12">tomphillip32@gmail.com</span>
+                            <span class="d-block fw-semibold lh-1">
+                               {{ $page.props.auth.user.persona?.nombre_completo }}
+                            </span>
+                            <span class="text-muted fs-12">{{ $page.props.auth.user.email }}</span>
                         </div>
                     </div>
                 </div>
@@ -396,35 +398,24 @@
                         <ul class="list-unstyled mb-0 sub-list">
                             <li>
                                 <Link class="dropdown-item d-flex align-items-center" href="#!"><i
-                                        class="ti ti-user-circle me-2 fs-18"></i>View Profile</Link>
+                                        class="ti ti-user-circle me-2 fs-18"></i>Ver Perfil</Link>
                             </li>
-                            <li>
-                                <Link class="dropdown-item d-flex align-items-center"
-                                    href="#!">
-                                    <i class="ti ti-settings-cog me-2 fs-18"></i>Account Settings
-                                </Link>
-                            </li>
+
                         </ul>
                     </li>
                     <li>
                         <ul class="list-unstyled mb-0 sub-list">
                             <li>
                                 <a class="dropdown-item d-flex align-items-center" href="javascript:void(0);"><i
-                                        class="ti ti-lifebuoy me-2 fs-18"></i>Support</a>
+                                        class="ti ti-lifebuoy me-2 fs-18"></i>Ayuda</a>
                             </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="javascript:void(0);"><i
-                                        class="ti ti-bolt me-2 fs-18"></i>Activity Log</a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="javascript:void(0);"><i
-                                        class="ti ti-calendar me-2 fs-18"></i>Events</a>
-                            </li>
+
+
                         </ul>
                     </li>
                     <li>
                         <Link href="#!" class="dropdown-item d-flex align-items-center" @click.prevent="logout"><i
-                                class="ti ti-logout me-2 fs-18"></i>Log Out</Link>
+                                class="ti ti-logout me-2 fs-18"></i>Cerrar Sesión</Link>
                     </li>
                 </ul>
             </div>

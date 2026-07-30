@@ -24,7 +24,7 @@ class ValeController extends Controller
 
     public function index(Request $request): Response
     {
-        $query = Vale::with(['vehiculo', 'conductor', 'grifo']);
+        $query = Vale::with(['vehiculo', 'conductor.persona', 'grifo']);
 
         if ($request->filled('nro_vale')) {
             $query->where('nro_vale', $request->nro_vale);
@@ -40,6 +40,10 @@ class ValeController extends Controller
         }
         if ($request->filled('id_conductor')) {
             $query->where('id_conductor', $request->id_conductor);
+        }
+        if(auth()->user()->hasRole('conductor')) {
+            $idConductor = auth()->user()->persona->id;
+            $query->where('id_conductor', $idConductor);
         }
 
         $vales = $query

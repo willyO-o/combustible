@@ -15,56 +15,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Support\Facades\DB;
 
 class CargaCombustibleController extends Controller
 {
-    /* ------------------------------------------------------------------ */
-    /*  Endpoints JSON                                                      */
-    /* ------------------------------------------------------------------ */
-
-    /** Info del vehículo: tipo_combustible + conductorAsignado ACTIVO */
-    public function vehiculoInfo(int $id): JsonResponse
-    {
-        $vehiculo = Vehiculo::with(['tipoCombustible'])->findOrFail($id);
-        $conductor = $vehiculo->conductorAsignado;
-
-
-        return response()->json([
-            'tipo_combustible' => $vehiculo->tipoCombustible ? [
-                'id'    => $vehiculo->tipoCombustible->id,
-                'label' => $vehiculo->tipoCombustible->tipo_combustible,
-            ] : null,
-            'conductor' => $conductor ? [
-                'id'    => $conductor->id,
-                'label' => trim("{$conductor->persona->nombres} {$conductor->persona->paterno} {$conductor->persona->materno}")
-                           . " (CI: {$conductor->persona->ci})",
-            ] : null,
-        ]);
-    }
-
-    /** Búsqueda de vales PENDIENTE (opcional filtrar por vehículo) */
-    public function searchVales(Request $request): JsonResponse
-    {
-        $q          = $request->input('q', '');
-        $idVehiculo = $request->input('id_vehiculo');
-
-        $query = Vale::where('estado_vale', 'PENDIENTE');
-
-        if ($idVehiculo) {
-            $query->where('id_vehiculo', $idVehiculo);
-        }
-        if ($q) {
-            $query->where('nro_vale', 'like', "%{$q}%");
-        }
-
-        $vales = $query->limit(20)->get(['id', 'nro_vale', 'fecha_emision', 'litros'])
-            ->map(fn($v) => [
-                'id'    => $v->id,
-                'label' => "Vale #{$v->nro_vale} — {$v->litros} Lt ({$v->fecha_emision->format('d/m/Y')})",
-            ]);
-
-        return response()->json($vales);
-    }
 
     /* ------------------------------------------------------------------ */
     /*  CRUD                                                               */
@@ -72,7 +26,7 @@ class CargaCombustibleController extends Controller
 
     public function index(Request $request): Response
     {
-        $query = CargaCombustible::with(['vehiculo', 'conductor', 'grifo', 'tipoCombustible', 'vale']);
+        $query = CargaCombustible::with(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible', 'vale']);
 
         if ($request->filled('nro_placa')) {
             $query->whereHas('vehiculo', fn($q) => $q->where('nro_placa', 'like', '%' . $request->nro_placa . '%'));
@@ -89,10 +43,13 @@ class CargaCombustibleController extends Controller
         if ($request->filled('estado_carga')) {
             $query->where('estado_carga', $request->estado_carga);
         }
+        if (auth()->user()->hasRole('conductor')) {
+            $query->whereHas('conductor.user', fn($q) => $q->where('id', auth()->id()));
+        }
 
         $cargas = $query
             ->orderBy('fecha_carga', 'desc')
-            ->orderBy('id', 'desc')
+            ->orderBy('fecha_carga', 'desc')
             ->paginate(10)
             ->withQueryString();
 
@@ -109,21 +66,28 @@ class CargaCombustibleController extends Controller
     public function create(): Response
     {
         $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
-                ->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']);
+            ->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']);
 
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
-                ->orderBy('razon_social')
-                ->get(['id', 'razon_social', 'ciudad'])
-                ->map(fn($g) => [
-                    'id'    => $g->id,
-                    'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : ''),
-                ]);
+            ->orderBy('razon_social')
+            ->get(['id', 'razon_social', 'ciudad'])
+            ->map(fn($g) => [
+                'id'    => $g->id,
+                'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : ''),
+            ]);
 
         // verificar si el rol es conductor y obtener el conductor asignado al usuario autenticado
         $conductor = null;
-        if(auth()->user()->hasRole('conductor')) {
+        $valesConductor = [];
+        if (auth()->user()->hasRole('conductor')) {
             $conductor = auth()->user()->persona;
             $conductor->load('conductor.asignacionesActivas');
+
+            $valesConductor = Vale::where('estado_vale', 'PENDIENTE')
+                ->where('id_conductor', $conductor->id)
+                ->orderBy('fecha_emision', 'desc')
+                ->get();
+
         }
 
         // dd($conductor->conductor->asignacioneActivas);
@@ -131,21 +95,38 @@ class CargaCombustibleController extends Controller
         return Inertia::render('CargasCombustible/Create', [
             'tiposCombustible' => $tiposCombustible,
             'grifos' => $grifos,
-            'conductor' => $conductor
+            'conductor' => $conductor,
+            'valesConductor' => $valesConductor
         ]);
     }
 
     public function store(CargaCombustibleRequest $request): RedirectResponse
     {
-        $data = $request->validated();
+        $data = $request->all();
         unset($data['respaldo_count']);
 
-        $carga = CargaCombustible::create($data);
+        try {
+            DB::beginTransaction();
 
-        $this->processRespaldos($request, $carga);
+            $carga = CargaCombustible::create($data);
 
-        return redirect()->route('cargas.index')
-            ->with('success', 'Carga de combustible registrada exitosamente.');
+            $this->processRespaldos($request, $carga);
+
+            $vale = Vale::find($data['id_vale']);
+
+            $vale?->update([
+                'estado_vale' => 'USADO',
+            ]);
+
+
+            DB::commit();
+
+            return redirect()->route('cargas.index')
+                ->with('success', 'Carga de combustible registrada exitosamente.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Error al registrar la carga de combustible: ' . $e->getMessage());
+        }
     }
 
     public function edit(CargaCombustible $carga): Response
@@ -232,5 +213,58 @@ class CargaCombustibleController extends Controller
                 'id_incidencia'        => null,
             ]);
         }
+    }
+
+        /* ------------------------------------------------------------------ */
+    /*  Endpoints JSON                                                      */
+    /* ------------------------------------------------------------------ */
+
+    /** Info del vehículo: tipo_combustible + conductorAsignado ACTIVO */
+    public function vehiculoInfo(int $id): JsonResponse
+    {
+        $vehiculo = Vehiculo::with(['tipoCombustible'])->findOrFail($id);
+        $conductor = $vehiculo->conductorAsignado;
+
+
+        return response()->json([
+            'tipo_combustible' => $vehiculo->tipoCombustible ? [
+                'id'    => $vehiculo->tipoCombustible->id,
+                'label' => $vehiculo->tipoCombustible->tipo_combustible,
+            ] : null,
+            'conductor' => $conductor ? [
+                'id'    => $conductor->id,
+                'label' => trim("{$conductor->persona->nombres} {$conductor->persona->paterno} {$conductor->persona->materno}")
+                    . " (CI: {$conductor->persona->ci})",
+            ] : null,
+        ]);
+    }
+
+    /** Búsqueda de vales PENDIENTE (opcional filtrar por vehículo) */
+    public function searchVales(Request $request): JsonResponse
+    {
+        $q          = $request->input('q', '');
+        $idVehiculo = $request->input('id_vehiculo');
+
+        $query = Vale::where('estado_vale', 'PENDIENTE');
+
+        if ($idVehiculo) {
+            $query->where('id_vehiculo', $idVehiculo);
+        }
+        if ($q) {
+            $query->where('nro_vale', 'like', "%{$q}%");
+        }
+
+        if(auth()->user()->hasRole('conductor')) {
+            $idConductor = auth()->user()->persona->id;
+            $query->where('id_conductor', $idConductor);
+        }
+
+        $vales = $query->limit(20)->get()
+            ->map(fn($v) => [
+                'id'    => $v->id,
+                'label' => "Vale #{$v->nro} — {$v->litros} Lt ({$v->fecha_emision_f})",
+            ]);
+
+        return response()->json($vales);
     }
 }
