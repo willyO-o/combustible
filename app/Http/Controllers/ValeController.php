@@ -79,7 +79,7 @@ class ValeController extends Controller
 
     public function store(ValeRequest $request): RedirectResponse
     {
-        Vale::create($request->validated());
+        Vale::create($request->all());
 
         return redirect()->route('vales.index')
             ->with('success', "Vale #{$request->nro_vale} registrado exitosamente.");
@@ -145,15 +145,23 @@ class ValeController extends Controller
     {
         $q = $request->input('q', '');
 
-        $conductores = Conductor::where('estado_conductor', 'ACTIVO')
+        $conductores = Conductor::join('persona', 'conductor.id', '=', 'persona.id')
+            ->where('estado_conductor', 'ACTIVO')
             ->where(function ($query) use ($q) {
-                $query->where('ci', 'like', "%{$q}%")
-                      ->orWhere('nombres', 'like', "%{$q}%")
-                      ->orWhere('paterno', 'like', "%{$q}%")
-                      ->orWhere('materno', 'like', "%{$q}%");
+                $query->where('persona.ci', 'like', "%{$q}%")
+                      ->orWhere('persona.nombres', 'like', "%{$q}%")
+                      ->orWhere('persona.paterno', 'like', "%{$q}%")
+                      ->orWhere('persona.materno', 'like', "%{$q}%")
+                      ->orWhereRaw("CONCAT(persona.nombres, ' ', COALESCE(persona.paterno, ''), ' ', COALESCE(persona.materno, '')) like ?", ["%{$q}%"]);
+            })
+            ->when($request->input('id_vehiculo'), function ($query, $idVehiculo) {
+                // Filtrar conductores con asignación activa al vehículo especificado
+                $query->whereHas('asignacionesActivas', function ($q) use ($idVehiculo) {
+                    $q->where('id', $idVehiculo);
+                });
             })
             ->limit(20)
-            ->get(['id', 'ci', 'nombres', 'paterno', 'materno'])
+            ->get(['persona.id', 'persona.ci', 'persona.nombres', 'persona.paterno', 'persona.materno'])
             ->map(fn($c) => [
                 'id'    => $c->id,
                 'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}") . " (CI: {$c->ci})",

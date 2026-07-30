@@ -53,13 +53,8 @@ const onSelected = (option) => {
 }
 
 const onCleared = () => {
-    multiselectRef.value?.clear()
 
-    emit('update:modelValue', null)
-    emit('cleared')
-}
-
-const clear = () => {
+    console.log("limpiando");
 
     multiselectRef.value?.clear()
 

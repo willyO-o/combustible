@@ -3,6 +3,8 @@ import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 
+import { ref, watch } from 'vue'
+
 const props = defineProps({
     nextNroVale: String,
     tiposCombustible: Array,
@@ -20,12 +22,15 @@ const form = useForm({
     id_tipo_combustible: null,
 })
 
+const paramsConductor = ref({id_vehiculo: null})
+
 // Los SearchSelect retornan el objeto completo {id, label}
 // Extraemos el id antes de enviar
 function submit() {
     form
         .transform((data) => ({
             ...data,
+            nro_vale: Number(data.nro_vale),
             id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
             id_conductor: data.id_conductor?.id ?? data.id_conductor,
             id_grifo: data.id_grifo?.id ?? data.id_grifo,
@@ -37,8 +42,13 @@ function submit() {
 
 const vehiculoSeleccionado = (vehiculo) => {
 
+
     form.id_tipo_combustible = vehiculo?.meta.id_tipo_combustible ?? null
-    console.log('Vehículo seleccionado:', vehiculo);
+
+    paramsConductor.value = {
+        id_vehiculo: vehiculo?.id ?? null,
+    }
+
 
 }
 </script>
@@ -103,6 +113,7 @@ const vehiculoSeleccionado = (vehiculo) => {
                                     </label>
                                     <SearchSelect v-model="form.id_conductor" :search-url="route('search.conductores')"
                                         placeholder="Buscar por CI, nombre o apellido (mín. 2 caracteres)..."
+                                        :params="paramsConductor"
                                         :invalid="!!form.errors.id_conductor" />
                                     <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                         form.errors.id_conductor }}</div>
