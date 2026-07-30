@@ -115,7 +115,7 @@ class ValeController extends Controller
     }
 
 
-        /* ------------------------------------------------------------------ */
+    /* ------------------------------------------------------------------ */
     /*  Endpoints JSON para selects con búsqueda                           */
     /* ------------------------------------------------------------------ */
 
@@ -123,18 +123,19 @@ class ValeController extends Controller
     {
         $q = $request->input('q', '');
 
-        $vehiculos = Vehiculo::where('estado_vehiculo', 'ACTIVO')
+        $vehiculos = Vehiculo::with('conductorAsignado')->where('estado_vehiculo', 'ACTIVO')
             ->where(function ($query) use ($q) {
                 $query->where('nro_placa', 'like', "%{$q}%")
-                      ->orWhere('marca', 'like', "%{$q}%");
+                    ->orWhere('marca', 'like', "%{$q}%");
             })
             ->limit(20)
-            ->get(['id', 'nro_placa', 'marca', 'anio','id_tipo_combustible'])
+            ->get(['id', 'nro_placa', 'marca', 'anio', 'id_tipo_combustible'])
             ->map(fn($v) => [
                 'id'    => $v->id,
                 'label' => "{$v->nro_placa}" . ($v->marca ? " — {$v->marca}" : '') . ($v->anio ? " ({$v->anio})" : ''),
                 'meta'  => [
                     'id_tipo_combustible' => $v->id_tipo_combustible,
+                    'id_conductor' => $v->conductorAsignado ? $v->conductorAsignado->id : null,
                 ],
             ]);
 
@@ -143,29 +144,48 @@ class ValeController extends Controller
 
     public function searchConductores(Request $request): JsonResponse
     {
-        $q = $request->input('q', '');
-
-        $conductores = Conductor::join('persona', 'conductor.id', '=', 'persona.id')
-            ->where('estado_conductor', 'ACTIVO')
-            ->where(function ($query) use ($q) {
-                $query->where('persona.ci', 'like', "%{$q}%")
-                      ->orWhere('persona.nombres', 'like', "%{$q}%")
-                      ->orWhere('persona.paterno', 'like', "%{$q}%")
-                      ->orWhere('persona.materno', 'like', "%{$q}%")
-                      ->orWhereRaw("CONCAT(persona.nombres, ' ', COALESCE(persona.paterno, ''), ' ', COALESCE(persona.materno, '')) like ?", ["%{$q}%"]);
-            })
-            ->when($request->input('id_vehiculo'), function ($query, $idVehiculo) {
-                // Filtrar conductores con asignación activa al vehículo especificado
-                $query->whereHas('asignacionesActivas', function ($q) use ($idVehiculo) {
-                    $q->where('id', $idVehiculo);
+        $conductores = [];
+        if ($request->filled('id_vehiculo')) {
+            $vehiculo = Vehiculo::find($request->id_vehiculo);
+            $conductores = $vehiculo->conductorAsignado()
+                ->join('persona', 'persona.id', '=', 'conductor.id')
+                ->select(
+                    'conductor.id',
+                    'persona.ci',
+                    'persona.nombres',
+                    'persona.paterno',
+                    'persona.materno'
+                )
+                ->get()
+                ->map(function ($c) {
+                    return [
+                        'id' => $c->id,
+                        'label' => trim(
+                            "{$c->nombres} {$c->paterno} {$c->materno}"
+                        ) . " (CI: {$c->ci})",
+                    ];
                 });
-            })
-            ->limit(20)
-            ->get(['persona.id', 'persona.ci', 'persona.nombres', 'persona.paterno', 'persona.materno'])
-            ->map(fn($c) => [
-                'id'    => $c->id,
-                'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}") . " (CI: {$c->ci})",
-            ]);
+
+        } else {
+
+            $q = $request->input('q', '');
+
+            $conductores = Conductor::join('persona', 'conductor.id', '=', 'persona.id')
+                ->where('estado_conductor', 'ACTIVO')
+                ->where(function ($query) use ($q) {
+                    $query->where('persona.ci', 'like', "%{$q}%")
+                        ->orWhere('persona.nombres', 'like', "%{$q}%")
+                        ->orWhere('persona.paterno', 'like', "%{$q}%")
+                        ->orWhere('persona.materno', 'like', "%{$q}%")
+                        ->orWhereRaw("CONCAT(persona.nombres, ' ', COALESCE(persona.paterno, ''), ' ', COALESCE(persona.materno, '')) like ?", ["%{$q}%"]);
+                })
+                ->limit(20)
+                ->get(['persona.id', 'persona.ci', 'persona.nombres', 'persona.paterno', 'persona.materno'])
+                ->map(fn($c) => [
+                    'id'    => $c->id,
+                    'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}") . " (CI: {$c->ci})",
+                ]);
+        }
 
         return response()->json($conductores);
     }
@@ -177,8 +197,8 @@ class ValeController extends Controller
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
             ->where(function ($query) use ($q) {
                 $query->where('razon_social', 'like', "%{$q}%")
-                      ->orWhere('nit', 'like', "%{$q}%")
-                      ->orWhere('ciudad', 'like', "%{$q}%");
+                    ->orWhere('nit', 'like', "%{$q}%")
+                    ->orWhere('ciudad', 'like', "%{$q}%");
             })
             ->limit(20)
             ->get(['id', 'razon_social', 'nit', 'ciudad'])

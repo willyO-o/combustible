@@ -42,7 +42,7 @@ class Conductor extends Model
     // Relaciones
     public function persona()
     {
-        return $this->belongsTo(Persona::class, 'id_persona');
+        return $this->belongsTo(Persona::class, 'id');
     }
 
     public function asignaciones()
@@ -53,7 +53,7 @@ class Conductor extends Model
     public function asignacionesActivas()
     {
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
-            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle'])
+            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle','id_vehiculo','id_conductor'])
             // verifica que la asignación esté activa y que la fecha de culminación sea nula o mayor a la fecha actual
             ->wherePivot('estado_asignacion', 'ACTIVO')
             ->where(function ($query) {

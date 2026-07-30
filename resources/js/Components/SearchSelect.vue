@@ -30,7 +30,7 @@ const multiselectRef = ref(null)
 const emit = defineEmits(['update:modelValue', 'selected', 'cleared'])
 
 async function search(query) {
-    if (!query || query.length < 2) return []
+    if ((!query || query.length < 2) && !Object.keys(props.params).length) return []
     const url = new URL(props.searchUrl, window.location.origin)
     url.searchParams.set('q', query)
     Object.entries(props.params).forEach(([key, value]) => {
@@ -53,25 +53,20 @@ const onSelected = (option) => {
 }
 
 const onCleared = () => {
-
-    console.log("limpiando");
-
-    multiselectRef.value?.clear()
-
     emit('update:modelValue', null)
     emit('cleared')
 }
-
 
 watch(
     () => props.params,
     (newValue, oldValue) => {
 
-        if (!props.autoClear)
-            return
+        if (!props.autoClear) return
 
         if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
-            onCleared()
+            multiselectRef.value?.clear()
+            multiselectRef.value?.refreshOptions()
+
         }
 
     },

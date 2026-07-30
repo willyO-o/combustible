@@ -25,8 +25,9 @@ class CargaCombustibleController extends Controller
     /** Info del vehículo: tipo_combustible + conductorAsignado ACTIVO */
     public function vehiculoInfo(int $id): JsonResponse
     {
-        $vehiculo = Vehiculo::with('tipoCombustible')->findOrFail($id);
+        $vehiculo = Vehiculo::with(['tipoCombustible'])->findOrFail($id);
         $conductor = $vehiculo->conductorAsignado;
+
 
         return response()->json([
             'tipo_combustible' => $vehiculo->tipoCombustible ? [
@@ -35,8 +36,8 @@ class CargaCombustibleController extends Controller
             ] : null,
             'conductor' => $conductor ? [
                 'id'    => $conductor->id,
-                'label' => trim("{$conductor->nombres} {$conductor->paterno} {$conductor->materno}")
-                           . " (CI: {$conductor->ci})",
+                'label' => trim("{$conductor->persona->nombres} {$conductor->persona->paterno} {$conductor->persona->materno}")
+                           . " (CI: {$conductor->persona->ci})",
             ] : null,
         ]);
     }

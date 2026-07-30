@@ -41,6 +41,9 @@ const conductorAutoFill = ref(null)   // { id, label } del conductor asignado
 const loadingVehiculo = ref(false)
 
 watch(() => form.id_vehiculo, async (val) => {
+
+
+
     if (!val) {
         form.id_tipo_combustible = ''
         conductorAutoFill.value = null
@@ -49,19 +52,22 @@ watch(() => form.id_vehiculo, async (val) => {
     }
     loadingVehiculo.value = true
     try {
-        const res = await fetch(route('cargas.vehiculo-info', val.id))
+
+        const res = await fetch(route('cargas.vehiculo-info', val))
         const data = await res.json()
         if (data.tipo_combustible) {
             form.id_tipo_combustible = data.tipo_combustible.id
         }
         if (data.conductor) {
             conductorAutoFill.value = data.conductor
-            form.id_conductor = data.conductor
+            form.id_conductor = data.conductor.id
         } else {
             conductorAutoFill.value = null
         }
-    } catch {
+    } catch (error){
         // no critical
+
+
     } finally {
         loadingVehiculo.value = false
     }
@@ -183,6 +189,9 @@ onMounted(() => {
             optionVehiculos.value = props.conductor.conductor.asignaciones_activas.map(asignacion => ({
                 id: asignacion.id,
                 label: `${asignacion.nro_placa} - ${asignacion.marca} (${asignacion.anio})`,
+                meta: {
+                    tipo_medicion: asignacion.tipo_medicion,
+                }
             }))
 
             form.id_vehiculo = props.conductor.conductor.asignaciones_activas[0].id
