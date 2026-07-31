@@ -1,16 +1,27 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
+import SearchSelect from '@/Components/SearchSelect.vue'
+
 import Multiselect from '@vueform/multiselect'
-import '@vueform/multiselect/themes/default.css'
+// import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+
+import axios from 'axios'
+
 
 const props = defineProps({
     tiposCombustible: Array,
     grifos: Array,
     conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
     valesConductor: Array, // [{ id, nro_vale, fecha_emision, litros }] vales PENDIENTE del conductor (si hay uno)
+    vehiculosAsignados: Array, // [{ id, label }] vehículos asignados al conductor (si hay uno)
 })
+
+const valesVehiculo = ref(props.valesConductor || [])
+const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
+
+
 
 
 
@@ -24,6 +35,7 @@ const form = useForm({
     litros: '',
     precio: '',
     kilometraje: '',
+    horometro: '',
     nro_factura: '',
     tipo_carga: 'VALE',
     estado_carga: 'REGISTRADO',
@@ -83,35 +95,6 @@ watch(() => form.id_vale, (val) => {
     form.tipo_carga = 'VALE'
 
 })
-
-/* ------------------------------------------------------------------ */
-/*  Búsqueda asíncrona de vehículos (mismo endpoint de Vales)         */
-/* ------------------------------------------------------------------ */
-async function buscarVehiculos(q) {
-    if (!q || q.length < 2) return []
-    const res = await fetch(`${route('search.vehiculos')}?q=${encodeURIComponent(q)}`)
-    return res.ok ? await res.json() : []
-}
-
-/* ------------------------------------------------------------------ */
-/*  Búsqueda asíncrona de conductores                                  */
-/* ------------------------------------------------------------------ */
-async function buscarConductores(q) {
-    if (!q || q.length < 2) return []
-    const res = await fetch(`${route('search.conductores')}?q=${encodeURIComponent(q)}`)
-    return res.ok ? await res.json() : []
-}
-
-/* ------------------------------------------------------------------ */
-/*  Búsqueda asíncrona de vales (filtra por vehículo si hay uno)      */
-/* ------------------------------------------------------------------ */
-async function buscarVales(q) {
-    if (!q || q.length < 1) return []
-    const params = new URLSearchParams({ q })
-    if (form.id_vehiculo?.id) params.set('id_vehiculo', form.id_vehiculo.id)
-    const res = await fetch(`${route('search.vales-carga')}?${params}`)
-    return res.ok ? await res.json() : []
-}
 
 /* ------------------------------------------------------------------ */
 /*  Respaldos digitales                                                */
@@ -187,15 +170,15 @@ const valeSeleccionado = (e) => {
     form.litros = ''
     form.precio = ''
     form.id_grifo = ''
-    if (!props.valesConductor) return
+    if (valesVehiculo.value.length === 0) return
 
-    const selectedVale = props.valesConductor.find(vale => vale.id == selectedValeId)
+    const selectedVale = valesVehiculo.value.find(vale => vale.id == selectedValeId)
     if (!selectedVale) return
 
 
-    form.litros = selectedVale.litros
-    form.precio = selectedVale.precio
-    form.id_grifo = selectedVale.id_grifo
+    form.litros = selectedVale.meta.litros
+    form.precio = selectedVale.meta.precio
+    form.id_grifo = selectedVale.meta.id_grifo
 
 
 
@@ -205,7 +188,63 @@ const valeSeleccionado = (e) => {
 
 
 
-const optionVehiculos = ref([])
+const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
+
+const cambioVehiculo = async (vehiculoId) => {
+
+
+    console.log('cambioVehiculo', vehiculoId);
+
+
+
+    form.kilometraje = ''
+    form.horometro = ''
+    form.id_vale = null
+    form.id_grifo = null
+    form.precio = ''
+    form.litros = ''
+
+    let vehiculoSelected = null
+
+    //corregir
+    if(!vehiculoId || (typeof vehiculoId === 'object' && vehiculoId === null)) {
+        tipoMedicion.value = ''
+        valesVehiculo.value = []
+        return
+    }
+
+    if (typeof vehiculoId === 'object' && vehiculoId !== null) {
+        vehiculoSelected = vehiculoId // This line is incorrect, it should be:
+
+        vehiculoId = vehiculoId.id
+
+    } else {
+        vehiculoSelected = vehiculosAsignadosOpt.value.find(v => v.id === vehiculoId)
+
+    }
+
+
+    if (vehiculoSelected) {
+        tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
+    }
+
+
+    const { data } = await axios.get(route('search.vales-carga'), {
+        params: {
+            id_vehiculo: vehiculoId,
+            q: '',
+        }
+    })
+    if (data) {
+        valesVehiculo.value = data.map(v => ({
+            id: v.id,
+            label: v.label,
+            meta: v.meta,
+        }))
+    }
+
+}
+
 
 
 
@@ -218,20 +257,8 @@ onMounted(() => {
         form.id_conductor = props.conductor.id
         form.id_tipo_combustible = props.conductor.tipo_combustible_id
 
-        if (props.conductor.conductor.asignaciones_activas.length > 0) {
-
-            optionVehiculos.value = props.conductor.conductor.asignaciones_activas.map(asignacion => ({
-                id: asignacion.id,
-                label: `${asignacion.nro_placa} - ${asignacion.marca} (${asignacion.anio})`,
-                meta: {
-                    tipo_medicion: asignacion.tipo_medicion,
-                }
-            }))
-
-            form.id_vehiculo = props.conductor.conductor.asignaciones_activas[0].id
-
-            form.id_tipo_combustible = props.conductor.conductor.asignaciones_activas[0].id_tipo_combustible
-
+        if (vehiculosAsignadosOpt.value.length > 0) {
+            form.id_vehiculo = vehiculosAsignadosOpt.value[0].id
         }
     }
 
@@ -276,10 +303,10 @@ onMounted(() => {
                             <div class="row g-3">
 
                                 <div v-if="props.conductor" class="col-12">
-                                    <h6>
+                                    <h5>
                                         Conductor asignado:
                                         {{ props.conductor.nombre_completo ?? '—' }}
-                                    </h6>
+                                    </h5>
 
                                 </div>
 
@@ -288,12 +315,13 @@ onMounted(() => {
                                         Vehículo <span class="text-danger">*</span>
                                     </label>
                                     <Multiselect v-if="props.conductor" v-model="form.id_vehiculo"
-                                        :options="optionVehiculos" value-prop="id" label="label"
-                                        placeholder="Conductor asignado al vehículo" />
+                                        :options="vehiculosAsignadosOpt" value-prop="id" label="label"
+                                        @change="cambioVehiculo" placeholder="Seleccionar vehículo" />
 
-                                    <Multiselect v-else @select="(opt) => console.log(opt)" v-model="form.id_vehiculo"
-                                        :options="buscarVehiculos" value-prop="id" label="label" :searchable="true"
-                                        :min-chars="2" :delay="300" :resolve-on-load="false"
+                                    <SearchSelect v-else @change-data="cambioVehiculo" v-model="form.id_vehiculo"
+                                        :search-url="route('search.vehiculos')" value-prop="id" :object="true"
+                                        label-prop="label" :searchable="true" :min-chars="2" :delay="300"
+                                        :resolve-on-load="false"
                                         placeholder="Buscar por placa o marca (mín. 2 caracteres)..."
                                         no-options-text="Escriba para buscar" no-results-text="Sin resultados"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
@@ -341,9 +369,9 @@ onMounted(() => {
 
 
 
-                                    <Multiselect v-if="!props.conductor" v-model="form.id_conductor"
-                                        :options="buscarConductores" value-prop="id" label="label" :searchable="true"
-                                        :min-chars="2" :delay="300" :resolve-on-load="false"
+                                    <SearchSelect v-if="!props.conductor" v-model="form.id_conductor"
+                                        :search-url="route('search.conductores')" value-prop="id" label-prop="label"
+                                        :searchable="true" :min-chars="2" :delay="300" :resolve-on-load="false"
                                         placeholder="Buscar por CI, nombre o apellido..."
                                         no-options-text="Escriba para buscar" no-results-text="Sin resultados"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
@@ -355,7 +383,7 @@ onMounted(() => {
                                                 vehículo.
                                             </div>
                                         </template>
-                                    </Multiselect>
+                                    </SearchSelect>
                                     <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                         form.errors.id_conductor }}</div>
                                 </div>
@@ -379,18 +407,12 @@ onMounted(() => {
                                     <label class="form-label fw-medium">
                                         Nro de Vale <span class="text-muted small">(Si aplica)</span>
                                     </label>
-                                    <Multiselect v-if="!props.conductor" v-model="form.id_vale" :options="buscarVales"
-                                        value-prop="id" label="label" :searchable="true" :min-chars="1" :delay="300"
-                                        :resolve-on-load="false"
-                                        placeholder="Buscar vale por número (mín. 1 caracter)..."
-                                        no-options-text="Escriba el número de vale"
-                                        no-results-text="Sin vales PENDIENTE" :can-clear="true"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_vale }" />
-                                    <select v-else v-model="form.id_vale" class="form-select"
+
+                                    <select v-model="form.id_vale" class="form-select"
                                         :class="{ 'is-invalid': form.errors.id_vale }" @change="valeSeleccionado">
-                                        <option value="">— Seleccionar —</option>
-                                        <option v-for="vale in valesConductor" :key="vale.id" :value="vale.id">
-                                            Vale #{{ vale.nro }} — {{ vale.litros }} Lt ({{ vale.fecha_emision_f }})
+                                        <option :value="null">— Seleccione —</option>
+                                        <option v-for="vale in valesVehiculo" :key="vale.id" :value="vale.id">
+                                            {{ vale.label }}
                                         </option>
                                     </select>
 
@@ -487,13 +509,31 @@ onMounted(() => {
                                     </div>
                                 </div>
 
-                                <div class="col-sm-6">
+                                <div v-if="tipoMedicion === 'kilometraje'" class="col-sm-6">
                                     <label class="form-label fw-medium">Kilometraje</label>
                                     <div class="input-group">
                                         <input v-model="form.kilometraje" type="number" min="0" class="form-control"
-                                            :class="{ 'is-invalid': form.errors.kilometraje }" placeholder="0" />
+                                            :class="{ 'is-invalid': form.errors.kilometraje }" placeholder="0"
+                                            step="0.1" />
                                         <span class="input-group-text">km</span>
+                                        <div v-if="form.errors.kilometraje" class="invalid-feedback">{{
+                                            form.errors.kilometraje }}</div>
                                     </div>
+
+                                </div>
+
+                                <div v-if="tipoMedicion === 'horometro'" class="col-sm-6">
+                                    <label class="form-label fw-medium">Horometro</label>
+                                    <div class="input-group">
+                                        <input v-model="form.horometro" type="number" min="0" class="form-control"
+                                            :class="{ 'is-invalid': form.errors.horometro }" placeholder="0"
+                                            step="0.1" />
+                                        <span class="input-group-text">h</span>
+                                        <div v-if="form.errors.horometro" class="invalid-feedback">{{
+                                            form.errors.horometro
+                                            }}</div>
+                                    </div>
+
                                 </div>
 
                                 <div class="col-sm-6">
@@ -595,6 +635,7 @@ onMounted(() => {
     border-color: #dc3545 !important;
 }
 
+/*
 .multiselect {
     --ms-font-size: 0.875rem;
     --ms-border-color: #dee2e6;
@@ -608,5 +649,5 @@ onMounted(() => {
     --ms-option-bg-selected-pointed: #0a58ca;
     --ms-option-color-selected: #fff;
     --ms-option-color-selected-pointed: #fff;
-}
+} */
 </style>

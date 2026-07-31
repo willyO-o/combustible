@@ -41,7 +41,7 @@ class ValeController extends Controller
         if ($request->filled('id_conductor')) {
             $query->where('id_conductor', $request->id_conductor);
         }
-        if(auth()->user()->hasRole('conductor')) {
+        if (auth()->user()->hasRole('conductor')) {
             $idConductor = auth()->user()->persona->id;
             $query->where('id_conductor', $idConductor);
         }
@@ -133,13 +133,18 @@ class ValeController extends Controller
                     ->orWhere('marca', 'like', "%{$q}%");
             })
             ->limit(20)
-            ->get(['id', 'nro_placa', 'marca', 'anio', 'id_tipo_combustible'])
+            ->get()
             ->map(fn($v) => [
                 'id'    => $v->id,
                 'label' => "{$v->nro_placa}" . ($v->marca ? " — {$v->marca}" : '') . ($v->anio ? " ({$v->anio})" : ''),
                 'meta'  => [
-                    'id_tipo_combustible' => $v->id_tipo_combustible,
                     'id_conductor' => $v->conductorAsignado ? $v->conductorAsignado->id : null,
+                    'id_tipo_vehiculo' => $v->id_tipo_vehiculo,
+                    'id_tipo_combustible' => $v->id_tipo_combustible,
+                    'tipo_medicion' => $v->tipo_medicion,
+                    'marca' => $v->marca,
+                    'nro_placa' => $v->nro_placa,
+                    'anio' => $v->anio,
                 ],
             ]);
 
@@ -169,7 +174,6 @@ class ValeController extends Controller
                         ) . " (CI: {$c->ci})",
                     ];
                 });
-
         } else {
 
             $q = $request->input('q', '');

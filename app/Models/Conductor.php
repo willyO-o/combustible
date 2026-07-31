@@ -66,6 +66,28 @@ class Conductor extends Model
             });;
     }
 
+    public function asignacionesActivasOpt()
+    {
+        //devolver en formato id, label y meta para usar en select2
+
+        return $this->asignacionesActivas->map(function ($asignacion) {
+            return [
+                'id'    => $asignacion->id,
+                'label' => "{$asignacion->nro_placa} — {$asignacion->marca} ({$asignacion->anio})",
+                'meta'  => [
+                    'id_tipo_vehiculo' => $asignacion->id_tipo_vehiculo,
+                    'id_tipo_combustible'   => $asignacion->id_tipo_combustible,
+                    'tipo_medicion'       => $asignacion->tipo_medicion,
+                    'marca'       => $asignacion->marca,
+                    'nro_placa'       => $asignacion->nro_placa,
+                    'anio'       => $asignacion->anio,
+                ],
+            ];
+        });
+
+
+    }
+
     public function historialAsignacionesVehiculos()
     {
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')

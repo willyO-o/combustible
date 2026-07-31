@@ -12,7 +12,8 @@
 import Multiselect from '@vueform/multiselect'
 import '@vueform/multiselect/themes/default.css'
 
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import axios from 'axios'
 
 const props = defineProps({
     modelValue: { default: null },
@@ -24,23 +25,26 @@ const props = defineProps({
     object: { type: Boolean, default: false }, // si true, devuelve objeto completo; si false, devuelve solo valueProp
     params: { type: Object, default: () => ({}) }, // parámetros adicionales para la búsqueda
     autoClear: { type: Boolean, default: true }, // si true, limpia el valor seleccionado al cambiar params
+    minCharsProp: { type: Number, default: 2 }, // mínimo de caracteres para iniciar búsqueda
 })
 
 const multiselectRef = ref(null)
-const emit = defineEmits(['update:modelValue', 'selected', 'cleared'])
+const emit = defineEmits(['update:modelValue', 'selected', 'cleared', 'change-data'])
 
 async function search(query) {
-    if ((!query || query.length < 2) && !Object.keys(props.params).length) return []
-    const url = new URL(props.searchUrl, window.location.origin)
-    url.searchParams.set('q', query)
+    if ((!query || query.length < props.minCharsProp) && !Object.keys(props.params).length) return []
+    const params = { q: query }
     Object.entries(props.params).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
-            url.searchParams.set(key, value)
+            params[key] = value
         }
     })
-    const res = await fetch(url)
-    if (!res.ok) return []
-    return await res.json()
+    try {
+        const { data } = await axios.get(props.searchUrl, { params })
+        return data
+    } catch {
+        return []
+    }
 }
 
 
@@ -56,6 +60,27 @@ const onCleared = () => {
     emit('update:modelValue', null)
     emit('cleared')
 }
+
+const onChange = (value) => {
+    emit('change-data', value)
+}
+
+// Texto de búsqueda actual, para decidir qué mensaje mostrar cuando no hay opciones
+const searchQuery = ref('')
+
+const onSearchChange = (query) => {
+    searchQuery.value = query
+}
+
+// Si hay params extra, la búsqueda no depende del mínimo de caracteres (ver search())
+const belowMinChars = computed(() =>
+    !Object.keys(props.params).length && searchQuery.value.length < props.minCharsProp
+)
+
+const minCharsHintText = computed(() => {
+    const min = props.minCharsProp
+    return `Escriba al menos ${min} caracter${min === 1 ? '' : 'es'} para comenzar la búsqueda`
+})
 
 watch(
     () => props.params,
@@ -78,14 +103,26 @@ watch(
 
 <template>
     <Multiselect ref="multiselectRef" :model-value="modelValue" @update:model-value="onSelected" @clear="onCleared"
-        :options="search" :object="object" :value-prop="valueProp" :label="labelProp" :searchable="true" :min-chars="2"
-        :delay="300" :resolve-on-load="false" :placeholder="placeholder" no-options-text="Sin resultados"
-        no-results-text="No se encontraron resultados" :class="{ 'is-invalid-multiselect': invalid }" />
+        @change="onChange" @search-change="onSearchChange" :options="search" :object="object" :value-prop="valueProp"
+        :label="labelProp" :searchable="true" :min-chars="minCharsProp" :delay="300" :resolve-on-load="false"
+        :placeholder="placeholder" no-results-text="No se encontraron resultados"
+        :class="{ 'is-invalid-multiselect': invalid }">
+        <template #nooptions>
+            <div class="multiselect-no-options">
+                {{ belowMinChars ? minCharsHintText : 'Sin resultados' }}
+            </div>
+        </template>
+    </Multiselect>
 </template>
 
-<style>
-/* Integración con Bootstrap 5 */
-.multiselect {
+<style scoped>
+/* definir la variable --ms-bg para dark y light */
+
+/* .multiselect-search {
+    --ms-bg: #000;
+} */
+
+/* .multiselect {
     --ms-font-size: 0.875rem;
     --ms-border-color: #dee2e6;
     --ms-border-color-active: #86b7fe;
@@ -98,9 +135,9 @@ watch(
     --ms-option-bg-selected-pointed: #0a58ca;
     --ms-option-color-selected: #fff;
     --ms-option-color-selected-pointed: #fff;
-}
+} */
 
-.is-invalid-multiselect .multiselect-wrapper {
+/* .is-invalid-multiselect .multiselect-wrapper {
     border-color: #dc3545 !important;
-}
+} */
 </style>

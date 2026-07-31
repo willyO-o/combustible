@@ -19,12 +19,19 @@ class CargaCombustibleRequest extends FormRequest
             'fecha_carga'         => ['required', 'date'],
             'litros'              => ['required', 'numeric', 'min:0.01', 'max:9999.99'],
             'precio'              => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
-            'kilometraje'         => ['nullable', 'integer', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
-            'horometro'           => ['nullable', 'integer', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
+            // requerir kilometraje si el id_vehiculo tiene tipo_medicion = KILOMETRAJE, de lo contrario permitir null
+            'kilometraje'         => [Rule::requiredIf(function () {
+                                            $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
+                                            return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
+                                        }),'nullable' ,'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
+            'horometro'           => [Rule::requiredIf(function () {
+                                            $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
+                                            return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
+                                        }), 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
             'id_vehiculo'         => ['required', 'integer', 'exists:vehiculo,id'],
             'id_grifo'            => ['required', 'integer', 'exists:grifo,id'],
             'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
-            'id_conductor'        => [ auth()->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
+            'id_conductor'        => [auth()->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
             'id_vale'             => ['nullable', 'integer', 'exists:vale,id'],
             'nro_factura'         => ['nullable', 'string', 'max:50'],
             'tipo_carga'          => ['required', Rule::in(['VALE', 'PREPAGO'])],
@@ -72,6 +79,16 @@ class CargaCombustibleRequest extends FormRequest
             'nro_factura'         => 'número de factura',
             'tipo_carga'          => 'tipo de carga',
             'estado_carga'        => 'estado',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'kilometraje.greater_than_previous_reading' => 'El kilometraje debe ser mayor al último registrado para este vehículo.',
+            'horometro.greater_than_previous_reading'   => 'El horómetro debe ser mayor al último registrado para este vehículo.',
+            'kilometraje.required_if' => 'El kilometraje es obligatorio para vehículos con medición por kilometraje.',
+            'horometro.required_if'   => 'El horómetro es obligatorio para vehículos con medición por horómetro.',
         ];
     }
 }

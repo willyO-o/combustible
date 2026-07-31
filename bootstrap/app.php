@@ -21,7 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
-            return true; // Fuerza JSON para todas las peticiones si lo prefieres así
+
+            // forzar json solo si se producjo un error 500
+            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException && $e->getStatusCode() === 500) {
+                return true;
+            }
         });
         // $exceptions->shouldRenderJsonWhen(
         //     fn(Request $request) => $request->is('api/*'),

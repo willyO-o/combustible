@@ -1,0 +1,15 @@
+.multiselect-search {
+    /* --ms-bg: #161623; */
+    --ms-bg: var(--custom-white);
+}
+.multiselect-dropdown{
+    --ms-dropdown-bg: var(--custom-white);
+}
+.multiselect-option.is-pointed {
+    --ms-option-bg-pointed: var(--primary-color);
+    --ms-option-color-pointed: var(--default-text-color);
+}
+.multiselect-option.is-selected.is-pointed{
+    /* --ms-option-bg-selected-pointed: var(--primary-color); */
+    --ms-option-color-selected-pointed: var(--default-text-color);
+}
