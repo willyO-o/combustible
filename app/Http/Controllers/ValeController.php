@@ -172,6 +172,7 @@ class ValeController extends Controller
                         'label' => trim(
                             "{$c->nombres} {$c->paterno} {$c->materno}"
                         ) . " (CI: {$c->ci})",
+                        'meta' => []
                     ];
                 });
         } else {
@@ -192,6 +193,7 @@ class ValeController extends Controller
                 ->map(fn($c) => [
                     'id'    => $c->id,
                     'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}") . " (CI: {$c->ci})",
+                    'meta'  => []
                 ]);
         }
 

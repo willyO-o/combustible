@@ -21,6 +21,7 @@ const props = defineProps({
 const valesVehiculo = ref(props.valesConductor || [])
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
 
+const conductoresOpt = ref([])   // [{ id, label }] conductores activos (para búsqueda async)
 
 
 
@@ -61,6 +62,7 @@ watch(() => form.id_vehiculo, async (val) => {
         form.id_tipo_combustible = ''
         conductorAutoFill.value = null
         form.id_conductor = null
+        conductoresOpt.value = []
         return
     }
     loadingVehiculo.value = true
@@ -193,8 +195,6 @@ const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
 const cambioVehiculo = async (vehiculoId) => {
 
 
-    console.log('cambioVehiculo', vehiculoId);
-
 
 
     form.kilometraje = ''
@@ -203,11 +203,12 @@ const cambioVehiculo = async (vehiculoId) => {
     form.id_grifo = null
     form.precio = ''
     form.litros = ''
+    form.id_conductor = null
 
     let vehiculoSelected = null
 
     //corregir
-    if(!vehiculoId || (typeof vehiculoId === 'object' && vehiculoId === null)) {
+    if (!vehiculoId || (typeof vehiculoId === 'object' && vehiculoId === null) || JSON.stringify(vehiculoId) === '{}') {
         tipoMedicion.value = ''
         valesVehiculo.value = []
         return
@@ -243,6 +244,18 @@ const cambioVehiculo = async (vehiculoId) => {
         }))
     }
 
+    const conductoresRes = await axios.get(route('search.conductores'), {
+        params: {
+            id_vehiculo: vehiculoId,
+        }
+    })
+
+    conductoresOpt.value = conductoresRes.data.map(c => ({
+        id: c.id,
+        label: c.label,
+        meta: c.meta,
+    }))
+
 }
 
 
@@ -251,7 +264,6 @@ const cambioVehiculo = async (vehiculoId) => {
 
 onMounted(() => {
     // Si hay un conductor asignado desde el servidor, auto-seleccionarlo
-    // console.log('props.conductor', props.conductor);
 
     if (props.conductor) {
         form.id_conductor = props.conductor.id
@@ -366,24 +378,10 @@ onMounted(() => {
                                         </span>
                                     </label>
 
-
-
-
-                                    <SearchSelect v-if="!props.conductor" v-model="form.id_conductor"
-                                        :search-url="route('search.conductores')" value-prop="id" label-prop="label"
-                                        :searchable="true" :min-chars="2" :delay="300" :resolve-on-load="false"
-                                        placeholder="Buscar por CI, nombre o apellido..."
-                                        no-options-text="Escriba para buscar" no-results-text="Sin resultados"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
-
-                                        <template #noResult>
-                                            <div class="text-muted small">
-                                                <i class="ri-information-line me-1"></i>
-                                                No se encontró conductor. Asegúrese de que esté activo y asignado al
-                                                vehículo.
-                                            </div>
-                                        </template>
-                                    </SearchSelect>
+                                    <Multiselect v-model="form.id_conductor" :options="conductoresOpt" value-prop="id" label="label"
+                                        :searchable="true" :filter-results="true" placeholder="Buscar conductor..."
+                                        no-options-text="Sin conductores activos" no-results-text="Sin resultados"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
                                     <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                         form.errors.id_conductor }}</div>
                                 </div>
@@ -487,7 +485,7 @@ onMounted(() => {
                                     <label class="form-label fw-medium">Litros <span
                                             class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <input v-model="form.litros" type="number" step="0.01" min="0.01"
+                                        <input v-model="form.litros" type="text"   v-decimal="2"
                                             class="form-control" :class="{ 'is-invalid': form.errors.litros }"
                                             placeholder="0.00" />
                                         <span class="input-group-text">Lt</span>
@@ -497,11 +495,11 @@ onMounted(() => {
                                 </div>
 
                                 <div class="col-sm-6">
-                                    <label class="form-label fw-medium">Precio (Bs) <span
+                                    <label class="form-label fw-medium">Precio x Litro (Bs) <span
                                             class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text">Bs</span>
-                                        <input v-model="form.precio" type="number" step="0.01" min="0.01"
+                                        <input v-model="form.precio" type="text"   v-decimal="2"
                                             class="form-control" :class="{ 'is-invalid': form.errors.precio }"
                                             placeholder="0.00" />
                                         <div v-if="form.errors.precio" class="invalid-feedback">{{ form.errors.precio }}
@@ -512,7 +510,7 @@ onMounted(() => {
                                 <div v-if="tipoMedicion === 'kilometraje'" class="col-sm-6">
                                     <label class="form-label fw-medium">Kilometraje</label>
                                     <div class="input-group">
-                                        <input v-model="form.kilometraje" type="number" min="0" class="form-control"
+                                        <input v-model="form.kilometraje" type="text" class="form-control"  v-decimal="1"
                                             :class="{ 'is-invalid': form.errors.kilometraje }" placeholder="0"
                                             step="0.1" />
                                         <span class="input-group-text">km</span>
@@ -525,13 +523,13 @@ onMounted(() => {
                                 <div v-if="tipoMedicion === 'horometro'" class="col-sm-6">
                                     <label class="form-label fw-medium">Horometro</label>
                                     <div class="input-group">
-                                        <input v-model="form.horometro" type="number" min="0" class="form-control"
+                                        <input v-model="form.horometro" type="text" class="form-control"  v-decimal="1"
                                             :class="{ 'is-invalid': form.errors.horometro }" placeholder="0"
                                             step="0.1" />
                                         <span class="input-group-text">h</span>
                                         <div v-if="form.errors.horometro" class="invalid-feedback">{{
                                             form.errors.horometro
-                                            }}</div>
+                                        }}</div>
                                     </div>
 
                                 </div>
@@ -550,7 +548,7 @@ onMounted(() => {
                                             <span class="fw-medium">Total:</span>
                                             <strong class="ms-1">Bs {{ totalMonto }}</strong>
                                             <small class="text-muted ms-2">({{ form.litros }} Lt × Bs {{ form.precio
-                                            }})</small>
+                                                }})</small>
                                         </div>
                                     </div>
                                 </div>

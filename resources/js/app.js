@@ -15,6 +15,7 @@ import Vue3ColorPicker from 'vue3-colorpicker';
 import 'vue3-colorpicker/style.css';
 import 'vue3-toastify/dist/index.css';
 import can from '@/Directives/can';
+import Decimal from '@/Directives/Decimal';
 
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -35,6 +36,7 @@ createInertiaApp({
             .use(Vue3ColorPicker)
             .component('Apexchart', VueApexCharts)
             .directive('can', can)
+            .directive('decimal', Decimal)
             .mount(el);
     },
     progress: {

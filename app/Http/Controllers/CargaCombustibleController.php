@@ -44,11 +44,12 @@ class CargaCombustibleController extends Controller
             $query->where('estado_carga', $request->estado_carga);
         }
         if (auth()->user()->hasRole('conductor')) {
-            $query->whereHas('conductor.user', fn($q) => $q->where('id', auth()->id()));
+            // $query->whereHas('conductor.user', fn($q) => $q->where('id', auth()->id()));
+            $query->where('id_conductor', auth()->user()->id_persona);
         }
 
         $cargas = $query
-            ->orderBy('fecha_carga', 'desc')
+            ->orderBy('id', 'desc')
             ->orderBy('fecha_carga', 'desc')
             ->paginate(10)
             ->withQueryString();

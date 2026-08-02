@@ -174,7 +174,7 @@ const vehiculoSeleccionado = (vehiculo) => {
                                         Litros <span class="text-danger">*</span>
                                     </label>
                                     <div class="input-group">
-                                        <input v-model="form.litros" type="number" step="0.01" min="0.01"
+                                        <input v-model="form.litros" type="text" v-decimal="2"
                                             class="form-control" :class="{ 'is-invalid': form.errors.litros }"
                                             placeholder="0.00" />
                                         <span class="input-group-text">Lt</span>
@@ -190,7 +190,7 @@ const vehiculoSeleccionado = (vehiculo) => {
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">Bs</span>
-                                        <input v-model="form.precio" type="number" step="0.01" min="0.01"
+                                        <input v-model="form.precio" type="text" v-decimal="2"
                                             class="form-control" :class="{ 'is-invalid': form.errors.precio }"
                                             placeholder="0.00" />
                                         <div v-if="form.errors.precio" class="invalid-feedback">{{ form.errors.precio }}
