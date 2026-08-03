@@ -54,7 +54,7 @@ class CargaCombustible extends Model
 
     public function conductor()
     {
-        return $this->belongsTo(Conductor::class, 'id');
+        return $this->belongsTo(Conductor::class, 'id_conductor');
     }
 
     public function vale()

@@ -14,6 +14,8 @@ const props = defineProps({
     vehiculoActual: Object,
     conductorActual: Object,
     valeActual: Object,
+    conductores: Array,
+    conductor: Object,
 })
 
 /* ------------------------------------------------------------------ */
@@ -26,24 +28,32 @@ const form = useForm({
     litros: props.carga.litros,
     precio: props.carga.precio,
     kilometraje: props.carga.kilometraje ?? '',
+    horometro: props.carga.horometro ?? '',
     nro_factura: props.carga.nro_factura ?? '',
     tipo_carga: props.carga.tipo_carga,
     estado_carga: props.carga.estado_carga ?? 'REGISTRADO',
     id_vehiculo: props.vehiculoActual.id ?? null,
     id_grifo: props.grifos.find(g => g.id === props.carga.id_grifo) ?? null,
     id_tipo_combustible: props.carga.id_tipo_combustible,
-    id_conductor: props.conductorActual ?? null,
+    id_conductor: props.carga.id_conductor ?? null,
     id_vale: props.valeActual ?? null,
     respaldo_count: 0,
     respaldos_eliminar: [],
 })
 
+
+const tipoMedicion = ref(props.vehiculoActual?.meta?.tipo_medicion ?? null)
 /* ------------------------------------------------------------------ */
 /*  Auto-relleno al cambiar vehículo                                   */
 /* ------------------------------------------------------------------ */
 const conductorAutoFill = ref(props.conductorActual ?? null)
 const loadingVehiculo = ref(false)
 let prevVehiculoId = props.vehiculoActual?.id ?? null
+
+const conductoresOptions = ref(props.conductores ?? [])
+
+console.log("conduc", form);
+
 
 watch(() => form.id_vehiculo, async (val) => {
     const newId = val?.id ?? null
@@ -90,11 +100,7 @@ async function buscarVehiculos(q) {
     return res.ok ? await res.json() : []
 }
 
-async function buscarConductores(q) {
-    if (!q || q.length < 2) return []
-    const res = await fetch(`${route('search.conductores')}?q=${encodeURIComponent(q)}`)
-    return res.ok ? await res.json() : []
-}
+
 
 async function buscarVales(q) {
     if (!q || q.length < 1) return []
@@ -156,6 +162,7 @@ const totalMonto = computed(() => {
     return l > 0 && p > 0 ? (l * p).toFixed(2) : null
 })
 
+
 /* ------------------------------------------------------------------ */
 /*  Envío                                                              */
 /* ------------------------------------------------------------------ */
@@ -184,7 +191,7 @@ function submit() {
         .post(route('cargas.update', props.carga.id), { forceFormData: true })
 }
 
-const multi= ref(null)
+const multi = ref(null)
 
 onMounted(() => {
 
@@ -234,16 +241,22 @@ onMounted(() => {
                         </div>
                         <div class="card-body">
                             <div class="row g-3">
+                                <div v-if="props.conductor" class="col-12">
+                                    <h5>
+                                        Conductor asignado:
+                                        {{ props.conductor.nombre_completo ?? '—' }}
+                                    </h5>
+
+                                </div>
                                 <div class="col-12">
                                     <label class="form-label fw-medium">Vehículo <span
                                             class="text-danger">*</span></label>
-                                    <Multiselect
-                                    ref="multi"
-                                    v-model="form.id_vehiculo" :options="buscarVehiculos" value-prop="id"
-                                        label="label" :searchable="true" :min-chars="2" :delay="300"
-                                        :resolve-on-load="false" @search-change="buscarVehiculos"
+                                    <Multiselect ref="multi" v-model="form.id_vehiculo"
+                                        :options="[{ id: props.vehiculoActual.id, label: props.vehiculoActual.label }]"
+                                        value-prop="id" label="label" :searchable="true" :min-chars="2" :delay="300"
+                                        :resolve-on-load="false"
                                         placeholder="Buscar por placa o marca..." no-options-text="Escriba para buscar"
-                                        no-results-text="Sin resultados"
+                                        no-results-text="Sin resultados" :disabled="true"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
                                     <InputError :message="form.errors.id_vehiculo" />
                                     <div v-if="loadingVehiculo" class="text-muted small mt-1">
@@ -256,7 +269,7 @@ onMounted(() => {
                                         <span v-if="form.id_vehiculo"
                                             class="badge bg-success-transparent text-success ms-2 fs-10">Auto-llenado</span>
                                     </label>
-                                    <select v-model="form.id_tipo_combustible" class="form-select"
+                                    <select v-model="form.id_tipo_combustible" class="form-select" :disabled="true"
                                         :class="{ 'is-invalid': form.errors.id_tipo_combustible }">
                                         <option value="">— Seleccionar —</option>
                                         <option v-for="tc in tiposCombustible" :key="tc.id" :value="tc.id">{{
@@ -265,14 +278,14 @@ onMounted(() => {
                                     <div v-if="form.errors.id_tipo_combustible" class="invalid-feedback">{{
                                         form.errors.id_tipo_combustible }}</div>
                                 </div>
-                                <div class="col-12">
+                                <div class="col-12" v-if="!props.conductor">
                                     <label class="form-label fw-medium">
                                         Conductor <span class="text-danger">*</span>
                                         <span v-if="conductorAutoFill"
                                             class="badge bg-success-transparent text-success ms-2 fs-10">Asignado
                                             activo</span>
                                     </label>
-                                    <Multiselect v-model="form.id_conductor" :options="buscarConductores"
+                                    <Multiselect v-model="form.id_conductor" :options="conductoresOptions"
                                         value-prop="id" label="label" :searchable="true" :min-chars="2" :delay="300"
                                         :resolve-on-load="false" placeholder="Buscar conductor..."
                                         no-options-text="Escriba para buscar" no-results-text="Sin resultados"
@@ -300,7 +313,7 @@ onMounted(() => {
                                     <div v-if="form.errors.fecha_carga" class="invalid-feedback">{{
                                         form.errors.fecha_carga }}</div>
                                 </div>
-                                <div class="col-sm-6">
+                                <div v-if="!props.conductor" class="col-sm-6">
                                     <label class="form-label fw-medium">Estado</label>
                                     <select v-model="form.estado_carga" class="form-select">
                                         <option value="REGISTRADO">REGISTRADO</option>
@@ -331,14 +344,34 @@ onMounted(() => {
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-sm-6">
+
+                                <div v-if="tipoMedicion === 'kilometraje'" class="col-sm-6">
                                     <label class="form-label fw-medium">Kilometraje</label>
                                     <div class="input-group">
-                                        <input v-model="form.kilometraje" type="number" min="0" class="form-control"
-                                            placeholder="0" />
+                                        <input v-model="form.kilometraje" type="text" class="form-control" v-decimal="1"
+                                            :class="{ 'is-invalid': form.errors.kilometraje }" placeholder="0"
+                                            step="0.1" />
                                         <span class="input-group-text">km</span>
+                                        <div v-if="form.errors.kilometraje" class="invalid-feedback">{{
+                                            form.errors.kilometraje }}</div>
                                     </div>
+
                                 </div>
+
+                                <div v-if="tipoMedicion === 'horometro'" class="col-sm-6">
+                                    <label class="form-label fw-medium">Horometro</label>
+                                    <div class="input-group">
+                                        <input v-model="form.horometro" type="text" class="form-control" v-decimal="1"
+                                            :class="{ 'is-invalid': form.errors.horometro }" placeholder="0"
+                                            step="0.1" />
+                                        <span class="input-group-text">h</span>
+                                        <div v-if="form.errors.horometro" class="invalid-feedback">{{
+                                            form.errors.horometro
+                                            }}</div>
+                                    </div>
+
+                                </div>
+
                                 <div class="col-sm-6">
                                     <label class="form-label fw-medium">Nro. Factura</label>
                                     <input v-model="form.nro_factura" type="text" class="form-control" maxlength="50" />

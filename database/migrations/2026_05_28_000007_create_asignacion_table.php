@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('id_conductor')->constrained('conductor')->onDelete('restrict')->onUpdate('cascade');
             $table->date('fecha_asignacion');
             $table->date('fecha_culminacion')->nullable();
-            $table->enum('estado_asignacion', ['ACTIVO', 'INACTIVO', 'REASIGNADO'])->default('ACTIVO');
+            $table->enum('estado_asignacion', ['ACTIVO', 'INACTIVO', 'REASIGNADO','PROVISIONAL'])->default('ACTIVO');
             $table->text('detalle')->nullable();
             $table->bigInteger('id_usuario')->nullable();
             $table->decimal('kilometraje_inicial', 12, 2)->nullable();

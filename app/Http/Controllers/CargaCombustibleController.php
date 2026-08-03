@@ -146,8 +146,15 @@ class CargaCombustibleController extends Controller
 
     public function edit(CargaCombustible $carga): Response
     {
-        $carga->load(['vehiculo.tipoCombustible', 'conductor', 'grifo', 'tipoCombustible', 'vale', 'respaldosDigitales']);
+        $carga->load(['vehiculo.tipoCombustible', 'vehiculo','conductor', 'grifo', 'tipoCombustible', 'vale', 'respaldosDigitales']);
 
+        $conductor = null;
+        if(auth()->user()->hasRole('conductor')) {
+            $conductor = auth()->user()->persona;
+            $conductor->load('conductor');
+        }
+
+        // dd($carga->vehiculo->conductoresAsignados);
         return Inertia::render('CargasCombustible/Edit', [
             'carga' => $carga,
             'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
@@ -159,10 +166,20 @@ class CargaCombustibleController extends Controller
                     'id'    => $g->id,
                     'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : ''),
                 ]),
+            'conductores' => $carga->vehiculo->conductoresAsignadosOpt(),
             // Objetos actuales para los SearchSelects
-            'vehiculoActual'  => $carga->vehiculo  ? ['id' => $carga->vehiculo->id,   'label' => "{$carga->vehiculo->nro_placa}" . ($carga->vehiculo->marca ? " — {$carga->vehiculo->marca}" : '')] : null,
-            'conductorActual' => $carga->conductor ? ['id' => $carga->conductor->id,  'label' => trim("{$carga->conductor->nombres} {$carga->conductor->paterno} {$carga->conductor->materno}") . " (CI: {$carga->conductor->ci})"] : null,
+            'vehiculoActual'  => $carga->vehiculo  ? [
+                'id' => $carga->vehiculo->id,
+                'label' => "{$carga->vehiculo->nro_placa}" . " — {$carga->vehiculo->marca} ({$carga->vehiculo->anio})" ,
+                'meta' => [
+                    'id_tipo_combustible' => $carga->vehiculo->id_tipo_combustible,
+                    'tipo_medicion' => $carga->vehiculo->tipo_medicion
+
+                ]
+            ] : null,
+            'conductorActual' => $carga->conductor ? ['id' => $carga->conductor->id,  'label' => trim("{$carga->conductor->persona->nombre_completo}") . " (CI: {$carga->conductor->persona->ci})"] : null,
             'valeActual'      => $carga->vale      ? ['id' => $carga->vale->id,       'label' => "Vale #{$carga->vale->nro_vale} — {$carga->vale->litros} Lt"] : null,
+            'conductor' => $conductor,
         ]);
     }
 

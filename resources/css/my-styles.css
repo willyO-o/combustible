@@ -13,3 +13,14 @@
     /* --ms-option-bg-selected-pointed: var(--primary-color); */
     --ms-option-color-selected-pointed: var(--default-text-color);
 }
+/* .multiselect.is-disabled{
+    --ms-bg-disabled: var(--bs-gray-200);
+}
+ .multiselect.is-disabled{
+    --ms-bg-disabled: var(--bs-gray-900);
+}
+.multiselect.is-disabled .multiselect-wrapper{
+    background-color: var(--bs-gray-200) ;
+     background-color: transparent !important;
+}
+ */

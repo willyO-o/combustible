@@ -53,6 +53,42 @@ class Vehiculo extends Model
             'id_conductor'         // Llave foránea en la tabla Asignacion que apunta al Conductor
         )->where('asignacion.estado_asignacion', 'ACTIVO');
     }
+    public function conductores()
+    {
+        return $this->hasManyThrough(
+            Conductor::class,      // Modelo final que queremos obtener
+            Asignacion::class,     // Modelo intermedio
+            'id_vehiculo',         // Llave foránea en la tabla Asignacion
+            'id',                  // Llave primaria en la tabla Conductor
+            'id',                  // Llave primaria en la tabla Vehiculo
+            'id_conductor'         // Llave foránea en la tabla Asignacion que apunta al Conductor
+        );
+    }
+
+    public function conductoresAsignados()
+    {
+        // para  estados PROVISIONAL   y ACTIVO o tambien que la fecha de culminacion sea nula o mayor a la fecha actual
+        return $this->conductores()->where(function ($query) {
+            $query->where('asignacion.estado_asignacion', 'PROVISIONAL')
+                ->orWhere('asignacion.estado_asignacion', 'ACTIVO')
+                ->orWhere(function ($query) {
+                    $query->whereNull('asignacion.fecha_culminacion')
+                        ->orWhere('asignacion.fecha_culminacion', '>', now());
+                });
+        });
+    }
+
+
+    public function conductoresAsignadosOpt()
+    {
+        return $this->conductoresAsignados->map(function ($conductor) {
+            return [
+                'id' => $conductor->id,
+                'label' => "{$conductor->persona->nombre_completo} (CI: {$conductor->persona->ci})",
+                'meta' => []
+            ];
+        });
+    }
 
     public function vales()
     {
