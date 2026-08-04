@@ -68,6 +68,8 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('vales', ValeController::class)
         ->parameters(['vales' => 'vale']);
+    Route::get('vales/{vale}/detalle', [ValeController::class, 'detalle'])->name('vales.detalle');
+    Route::get('vale-imprimir/{vale}', [ValeController::class, 'imprimirVale'])->name('vales.imprimir');
 
     // Cargas de Combustible
     Route::get('/cargas-combustible/vehiculo-info/{id}', [CargaCombustibleController::class, 'vehiculoInfo'])->name('cargas.vehiculo-info');
@@ -83,6 +85,7 @@ Route::middleware('auth')->group(function () {
         Route::get('solicitudes/crear',         [MantenimientoController::class, 'createSolicitud'])->name('solicitudes.create');
         Route::post('solicitudes',              [MantenimientoController::class, 'storeSolicitud'])->name('solicitudes.store');
         Route::get('solicitudes/{solicitud}',   [MantenimientoController::class, 'showSolicitud'])->name('solicitudes.show');
+        Route::get('solicitud-imprimir/{solicitud}',   [MantenimientoController::class, 'imprimirSolicitud'])->name('solicitudes.imprimir');
 
         // Órdenes de trabajo (Paso 2 – Jefe de Transportes)
         Route::get('ordenes',                   [MantenimientoController::class, 'indexOrdenes'])->name('ordenes.index');
@@ -95,8 +98,8 @@ Route::middleware('auth')->group(function () {
 
         // Ejecución / registro de trabajo realizado (Paso 3 – Jefe de Transportes)
         Route::get('ordenes/{orden}/ejecucion', [MantenimientoController::class, 'createEjecucion'])->name('ordenes.ejecucion.create');
-        Route::post('ordenes/{orden}/ejecucion',[MantenimientoController::class, 'storeEjecucion'])->name('ordenes.ejecucion.store');
+        Route::post('ordenes/{orden}/ejecucion', [MantenimientoController::class, 'storeEjecucion'])->name('ordenes.ejecucion.store');
     });
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

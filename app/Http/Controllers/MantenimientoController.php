@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use App\Libraries\Reportes;
+
 class MantenimientoController extends Controller
 {
     // ══════════════════════════════════════════════════════════════════════════
@@ -31,7 +33,7 @@ class MantenimientoController extends Controller
      */
     public function indexSolicitudes(Request $request): Response
     {
-        $query = SolicitudMantenimiento::with(['vehiculo', 'conductor', 'usuarioRegistra', 'planMantenimiento']);
+        $query = SolicitudMantenimiento::with(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'planMantenimiento']);
 
         if ($request->filled('estado')) {
             $query->where('estado', $request->estado);
@@ -41,6 +43,11 @@ class MantenimientoController extends Controller
         }
         if ($request->filled('id_vehiculo')) {
             $query->where('id_vehiculo', $request->id_vehiculo);
+        }
+
+        if (auth()->user()->hasRole('conductor')) {
+            // $query->whereHas('conductor.user', fn($q) => $q->where('id', auth()->id()));
+            $query->where('id_conductor', auth()->user()->id_persona);
         }
 
         $solicitudes = $query->orderBy('id', 'desc')
@@ -68,19 +75,29 @@ class MantenimientoController extends Controller
      */
     public function createSolicitud(): Response
     {
-        $vehiculos   = Vehiculo::select('id', 'nro_placa', 'marca')
-            ->where('estado_vehiculo', 'ACTIVO')
-            ->orderBy('nro_placa')
+
+
+
+
+
+        $conductores = Conductor::join('persona', 'conductor.id', '=', 'persona.id')
+            ->orderBy('persona.nombres')
             ->get();
 
-        $conductores = Conductor::select('id', 'ci', 'nombres', 'paterno')
-            ->where('estado_conductor', 'ACTIVO')
-            ->orderBy('nombres')
-            ->get();
+        $conductor = null;
+        if (auth()->user()->hasRole('conductor')) {
+            $conductor = Conductor::with('persona')->where('id', auth()->user()->id_persona)->first();
+            $vehiculos = $conductor->asignacionesActivas;
+        } else {
+            $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca')
+                ->where('estado_vehiculo', 'ACTIVO')
+                ->orderBy('nro_placa')->get();
+        }
 
         return Inertia::render('Mantenimiento/SolicitudesCreate', [
             'vehiculos'   => $vehiculos,
             'conductores' => $conductores,
+            'conductor'   => $conductor,
         ]);
     }
 
@@ -279,7 +296,7 @@ class MantenimientoController extends Controller
         return Inertia::render('Mantenimiento/OrdenesEdit', [
             'orden'             => $orden,
             'vehiculos'         => $vehiculos,
-            'tiposMantenimiento'=> $tiposMantenimiento,
+            'tiposMantenimiento' => $tiposMantenimiento,
             'talleres'          => $talleres,
         ]);
     }
@@ -365,5 +382,13 @@ class MantenimientoController extends Controller
 
         return redirect()->back()
             ->with('success', 'Estado de la orden actualizado a "' . $request->estado_plan . '".');
+    }
+
+    public function imprimirSolicitud(SolicitudMantenimiento $solicitud)
+    {
+        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'planMantenimiento.tipoMantenimiento']);
+        $reporte = new Reportes();
+        $reporte->generarSolicitudMantenimiento($solicitud);
+        exit;
     }
 }

@@ -158,7 +158,7 @@ const tipoBadge = (tipo) => {
                                     <span class="fw-medium">{{ s.vehiculo?.nro_placa ?? '—' }}</span>
                                     <br /><small class="text-muted">{{ s.vehiculo?.marca ?? '' }}</small>
                                 </td>
-                                <td>{{ s.conductor ? `${s.conductor.nombres} ${s.conductor.paterno ?? ''}` : '—' }}</td>
+                                <td>{{ s.conductor ? `${s.conductor.persona.nombre_completo}` : '—' }}</td>
                                 <td><span class="badge" :class="tipoBadge(s.tipo_mantenimiento)">{{ s.tipo_mantenimiento }}</span></td>
                                 <td style="max-width:220px;white-space:normal;">
                                     {{ s.descripcion_problema?.substring(0, 80) }}{{ s.descripcion_problema?.length > 80 ? '…' : '' }}
@@ -171,7 +171,12 @@ const tipoBadge = (tipo) => {
                                             class="btn btn-outline-primary btn-wave" title="Ver detalle">
                                             <i class="ri-eye-line"></i>
                                         </Link>
-                                        <Link v-if="s.estado === 'PENDIENTE' && !s.plan_mantenimiento"
+                                        <Link :href="route('mantenimiento.solicitudes.imprimir', s.id)" target="_blank"
+                                            class="btn btn-outline-primary btn-wave" title="Ver detalle">
+                                            <i class="ri-file-list-3-line"></i>
+                                        </Link>
+                                        <!-- <Link v-if="s.estado === 'PENDIENTE' && !s.plan_mantenimiento" -->
+                                         <Link v-if="false" >
                                             :href="route('mantenimiento.ordenes.create', { solicitud: s.id })"
                                             class="btn btn-outline-success btn-wave" title="Generar orden de trabajo">
                                             <i class="ri-file-list-3-line"></i>

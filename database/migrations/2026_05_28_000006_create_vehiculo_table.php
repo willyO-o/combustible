@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('vehiculo', function (Blueprint $table) {
             $table->id();
             $table->string('nro_placa', 20)->unique();
+            $table->string('codigo', 50)->nullable();
             $table->string('anio', 4)->nullable();
             $table->string('marca', 50)->nullable();
             $table->enum('estado_vehiculo', ['ACTIVO', 'RETIRADO', 'VENDIDO'])->default('ACTIVO');

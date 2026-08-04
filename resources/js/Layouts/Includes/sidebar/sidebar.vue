@@ -4,7 +4,7 @@ import { MENUITEMS as staticMenuData } from '@/Data/sidebar/nav.ts';
 import { Link, usePage } from '@inertiajs/vue3';
 import {  PerfectScrollbar} from 'vue3-perfect-scrollbar';
 import 'vue3-perfect-scrollbar/style.css';
-// import media80 from "@/Assets/images/media/media-80.png"
+// import media80 from "images/media/media-80.png"
 import { switcherStore } from '@/stores/switcher';
 import RecursiveMenu from '@/UI/recursiveMenu.vue';
 
@@ -536,9 +536,9 @@ onBeforeMount(() => {
     <!-- Start::main-sidebar-header -->
     <div class="main-sidebar-header">
         <Link href="/dashboard" class="header-logo">
-            <img src="/images/logo/logo-plus-metals.webp" alt="logo" class="desktop-logo">
+            <img src="/images/logo/logo-plus-metals.png" alt="logo" class="desktop-logo">
             <img src="/images/logo/logo-min.png" alt="logo" class="toggle-dark">
-            <img src="/images/logo/logo-plus-metals.webp" alt="logo" class="desktop-dark">
+            <img src="/images/logo/logo-plus-metals.png" alt="logo" class="desktop-dark">
             <img src="/images/logo/logo-min.png" alt="logo" class="toggle-logo">
         </Link>
     </div>

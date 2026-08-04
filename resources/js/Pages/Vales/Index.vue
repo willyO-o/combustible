@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import ValeDetalleModal from '@/Components/ValeDetalleModal.vue'
 
 const props = defineProps({
     vales: Object,
@@ -46,6 +47,10 @@ function confirmDelete(vale) {
         router.delete(route('vales.destroy', vale.id))
     }
 }
+
+const selectedValeId = ref(null)
+const openDetalle = (id) => { selectedValeId.value = id }
+const closeDetalle = () => { selectedValeId.value = null }
 
 const estadoBadge = (estado) => {
     const map = {
@@ -199,9 +204,17 @@ const formatDate = (date) => {
                                 </td>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
+                                        <button type="button" class="btn btn-sm btn-icon btn-primary-light"
+                                            title="Ver detalles" @click="openDetalle(vale.id)">
+                                            <i class="ri-eye-line"></i>
+                                        </button>
                                         <Link :href="route('vales.edit', vale.id)"
                                             class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
+                                        </Link>
+                                        <Link :href="route('vales.imprimir', vale.id)" target="_blank"
+                                            class="btn btn-sm btn-icon btn-warning-light" title="Imprimir">
+                                            <i class="ri-printer-line"></i>
                                         </Link>
                                         <button type="button" class="btn btn-sm btn-icon btn-danger-light"
                                             title="Eliminar" @click="confirmDelete(vale)">
@@ -233,5 +246,9 @@ const formatDate = (date) => {
                 </nav>
             </div>
         </div>
+
+        <!-- Modal Detalle Vale -->
+        <ValeDetalleModal :vale-id="selectedValeId" @close="closeDetalle" />
+
     </Maindashboard>
 </template>

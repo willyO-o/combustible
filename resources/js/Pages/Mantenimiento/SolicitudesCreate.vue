@@ -6,11 +6,12 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 const props = defineProps({
     vehiculos: Array,
     conductores: Array,
+    conductor: Object,
 })
 
 const form = useForm({
     id_vehiculo:          '',
-    id_conductor:         '',
+    id_conductor:         props.conductor?.id ?? '',
     tipo_mantenimiento:   'PREVENTIVO',
     descripcion_problema: '',
     kilometraje_actual:   '',
@@ -75,7 +76,7 @@ function submit() {
                         <!-- Conductor -->
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">Conductor</label>
-                            <select v-model="form.id_conductor" class="form-select"
+                            <select :disabled="props.conductor" v-model="form.id_conductor" class="form-select"
                                 :class="{ 'is-invalid': form.errors.id_conductor }">
                                 <option value="">— Seleccione (opcional) —</option>
                                 <option v-for="c in conductores" :key="c.id" :value="c.id">

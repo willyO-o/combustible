@@ -12,6 +12,8 @@
         "laravel/framework": "^13.8",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
+        "luecano/numero-a-letras": "^4.1",
+        "setasign/fpdf": "1.9",
         "spatie/laravel-permission": "^8.3",
         "tightenco/ziggy": "^2.0"
     },
@@ -30,7 +32,10 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Helpers/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

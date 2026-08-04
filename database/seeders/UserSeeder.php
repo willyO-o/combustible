@@ -126,6 +126,9 @@ class UserSeeder extends Seeder
             'vales.ver',
             'cargas-combustible.ver',
             'cargas-combustible.registrar',
+            'mantenimiento.solicitudes.crear',
+            'mantenimiento.solicitudes.ver',
+            'mantenimiento.ordenes.ver',
         ]);
 
         $conductorUser2 = User::firstOrCreate([

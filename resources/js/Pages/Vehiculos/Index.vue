@@ -158,6 +158,7 @@ onMounted(() => {
                         <thead class="table-light">
                             <tr>
                                 <th>Vehiculo / Placa / Modelo</th>
+                                <th>Codigo</th>
                                 <th>Año</th>
                                 <th>Tipo Vehículo</th>
                                 <th>Tipo Combustible</th>
@@ -194,6 +195,7 @@ onMounted(() => {
                                     </div>
 
                                 </td>
+                                <td>{{ vehiculo.codigo ?? '—' }}</td>
                                 <td>{{ vehiculo.anio ?? '—' }}</td>
                                 <td>
                                     <span class="badge bg-info-transparent text-info">

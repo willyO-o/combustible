@@ -14,6 +14,8 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use App\Libraries\Reportes;
+
 class ValeController extends Controller
 {
 
@@ -218,5 +220,84 @@ class ValeController extends Controller
             ]);
 
         return response()->json($grifos);
+    }
+
+
+    public function detalle(Vale $vale): JsonResponse
+    {
+        $vale->load([
+            'vehiculo',
+            'conductor.persona',
+            'grifo',
+            'tipoCombustible',
+            'user',
+            'cargasCombustible.grifo',
+            'cargasCombustible.conductor.persona',
+        ]);
+
+        $total = round($vale->litros * $vale->precio, 2);
+
+        $carga = null;
+        if ($vale->estado_vale === 'USADO' && $vale->cargasCombustible->isNotEmpty()) {
+            $c = $vale->cargasCombustible->first();
+            $carga = [
+                'id'             => $c->id,
+                'fecha_carga'    => $c->fecha_carga?->format('d/m/Y'),
+                'litros'         => $c->litros,
+                'precio'         => $c->precio,
+                'total'          => round($c->litros * $c->precio, 2),
+                'nro_factura'    => $c->nro_factura,
+                'kilometraje'    => $c->kilometraje,
+                'horometro'      => $c->horometro,
+                'tipo_carga'     => $c->tipo_carga,
+                'estado_carga'   => $c->estado_carga,
+                'grifo'          => $c->grifo ? [
+                    'razon_social' => $c->grifo->razon_social,
+                    'ciudad'       => $c->grifo->ciudad,
+                ] : null,
+            ];
+        }
+
+        return response()->json([
+            'id'                => $vale->id,
+            'nro'               => $vale->nro,
+            'fecha_emision'     => $vale->fecha_emision_f,
+            'litros'            => $vale->litros,
+            'precio'            => $vale->precio,
+            'total'             => $total,
+            'estado_vale'       => $vale->estado_vale,
+            'tipo_combustible'  => $vale->tipoCombustible?->tipo_combustible,
+            'vehiculo'          => $vale->vehiculo ? [
+                'nro_placa' => $vale->vehiculo->nro_placa,
+                'marca'     => $vale->vehiculo->marca,
+                'anio'      => $vale->vehiculo->anio,
+                'modelo'    => $vale->vehiculo->modelo ?? null,
+            ] : null,
+            'conductor'         => $vale->conductor ? [
+                'nombre_completo' => trim("{$vale->conductor->persona->nombres} {$vale->conductor->persona->paterno} {$vale->conductor->persona->materno}"),
+                'ci'              => $vale->conductor->persona->ci,
+            ] : null,
+            'grifo'             => $vale->grifo ? [
+                'razon_social' => $vale->grifo->razon_social,
+                'ciudad'       => $vale->grifo->ciudad,
+                'nit'          => $vale->grifo->nit,
+            ] : null,
+            'registrado_por'    => $vale->user?->name,
+            'carga'             => $carga,
+        ]);
+    }
+
+    public function imprimirVale(Vale $vale)
+    {
+        // dd($vale);
+        $vale->load(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible','user']);
+
+        $reporte = new Reportes();
+        $reporte->generarVale($vale);
+
+        exit;
+
+        // return response()->json(['message' => 'PDF generado correctamente.']);
+
     }
 }

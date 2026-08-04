@@ -63,4 +63,25 @@ class Vale extends Model
     {
         return $this->hasMany(CargaCombustible::class, 'id_vale');
     }
+    public function tipoCombustible()
+    {
+        return $this->belongsTo(TipoCombustible::class, 'id_tipo_combustible');
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'id_user');
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Asignar el ID del usuario autenticado al crear un nuevo registro
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->id_user = auth()->id();
+            }
+        });
+    }
+
 }

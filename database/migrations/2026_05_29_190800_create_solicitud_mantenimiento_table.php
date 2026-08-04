@@ -17,6 +17,8 @@ return new class extends Migration
     {
         Schema::create('solicitud_mantenimiento', function (Blueprint $table) {
             $table->id();
+            //nro
+            $table->integer('nro_solicitud');
 
             // Vehículo y conductor que generan la solicitud
             $table->foreignId('id_vehiculo')->constrained('vehiculo')->onDelete('restrict');

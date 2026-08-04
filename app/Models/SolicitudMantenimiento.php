@@ -38,6 +38,11 @@ class SolicitudMantenimiento extends Model
         return $this->belongsTo(Conductor::class, 'id_conductor');
     }
 
+    public function persona()
+    {
+        return $this->belongsTo(Persona::class, 'id_conductor');
+    }
+
     public function usuarioRegistra()
     {
         return $this->belongsTo(User::class, 'id_usuario_registra');

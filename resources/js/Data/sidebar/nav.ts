@@ -46,11 +46,11 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
 
   {
-    title: 'Mantenimiento', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver', 'mantenimiento.ver'],
+    title: 'Mantenimiento', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver', 'mantenimiento.ver','mantenimiento.solicitudes.crear'],
     children: [
       { path: '/mantenimiento/solicitudes', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Solicitudes', permission: 'mantenimiento.solicitudes.ver' },
+      { path: '/mantenimiento/solicitudes/crear', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Crear Solicitud', permission: 'mantenimiento.solicitudes.crear' },
       { path: '/mantenimiento/ordenes',    icon: Svgicons.OrdenMantenimientoIcon,      type: 'link', active: false, selected: false, dirchange: false, title: 'Órdenes de Trabajo', permission: 'mantenimiento.ordenes.ver' },
-      { path: '/mantenimiento/ordenes',    icon: Svgicons.OrdenMantenimientoIcon,      type: 'link', active: false, selected: false, dirchange: false, title: 'Órdenes de Trabajo', permission: 'mantenimiento.ver' },
     ],
   },
   {
