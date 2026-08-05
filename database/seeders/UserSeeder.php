@@ -38,6 +38,7 @@ class UserSeeder extends Seeder
             'cargas-combustible.registrar',
             'cargas-combustible.editar',
             'cargas-combustible.eliminar',
+            'cargas-combustible.reporte',
 
             // Mantenimiento: solicitud, orden de trabajo y ejecución
             'mantenimiento.solicitudes.ver',
@@ -171,5 +172,71 @@ class UserSeeder extends Seeder
         ]);
 
         $superAdminUser->assignRole($superAdminRole);
+
+        //roles de jefe de transporte
+
+        $jefeTransporteRole = Role::firstOrCreate([
+            'name' => 'jefe-transporte',
+            'guard_name' => 'web',
+        ]);
+
+        $jefeTransporteRole->syncPermissions([
+            // Vales y cargas de combustible
+            'vales.ver',
+            'vales.crear',
+            'vales.editar',
+            'vales.eliminar',
+            'cargas-combustible.ver',
+            'cargas-combustible.registrar',
+            'cargas-combustible.editar',
+            'cargas-combustible.eliminar',
+            'cargas-combustible.reporte',
+
+            // Mantenimiento: solicitud, orden de trabajo y ejecución
+            'mantenimiento.solicitudes.ver',
+            'mantenimiento.solicitudes.crear',
+            'mantenimiento.ordenes.ver',
+            'mantenimiento.ordenes.crear',
+            'mantenimiento.ordenes.editar',
+            'mantenimiento.ordenes.estado.cambiar',
+            'mantenimiento.ordenes.ejecucion.registrar',
+
+            // Catálogos
+            'conductores.ver',
+            'conductores.crear',
+            'conductores.editar',
+            'conductores.eliminar',
+            'vehiculos.ver',
+            'vehiculos.crear',
+            'vehiculos.editar',
+            'vehiculos.eliminar',
+            'grifos.ver',
+            'grifos.crear',
+            'grifos.editar',
+            'grifos.eliminar',
+            'tipos-combustible.ver',
+            'tipos-combustible.crear',
+            'tipos-combustible.editar',
+            'tipos-combustible.eliminar',
+            'tipos-mantenimiento.ver',
+            'tipos-mantenimiento.crear',
+            'tipos-mantenimiento.editar',
+            'tipos-mantenimiento.eliminar',
+        ]);
+
+        $jefeTransporteUser = User::firstOrCreate([
+            'email' => 'jefe-transporte@gmail.com',
+        ], [
+            'name' => 'Jefe de Transporte User',
+            'password' => bcrypt('jefetransporte123'),
+        ]);
+
+        $jefeTransporteUser->assignRole($jefeTransporteRole);
+
+
+
+
+
+
     }
 }

@@ -546,6 +546,225 @@ class Reportes extends FPDF
         $this->Output('I', 'solicitud_mantenimiento.pdf');
     }
 
+    public function generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo = null)
+    {
+        // Importar modelo
+        $cargasCombustibleQuery = \App\Models\CargaCombustible::whereBetween('fecha_carga', [$fechaInicio, $fechaFin])
+            ->with(['vehiculo', 'tipoCombustible']);
+
+        if ($idVehiculo) {
+            $cargasCombustibleQuery->where('id_vehiculo', $idVehiculo);
+        }
+
+        $cargas = $cargasCombustibleQuery->orderBy('fecha_carga')->get();
+
+        // Agrupar por vehículo
+        $vehiculosAgrupados = $cargas->groupBy('id_vehiculo')->map(function ($grupo) {
+            $primerCarga = $grupo->first();
+            return [
+                'vehiculo' => $primerCarga->vehiculo,
+                'cargas' => $grupo->toArray(),
+                'total_litros' => $grupo->sum('litros'),
+                'total_costo' => $grupo->sum(function ($c) {
+                    return $c->precio * $c->litros;
+                }),
+            ];
+        })->values();
+
+        // Calcular totales generales
+        $totalLitros = $cargas->sum('litros');
+        $totalCosto = $cargas->sum(function ($c) {
+            return $c->precio * $c->litros;
+        });
+
+        // Colores
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $rojo = [190, 30, 30];
+        $negro = [30, 30, 30];
+        $gris = [90, 90, 90];
+        $blanco = [255, 255, 255];
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 199.9;
+
+        // ════════════════════════════════════════════════════════════════
+        // ENCABEZADO
+        // ════════════════════════════════════════════════════════════════
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy, $uw, 16);
+
+        // Logo
+        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 4, $sy + 1.5, 35);
+
+        // Título
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy);
+        $this->Cell($uw - 40, 8, utf8Decode('REPORTE DE CARGAS DE COMBUSTIBLE'), 0, 2, 'L');
+
+        // Rango de fechas
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 8);
+        $this->Cell($uw - 40, 8, utf8Decode("Del " . date('d/m/Y', strtotime($fechaInicio)) . " al " . date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+
+        $currentY = $sy + 16 + 5;
+
+        // ════════════════════════════════════════════════════════════════
+        // TARJETAS DE RESUMEN
+        // ════════════════════════════════════════════════════════════════
+        $cardW = 49;
+        $cardH = 14;
+        $cards = [
+            ['TOTAL LITROS', round($totalLitros, 2) . ' L', 'Azul'],
+            ['TOTAL COSTO', 'Bs. ' . number_format($totalCosto, 2, ',', '.'), 'Verde'],
+            ['COSTO/LITRO', 'Bs. ' . number_format($totalLitros > 0 ? $totalCosto / $totalLitros : 0, 2, ',', '.'), 'Rojo'],
+            ['CANTIDAD CARGAS', count($cargas), 'Gris'],
+        ];
+
+        $cardX = $sx;
+        foreach ($cards as $card) {
+            $color = match ($card[2]) {
+                'Azul' => [59, 89, 152],
+                'Verde' => [34, 177, 76],
+                'Rojo' => [192, 0, 0],
+                'Gris' => [155, 155, 155],
+            };
+
+            $this->SetLineWidth(0.3);
+            $this->SetDrawColor($color[0], $color[1], $color[2]);
+            $this->SetFillColor($color[0], $color[1], $color[2]);
+            $this->Rect($cardX, $currentY, $cardW, $cardH, 'FD');
+
+            $this->SetFont('Arial', 'B', 7);
+            $this->SetTextColor(255, 255, 255);
+            $this->SetXY($cardX, $currentY);
+            $this->Cell($cardW, 5, utf8Decode($card[0]), 0, 1, 'C');
+
+            $this->SetFont('Arial', 'B', 10);
+            $this->SetXY($cardX, $currentY + 5);
+            $this->Cell($cardW, 9, utf8Decode($card[1]), 0, 1, 'C');
+
+            $cardX += $cardW + 2;
+        }
+
+        $currentY += $cardH + 8;
+
+        // ════════════════════════════════════════════════════════════════
+        // TABLA DE VEHÍCULOS
+        // ════════════════════════════════════════════════════════════════
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('DETALLE POR VEHÍCULO'), 0, 1, 'C');
+
+        $currentY += 8;
+
+        // Encabezados de columnas
+        $cols = [
+            ['label' => 'PLACA', 'w' => 25, 'align' => 'C'],
+            ['label' => 'MARCA', 'w' => 35, 'align' => 'L'],
+            ['label' => 'TOTAL LITROS', 'w' => 28, 'align' => 'R'],
+            ['label' => 'TOTAL COSTO (Bs.)', 'w' => 35, 'align' => 'R'],
+            ['label' => 'NRO. CARGAS', 'w' => 20, 'align' => 'C'],
+            ['label' => 'PRECIO PROM.', 'w' => 27.9, 'align' => 'R'],
+        ];
+
+        $this->SetFillColor(240, 240, 240);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.2);
+        $this->SetFont('Arial', 'B', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        $colX = $sx;
+        foreach ($cols as $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX, $currentY);
+            $this->Cell($col['w'], 7, utf8Decode($col['label']), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        $currentY += 7;
+
+        // Filas de datos
+        $this->SetFont('Arial', '', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        foreach ($vehiculosAgrupados as $vehData) {
+            $precioPromedio = count($vehData['cargas']) > 0
+                ? array_sum(array_map(fn($c) => $c['precio'], $vehData['cargas'])) / count($vehData['cargas'])
+                : 0;
+
+            $valores = [
+                $vehData['vehiculo']->nro_placa,
+                $vehData['vehiculo']->marca,
+                number_format($vehData['total_litros'], 2, ',', '.'),
+                number_format($vehData['total_costo'], 2, ',', '.'),
+                count($vehData['cargas']),
+                number_format($precioPromedio, 2, ',', '.'),
+            ];
+
+            $colX = $sx;
+            foreach ($cols as $idx => $col) {
+                $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
+                $this->SetLineWidth(0.1);
+                $this->Rect($colX, $currentY, $col['w'], 6);
+                $this->SetXY($colX + 1, $currentY + 0.5);
+                $this->Cell($col['w'] - 2, 6, utf8Decode($valores[$idx]), 0, 0, $col['align']);
+                $colX += $col['w'];
+            }
+
+            $currentY += 6;
+        }
+
+        // Fila de TOTALES
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFont('Arial', 'B', 8);
+        $this->SetTextColor(255, 255, 255);
+
+        $totales = [
+            'TOTALES',
+            '',
+            number_format($totalLitros, 2, ',', '.'),
+            number_format($totalCosto, 2, ',', '.'),
+            count($cargas),
+            number_format($totalLitros > 0 ? $totalCosto / $totalLitros : 0, 2, ',', '.'),
+        ];
+
+        $colX = $sx;
+        foreach ($cols as $idx => $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX + 1, $currentY);
+            $this->Cell($col['w'] - 2, 7, utf8Decode($totales[$idx]), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // PIE DE PÁGINA
+        // ════════════════════════════════════════════════════════════════
+        $this->SetY(-12);
+        $this->SetFont('Arial', 'I', 8);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->Cell($uw, 4, utf8Decode('Reporte generado el: ' . date('d/m/Y H:i')), 0, 0, 'L');
+        $this->Cell($uw, 4, utf8Decode('Página: ') . $this->PageNo() . '/{nb}', 0, 0, 'R');
+
+        $this->AliasNbPages();
+        $this->Output('I', 'reporte_cargas_combustible.pdf');
+    }
+
     protected function drawCircle(float $cx, float $cy, float $r, string $style = 'D'): void
     {
         if ($style === 'F') {

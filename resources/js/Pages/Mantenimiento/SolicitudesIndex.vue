@@ -1,8 +1,11 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { ref, watch, computed, onMounted } from 'vue'
+import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import { showToast, confirm } from '@/Utils/alertUtil.js'
+import { Modal } from 'bootstrap'
+
+const page = usePage()
 
 const props = defineProps({
     solicitudes: Object,
@@ -16,6 +19,62 @@ const filters = ref({
     tipo_mantenimiento: props.filters?.tipo_mantenimiento ?? '',
     id_vehiculo: props.filters?.id_vehiculo ?? '',
 })
+
+// Modal de solicitudes pendientes
+const showPendingModal = ref(false)
+const modalInstance = ref(null)
+const modalKey = 'pendingModalShown'
+
+// Verificar si el usuario es conductor
+const esUsuarioConductor = computed(() => {
+    const roles = page.props.auth?.roles || []
+    return roles.includes('conductor')
+})
+
+// Obtener solicitudes pendientes
+const solicitudesPendientes = computed(() => {
+    return props.solicitudes?.data?.filter(s => s.estado === 'PENDIENTE') || []
+})
+
+// Verificar si debe mostrarse el modal
+const verificarYMostrarModal = () => {
+    // No mostrar si es conductor
+    if (esUsuarioConductor.value) {
+        return
+    }
+
+    const yaVisto = sessionStorage.getItem(modalKey)
+    if (!yaVisto && solicitudesPendientes.value.length > 0) {
+        showPendingModal.value = true
+        sessionStorage.setItem(modalKey, 'true')
+        // Mostrar modal cuando el DOM esté listo
+        setTimeout(() => {
+            const modalEl = document.getElementById('pendingRequestsModal')
+            if (modalEl && !modalInstance.value) {
+                modalInstance.value = new Modal(modalEl)
+                modalInstance.value.show()
+            }
+        }, 300)
+    }
+}
+
+// Watch de cambios en solicitudes (detecta nuevo login)
+watch(() => props.solicitudes?.data?.length, () => {
+    verificarYMostrarModal()
+})
+
+// Inicializar al montar
+onMounted(() => {
+    verificarYMostrarModal()
+})
+
+// Cerrar modal
+const cerrarModalPendiente = () => {
+    if (modalInstance.value) {
+        modalInstance.value.hide()
+    }
+    showPendingModal.value = false
+}
 
 let debounceTimer = null
 watch(filters, (val) => {
@@ -77,6 +136,68 @@ const tipoBadge = (tipo) => {
         <div v-if="flash?.error" class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="ri-error-warning-line me-2"></i>{{ flash.error }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Modal de Solicitudes Pendientes -->
+        <div id="pendingRequestsModal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                <div class="modal-content border-warning">
+                    <div class="modal-header bg-warning bg-opacity-10 border-warning">
+                        <div>
+                            <h5 class="modal-title fw-bold text-warning">
+                                <i class="ri-alert-line me-2"></i>Solicitudes Pendientes
+                            </h5>
+                            <small class="text-muted">Tienes {{ solicitudesPendientes.length }} solicitud(es) pendiente(s) de aprobación</small>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nro</th>
+                                        <th>Fecha</th>
+                                        <th>Vehículo</th>
+                                        <th>Tipo</th>
+                                        <th>Descripción</th>
+                                        <th class="text-center">Ver</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="s in solicitudesPendientes" :key="s.id" class="align-middle">
+                                        <td class="fw-medium">{{ s.nro }}</td>
+                                        <td><small>{{ s.fecha }}</small></td>
+                                        <td>
+                                            <span class="fw-medium">{{ s.vehiculo?.nro_placa ?? '—' }}</span>
+                                            <br /><small class="text-muted">{{ s.vehiculo?.marca ?? '' }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge" :class="tipoBadge(s.tipo_mantenimiento)">
+                                                {{ s.tipo_mantenimiento }}
+                                            </span>
+                                        </td>
+                                        <td style="max-width:200px;white-space:normal;">
+                                            <small>{{ s.descripcion_problema?.substring(0, 60) }}{{ s.descripcion_problema?.length > 60 ? '…' : '' }}</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <Link :href="route('mantenimiento.solicitudes.show', s.id)"
+                                                class="btn btn-sm btn-outline-primary btn-wave">
+                                                <i class="ri-eye-line"></i>
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-primary btn-wave fw-medium" data-bs-dismiss="modal" @click="cerrarModalPendiente">
+                            <i class="ri-check-line me-1"></i>De acuerdo
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Filtros -->

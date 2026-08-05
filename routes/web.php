@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CargaCombustibleController;
+use App\Http\Controllers\CargasCombustibleReportController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\GrifoController;
 use App\Http\Controllers\MantenimientoController;
@@ -99,6 +100,12 @@ Route::middleware('auth')->group(function () {
         // Ejecución / registro de trabajo realizado (Paso 3 – Jefe de Transportes)
         Route::get('ordenes/{orden}/ejecucion', [MantenimientoController::class, 'createEjecucion'])->name('ordenes.ejecucion.create');
         Route::post('ordenes/{orden}/ejecucion', [MantenimientoController::class, 'storeEjecucion'])->name('ordenes.ejecucion.store');
+    });
+
+    // ── Reportes de Cargas de Combustible ────────────────────────────────────
+    Route::prefix('reportes')->name('cargas-combustible.reporte.')->group(function () {
+        Route::get('cargas-combustible', [CargasCombustibleReportController::class, 'index'])->name('index');
+        Route::get('cargas-combustible/pdf', [CargasCombustibleReportController::class, 'generarPDF'])->name('pdf');
     });
 });
 

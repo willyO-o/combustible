@@ -85,7 +85,7 @@ const formatDate = (date) => {
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Vales</h1>
             </div>
-            <Link v-can="'vales.create'" :href="route('vales.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'vales.crear'" :href="route('vales.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nuevo Vale
             </Link>
         </div>

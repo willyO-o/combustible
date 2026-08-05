@@ -284,8 +284,8 @@ class MantenimientoController extends Controller
             ->orderBy('nro_placa')
             ->get();
 
-        $tiposMantenimiento = TipoMantenimiento::select('id', 'nombre_tipo')
-            ->orderBy('nombre_tipo')
+        $tiposMantenimiento = TipoMantenimiento::select('id', 'tipo_mantenimiento')
+            ->orderBy('tipo_mantenimiento')
             ->get();
 
         $talleres           = Taller::select('id', 'razon_social', 'nit')

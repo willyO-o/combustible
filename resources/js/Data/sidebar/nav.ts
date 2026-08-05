@@ -35,7 +35,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Dashboard', icon: Svgicons.Dashboardicon, type: 'link', path: '/dashboard', active: true, selected: true, dirchange: false, permission: 'dashboard.ver',
   },
   {
-    menutitle: 'GESTIÓN', permission: ['dashboard.ver', 'vales.ver', 'cargas-combustible.ver', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
+    menutitle: 'GESTIÓN', permission: ['dashboard.ver', 'vales.ver', 'cargas-combustible.ver', 'cargas-combustible.reporte', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
   },
 
   {
@@ -43,6 +43,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
   {
     title: 'Cargas Combustible', icon: Svgicons.CargaIcon, type: 'link', path: '/cargas', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.ver',
+  },
+  {
+    title: 'Reportes Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
   },
 
   {
