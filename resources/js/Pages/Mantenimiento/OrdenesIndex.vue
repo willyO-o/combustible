@@ -170,7 +170,7 @@ const ordenBadge = (tipo) =>
                                     <span class="fw-medium">{{ o.vehiculo?.nro_placa ?? '—' }}</span>
                                     <br /><small class="text-muted">{{ o.vehiculo?.marca ?? '' }}</small>
                                 </td>
-                                <td><span class="badge" :class="tipoBadge(o.tipo_mantenimiento)">{{ o.tipo_mantenimiento }}</span></td>
+                                <td><span class="badge" :class="tipoBadge(o.tipo_mantenimiento)">{{ o.tipo_mantenimiento.tipo_mantenimiento }}</span></td>
                                 <td><span class="badge" :class="ordenBadge(o.tipo_orden)">{{ o.tipo_orden }}</span></td>
                                 <td>{{ o.fecha_orden ?? '—' }}</td>
                                 <td>{{ o.fecha_programada ?? '—' }}</td>

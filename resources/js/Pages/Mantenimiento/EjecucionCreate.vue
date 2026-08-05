@@ -117,7 +117,7 @@ agregarItem()
             <div>
                 <strong>Orden #{{ orden.id }}</strong> —
                 Vehículo: <strong>{{ orden.vehiculo?.nro_placa }} {{ orden.vehiculo?.marca }}</strong> —
-                <span class="badge bg-info-transparent text-info">{{ orden.tipo_mantenimiento }}</span>
+                <span class="badge bg-info-transparent text-info">{{ orden.tipo_mantenimiento.tipo_mantenimiento }}</span>
                 <span class="badge bg-primary-transparent text-primary ms-1">{{ orden.tipo_orden }}</span>
                 <span v-if="orden.taller"> — Taller: {{ orden.taller.razon_social }}</span>
             </div>

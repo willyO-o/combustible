@@ -109,13 +109,13 @@ const costoTotalRepuestos = () => {
                             <div class="col-sm-6">
                                 <label class="form-label text-muted mb-0">Tipo de Mantenimiento</label>
                                 <p>
-                                    <span class="badge me-1" :class="tipoBadge(orden.tipo_mantenimiento)">{{ orden.tipo_mantenimiento }}</span>
+                                    <span class="badge me-1" :class="tipoBadge(orden.tipo_mantenimiento)">{{ orden.tipo_mantenimiento.tipo_mantenimiento }}</span>
                                     <span class="badge" :class="ordenBadge(orden.tipo_orden)">{{ orden.tipo_orden }}</span>
                                 </p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label text-muted mb-0">Categoría de Mantenimiento</label>
-                                <p>{{ orden.tipo_mantenimiento?.nombre_tipo ?? orden.tipo_mantenimiento }}</p>
+                                <p>{{ orden.tipo_mantenimiento?.tipo_mantenimiento ?? orden.tipo_mantenimiento }}</p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label text-muted mb-0">Fecha de Orden</label>

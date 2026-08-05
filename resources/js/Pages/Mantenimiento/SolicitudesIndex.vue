@@ -134,6 +134,7 @@ const tipoBadge = (tipo) => {
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
+                                <th>Nro</th>
                                 <th>Fecha</th>
                                 <th>Vehículo</th>
                                 <th>Conductor</th>
@@ -153,7 +154,8 @@ const tipoBadge = (tipo) => {
                             </tr>
                             <tr v-for="(s, idx) in solicitudes.data" :key="s.id">
                                 <td>{{ idx + 1 }}</td>
-                                <td>{{ s.fecha_solicitud ? s.fecha_solicitud.substring(0,10) : '—' }}</td>
+                                <td>{{ s.nro }}</td>
+                                <td>{{ s.fecha }}</td>
                                 <td>
                                     <span class="fw-medium">{{ s.vehiculo?.nro_placa ?? '—' }}</span>
                                     <br /><small class="text-muted">{{ s.vehiculo?.marca ?? '' }}</small>

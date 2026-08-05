@@ -126,7 +126,7 @@ function submit() {
                                 :class="{ 'is-invalid': form.errors.id_tipo_mantenimiento }">
                                 <option value="">— Seleccione —</option>
                                 <option v-for="t in tiposMantenimiento" :key="t.id" :value="t.id">
-                                    {{ t.nombre_tipo }}
+                                    {{ t.tipo_mantenimiento }}
                                 </option>
                             </select>
                             <div v-if="form.errors.id_tipo_mantenimiento" class="invalid-feedback">
