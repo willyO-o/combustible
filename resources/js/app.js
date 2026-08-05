@@ -16,9 +16,14 @@ import 'vue3-colorpicker/style.css';
 import 'vue3-toastify/dist/index.css';
 import can from '@/Directives/can';
 import Decimal from '@/Directives/Decimal';
+import { registerSW } from 'virtual:pwa-register';
+
 
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+
+registerSW({ immediate: true });
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
