@@ -76,4 +76,20 @@ class OperacionDiariaController extends Controller
     {
         //
     }
+
+    public function validarActividad(Request $request)
+    {
+        // Validar los campos requeridos
+        $validated = $request->validate([
+            'actividad' => 'required|string',
+            'cantidad' => 'required|numeric',
+            'unidad_medida' => 'required|string',
+            'hora_inicio' => 'required|date_format:H:i',
+            'hora_fin' => 'required|date_format:H:i',
+        ]);
+
+        // Agregar la actividad al arreglo de actividades_realizadas
+
+        return redirect()->back();
+    }
 }

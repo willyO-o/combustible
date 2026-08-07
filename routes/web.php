@@ -117,6 +117,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('operacion-diaria', \App\Http\Controllers\OperacionDiariaController::class)
         ->parameters(['operacion-diaria' => 'operacion']);
 
+    Route::post('operacion-actividad', [\App\Http\Controllers\OperacionDiariaController::class, 'validarActividad'])
+        ->name('operacion-diaria.agregar-actividad');
+
 });
 
 require __DIR__ . '/auth.php';

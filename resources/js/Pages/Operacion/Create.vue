@@ -1,10 +1,9 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import SearchSelect from '@/Components/SearchSelect.vue'
 
 import Multiselect from '@vueform/multiselect'
-// import '@vueform/multiselect/themes/default.css'
+import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Modal from '@/Components/Modal.vue'; // Ajusta la ruta según tu proyecto
 
@@ -148,8 +147,8 @@ function agregarRespaldo() {
     respaldos.value.push({ archivo: null, tipo_respaldo: 'FACTURA', preview: null, previewType: null })
 }
 
-function quitarRespaldo(idx) {
-    respaldos.value.splice(idx, 1)
+function quitarActividad(idx) {
+    form.actividades_realizadas.splice(idx, 1)
 }
 
 function onArchivoChange(e, idx) {
@@ -199,6 +198,35 @@ function submit() {
             return out
         })
         .post(route('cargas.store'), { forceFormData: true })
+}
+
+const agregarActividad = () => {
+
+
+    formActividad.post(route('operacion-diaria.agregar-actividad'), {
+        onSuccess: () => {
+            // Agregar la actividad al arreglo de actividades_realizadas
+            form.actividades_realizadas.push({ ...formActividad });
+
+            // Limpiar el formulario de actividad
+            formActividad.actividad = '';
+            formActividad.id_actividad = null;
+            formActividad.origen = '';
+            formActividad.destino = '';
+            formActividad.cantidad = '';
+            formActividad.unidad_medida = '';
+            formActividad.hora_inicio = '';
+            formActividad.hora_fin = '';
+            formActividad.detalle = '';
+
+            // Cerrar el modal
+            estaAbiertoModal.value = false;
+        },
+        onError: () => {
+            // Manejar errores si es necesario
+        }
+    });
+
 }
 
 
@@ -366,7 +394,7 @@ onMounted(() => {
                                         <!-- Opción Día -->
                                         <input type="radio" class="btn-check" name="btnradio" id="btnradio1"
                                             autocomplete="off" value="DIA" v-model="form.turno">
-                                        <label class="btn btn-outline-info btn-wave rounded-pill" for="btnradio1">
+                                        <label class="btn btn-outline-primary btn-wave rounded-pill" for="btnradio1">
                                             <i class="ri-sun-line text-warning"></i>
                                             Día
                                         </label>
@@ -374,7 +402,7 @@ onMounted(() => {
                                         <!-- Opción Noche -->
                                         <input type="radio" class="btn-check" name="btnradio" id="btnradio2"
                                             autocomplete="off" value="NOCHE" v-model="form.turno">
-                                        <label class="btn btn-outline-info btn-wave rounded-pill" for="btnradio2">
+                                        <label class="btn btn-outline-primary btn-wave rounded-pill" for="btnradio2">
                                             <i class="ri-moon-line text-dark"></i>
                                             Noche
                                         </label>
@@ -539,7 +567,7 @@ onMounted(() => {
 
 
 
-                <!-- ====== RESPALDOS DIGITALES ====== -->
+                <!-- ======  ====== -->
                 <div class="col-xl-6">
                     <div class=" custom-card h-100" :class="{ 'card': !isMobile, }">
                         <div
@@ -549,48 +577,72 @@ onMounted(() => {
                             </div>
 
                         </div>
-                        <div class="card-body">
-                            <div class="text-center px-5 py-2 border w-100 border-info mt-4  rounded-pill btn-wave btn btn-info-light"
+                        <div class="card-body pt-2">
+
+                            <div v-for="(r, idx) in form.actividades_realizadas" :key="idx"
+                                class="border rounded-3 p-3 mb-3 bg-white rounded-3 shadow-sm ">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="fw-medium  text-muted">
+                                        {{ idx + 1 }} . {{ r.actividad }}
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-icon btn-danger-light"
+                                        @click="quitarActividad(idx)">
+                                        <i class="ri-close-line"></i>
+                                    </button>
+                                </div>
+                                <div class="row g-2 ps-4 p-2">
+                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                        <label class="form-label form-label-sm fw-medium mb-0">
+                                            <i class="ri-map-pin-line text-info"></i>
+
+                                            Origen:
+                                        </label>
+                                        <p class="mb-0">
+                                            {{ r.origen }}
+                                        </p>
+                                    </div>
+                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                        <label class="form-label form-label-sm fw-medium mb-0">
+                                            <i class="ri-map-pin-line text-info"></i>
+
+                                            Destino:
+                                        </label>
+                                        <p class="mb-0">
+                                            {{ r.destino }}
+                                        </p>
+                                    </div>
+
+                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                        <label class="form-label form-label-sm fw-medium mb-0">
+                                            <i class="ri-map-pin-line text-info"></i>
+
+                                            Cantidad:
+                                        </label>
+                                        <p class="mb-0">
+                                            {{ r.cantidad }} {{ r.unidad_medida }}
+                                        </p>
+                                    </div>
+
+                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                        <label class="form-label form-label-sm fw-medium mb-0">
+                                            <i class="ri-map-pin-line text-info"></i>
+
+                                            Horario:
+                                        </label>
+                                        <p class="mb-0">
+                                            {{ r.hora_inicio }} - {{ r.hora_fin }}
+                                        </p>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <div class="text-center px-5 py-2 border w-100 border-info mt-4 mb-4  rounded-pill btn-wave btn btn-info-light"
                                 @click="estaAbiertoModal = true">
                                 <i class="ri-add-line  "></i>
                                 <small>Añadir actividad</small>
                             </div>
 
-                            <div v-for="(r, idx) in form.actividades_realizadas" :key="idx"
-                                class="border rounded-3 p-3 mb-3">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <span class="fw-medium small text-muted">Respaldo {{ idx + 1 }}</span>
-                                    <button type="button" class="btn btn-sm btn-icon btn-danger-light"
-                                        @click="quitarRespaldo(idx)">
-                                        <i class="ri-close-line"></i>
-                                    </button>
-                                </div>
-                                <div class="row g-2">
-                                    <div class="col-sm-4">
-                                        <label class="form-label form-label-sm fw-medium">Tipo</label>
-                                        <select v-model="r.tipo_respaldo" class="form-select form-select-sm">
-                                            <option v-for="tipo in tiposRespaldo" :key="tipo" :value="tipo">{{ tipo }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div class="col-sm-8">
-                                        <label class="form-label form-label-sm fw-medium">Archivo</label>
-                                        <input type="file" class="form-control form-control-sm"
-                                            accept="image/jpeg,image/png,image/webp,application/pdf"
-                                            @change="onArchivoChange($event, idx)" />
-                                    </div>
-                                    <!-- Preview -->
-                                    <div v-if="r.preview" class="col-12 mt-1">
-                                        <img :src="r.preview" alt="Preview" class="rounded"
-                                            style="max-height:100px;object-fit:contain;" />
-                                    </div>
-                                    <div v-else-if="r.previewType === 'PDF'" class="col-12 mt-1">
-                                        <span class="badge bg-danger-transparent text-danger fs-12">
-                                            <i class="ri-file-pdf-line me-1"></i>PDF seleccionado: {{ r.archivo?.name }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -598,12 +650,12 @@ onMounted(() => {
             </div>
 
             <!-- Botones -->
-            <div class="d-flex justify-content-end gap-2 mt-4">
+            <div class="d-flex justify-content-md-end justify-content-between gap-2 mt-4">
                 <Link :href="route('cargas.index')" class="btn btn-outline-secondary btn-wave">Cancelar</Link>
                 <button type="submit" class="btn btn-primary btn-wave" :disabled="form.processing">
                     <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                     <i v-else class="ri-save-line me-1"></i>
-                    {{ form.processing ? 'Guardando...' : 'Guardar Carga' }}
+                    {{ form.processing ? 'Guardando...' : 'Registrar' }}
                 </button>
             </div>
         </form>
@@ -611,115 +663,117 @@ onMounted(() => {
 
 
         <Modal :show="estaAbiertoModal" maxWidth="md" @close="estaAbiertoModal = false">
-            <div class="p-6">
-                <h2 class="text-lg text-center font-medium text-gray-600">Detalles de actividad</h2>
 
-                <p class="mt-2 text-sm text-gray-600 text-sm text-center">
-                    Aquí puedes colocar todo el contenido que desees mostrar dentro del modal.
-                </p>
+            <form action="" @submit.prevent="agregarActividad">
+                <div class="p-6">
+                    <h2 class="text-lg text-center font-medium text-gray-600">Detalles de actividad</h2>
 
-                <div class="row g-3">
+                    <p class="mt-2 text-sm text-gray-600 text-sm text-center">
+                        Aquí puedes colocar todo el contenido que desees mostrar dentro del modal.
+                    </p>
+
+                    <div class="row g-3">
 
 
 
-                    <div class="col-12">
-                        <label class="form-label fw-medium">
-                            Actividad <span class="text-danger">*</span>
-                        </label>
-                        <textarea v-model="formActividad.actividad" type="text" class="form-control" rows="4"
-                            :class="{ 'is-invalid': formActividad.errors.actividad }"
-                            placeholder="Descripción de la actividad"></textarea>
+                        <div class="col-12">
+                            <label class="form-label fw-medium">
+                                Actividad <span class="text-danger">*</span>
+                            </label>
+                            <textarea v-model="formActividad.actividad" type="text" class="form-control" rows="4"
+                                :class="{ 'is-invalid': formActividad.errors.actividad }"
+                                placeholder="Descripción de la actividad"></textarea>
 
-                        <div v-if="formActividad.errors.actividad" class="text-danger small mt-1">{{
-                            formActividad.errors.actividad }}</div>
+                            <div v-if="formActividad.errors.actividad" class="text-danger small mt-1">{{
+                                formActividad.errors.actividad }}</div>
+
+                        </div>
+
+                        <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
+                            <label class="form-label fw-medium">
+                                Origen <span class="text-danger">*</span>
+                            </label>
+                            <input v-model="formActividad.origen" type="text" class="form-control"
+                                :class="{ 'is-invalid': formActividad.errors.origen }" placeholder="Lugar de origen" />
+
+                            <div v-if="formActividad.errors.origen" class="text-danger small mt-1">{{
+                                formActividad.errors.origen }}</div>
+
+                        </div>
+
+                        <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
+                            <label class="form-label fw-medium">
+                                Destino <span class="text-danger">*</span>
+                            </label>
+                            <input v-model="formActividad.destino" type="text" class="form-control"
+                                :class="{ 'is-invalid': formActividad.errors.destino }"
+                                placeholder="Lugar de destino" />
+
+                            <div v-if="formActividad.errors.destino" class="text-danger small mt-1">{{
+                                formActividad.errors.destino }}</div>
+
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label fw-medium">
+                                Cantidad <span class="text-danger">*</span>
+                            </label>
+                            <input v-model="formActividad.cantidad" type="text" class="form-control"
+                                :class="{ 'is-invalid': formActividad.errors.cantidad }" placeholder="Cantidad" />
+
+                            <div v-if="formActividad.errors.cantidad" class="text-danger small mt-1">{{
+                                formActividad.errors.cantidad }}</div>
+
+                        </div>
+                        <div class="col-8">
+                            <label class="form-label fw-medium">
+                                Unidad de medida <span class="text-danger">*</span>
+                            </label>
+                            <input v-model="formActividad.unidad_medida" type="text" class="form-control"
+                                :class="{ 'is-invalid': formActividad.errors.unidad_medida }" placeholder="Viajes, " />
+
+                            <div v-if="formActividad.errors.unidad_medida" class="text-danger small mt-1">{{
+                                formActividad.errors.unidad_medida }}</div>
+
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-medium">
+                                Hora Inicio <span class="text-danger">*</span>
+                            </label>
+                            <input v-model="formActividad.hora_inicio" type="time" class="form-control" max="17:59"
+                                :class="{ 'is-invalid': formActividad.errors.hora_inicio }" placeholder="HH:MM" />
+
+                            <div v-if="formActividad.errors.hora_inicio" class="text-danger small mt-1">{{
+                                formActividad.errors.hora_inicio }}</div>
+
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-medium">
+                                Hora Fin <span class="text-danger">*</span>
+                            </label>
+                            <input v-model="formActividad.hora_fin" type="time" class="form-control" :max="horaMaxTurno"
+                                :class="{ 'is-invalid': formActividad.errors.hora_fin }" placeholder="HH:MM" />
+                            <div v-if="formActividad.errors.hora_fin" class="text-danger small mt-1">{{
+                                formActividad.errors.hora_fin }}</div>
+
+                        </div>
+
 
                     </div>
 
-                    <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
-                        <label class="form-label fw-medium">
-                            Origen <span class="text-danger">*</span>
-                        </label>
-                        <input v-model="formActividad.origen" type="text" class="form-control"
-                            :class="{ 'is-invalid': formActividad.errors.origen }" placeholder="Lugar de origen" />
+                    <!-- Botón para cerrar el modal desde adentro -->
+                    <div class="mt-6 flex justify-between">
+                        <button @click="estaAbiertoModal = false" class="btn btn-secondary" type="button">
+                            Cancelar
+                        </button>
 
-                        <div v-if="formActividad.errors.origen" class="text-danger small mt-1">{{
-                            formActividad.errors.origen }}</div>
-
-                    </div>
-
-                    <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
-                        <label class="form-label fw-medium">
-                            Destino <span class="text-danger">*</span>
-                        </label>
-                        <input v-model="formActividad.destino" type="text" class="form-control"
-                            :class="{ 'is-invalid': formActividad.errors.destino }" placeholder="Lugar de destino" />
-
-                        <div v-if="formActividad.errors.destino" class="text-danger small mt-1">{{
-                            formActividad.errors.destino }}</div>
-
-                    </div>
-                    <div class="col-4">
-                        <label class="form-label fw-medium">
-                            Cantidad <span class="text-danger">*</span>
-                        </label>
-                        <input v-model="formActividad.cantidad" type="text" class="form-control"
-                            :class="{ 'is-invalid': formActividad.errors.cantidad }" placeholder="Cantidad" />
-
-                        <div v-if="formActividad.errors.cantidad" class="text-danger small mt-1">{{
-                            formActividad.errors.cantidad }}</div>
-
-                    </div>
-                    <div class="col-8">
-                        <label class="form-label fw-medium">
-                            Unidad de medida <span class="text-danger">*</span>
-                        </label>
-                        <input v-model="formActividad.unidad_medida" type="text" class="form-control"
-                            :class="{ 'is-invalid': formActividad.errors.unidad_medida }" placeholder="Viajes, " />
-
-                        <div v-if="formActividad.errors.unidad_medida" class="text-danger small mt-1">{{
-                            formActividad.errors.unidad_medida }}</div>
-
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label fw-medium">
-                            Hora Inicio <span class="text-danger">*</span>
-                        </label>
-                        <input v-model="formActividad.hora_inicio" type="time" class="form-control" min="06:00"
-                            max="17:59" :class="{ 'is-invalid': formActividad.errors.hora_inicio }"
-                            placeholder="HH:MM" />
-
-                        <div v-if="formActividad.errors.hora_inicio" class="text-danger small mt-1">{{
-                            formActividad.errors.hora_inicio }}</div>
-
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label fw-medium">
-                            Hora Fin <span class="text-danger">*</span>
-                        </label>
-                        <input v-model="formActividad.hora_fin" type="time" class="form-control" :min="horaMinTurno"
-                            :max="horaMaxTurno" :class="{ 'is-invalid': formActividad.errors.hora_fin }"
-                            placeholder="HH:MM" />
-                        <div v-if="formActividad.errors.hora_fin" class="text-danger small mt-1">{{
-                            formActividad.errors.hora_fin }}</div>
-
+                        <button class="btn btn-primary">
+                            Agregar Actividad
+                        </button>
                     </div>
 
 
                 </div>
-
-                <!-- Botón para cerrar el modal desde adentro -->
-                <div class="mt-6 flex justify-between">
-                    <button @click="estaAbiertoModal = false" class="btn btn-secondary">
-                        Cancelar
-                    </button>
-
-                    <button @click="agregarActividad" class="btn btn-primary">
-                        Agregar Actividad
-                    </button>
-                </div>
-
-
-            </div>
+            </form>
         </Modal>
     </Maindashboard>
 </template>
