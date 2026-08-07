@@ -7,14 +7,16 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 #[Fillable([
     'tipo_vehiculo',
     'estado_tipo_vehiculo',
+    'id_grupo_vehiculo'
 ])]
 class TipoVehiculo extends Model
 {
     protected $table = 'tipo_vehiculo';
 
-
-
-
+    public function grupoVehiculo()
+    {
+        return $this->belongsTo(GrupoVehiculo::class, 'id_grupo_vehiculo');
+    }
 
     // Relaciones
     public function vehiculos()

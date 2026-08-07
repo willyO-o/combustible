@@ -17,30 +17,26 @@ return new class extends Migration
     {
         Schema::create('solicitud_mantenimiento', function (Blueprint $table) {
             $table->id();
-            //nro
             $table->integer('nro_solicitud');
+            $table->integer('gestion');
 
-            // Vehículo y conductor que generan la solicitud
             $table->foreignId('id_vehiculo')->constrained('vehiculo')->onDelete('restrict');
             $table->foreignId('id_conductor')->nullable()->constrained('conductor')->onDelete('set null');
             $table->foreignId('id_usuario_registra')->nullable()->constrained('users')->onDelete('set null');
 
-            // Tipo de solicitud
             $table->enum('tipo_mantenimiento', ['PREVENTIVO', 'CORRECTIVO'])->default('PREVENTIVO');
 
-            // Descripción del problema o mantenimiento preventivo
             $table->text('descripcion_problema');
 
-            // Datos del vehículo al momento de la solicitud
             $table->integer('kilometraje_actual')->nullable();
             $table->integer('horometro')->nullable();
             $table->dateTime('fecha_solicitud');
 
-            // Estado del flujo
             $table->enum('estado', ['PENDIENTE', 'APROBADA', 'RECHAZADA', 'ANULADA'])->default('PENDIENTE');
-
             $table->text('observacion')->nullable();
             $table->timestamps();
+
+            $table->unique(['nro_solicitud', 'gestion'], 'unique_nro_solicitud_gestion');
         });
     }
 

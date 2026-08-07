@@ -16,8 +16,8 @@ return new class extends Migration
             $table->string('ruta_respaldo', 250);
             $table->string('tipo_respaldo', 30);
             $table->string('tipo_archivo', 30);
-            $table->foreignId('id_carga_combustible')->constrained('carga_combustible')->onDelete('restrict')->onUpdate('cascade');
-            $table->foreignId('id_incidencia')->constrained('incidencia')->onDelete('restrict')->onUpdate('cascade');
+            $table->foreignId('id_carga_combustible')->nullable()->constrained('carga_combustible')->onDelete('restrict')->onUpdate('cascade');
+            $table->foreignId('id_incidencia')->nullable()->constrained('incidencia')->onDelete('restrict')->onUpdate('cascade');
             $table->timestamps();
         });
     }

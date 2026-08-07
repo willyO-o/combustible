@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
 
         // Ejecutar seeders de datos parametricos
         $this->call([
+            AreaSeeder::class,
             TipoCombustibleSeeder::class,
             TipoMantenimientoSeeder::class,
             TipoVehiculoSeeder::class,

@@ -13,8 +13,9 @@ return new class extends Migration
     {
         Schema::create('vale', function (Blueprint $table) {
             $table->id();
-            $table->integer('nro_vale')->unique();
-            $table->date('fecha_emision');
+            $table->integer('nro_vale');
+            $table->integer('gestion');
+            $table->dateTime('fecha_emision');
             $table->decimal('litros', 10, 2);
             $table->decimal('precio', 10, 2);
             $table->foreignId('id_vehiculo')->constrained('vehiculo')->onDelete('restrict')->onUpdate('cascade');
@@ -25,6 +26,8 @@ return new class extends Migration
             $table->foreignId('id_tipo_combustible')->constrained('tipo_combustible')->onDelete('restrict')->onUpdate('cascade');
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['nro_vale', 'gestion'], 'unique_nro_vale_gestion');
 
         });
     }

@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('area', function (Blueprint $table) {
+        Schema::create('grupo_vehiculo', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre_area', 200);
-            $table->text('descripcion_area')->nullable();
-            $table->enum('estado_area', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
+            $table->string('grupo_vehiculo', 150);
+            $table->enum('estado_grupo_vehiculo', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
             $table->timestamps();
         });
+
     }
 
     /**
@@ -25,6 +25,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('area');
+        Schema::dropIfExists('grupo_vehiculo');
+
     }
 };

@@ -20,10 +20,11 @@ class ConductorSeeder extends Seeder
                 'materno' => 'López',
                 'foto' => 'conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg',
                 'ci' => '1234567',
-                'celular' => '7123456789',
+                'celular' => '77777777',
                 'direccion' => 'Av. Principal 123',
                 'fecha_nacimiento' => '1990-05-15',
                 'estado_persona' => 'ACTIVO',
+                'es_conductor' => true,
             ],
             [
                 'nombres' => 'María',
@@ -31,10 +32,12 @@ class ConductorSeeder extends Seeder
                 'materno' => 'Martínez',
                 'foto' => 'conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg',
                 'ci' => '1234568',
-                'celular' => '7123456790',
+                'celular' => '77777778',
                 'direccion' => 'Calle 5ta 456',
                 'fecha_nacimiento' => '1992-08-20',
                 'estado_persona' => 'ACTIVO',
+                'es_conductor' => true,
+
             ],
             [
                 'nombres' => 'Carlos',
@@ -42,10 +45,12 @@ class ConductorSeeder extends Seeder
                 'materno' => 'Sánchez',
                 'foto' => 'conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg',
                 'ci' => '1234569',
-                'celular' => '7123456791',
+                'celular' => '77777779',
                 'direccion' => 'Pasaje 2 789',
                 'fecha_nacimiento' => '1988-12-10',
                 'estado_persona' => 'ACTIVO',
+                'es_conductor' => true,
+
             ],
             [
                 'nombres' => 'Ana',
@@ -53,21 +58,51 @@ class ConductorSeeder extends Seeder
                 'materno' => 'Gutierrez',
                 'foto' => 'conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg',
                 'ci' => '1234570',
-                'celular' => '7123456792',
+                'celular' => '77777780',
                 'direccion' => 'Boulevard Central 321',
                 'fecha_nacimiento' => '1995-03-25',
                 'estado_persona' => 'ACTIVO',
+                'es_conductor' => true,
+
             ],
             [
-                'nombres' => 'Roberto',
-                'paterno' => 'Hernández',
+                'nombres' => 'Jose Luis',
+                'paterno' => 'Pérez',
                 'materno' => 'Ramos',
                 'foto' => 'conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg',
-                'ci' => '1234571',
-                'celular' => '7123456793',
+                'ci' => '1234572',
+                'celular' => '77777781',
                 'direccion' => 'Avenida Este 654',
                 'fecha_nacimiento' => '1985-07-08',
                 'estado_persona' => 'ACTIVO',
+                'es_conductor' => false,
+
+            ],
+            [
+                'nombres' => 'Carlos',
+                'paterno' => 'Cruz',
+                'materno' => 'Ramos',
+                'foto' => 'conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg',
+                'ci' => '1234573',
+                'celular' => '77777782',
+                'direccion' => 'Avenida Este 654',
+                'fecha_nacimiento' => '1985-07-08',
+                'estado_persona' => 'ACTIVO',
+                'es_conductor' => false,
+
+            ],
+            [
+                'nombres' => 'Maria Luisa',
+                'paterno' => 'Jiménez',
+                'materno' => 'Ramos',
+                'foto' => 'conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg',
+                'ci' => '1234574',
+                'celular' => '77777783',
+                'direccion' => 'Avenida Este 654',
+                'fecha_nacimiento' => '1985-07-08',
+                'estado_persona' => 'ACTIVO',
+                'es_conductor' => false,
+
             ],
         ];
 
@@ -87,12 +122,15 @@ class ConductorSeeder extends Seeder
                 ]
             );
 
-            Conductor::updateOrCreate(
-                ['id' => $persona->id],
-                [
-                    'estado_conductor' => 'ACTIVO',
-                ]
-            );
+            if ($conductor['es_conductor']) {
+                Conductor::updateOrCreate(
+                    ['id' => $persona->id],
+                    [
+                        'estado_conductor' => 'ACTIVO',
+                    ]
+                );
+            }
+
         }
 
         $this->command->info('✓ Conductores creados exitosamente');

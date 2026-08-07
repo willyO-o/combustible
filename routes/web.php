@@ -107,6 +107,16 @@ Route::middleware('auth')->group(function () {
         Route::get('cargas-combustible', [CargasCombustibleReportController::class, 'index'])->name('index');
         Route::get('cargas-combustible/pdf', [CargasCombustibleReportController::class, 'generarPDF'])->name('pdf');
     });
+
+
+
+
+
+    //  Actividades de los operadores de transporte
+
+    Route::resource('operacion-diaria', \App\Http\Controllers\OperacionDiariaController::class)
+        ->parameters(['operacion-diaria' => 'operacion']);
+
 });
 
 require __DIR__ . '/auth.php';

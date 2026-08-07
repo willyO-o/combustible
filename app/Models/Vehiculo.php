@@ -5,23 +5,34 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+
 
 #[Fillable([
     'nro_placa',
+    'codigo',
     'anio',
     'marca',
+    'modelo',
     'estado_vehiculo',
     'id_tipo_combustible',
     'id_tipo_vehiculo',
     'fotografia',
+    'uuid',
     'detalles',
     'tipo_medicion',
 ])]
 class Vehiculo extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasUuids;
 
     protected $table = 'vehiculo';
+
+
+    public function uniqueIds(): array
+    {
+        return ['uuid'];
+    }
 
     // Relaciones
     public function tipoCombustible()

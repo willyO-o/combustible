@@ -49,6 +49,13 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
 
   {
+    title: 'Operación Diaria', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['operacion-diaria.ver', 'operacion-diaria.crear', 'operacion-diaria.informe'],
+    children: [
+      { path: '/operacion-diaria', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Actividades', permission: 'operacion-diaria.ver' },
+      { path: '/operacion-diaria/create', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Registrar Actividad', permission: 'operacion-diaria.crear' },
+    ],
+  },
+  {
     title: 'Mantenimiento', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver', 'mantenimiento.ver','mantenimiento.solicitudes.crear'],
     children: [
       { path: '/mantenimiento/solicitudes', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Solicitudes', permission: 'mantenimiento.solicitudes.ver' },

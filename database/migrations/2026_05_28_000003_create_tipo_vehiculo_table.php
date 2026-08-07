@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('tipo_vehiculo', 150);
             $table->enum('estado_tipo_vehiculo', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
+            $table->foreignId('id_grupo_vehiculo')->nullable()->constrained('grupo_vehiculo')->onDelete('RESTRICT')->onUpdate('CASCADE');
             $table->timestamps();
         });
     }

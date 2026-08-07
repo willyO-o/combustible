@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
 use App\Models\User;
+use App\Models\EncargadoArea;
+use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -12,35 +12,59 @@ use Spatie\Permission\PermissionRegistrar;
 class UserSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Convención de nombres: "modulo.accion" y "modulo.submodulo.accion".
+     * Los permisos y roles se crean de forma idempotente (firstOrCreate/syncPermissions),
+     * por lo que el seeder puede ejecutarse varias veces sin duplicar datos.
      */
-    public function run(): void
+
+    /* -----------------------------------------------------------------
+     |  Grupos de permisos por módulo
+     |  Mantener cada módulo en su propio array facilita agregar,
+     |  quitar o reutilizar permisos al armar los roles más abajo.
+     | -----------------------------------------------------------------
+     */
+
+    private function permisosDashboard(): array
     {
-        // Mantiene sincronizada la caché de Spatie al ejecutar el seeder.
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
-
-        /*
-         * Convención: "modulo.accion" y "modulo.submodulo.accion".
-         * Los permisos se crean de forma idempotente, por lo que puedes ejecutar
-         * el seeder varias veces sin duplicarlos. La asignación a roles se realiza
-         * por separado.
-         */
-        $permisos = [
-            // Panel principal
+        return [
             'dashboard.ver',
+        ];
+    }
 
-            // Vales y cargas de combustible
+    private function permisosVales(): array
+    {
+        return [
             'vales.ver',
             'vales.crear',
             'vales.editar',
             'vales.eliminar',
+        ];
+    }
+    private function permisosOperacionDiaria(): array
+    {
+        return [
+            'operacion-diaria.ver',
+            'operacion-diaria.crear',
+            'operacion-diaria.editar',
+            'operacion-diaria.eliminar',
+            'operacion-diaria.informe',
+        ];
+    }
+
+    private function permisosCargasCombustible(): array
+    {
+        return [
             'cargas-combustible.ver',
             'cargas-combustible.registrar',
             'cargas-combustible.editar',
             'cargas-combustible.eliminar',
             'cargas-combustible.reporte',
+        ];
+    }
 
-            // Mantenimiento: solicitud, orden de trabajo y ejecución
+    private function permisosMantenimiento(): array
+    {
+        return [
             'mantenimiento.solicitudes.ver',
             'mantenimiento.solicitudes.crear',
             'mantenimiento.ordenes.ver',
@@ -48,195 +72,332 @@ class UserSeeder extends Seeder
             'mantenimiento.ordenes.editar',
             'mantenimiento.ordenes.estado.cambiar',
             'mantenimiento.ordenes.ejecucion.registrar',
+        ];
+    }
 
-            // Catálogos
+    private function permisosConductores(): array
+    {
+        return [
             'conductores.ver',
             'conductores.crear',
             'conductores.editar',
             'conductores.eliminar',
+        ];
+    }
+
+    private function permisosVehiculos(): array
+    {
+        return [
             'vehiculos.ver',
             'vehiculos.crear',
             'vehiculos.editar',
             'vehiculos.eliminar',
+        ];
+    }
+
+    private function permisosGrifos(): array
+    {
+        return [
             'grifos.ver',
             'grifos.crear',
             'grifos.editar',
             'grifos.eliminar',
+        ];
+    }
+
+    private function permisosTiposCombustible(): array
+    {
+        return [
             'tipos-combustible.ver',
             'tipos-combustible.crear',
             'tipos-combustible.editar',
             'tipos-combustible.eliminar',
+        ];
+    }
+
+    private function permisosTiposMantenimiento(): array
+    {
+        return [
             'tipos-mantenimiento.ver',
             'tipos-mantenimiento.crear',
             'tipos-mantenimiento.editar',
             'tipos-mantenimiento.eliminar',
+        ];
+    }
+
+    private function permisosTiposVehiculo(): array
+    {
+        return [
             'tipos-vehiculo.ver',
             'tipos-vehiculo.crear',
             'tipos-vehiculo.editar',
             'tipos-vehiculo.eliminar',
+        ];
+    }
 
-            // Administración de usuarios
+    private function permisosUsuarios(): array
+    {
+        return [
             'usuarios.ver',
             'usuarios.crear',
             'usuarios.editar',
             'usuarios.eliminar',
             'usuarios.contrasena.cambiar',
         ];
+    }
 
+    private function permisosAreas(): array
+    {
+        return [
+            'areas.ver',
+            'areas.crear',
+            'areas.editar',
+            'areas.eliminar',
+        ];
+    }
+
+    /**
+     * Todos los catálogos (conductores, vehículos, grifos, tipos-*) agrupados,
+     * útil porque varios roles (admin, jefe de transporte) los comparten.
+     */
+    private function permisosCatalogos(): array
+    {
+        return [
+            ...$this->permisosConductores(),
+            ...$this->permisosVehiculos(),
+            ...$this->permisosGrifos(),
+            ...$this->permisosTiposCombustible(),
+            ...$this->permisosTiposMantenimiento(),
+            ...$this->permisosTiposVehiculo(),
+        ];
+    }
+
+    /**
+     * Operación diaria de flota: vales, combustible y mantenimiento.
+     * Compartido por administrador y jefe de transporte.
+     */
+    private function permisosOperacionVehiculo(): array
+    {
+        return [
+            ...$this->permisosVales(),
+            ...$this->permisosCargasCombustible(),
+            ...$this->permisosMantenimiento(),
+            ...$this->permisosOperacionDiaria(),
+        ];
+    }
+
+    /**
+     * Listado completo de todos los permisos del sistema.
+     * Es la única fuente de verdad usada para crear los permisos en BD.
+     */
+    private function todosLosPermisos(): array
+    {
+        return [
+            ...$this->permisosDashboard(),
+            ...$this->permisosOperacionVehiculo(),
+            ...$this->permisosCatalogos(),
+            ...$this->permisosUsuarios(),
+            ...$this->permisosAreas(),
+        ];
+    }
+
+    /* -----------------------------------------------------------------
+     |  Permisos por rol
+     |  Cada método describe explícitamente qué puede hacer cada rol.
+     | -----------------------------------------------------------------
+     */
+
+    private function permisosParaConductor(): array
+    {
+        return [
+            'vales.ver',
+            'cargas-combustible.ver',
+            'cargas-combustible.registrar',
+            'mantenimiento.solicitudes.crear',
+            'mantenimiento.solicitudes.ver',
+            'mantenimiento.ordenes.ver',
+            'operacion-diaria.ver',
+            'operacion-diaria.crear',
+            'operacion-diaria.editar',
+            'operacion-diaria.eliminar',
+            'operacion-diaria.informe',
+        ];
+    }
+
+    private function permisosParaJefeArea(): array
+    {
+        return [
+            ...$this->permisosOperacionVehiculo(),
+            ...$this->permisosCatalogos(),
+        ];
+    }
+
+    /* -----------------------------------------------------------------
+     |  Helpers de creación (roles, permisos, usuarios)
+     | -----------------------------------------------------------------
+     */
+
+    /**
+     * Crea (o recupera) todos los permisos indicados, de forma idempotente.
+     */
+    private function crearPermisos(array $permisos): void
+    {
         foreach ($permisos as $permiso) {
             Permission::firstOrCreate([
                 'name' => $permiso,
                 'guard_name' => 'web',
             ]);
         }
+    }
 
-        $adminRole = Role::firstOrCreate([
-            'name' => 'administrador',
+    /**
+     * Crea (o recupera) un rol y sincroniza su lista de permisos.
+     */
+    private function crearRolConPermisos(string $nombre, array $permisos): Role
+    {
+        $rol = Role::firstOrCreate([
+            'name' => $nombre,
             'guard_name' => 'web',
         ]);
 
+        $rol->syncPermissions($permisos);
 
-        // Asignar todos los permisos al rol de administrador
-        $adminRole->syncPermissions(Permission::all());
+        return $rol;
+    }
 
-        // Crear un usuario administrador
-        $adminUser = User::firstOrCreate([
-            'email' => 'admin@gmail.com',
-        ], [
-            'name' => 'Admin User',
-            'password' => bcrypt('admin123'),
-        ]);
+    /**
+     * Crea (o recupera) un usuario y le asigna un rol.
+     *
+     * @param  array  $datosBusqueda  Campos usados para localizar el registro (p.ej. email).
+     * @param  array  $datosCreacion  Campos usados solo al crear el registro.
+     */
+    private function crearUsuarioConRol(array $datosBusqueda, array $datosCreacion, Role $rol): User
+    {
+        $usuario = User::firstOrCreate($datosBusqueda, $datosCreacion);
 
-        $conductorUser = User::firstOrCreate([
-            'email' => 'conductor@gmail.com',
-        ], [
-            'name' => 'Conductor User',
-            'password' => bcrypt('conductor123'),
-            'id_persona' => 1, // Asignar el ID de la persona correspondiente
-        ]);
+        $usuario->assignRole($rol);
 
-        $conductorRole = Role::firstOrCreate([
-            'name' => 'conductor',
-            'guard_name' => 'web',
-        ]);
+        return $usuario;
+    }
 
-        $conductorUser->assignRole($conductorRole);
+    /* -----------------------------------------------------------------
+     |  Run
+     | -----------------------------------------------------------------
+     */
 
-        //asignar los roles             'vales.ver', 'cargas-combustible.ver', 'cargas-combustible.registrar',
-        $conductorRole->syncPermissions([
-            'vales.ver',
-            'cargas-combustible.ver',
-            'cargas-combustible.registrar',
-            'mantenimiento.solicitudes.crear',
-            'mantenimiento.solicitudes.ver',
-            'mantenimiento.ordenes.ver',
-        ]);
+    public function run(): void
+    {
+        // Mantiene sincronizada la caché de Spatie al ejecutar el seeder.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $conductorUser2 = User::firstOrCreate([
-            'email' => 'conductor2@gmail.com',
-        ], [
-            'name' => 'Conductor User 2',
-            'password' => bcrypt('conductor123'),
-            'id_persona' => 2, // Asignar el ID de la persona correspondiente
-        ]);
-        $conductorUser2->assignRole($conductorRole);
+        $this->crearPermisos($this->todosLosPermisos());
 
-        $conductorUser3 = User::firstOrCreate([
-            'email' => 'conductor3@gmail.com',
-        ], [
-            'name' => 'Conductor User 3',
-            'password' => bcrypt('conductor123'),
-            'id_persona' => 3, // Asignar el ID de la persona correspondiente
-        ]);
-        $conductorUser3->assignRole($conductorRole);
+        $this->crearRolAdministrador();
+        $this->crearRolSuperAdmin();
+        $this->crearRolConductor();
+        $this->crearRolJefeArea();
+    }
 
-        // Asignar rol de administrador al usuario administrador
-        $adminUser->assignRole($adminRole);
+    /* -----------------------------------------------------------------
+     |  Roles + usuarios de ejemplo
+     |  Un método por rol: crea el rol con sus permisos y sus usuarios
+     |  asociados. Mantenerlos separados facilita añadir o quitar roles
+     |  sin tocar el resto del seeder.
+     | -----------------------------------------------------------------
+     */
 
+    private function crearRolAdministrador(): void
+    {
+        $rol = $this->crearRolConPermisos('administrador', $this->todosLosPermisos());
 
+        $this->crearUsuarioConRol(
+            ['email' => 'admin@gmail.com'],
+            [
+                'name' => 'Admin User',
+                'password' => bcrypt('admin123'),
+            ],
+            $rol
+        );
+    }
 
-
-        $superAdminRole = Role::firstOrCreate([
-            'name' => 'super-admin',
-            'guard_name' => 'web',
-        ]);
-
+    private function crearRolSuperAdmin(): void
+    {
         // El super-admin recibe automáticamente todos los permisos existentes.
-        $superAdminRole->syncPermissions(Permission::all());
+        $rol = $this->crearRolConPermisos('super-admin', $this->todosLosPermisos());
 
-        $superAdminUser = User::firstOrCreate([
-            'email' => 'super-admin@gmail.com',
-        ], [
-            'name' => 'Super Admin User',
-            'password' => bcrypt('superadmin123'),
-        ]);
+        $this->crearUsuarioConRol(
+            ['email' => 'super-admin@gmail.com'],
+            [
+                'name' => 'Super Admin User',
+                'password' => bcrypt('superadmin123'),
+            ],
+            $rol
+        );
+    }
 
-        $superAdminUser->assignRole($superAdminRole);
+    private function crearRolConductor(): void
+    {
+        $rol = $this->crearRolConPermisos('conductor', $this->permisosParaConductor());
 
-        //roles de jefe de transporte
+        // Usuarios de ejemplo, cada uno vinculado a su id_persona correspondiente.
+        $personas = [
+            ['email' => 'conductor@gmail.com', 'name' => 'Conductor User', 'password' => 'conductor123', 'id_persona' => 1],
+            ['email' => 'conductor2@gmail.com', 'name' => 'Conductor User 2', 'password' => 'conductor123', 'id_persona' => 2],
+            ['email' => 'conductor3@gmail.com', 'name' => 'Conductor User 3', 'password' => 'conductor123', 'id_persona' => 3],
+            ['email' => 'jefearea1@gmail.com', 'name' => 'Jefe area 1', 'password' => 'jefearea123', 'id_persona' => 5],
+            ['email' => 'jefearea2@gmail.com', 'name' => 'Jefe area 2', 'password' => 'jefearea123', 'id_persona' => 6],
+            ['email' => 'jefearea3@gmail.com', 'name' => 'Jefe area 3', 'password' => 'jefearea123', 'id_persona' => 7],
+        ];
 
-        $jefeTransporteRole = Role::firstOrCreate([
-            'name' => 'jefe-transporte',
-            'guard_name' => 'web',
-        ]);
+        foreach ($personas as $persona) {
+            $this->crearUsuarioConRol(
+                ['email' => $persona['email']],
+                [
+                    'name' => $persona['name'],
+                    'password' => bcrypt($persona['password']),
+                    'id_persona' => $persona['id_persona'],
+                ],
+                $rol
+            );
+        }
+    }
 
-        $jefeTransporteRole->syncPermissions([
-            // Vales y cargas de combustible
-            'vales.ver',
-            'vales.crear',
-            'vales.editar',
-            'vales.eliminar',
-            'cargas-combustible.ver',
-            'cargas-combustible.registrar',
-            'cargas-combustible.editar',
-            'cargas-combustible.eliminar',
-            'cargas-combustible.reporte',
+    private function crearRolJefeArea(): void
+    {
 
-            // Mantenimiento: solicitud, orden de trabajo y ejecución
-            'mantenimiento.solicitudes.ver',
-            'mantenimiento.solicitudes.crear',
-            'mantenimiento.ordenes.ver',
-            'mantenimiento.ordenes.crear',
-            'mantenimiento.ordenes.editar',
-            'mantenimiento.ordenes.estado.cambiar',
-            'mantenimiento.ordenes.ejecucion.registrar',
+        $personas = [
+            ['email' => 'jefearea1@gmail.com', 'name' => 'Jefe area 1', 'password' => 'jefearea123', 'id_persona' => 5],
+            ['email' => 'jefearea2@gmail.com', 'name' => 'Jefe area 2', 'password' => 'jefearea123', 'id_persona' => 6],
+            ['email' => 'jefearea3@gmail.com', 'name' => 'Jefe area 3', 'password' => 'jefearea123', 'id_persona' => 7],
+        ];
 
-            // Catálogos
-            'conductores.ver',
-            'conductores.crear',
-            'conductores.editar',
-            'conductores.eliminar',
-            'vehiculos.ver',
-            'vehiculos.crear',
-            'vehiculos.editar',
-            'vehiculos.eliminar',
-            'grifos.ver',
-            'grifos.crear',
-            'grifos.editar',
-            'grifos.eliminar',
-            'tipos-combustible.ver',
-            'tipos-combustible.crear',
-            'tipos-combustible.editar',
-            'tipos-combustible.eliminar',
-            'tipos-mantenimiento.ver',
-            'tipos-mantenimiento.crear',
-            'tipos-mantenimiento.editar',
-            'tipos-mantenimiento.eliminar',
-        ]);
-
-        $jefeTransporteUser = User::firstOrCreate([
-            'email' => 'jefe-transporte@gmail.com',
-        ], [
-            'name' => 'Jefe de Transporte User',
-            'password' => bcrypt('jefetransporte123'),
-        ]);
-
-        $jefeTransporteUser->assignRole($jefeTransporteRole);
+        $rol = $this->crearRolConPermisos('jefe-area', $this->permisosParaJefeArea());
 
 
+        $idArea = 1; // Asignar áreas 1, 2 y 3 a los jefes de área 1
+        foreach ($personas as $persona) {
+            $us = $this->crearUsuarioConRol(
+                ['email' => $persona['email']],
+                [
+                    'name' => $persona['name'],
+                    'password' => bcrypt($persona['password']),
+                    'id_persona' => $persona['id_persona'],
+                ],
+                $rol
+            );
 
+            // Crear un registro en la tabla encargado_area para cada jefe de área
+            EncargadoArea::updateOrCreate(
+                ['id_persona' => $persona['id_persona']],
+                [
+                    'id_area' => $idArea, // Asignar áreas 1, 2 y 3 a los jefes de área 1
+                    'fecha_inicio' => now(),
+                    'tipo_encargo' => 'TITULAR',
+                    'estado_encargo' => 'ACTIVO',
+                ]
+            );
 
-
-
+            $idArea++; // Incrementar el área para el siguiente jefe de área
+        }
     }
 }

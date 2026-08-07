@@ -58,12 +58,14 @@ class Conductor extends Model
     {
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
             ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle','id_vehiculo','id_conductor'])
-            // verifica que la asignación esté activa y que la fecha de culminación sea nula o mayor a la fecha actual
-            ->wherePivot('estado_asignacion', 'ACTIVO')
+            ->where(function ($query) {
+                $query->where('asignacion.estado_asignacion', 'ACTIVO')
+                    ->orWhere('asignacion.estado_asignacion', 'PROVISIONAL');
+            })
             ->where(function ($query) {
                 $query->whereNull('asignacion.fecha_culminacion')
                     ->orWhere('asignacion.fecha_culminacion', '>', now());
-            });;
+            });
     }
 
     public function asignacionesActivasOpt()
@@ -73,7 +75,7 @@ class Conductor extends Model
         return $this->asignacionesActivas->map(function ($asignacion) {
             return [
                 'id'    => $asignacion->id,
-                'label' => "{$asignacion->nro_placa} — {$asignacion->marca} ({$asignacion->anio})",
+                'label' => "{$asignacion->codigo} — {$asignacion->nro_placa} —  {$asignacion->marca} ({$asignacion->anio})",
                 'meta'  => [
                     'id_tipo_vehiculo' => $asignacion->id_tipo_vehiculo,
                     'id_tipo_combustible'   => $asignacion->id_tipo_combustible,
@@ -81,6 +83,8 @@ class Conductor extends Model
                     'marca'       => $asignacion->marca,
                     'nro_placa'       => $asignacion->nro_placa,
                     'anio'       => $asignacion->anio,
+                    'modelo'       => $asignacion->modelo,
+                    'codigo'       => $asignacion->codigo,
                 ],
             ];
         });
