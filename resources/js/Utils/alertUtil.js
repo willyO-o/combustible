@@ -43,6 +43,7 @@ export const confirm = async (
         icon: "warning",
         showCancelButton: true,
         confirmButtonText: txtBtn,
+        cancelButtonText: "Cancelar",
     });
 
     return result.isConfirmed;

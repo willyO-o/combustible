@@ -19,17 +19,12 @@ const isMobile = breakpoints.smaller('md') // Devuelve true si la pantalla es me
 
 
 const props = defineProps({
-    tiposCombustible: Array,
-    grifos: Array,
     conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
-    valesConductor: Array, // [{ id, nro_vale, fecha_emision, litros }] vales PENDIENTE del conductor (si hay uno)
     vehiculosAsignados: Array, // [{ id, label }] vehículos asignados al conductor (si hay uno)
 })
 
-const valesVehiculo = ref(props.valesConductor || [])
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
 
-const conductoresOpt = ref([])   // [{ id, label }] conductores activos (para búsqueda async)
 
 
 
@@ -39,9 +34,19 @@ const conductoresOpt = ref([])   // [{ id, label }] conductores activos (para b�
 /* ------------------------------------------------------------------ */
 const today = new Date().toISOString().slice(0, 16) // yyyy-MM-ddTHH:mm
 
+const turnoDefault = function () {
+    const hour = new Date().getHours()
+
+    if (hour >= 6 && hour < 18) {
+        return 'DIA'
+    } else {
+        return 'NOCHE'
+    }
+}
+
 const form = useForm({
     id_vehiculo: null,
-    turno: 'DIA',
+    turno: turnoDefault(),
     fecha_inicio: today,
     fecha_fin: today,
     kilometraje_inicio: '',
@@ -49,7 +54,7 @@ const form = useForm({
     horometro_inicio: '',
     horometro_fin: '',
     horas_trabajadas: '',
-    estado: 'REGISTRADO',
+    estado: 'FINALIZADO',
     observaciones: '',
     notificar_observaciones: false,
     actividades_realizadas: []
@@ -58,12 +63,12 @@ const form = useForm({
 /* ------------------------------------------------------------------ */
 /*  Auto-relleno al seleccionar vehículo                               */
 /* ------------------------------------------------------------------ */
-const conductorAutoFill = ref(null)   // { id, label } del conductor asignado
 const loadingVehiculo = ref(false)
 
 const formActividad = useForm({
     actividad: '',
     id_actividad: null,
+    lugar: '',
     origen: '',
     destino: '',
     cantidad: '',
@@ -91,89 +96,36 @@ const horaMaxTurno = computed(() => {
     return ''
 })
 
+const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
 
 watch(() => form.id_vehiculo, async (val) => {
 
 
+    tipoMedicion.value = ''
 
-    if (!val) {
-        form.id_tipo_combustible = ''
-        conductorAutoFill.value = null
-        form.id_conductor = null
-        conductoresOpt.value = []
-        return
-    }
-    loadingVehiculo.value = true
-    try {
-
-        const res = await fetch(route('cargas.vehiculo-info', val))
-        const data = await res.json()
-        if (data.tipo_combustible) {
-            form.id_tipo_combustible = data.tipo_combustible.id
-        }
-        if (data.conductor) {
-            conductorAutoFill.value = data.conductor
-            form.id_conductor = data.conductor.id
-        } else {
-            conductorAutoFill.value = null
-        }
-    } catch (error) {
-        // no critical
-
-
-    } finally {
-        loadingVehiculo.value = false
-    }
-})
-
-/* ------------------------------------------------------------------ */
-/*  Cuando se selecciona un vale → tipo_carga = VALE                  */
-/* ------------------------------------------------------------------ */
-watch(() => form.id_vale, (val) => {
     if (!val) return
 
-    form.tipo_carga = 'VALE'
+    const vehiculoSelected = vehiculosAsignadosOpt.value.find(v => v.id === val)
+
+    if (vehiculoSelected) {
+        tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
+    }
+
+
+
 
 })
 
-/* ------------------------------------------------------------------ */
-/*  Respaldos digitales                                                */
-/* ------------------------------------------------------------------ */
-const tiposRespaldo = ['FACTURA', 'NOTA', 'COMPROBANTE', 'OTRO']
-const respaldos = ref([])   // [{ archivo, tipo_respaldo, preview, previewType }]
 
-function agregarRespaldo() {
-    if (respaldos.value.length >= 5) return
-    respaldos.value.push({ archivo: null, tipo_respaldo: 'FACTURA', preview: null, previewType: null })
-}
+
+
 
 function quitarActividad(idx) {
     form.actividades_realizadas.splice(idx, 1)
 }
 
-function onArchivoChange(e, idx) {
-    const file = e.target.files[0]
-    if (!file) return
-    respaldos.value[idx].archivo = file
-    const isPdf = file.type === 'application/pdf'
-    respaldos.value[idx].previewType = isPdf ? 'PDF' : 'IMAGEN'
-    if (!isPdf) {
-        const reader = new FileReader()
-        reader.onload = (ev) => (respaldos.value[idx].preview = ev.target.result)
-        reader.readAsDataURL(file)
-    } else {
-        respaldos.value[idx].preview = null
-    }
-}
 
-/* ------------------------------------------------------------------ */
-/*  Resumen de monto total                                             */
-/* ------------------------------------------------------------------ */
-const totalMonto = computed(() => {
-    const l = Number(form.litros)
-    const p = Number(form.precio)
-    return !isNaN(l) && !isNaN(p) && l > 0 && p > 0 ? (l * p).toFixed(2) : null
-})
+
 
 /* ------------------------------------------------------------------ */
 /*  Envío                                                              */
@@ -184,20 +136,10 @@ function submit() {
             const out = {
                 ...data,
                 id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
-                id_grifo: data.id_grifo?.id ?? data.id_grifo,
-                id_conductor: data.id_conductor?.id ?? data.id_conductor,
-                id_vale: data.id_vale?.id ?? data.id_vale ?? null,
-                respaldo_count: respaldos.value.filter(r => r.archivo).length,
             }
-            respaldos.value.forEach((r, i) => {
-                if (r.archivo) {
-                    out[`respaldo_archivo_${i}`] = r.archivo
-                    out[`respaldo_tipo_${i}`] = r.tipo_respaldo
-                }
-            })
             return out
         })
-        .post(route('cargas.store'), { forceFormData: true })
+        .post(route('operacion-diaria.store'), { forceFormData: true })
 }
 
 const agregarActividad = () => {
@@ -211,6 +153,7 @@ const agregarActividad = () => {
             // Limpiar el formulario de actividad
             formActividad.actividad = '';
             formActividad.id_actividad = null;
+            formActividad.lugar = '';
             formActividad.origen = '';
             formActividad.destino = '';
             formActividad.cantidad = '';
@@ -231,100 +174,6 @@ const agregarActividad = () => {
 
 
 
-const valeSeleccionado = (e) => {
-    //obtener los datos del item seleccionado
-
-    const selectedValeId = e.target.value
-
-    form.litros = ''
-    form.precio = ''
-    form.id_grifo = ''
-    if (valesVehiculo.value.length === 0) return
-
-    const selectedVale = valesVehiculo.value.find(vale => vale.id == selectedValeId)
-    if (!selectedVale) return
-
-
-    form.litros = selectedVale.meta.litros
-    form.precio = selectedVale.meta.precio
-    form.id_grifo = selectedVale.meta.id_grifo
-
-
-
-
-}
-
-
-
-
-const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
-
-const cambioVehiculo = async (vehiculoId) => {
-
-
-
-
-    form.kilometraje = ''
-    form.horometro = ''
-    form.id_vale = null
-    form.id_grifo = null
-    form.precio = ''
-    form.litros = ''
-    form.id_conductor = null
-
-    let vehiculoSelected = null
-
-    //corregir
-    if (!vehiculoId || (typeof vehiculoId === 'object' && vehiculoId === null) || JSON.stringify(vehiculoId) === '{}') {
-        tipoMedicion.value = ''
-        valesVehiculo.value = []
-        return
-    }
-
-    if (typeof vehiculoId === 'object' && vehiculoId !== null) {
-        vehiculoSelected = vehiculoId // This line is incorrect, it should be:
-
-        vehiculoId = vehiculoId.id
-
-    } else {
-        vehiculoSelected = vehiculosAsignadosOpt.value.find(v => v.id === vehiculoId)
-
-    }
-
-
-    if (vehiculoSelected) {
-        tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
-    }
-
-
-    const { data } = await axios.get(route('search.vales-carga'), {
-        params: {
-            id_vehiculo: vehiculoId,
-            q: '',
-        }
-    })
-    if (data) {
-        valesVehiculo.value = data.map(v => ({
-            id: v.id,
-            label: v.label,
-            meta: v.meta,
-        }))
-    }
-
-    const conductoresRes = await axios.get(route('search.conductores'), {
-        params: {
-            id_vehiculo: vehiculoId,
-        }
-    })
-
-    conductoresOpt.value = conductoresRes.data.map(c => ({
-        id: c.id,
-        label: c.label,
-        meta: c.meta,
-    }))
-
-}
-
 
 
 
@@ -333,8 +182,6 @@ onMounted(() => {
     // Si hay un conductor asignado desde el servidor, auto-seleccionarlo
 
     if (props.conductor) {
-        form.id_conductor = props.conductor.id
-        form.id_tipo_combustible = props.conductor.tipo_combustible_id
 
         if (vehiculosAsignadosOpt.value.length > 0) {
             form.id_vehiculo = vehiculosAsignadosOpt.value[0].id
@@ -420,7 +267,7 @@ onMounted(() => {
                                     </label>
                                     <Multiselect v-if="props.conductor" v-model="form.id_vehiculo"
                                         :options="vehiculosAsignadosOpt" value-prop="id" label="label"
-                                        @change="cambioVehiculo" placeholder="Seleccionar vehículo" />
+                                        placeholder="Seleccionar vehículo" />
 
                                     <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">{{
                                         form.errors.id_vehiculo }}</div>
@@ -498,7 +345,7 @@ onMounted(() => {
                                         <span class="input-group-text">h</span>
                                         <div v-if="form.errors.horometro_inicio" class="invalid-feedback">{{
                                             form.errors.horometro_inicio
-                                            }}</div>
+                                        }}</div>
                                     </div>
 
                                 </div>
@@ -514,7 +361,7 @@ onMounted(() => {
                                         <span class="input-group-text">h</span>
                                         <div v-if="form.errors.horometro_fin" class="invalid-feedback">{{
                                             form.errors.horometro_fin
-                                            }}</div>
+                                        }}</div>
                                     </div>
 
                                 </div>
@@ -591,7 +438,7 @@ onMounted(() => {
                                     </button>
                                 </div>
                                 <div class="row g-2 ps-4 p-2">
-                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
                                         <label class="form-label form-label-sm fw-medium mb-0">
                                             <i class="ri-map-pin-line text-info"></i>
 
@@ -601,7 +448,7 @@ onMounted(() => {
                                             {{ r.origen }}
                                         </p>
                                     </div>
-                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
                                         <label class="form-label form-label-sm fw-medium mb-0">
                                             <i class="ri-map-pin-line text-info"></i>
 
@@ -612,7 +459,7 @@ onMounted(() => {
                                         </p>
                                     </div>
 
-                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
                                         <label class="form-label form-label-sm fw-medium mb-0">
                                             <i class="ri-map-pin-line text-info"></i>
 
@@ -623,7 +470,7 @@ onMounted(() => {
                                         </p>
                                     </div>
 
-                                    <div class="col-sm-4 small d-flex align-items-center  gap-3 my-0">
+                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
                                         <label class="form-label form-label-sm fw-medium mb-0">
                                             <i class="ri-map-pin-line text-info"></i>
 
@@ -713,11 +560,24 @@ onMounted(() => {
                                 formActividad.errors.destino }}</div>
 
                         </div>
+
+                        <div v-if="tipoMedicion == 'horometro'" class="col-12">
+                            <label class="form-label fw-medium">
+                                Lugar <span class="text-danger">*</span>
+                            </label>
+                            <input v-model="formActividad.lugar" type="text" class="form-control"
+                                :class="{ 'is-invalid': formActividad.errors.lugar }"
+                                placeholder="Lugar de la actividad" />
+
+                            <div v-if="formActividad.errors.lugar" class="text-danger small mt-1">{{
+                                formActividad.errors.lugar }}</div>
+
+                        </div>
                         <div class="col-4">
                             <label class="form-label fw-medium">
                                 Cantidad <span class="text-danger">*</span>
                             </label>
-                            <input v-model="formActividad.cantidad" type="text" class="form-control"
+                            <input v-model="formActividad.cantidad" type="text" class="form-control" v-entero="1"
                                 :class="{ 'is-invalid': formActividad.errors.cantidad }" placeholder="Cantidad" />
 
                             <div v-if="formActividad.errors.cantidad" class="text-danger small mt-1">{{
@@ -729,7 +589,8 @@ onMounted(() => {
                                 Unidad de medida <span class="text-danger">*</span>
                             </label>
                             <input v-model="formActividad.unidad_medida" type="text" class="form-control"
-                                :class="{ 'is-invalid': formActividad.errors.unidad_medida }" placeholder="Viajes, " />
+                                :class="{ 'is-invalid': formActividad.errors.unidad_medida }"
+                                placeholder="Viajes, Cargas, etc. " />
 
                             <div v-if="formActividad.errors.unidad_medida" class="text-danger small mt-1">{{
                                 formActividad.errors.unidad_medida }}</div>

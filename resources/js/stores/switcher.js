@@ -13,7 +13,7 @@ export const switcherStore = defineStore('switcher', {
         headerPosition: 'fixed',        // fixed, scrollable
         menuColor: 'dark',                  // light, dark, color, gradient, transparent
         headerColor: 'light',                // light, dark, color, gradient, transparent
-        themePrimary: '22, 119, 167',               //'22, 119, 167'   '58, 88, 146', '92, 144, 163', '161, 90, 223', '78, 172, 76', '223, 90, 90'
+        themePrimary: '60, 38 ,173',               //'22, 119, 167'   '58, 88, 146', '92, 144, 163', '161, 90, 223', '78, 172, 76', '223, 90, 90'
         themeBackground: '',
         backgroundImage: 'bgimg4',          // bg-img1, bg-img2, bg-img3, bg-img4, bg-img5, bg-img6
     }),

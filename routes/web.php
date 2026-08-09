@@ -12,6 +12,7 @@ use App\Http\Controllers\TipoVehiculoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValeController;
 use App\Http\Controllers\VehiculoController;
+use App\Http\Controllers\OperacionDiariaController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -106,18 +107,20 @@ Route::middleware('auth')->group(function () {
     Route::prefix('reportes')->name('cargas-combustible.reporte.')->group(function () {
         Route::get('cargas-combustible', [CargasCombustibleReportController::class, 'index'])->name('index');
         Route::get('cargas-combustible/pdf', [CargasCombustibleReportController::class, 'generarPDF'])->name('pdf');
+
     });
 
+        Route::get('reportes/operacion-diaria/pdf/{operacionDiaria}', [OperacionDiariaController::class, 'generarPDF'])->name('operacion-diaria.reporte.pdf');
 
 
 
 
     //  Actividades de los operadores de transporte
+    Route::post('operacion-diaria/verificar', [OperacionDiariaController::class, 'verificarOperacion'])->name('operacion-diaria.verificar');
+    Route::resource('operacion-diaria', OperacionDiariaController::class)
+        ->parameters(['operacion-diaria' => 'operacionDiaria']);
 
-    Route::resource('operacion-diaria', \App\Http\Controllers\OperacionDiariaController::class)
-        ->parameters(['operacion-diaria' => 'operacion']);
-
-    Route::post('operacion-actividad', [\App\Http\Controllers\OperacionDiariaController::class, 'validarActividad'])
+    Route::post('operacion-actividad', [OperacionDiariaController::class, 'validarActividad'])
         ->name('operacion-diaria.agregar-actividad');
 
 });

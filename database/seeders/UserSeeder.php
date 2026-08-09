@@ -48,6 +48,8 @@ class UserSeeder extends Seeder
             'operacion-diaria.editar',
             'operacion-diaria.eliminar',
             'operacion-diaria.informe',
+            'operacion-diaria.reporte.pdf',
+            'operacion-diaria.verificar',
         ];
     }
 
@@ -229,6 +231,8 @@ class UserSeeder extends Seeder
         return [
             ...$this->permisosOperacionVehiculo(),
             ...$this->permisosCatalogos(),
+            'operacion-diaria.verificar'
+            ,
         ];
     }
 
@@ -344,9 +348,6 @@ class UserSeeder extends Seeder
             ['email' => 'conductor@gmail.com', 'name' => 'Conductor User', 'password' => 'conductor123', 'id_persona' => 1],
             ['email' => 'conductor2@gmail.com', 'name' => 'Conductor User 2', 'password' => 'conductor123', 'id_persona' => 2],
             ['email' => 'conductor3@gmail.com', 'name' => 'Conductor User 3', 'password' => 'conductor123', 'id_persona' => 3],
-            ['email' => 'jefearea1@gmail.com', 'name' => 'Jefe area 1', 'password' => 'jefearea123', 'id_persona' => 5],
-            ['email' => 'jefearea2@gmail.com', 'name' => 'Jefe area 2', 'password' => 'jefearea123', 'id_persona' => 6],
-            ['email' => 'jefearea3@gmail.com', 'name' => 'Jefe area 3', 'password' => 'jefearea123', 'id_persona' => 7],
         ];
 
         foreach ($personas as $persona) {

@@ -77,4 +77,26 @@ class Persona extends Model
             'id_vehiculo'         // Llave foránea en la tabla Asignacion que apunta al Vehiculo
         )->where('asignacion.estado_asignacion', 'ACTIVO');
     }
+
+    public function areas()
+    {
+        return $this->belongsToMany(
+            Area::class,
+            'encargado_area',
+            'id_persona',
+            'id_area'
+        )->using(EncargadoArea::class)
+        ->withPivot('id', 'tipo_encargo', 'fecha_inicio', 'fecha_reasignacion', 'fecha_fin', 'motivo', 'estado_encargo');
+    }
+
+    public function encargadoAreas()
+    {
+        return $this->areas()->where(function ($query) {
+            $query->where('encargado_area.estado_encargo', 'ACTIVO')
+                ->orWhere(function ($query) {
+                    $query->whereNull('encargado_area.fecha_fin')
+                        ->orWhere('encargado_area.fecha_fin', '>', now());
+                });
+        });
+    }
 }

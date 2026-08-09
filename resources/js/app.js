@@ -16,6 +16,8 @@ import 'vue3-colorpicker/style.css';
 import 'vue3-toastify/dist/index.css';
 import can from '@/Directives/can';
 import Decimal from '@/Directives/Decimal';
+import Entero from '@/Directives/Entero';
+import MaxLength from '@/Directives/MaxLength';
 import { registerSW } from 'virtual:pwa-register';
 
 
@@ -42,6 +44,8 @@ createInertiaApp({
             .component('Apexchart', VueApexCharts)
             .directive('can', can)
             .directive('decimal', Decimal)
+            .directive('entero', Entero)
+            .directive('max-length', MaxLength)
             .mount(el);
     },
     progress: {

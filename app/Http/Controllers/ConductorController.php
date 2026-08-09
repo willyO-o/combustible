@@ -67,7 +67,7 @@ class ConductorController extends Controller
     public function show(Conductor $conductor): Response
     {
         $historialAsignaciones = $conductor->historialAsignacionesVehiculos()->get();
-        $conductor->load('asignacioneActivas'); // Cargar las asignaciones activas para el conductor
+        $conductor->load('asignacionesActivas'); // Cargar las asignaciones activas para el conductor
 
         return Inertia::render('Conductores/Show', [
             'conductor' => $conductor,

@@ -38,7 +38,27 @@ class OperacionDiaria extends Model
             'horometro_inicio' => 'decimal:2',
             'horometro_fin' => 'decimal:2',
             'horas_trabajadas' => 'decimal:2',
+            'created_at' => 'datetime:d/m/Y H:i',
         ];
+    }
+
+    protected $appends = ['nro'];
+
+    public function getNroAttribute()
+    {
+        return str_pad($this->nro_operacion, 5, '0', STR_PAD_LEFT);
+    }
+
+
+
+    protected static function booted()
+    {
+        static::creating(function ($operacion) {
+            $ultimoNroOperacion = self::max('nro_operacion');
+            $operacion->nro_operacion = $ultimoNroOperacion ? $ultimoNroOperacion + 1 : 1;
+
+            $operacion->id_conductor = auth()->user()->id_persona;
+        });
     }
 
     public function conductor()
@@ -68,7 +88,7 @@ class OperacionDiaria extends Model
             'actividad_realizada',
             'id_operacion_diaria',
             'id_actividad'
-        )
-        ->withPivot('origen', 'destino', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
+        )->using(ActividadRealizada::class)
+        ->withPivot('id', 'origen', 'destino', 'lugar', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
     }
 }

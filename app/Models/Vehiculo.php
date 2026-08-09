@@ -120,4 +120,36 @@ class Vehiculo extends Model
     {
         return $this->hasMany(Mantenimiento::class, 'id_vehiculo');
     }
+
+    public function areas()
+    {
+        return $this->belongsToMany(
+            Area::class,
+            'vehiculo_area',
+            'id_vehiculo',
+            'id_area'
+        )->using(VehiculoArea::class)
+            ->withPivot([
+                'id',
+                'motivo_asignacion',
+                'fecha_asignacion',
+                'fecha_reasignacion',
+                'fecha_culminacion',
+                'estado_asignacion'
+            ])
+            ->withTimestamps();
+    }
+
+    public function areasAsignadas()
+    {
+        return $this->areas()->where(function ($query) {
+            $query->where('vehiculo_area.estado_asignacion', 'PROVISIONAL')
+                ->orWhere('vehiculo_area.estado_asignacion', 'ACTIVO')
+                ->orWhere(function ($query) {
+                    $query->whereNull('vehiculo_area.fecha_culminacion')
+                        ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
+                })
+                ->orderBy('vehiculo_area.fecha_asignacion', 'desc');
+        });
+    }
 }
