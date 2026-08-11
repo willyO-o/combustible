@@ -42,13 +42,21 @@ class OperacionDiaria extends Model
         ];
     }
 
-    protected $appends = ['nro'];
+    protected $appends = ['nro', 'fecha_i_f', 'fecha_f_f'];
 
     public function getNroAttribute()
     {
         return str_pad($this->nro_operacion, 5, '0', STR_PAD_LEFT);
     }
 
+    public function getFechaIFAttribute()
+    {
+        return $this->fecha_inicio ? $this->fecha_inicio->format('Y-m-d H:i') : null;
+    }
+    public function getFechaFFAttribute()
+    {
+        return $this->fecha_fin ? $this->fecha_fin->format('Y-m-d H:i') : null;
+    }
 
 
     protected static function booted()
@@ -90,5 +98,23 @@ class OperacionDiaria extends Model
             'id_actividad'
         )->using(ActividadRealizada::class)
         ->withPivot('id', 'origen', 'destino', 'lugar', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
+    }
+
+    public function actividadesRealizadasEdit()
+    {
+        $actividades = $this->actividadesRealizadas()->get();
+        return $actividades->map(function ($actividad) {
+            return [
+                'id' => $actividad->pivot->id,
+                'actividad' => $actividad->nombre_actividad,
+                'origen' => $actividad->pivot->origen,
+                'destino' => $actividad->pivot->destino,
+                'lugar' => $actividad->pivot->lugar,
+                'cantidad' => $actividad->pivot->cantidad,
+                'unidad_medida' => $actividad->pivot->unidad_medida,
+                'hora_inicio' => $actividad->pivot->hora_inicio?->format('H:i'),
+                'hora_fin' => $actividad->pivot->hora_fin?->format('H:i'),
+            ];
+        });
     }
 }

@@ -20,11 +20,13 @@ const isMobile = breakpoints.smaller('md') // Devuelve true si la pantalla es me
 const props = defineProps({
     conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
     vehiculosAsignados: Array, // [{ id, label }] vehículos asignados al conductor (si hay uno)
+    operacion: Object, // { id, label } de la operación (si se está editando una operación existente)
 })
 
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
 
 
+console.log(props.operacion);
 
 
 
@@ -45,19 +47,30 @@ const turnoDefault = function () {
 
 const form = useForm({
     id_vehiculo: null,
-    turno: turnoDefault(),
-    fecha_inicio: today,
-    fecha_fin: '',
-    kilometraje_inicio: '',
-    kilometraje_fin: '',
-    horometro_inicio: '',
-    horometro_fin: '',
-    horas_trabajadas: '',
+    turno: (props.operacion ? props.operacion.turno : turnoDefault()) ?? turnoDefault(),
+    fecha_inicio: (props.operacion ? props.operacion.fecha_i_f : today) ?? today,
+    fecha_fin: (props.operacion ? props.operacion.fecha_f_f : '') ?? '',
+    kilometraje_inicio: (props.operacion ? props.operacion.kilometraje_inicio : '') ?? '',
+    kilometraje_fin: (props.operacion ? props.operacion.kilometraje_fin : '') ?? '',
+    horometro_inicio: (props.operacion ? props.operacion.horometro_inicio : '') ?? '',
+    horometro_fin: (props.operacion ? props.operacion.horometro_fin : '') ?? '',
+    horas_trabajadas: (props.operacion ? props.operacion.horas_trabajadas : '') ?? '',
     estado: 'FINALIZADO',
-    observaciones: '',
+    observaciones: (props.operacion ? props.operacion.observaciones : '') ?? '',
     notificar_observaciones: false,
-    actividades_realizadas: []
+    actividades_realizadas: (props.operacion ? props.operacion.actividades_realizadas_edit : []) ?? [],
 })
+
+
+const showErrorActividad = (idx) => {
+    //verificar si esta la palabra "actividades_realizadas" en form.errors y si tiene errores para el índice idx que viene como texto "actividades_realizadas.1.hora_fin"
+    if(form.errors && Object.keys(form.errors).some(key => key.startsWith(`actividades_realizadas.${idx}`))) {
+        // convertir en array de keys solo los errores que correspondan a la actividad en el índice idx
+        const actividadErrors = Object.keys(form.errors).filter(key => key.startsWith(`actividades_realizadas.${idx}`))
+        return actividadErrors.map(key => form.errors[key]).join(', ')
+    }
+    return null
+}
 
 /* ------------------------------------------------------------------ */
 /*  Auto-relleno al seleccionar vehículo                               */
@@ -102,15 +115,19 @@ function quitarActividad(idx) {
 /*  Envío                                                              */
 /* ------------------------------------------------------------------ */
 function submit() {
+
+    const routeName = props.operacion ? route('operacion-diaria.update', props.operacion.id) : route('operacion-diaria.store');
+
     form
         .transform((data) => {
             const out = {
                 ...data,
                 id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
+                _method: props.operacion ? 'PUT' : 'POST', // Agregar el campo _method para PUT si es una actualización
             }
             return out
         })
-        .post(route('operacion-diaria.store'), { forceFormData: true })
+        .post(routeName)
 }
 
 const agregarActividad = () => {
@@ -155,8 +172,12 @@ onMounted(() => {
 
     if (props.conductor) {
 
-        if (vehiculosAsignadosOpt.value.length > 0) {
+        if (vehiculosAsignadosOpt.value.length == 1 && !form.id_vehiculo) {
             form.id_vehiculo = vehiculosAsignadosOpt.value[0].id
+        }
+
+        if( props.operacion ){
+            form.id_vehiculo = props.operacion.id_vehiculo
         }
     }
 
@@ -317,7 +338,7 @@ onMounted(() => {
                                         <span class="input-group-text">h</span>
                                         <div v-if="form.errors.horometro_inicio" class="invalid-feedback">{{
                                             form.errors.horometro_inicio
-                                        }}</div>
+                                            }}</div>
                                     </div>
 
                                 </div>
@@ -333,7 +354,7 @@ onMounted(() => {
                                         <span class="input-group-text">h</span>
                                         <div v-if="form.errors.horometro_fin" class="invalid-feedback">{{
                                             form.errors.horometro_fin
-                                        }}</div>
+                                            }}</div>
                                     </div>
 
                                 </div>
@@ -452,6 +473,8 @@ onMounted(() => {
                                             {{ r.hora_inicio }} - {{ r.hora_fin }}
                                         </p>
                                     </div>
+                                    <div v-if="showErrorActividad(idx)" class="text-danger">{{
+                                        showErrorActividad(idx) }}</div>
 
                                 </div>
                             </div>
@@ -461,6 +484,8 @@ onMounted(() => {
                                 <i class="ri-add-line  "></i>
                                 <small>Añadir actividad</small>
                             </div>
+                            <div v-if="form.errors.actividades_realizadas" class="text-danger">{{
+                                form.errors.actividades_realizadas }}</div>
 
                         </div>
                     </div>

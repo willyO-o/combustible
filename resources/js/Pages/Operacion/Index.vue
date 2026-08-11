@@ -92,7 +92,7 @@ const estadoBadge = (estado) => {
 
             <div class="card-body p-3">
                 <div class="row g-1">
-                <div class="card-title">Filtros</div>
+                    <div class="card-title">Filtros</div>
 
                     <div class="col-sm-6 col-xl-2">
                         <label class="form-label">Nro. Placa</label>
@@ -106,12 +106,10 @@ const estadoBadge = (estado) => {
                         <label class="form-label">Fecha hasta</label>
                         <input v-model="filters.fecha_hasta" type="date" class="form-control" />
                     </div>
-                    <div  v-if="props.conductores.length"  class="col-sm-6 col-xl-4">
+                    <div v-if="props.conductores.length" class="col-sm-6 col-xl-4">
                         <label class="form-label">Conductor</label>
-                        <Multiselect v-model="filters.id_conductor" :options="props.conductores"
-                         label="label" track-by="label" value-prop="id" placeholder="Seleccione"
-                         :searchable="true"
-                         />
+                        <Multiselect v-model="filters.id_conductor" :options="props.conductores" label="label"
+                            track-by="label" value-prop="id" placeholder="Seleccione" :searchable="true" />
                         <!-- <select v-model="filters.id_conductor" class="form-select">
                             <option value="">Todos</option>
                             <option value="VALE">VALE</option>
@@ -201,9 +199,9 @@ const estadoBadge = (estado) => {
                                 </td>
                                 <td>
                                     <span class="badge" :class="estadoBadge(actividad.estado)">{{ actividad.estado
-                                    }}</span>
+                                        }}</span>
                                     <small class="text-muted d-block"> {{ actividad.verificador?.nombre_completo
-                                        }}</small>
+                                    }}</small>
 
                                 </td>
 
@@ -214,6 +212,13 @@ const estadoBadge = (estado) => {
                                             class="btn btn-sm btn-icon btn-info-light" title="Ver">
                                             <i class="ri-eye-line"></i>
                                         </Link>
+
+                                        <a v-can="'operacion-diaria.informe'"
+                                            :href="route('operacion-diaria.reporte.pdf', actividad.id)" target="_blank"
+                                            class="btn btn-danger-light btn-sm btn-icon" title="PDF">
+                                            <i class="ri-file-pdf-line"></i>
+                                        </a>
+
                                         <Link :href="route('operacion-diaria.edit', actividad.id)"
                                             class="btn btn-sm btn-icon btn-warning-light" title="Editar">
                                             <i class="ri-edit-line"></i>

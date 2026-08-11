@@ -97,6 +97,7 @@ class OperacionDiariaController extends Controller
         return inertia('Operacion/Create', [
             'conductor' => $conductor,
             'vehiculosAsignados' => $vehiculosAsignados,
+            'operacion' => null,
         ]);
     }
 
@@ -140,6 +141,8 @@ class OperacionDiariaController extends Controller
         //se busca primero ver si la actividad ya existe en la base de datos verificando el nombre_normalizado, sino existe se crea una nueva actividad
         // se guard en la tabla actividad_realizada, la relacion y los detalles, verificar que no re registre 2 veces la misma actividad contodos los campos iguales
 
+        $operacion->actividadesRealizadas()->detach();
+
         foreach ($actividades as $actividadData) {
             $nombreNormalizado = Str::of($actividadData['actividad'])
                 ->lower()->ascii()->trim();
@@ -155,6 +158,8 @@ class OperacionDiariaController extends Controller
 
                 ]
             );
+
+            // eliminar la relación si ya existe para evitar duplicados
 
 
             $operacion->actividadesRealizadas()->attach($actividad->id, [
@@ -188,15 +193,44 @@ class OperacionDiariaController extends Controller
      */
     public function edit(OperacionDiaria $operacionDiaria)
     {
-        //
+
+        $conductor = auth()->user()->persona;
+        $conductor->load('conductor');
+        $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
+
+        $operacionDiaria->actividades_realizadas_edit = $operacionDiaria->actividadesRealizadasEdit();
+
+        return inertia('Operacion/Create', [
+            'conductor' => $conductor,
+            'vehiculosAsignados' => $vehiculosAsignados,
+            'operacion' => $operacionDiaria->load(['vehiculo', 'area']),
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(OperacionStoreRequest $request, OperacionDiaria $operacionDiaria)
     {
-        //
+        try {
+            DB::beginTransaction();
+
+            $actividades = $request->actividades_realizadas;
+            $datos = $request->all();
+
+            $operacionDiaria->update($datos);
+
+
+            $this->guardarActividadesRealizadas($operacionDiaria, $actividades);
+
+
+            DB::commit();
+
+            return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria actualizada exitosamente.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Error al actualizar la operación diaria: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -218,7 +252,7 @@ class OperacionDiariaController extends Controller
             'cantidad' => 'required|numeric|min:1',
             'unidad_medida' => 'required|string',
             'hora_inicio' => 'required|date_format:H:i',
-            'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
+            'hora_fin' => 'required|date_format:H:i',
         ]);
 
         // Agregar la actividad al arreglo de actividades_realizadas
