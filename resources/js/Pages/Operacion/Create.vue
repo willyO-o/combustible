@@ -7,7 +7,6 @@ import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Modal from '@/Components/Modal.vue'; // Ajusta la ruta según tu proyecto
 
-import axios from 'axios'
 
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
@@ -32,8 +31,8 @@ const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
 /* ------------------------------------------------------------------ */
 /*  Form                                                               */
 /* ------------------------------------------------------------------ */
-const today = new Date().toISOString().slice(0, 16) // yyyy-MM-ddTHH:mm
-
+// const today = new Date().toISOString().slice(0, 16) // yyyy-MM-ddTHH:mm
+const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
 const turnoDefault = function () {
     const hour = new Date().getHours()
 
@@ -48,7 +47,7 @@ const form = useForm({
     id_vehiculo: null,
     turno: turnoDefault(),
     fecha_inicio: today,
-    fecha_fin: today,
+    fecha_fin: '',
     kilometraje_inicio: '',
     kilometraje_fin: '',
     horometro_inicio: '',
@@ -78,28 +77,10 @@ const formActividad = useForm({
     detalle: '',
 })
 
-const horaMinTurno = computed(() => {
-    if (form.turno === 'DIA') {
-        return '06:00'
-    } else if (form.turno === 'NOCHE') {
-        return '18:00'
-    }
-    return ''
-})
-
-const horaMaxTurno = computed(() => {
-    if (form.turno === 'DIA') {
-        return '17:59'
-    } else if (form.turno === 'NOCHE') {
-        return '05:59'
-    }
-    return ''
-})
 
 const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
 
 watch(() => form.id_vehiculo, async (val) => {
-
 
     tipoMedicion.value = ''
 
@@ -110,22 +91,12 @@ watch(() => form.id_vehiculo, async (val) => {
     if (vehiculoSelected) {
         tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
     }
-
-
-
-
 })
-
-
-
 
 
 function quitarActividad(idx) {
     form.actividades_realizadas.splice(idx, 1)
 }
-
-
-
 
 /* ------------------------------------------------------------------ */
 /*  Envío                                                              */
@@ -147,6 +118,7 @@ const agregarActividad = () => {
 
     formActividad.post(route('operacion-diaria.agregar-actividad'), {
         onSuccess: () => {
+
             // Agregar la actividad al arreglo de actividades_realizadas
             form.actividades_realizadas.push({ ...formActividad });
 
@@ -600,7 +572,7 @@ onMounted(() => {
                             <label class="form-label fw-medium">
                                 Hora Inicio <span class="text-danger">*</span>
                             </label>
-                            <input v-model="formActividad.hora_inicio" type="time" class="form-control" max="17:59"
+                            <input v-model="formActividad.hora_inicio" type="time" class="form-control"
                                 :class="{ 'is-invalid': formActividad.errors.hora_inicio }" placeholder="HH:MM" />
 
                             <div v-if="formActividad.errors.hora_inicio" class="text-danger small mt-1">{{
@@ -611,7 +583,7 @@ onMounted(() => {
                             <label class="form-label fw-medium">
                                 Hora Fin <span class="text-danger">*</span>
                             </label>
-                            <input v-model="formActividad.hora_fin" type="time" class="form-control" :max="horaMaxTurno"
+                            <input v-model="formActividad.hora_fin" type="time" class="form-control"
                                 :class="{ 'is-invalid': formActividad.errors.hora_fin }" placeholder="HH:MM" />
                             <div v-if="formActividad.errors.hora_fin" class="text-danger small mt-1">{{
                                 formActividad.errors.hora_fin }}</div>

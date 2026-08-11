@@ -41,6 +41,10 @@ class HandleInertiaRequests extends Middleware
                     : [],
                 'is_super_admin' => fn () => $request->user()?->hasRole('super-admin') ?? false,
             ],
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
         ];
     }
 }

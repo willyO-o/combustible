@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Requests\OperacionStoreRequest;
 use Illuminate\Support\Facades\DB;
 use App\Models\OperacionDiaria;
 use App\Models\Actividad;
 use App\Models\Vehiculo;
+use App\Models\Area;
 use Illuminate\Support\Str;
 
 
@@ -22,15 +24,46 @@ class OperacionDiariaController extends Controller
         //
         $query = OperacionDiaria::with(['conductor.persona', 'vehiculo', 'area', 'verificador']);
 
+        $conductores = [];
 
+        $areas = [];
+
+        if ($request->filled('nro_placa')) {
+            $query->whereHas('vehiculo', function ($q) use ($request) {
+                $q->where('nro_placa', 'like', '%' . $request->nro_placa . '%')
+                    ->orWhere('codigo', 'like', '%' . $request->nro_placa . '%');
+            });
+        }
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('fecha_inicio', '>=', $request->fecha_desde);
+        }
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('fecha_inicio', '<=', $request->fecha_hasta);
+        }
+        if ($request->filled('id_conductor')) {
+            $query->where('id_conductor', $request->id_conductor);
+        }
+        if ($request->filled('estado_operacion')) {
+            $query->where('estado', $request->estado_operacion);
+        }
 
         if (auth()->user()->hasRole('conductor')) {
             $query->where('id_conductor', auth()->user()->id_persona);
+            $areas = false;
         }
 
-        if(auth()->user()->hasRole('jefe-area')) {
+        if (auth()->user()->hasRole('jefe-area')) {
             $query->whereIn('id_area', auth()->user()->persona->encargadoAreas()->pluck('id_area'));
+            $areas = auth()->user()->persona->encargadoAreas()->pluck('id_area')->toArray();
         }
+
+        $conductores = Area::conductores($areas)?->map(function ($conductor) {
+            return [
+                'id' => $conductor->id,
+                'label' => "{$conductor->persona->nombre_completo} (CI: {$conductor->persona->ci})",
+            ];
+        })->toArray();
+
 
 
         $actividades = $query->orderBy('created_at', 'desc')
@@ -39,7 +72,8 @@ class OperacionDiariaController extends Controller
 
         return inertia('Operacion/Index', [
             'actividades' => $actividades,
-            'filters'     => $request->only(['estado', 'tipo_carga', 'id_vehiculo']),
+            'filters'     => $request->only(['nro_placa', 'fecha_desde', 'fecha_hasta', 'id_conductor', 'estado_operacion']),
+            'conductores' => $conductores,
             'flash'       => [
                 'success' => session('success'),
                 'error'   => session('error'),
@@ -69,7 +103,7 @@ class OperacionDiariaController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(OperacionStoreRequest $request)
     {
 
         try {
@@ -177,16 +211,19 @@ class OperacionDiariaController extends Controller
     {
         // Validar los campos requeridos
         $validated = $request->validate([
-            'actividad' => 'required|string',
-            'cantidad' => 'required|numeric',
+            'lugar' => 'required_without:origen|nullable|string',
+            'origen' => 'required_without:lugar|nullable|string',
+            'destino' => 'required_without:lugar|nullable|string',
+            'actividad' => 'required|string|min:3',
+            'cantidad' => 'required|numeric|min:1',
             'unidad_medida' => 'required|string',
             'hora_inicio' => 'required|date_format:H:i',
-            'hora_fin' => 'required|date_format:H:i',
+            'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
         ]);
 
         // Agregar la actividad al arreglo de actividades_realizadas
 
-        return redirect()->route('operacion-diaria.create');
+        return redirect()->route('operacion-diaria.create')->with('success', 'Actividad agregada exitosamente.');
     }
 
 
@@ -198,7 +235,6 @@ class OperacionDiariaController extends Controller
 
         $reporte->generarReporteOperacionDiaria($operacion);
         exit;
-
     }
 
     public function verificarOperacion(Request $request)

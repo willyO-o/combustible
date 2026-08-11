@@ -4,7 +4,8 @@ import {
     reactive,
     onMounted,
     onBeforeUnmount,
-    computed
+    computed,
+    watch
 } from 'vue'
 
 import { switcherStore } from '@/stores/switcher'
@@ -14,6 +15,9 @@ import Footer from '@/Layouts/Includes/footer/footer.vue'
 import Switcher from '@/Layouts/Includes/switcher/switcher.vue'
 import BackToTop from '@/Layouts/Includes/backtotop/backtotop.vue'
 
+import { usePage } from '@inertiajs/vue3';
+
+import { showToast, showError } from '@/Utils/alertUtil'
 // Reactive store
 const switcher = reactive(switcherStore())
 
@@ -21,6 +25,15 @@ const switcher = reactive(switcherStore())
 const customClass = computed(() =>
     switcher.pageStyles === 'flat' ? 'main-body-container' : ''
 )
+
+const page = usePage();
+watch(() => page.props.flash, (flash) => {
+
+    if (flash.success) {
+        showToast(flash.success);
+    }
+}, { deep: true });
+
 
 // Scroll progress logic
 const progressRef = ref(null)

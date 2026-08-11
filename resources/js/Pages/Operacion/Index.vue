@@ -3,18 +3,23 @@ import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 
+import Multiselect from '@vueform/multiselect'
+import '@vueform/multiselect/themes/default.css'
+
 const props = defineProps({
     actividades: Object,
     filters: Object,
     flash: Object,
+    conductores: Array,
 })
+
 
 const filters = ref({
     nro_placa: props.filters?.nro_placa ?? '',
     fecha_desde: props.filters?.fecha_desde ?? '',
     fecha_hasta: props.filters?.fecha_hasta ?? '',
-    tipo_carga: props.filters?.tipo_carga ?? '',
-    estado_carga: props.filters?.estado_carga ?? '',
+    id_conductor: props.filters?.id_conductor ?? '',
+    estado_operacion: props.filters?.estado_operacion ?? '',
 })
 
 let debounceTimer = null
@@ -25,14 +30,14 @@ watch(filters, (val) => {
             nro_placa: val.nro_placa || undefined,
             fecha_desde: val.fecha_desde || undefined,
             fecha_hasta: val.fecha_hasta || undefined,
-            tipo_carga: val.tipo_carga || undefined,
-            estado_carga: val.estado_carga || undefined,
+            id_conductor: val.id_conductor || undefined,
+            estado_operacion: val.estado_operacion || undefined,
         }, { preserveState: true, replace: true })
     }, 350)
 }, { deep: true })
 
 function clearFilters() {
-    filters.value = { nro_placa: '', fecha_desde: '', fecha_hasta: '', tipo_carga: '', estado_carga: '' }
+    filters.value = { nro_placa: '', fecha_desde: '', fecha_hasta: '', id_conductor: '', estado_operacion: '' }
 }
 
 function confirmDelete(carga) {
@@ -51,8 +56,6 @@ const estadoBadge = (estado) => {
     }
     return map[estado] ?? 'bg-secondary-transparent text-secondary'
 }
-const tipoBadge = (tipo) =>
-    tipo === 'estado' ? 'bg-primary-transparent text-primary' : 'bg-warning-transparent text-warning'
 
 
 
@@ -85,12 +88,12 @@ const tipoBadge = (tipo) =>
         </div>
 
         <!-- Filtros -->
-        <div class="card custom-card mb-4">
-            <div class="card-header">
+        <div class="card custom-card mb-2">
+
+            <div class="card-body p-3">
+                <div class="row g-1">
                 <div class="card-title">Filtros</div>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
+
                     <div class="col-sm-6 col-xl-2">
                         <label class="form-label">Nro. Placa</label>
                         <input v-model="filters.nro_placa" type="text" class="form-control" placeholder="Placa..." />
@@ -103,26 +106,32 @@ const tipoBadge = (tipo) =>
                         <label class="form-label">Fecha hasta</label>
                         <input v-model="filters.fecha_hasta" type="date" class="form-control" />
                     </div>
-                    <div class="col-sm-6 col-xl-2">
-                        <label class="form-label">Tipo</label>
-                        <select v-model="filters.tipo_carga" class="form-select">
+                    <div  v-if="props.conductores.length"  class="col-sm-6 col-xl-4">
+                        <label class="form-label">Conductor</label>
+                        <Multiselect v-model="filters.id_conductor" :options="props.conductores"
+                         label="label" track-by="label" value-prop="id" placeholder="Seleccione"
+                         :searchable="true"
+                         />
+                        <!-- <select v-model="filters.id_conductor" class="form-select">
                             <option value="">Todos</option>
                             <option value="VALE">VALE</option>
                             <option value="PREPAGO">PREPAGO</option>
-                        </select>
+                        </select> -->
                     </div>
                     <div class="col-sm-6 col-xl-2">
                         <label class="form-label">Estado</label>
-                        <select v-model="filters.estado_carga" class="form-select">
+                        <select v-model="filters.estado_operacion" class="form-select">
                             <option value="">Todos</option>
-                            <option value="REGISTRADO">REGISTRADO</option>
-                            <option value="VERIFICADO">VERIFICADO</option>
-                            <option value="ANULADO">ANULADO</option>
+                            <option value="PENDIENTE">Pendiente</option>
+                            <option value="EN_PROGRESO">En Progreso</option>
+                            <option value="FINALIZADO">Finalizado</option>
+                            <option value="VERIFICADO">Verificado</option>
+                            <option value="OBSERVADO">Observado</option>
                         </select>
                     </div>
                 </div>
                 <div class="mt-3 d-flex justify-content-end">
-                    <button type="button" class="btn btn-outline-secondary btn-wave" @click="clearFilters">
+                    <button type="button" class="btn btn-outline-secondary btn-sm btn-wave" @click="clearFilters">
                         <i class="ri-refresh-line me-1"></i> Limpiar
                     </button>
                 </div>
