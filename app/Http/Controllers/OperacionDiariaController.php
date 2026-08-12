@@ -127,6 +127,10 @@ class OperacionDiariaController extends Controller
 
             // dd($operacionDiaria->actividadesRealizadas());
 
+            if ($request->filled('observaciones') && $request->input('notificar_observaciones') == true) {
+                event(new \App\Events\ObservacionOperacionEvent($operacionDiaria));
+            }
+
             DB::commit();
 
             return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria creada exitosamente.');
@@ -218,11 +222,16 @@ class OperacionDiariaController extends Controller
             $actividades = $request->actividades_realizadas;
             $datos = $request->all();
 
+            $observacionesOriginales = $operacionDiaria->observaciones;
             $operacionDiaria->update($datos);
 
 
             $this->guardarActividadesRealizadas($operacionDiaria, $actividades);
 
+
+            if ($request->filled('observaciones') && $request->input('notificar_observaciones') == true && $datos['observaciones'] !== $observacionesOriginales) {
+                event(new \App\Events\ObservacionOperacionEvent($operacionDiaria));
+            }
 
             DB::commit();
 

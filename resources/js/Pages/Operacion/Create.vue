@@ -26,7 +26,6 @@ const props = defineProps({
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
 
 
-console.log(props.operacion);
 
 
 
@@ -203,14 +202,14 @@ onMounted(() => {
                         <li class="breadcrumb-item active">Nueva</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Registrar Actividades</h1>
+                <h1 class="page-title text-center fw-medium fs-18 mb-0">{{ props.conductor ? 'Editar' : 'Registrar' }} operación diaria</h1>
             </div>
             <Link :href="route('cargas.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver
             </Link>
         </div>
         <div v-else class="  mb-2 mt-1">
-            <h1 class="page-title text-center fw-medium fs-18 mb-0">Registrar Actividades</h1>
+            <h1 class="page-title text-center fw-medium fs-18 mb-0">{{ props.conductor ? 'Editar' : 'Registrar' }} operación diaria</h1>
 
         </div>
 
@@ -499,7 +498,7 @@ onMounted(() => {
                 <button type="submit" class="btn btn-primary btn-wave" :disabled="form.processing">
                     <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                     <i v-else class="ri-save-line me-1"></i>
-                    {{ form.processing ? 'Guardando...' : 'Registrar' }}
+                    {{ form.processing ? 'Guardando...' : 'Guardar' }}
                 </button>
             </div>
         </form>

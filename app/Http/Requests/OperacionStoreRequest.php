@@ -24,6 +24,7 @@ class OperacionStoreRequest extends FormRequest
      */
     public function rules(): array
     {
+        // dd($this->method());
         return [
             "id_vehiculo" => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id'],
             "turno" => "required|in:DIA,NOCHE",
