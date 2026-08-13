@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 use App\Rules\GreaterThanPreviousReading;
 use Illuminate\Foundation\Http\FormRequest;
@@ -17,6 +19,18 @@ class OperacionStoreRequest extends FormRequest
         return true;
     }
 
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => 'Los datos enviados no son válidos.',
+                'errors'  => $validator->errors(),
+            ], 422));
+        }
+
+        parent::failedValidation($validator);
+    }
     /**
      * Get the validation rules that apply to the request.
      *
@@ -31,14 +45,14 @@ class OperacionStoreRequest extends FormRequest
             "fecha_inicio" => "required|date",
             "fecha_fin" => "required|date|after:fecha_inicio",
             "kilometraje_inicio" => [$this->method() === 'POST' ? Rule::requiredIf(function () {
-                                            $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
-                                            return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
-                                        }) : 'sometimes', 'nullable' ,'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
+                $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
+                return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
+            }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
             "kilometraje_fin" => [$this->method() === 'POST' ? Rule::requiredIf(fn() => $this->kilometraje_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:kilometraje_inicio'],
             "horometro_inicio" => [$this->method() === 'POST' ? Rule::requiredIf(function () {
-                                            $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
-                                            return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
-                                        }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
+                $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
+                return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
+            }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
             "horometro_fin" => [$this->method() === 'POST' ? Rule::requiredIf(fn() => $this->horometro_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:horometro_inicio'],
             "horas_trabajadas" => 'required|numeric|min:0',
             "observaciones" => 'nullable|string|min:10',
@@ -51,7 +65,7 @@ class OperacionStoreRequest extends FormRequest
             'actividades_realizadas.*.cantidad' => 'required|numeric|min:1',
             'actividades_realizadas.*.unidad_medida' => 'required|string|min:1',
             'actividades_realizadas.*.hora_inicio' => 'required|date_format:H:i',
-            'actividades_realizadas.*.hora_fin' => 'required|date_format:H:i'
+            'actividades_realizadas.*.hora_fin' => 'required|date_format:H:i',
 
         ];
     }

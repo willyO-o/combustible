@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        apiPrefix: 'api/v1',
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
@@ -20,14 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
-
-            // forzar json solo si se producjo un error 500
-            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException && $e->getStatusCode() === 500) {
-                return true;
-            }
-        });
-        // $exceptions->shouldRenderJsonWhen(
-        //     fn(Request $request) => $request->is('api/*'),
-        // );
-    })->create();
+        // Respuesta JSON estándar para todas las rutas /api/*
+        $exceptions->shouldRenderJsonWhen(
+            fn(Request $request) => $request->is('api/*'),
+        );
+    })
+    ->withCommands([
+        __DIR__ . '/../app/Console/Commands',
+    ])
+    ->create();

@@ -10,6 +10,10 @@ use App\Models\Actividad;
 use App\Models\Vehiculo;
 use App\Models\Area;
 use Illuminate\Support\Str;
+use App\Exceptions\AreaNoAsignadaException;
+use App\Actions\OperacionDiaria\CreateOperacionDiariaAction;
+use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
+use App\Actions\OperacionDiaria\ListOperacionesDiariasAction;
 
 
 class OperacionDiariaController extends Controller
@@ -19,42 +23,25 @@ class OperacionDiariaController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
-    {
-        //
-        $query = OperacionDiaria::with(['conductor.persona', 'vehiculo', 'area', 'verificador']);
+    public function index(
+        Request $request,
+        ListOperacionesDiariasAction $listAction
+    ) {
+
+        $filters = $request->only(['nro_placa', 'fecha_desde', 'fecha_hasta', 'id_conductor', 'estado_operacion']);
+
+        $actividades = $listAction->execute($filters, $request->user());
 
         $conductores = [];
 
         $areas = [];
 
-        if ($request->filled('nro_placa')) {
-            $query->whereHas('vehiculo', function ($q) use ($request) {
-                $q->where('nro_placa', 'like', '%' . $request->nro_placa . '%')
-                    ->orWhere('codigo', 'like', '%' . $request->nro_placa . '%');
-            });
-        }
-        if ($request->filled('fecha_desde')) {
-            $query->whereDate('fecha_inicio', '>=', $request->fecha_desde);
-        }
-        if ($request->filled('fecha_hasta')) {
-            $query->whereDate('fecha_inicio', '<=', $request->fecha_hasta);
-        }
-        if ($request->filled('id_conductor')) {
-            $query->where('id_conductor', $request->id_conductor);
-        }
-        if ($request->filled('estado_operacion')) {
-            $query->where('estado', $request->estado_operacion);
-        }
-
-        if (auth()->user()->hasRole('conductor')) {
-            $query->where('id_conductor', auth()->user()->id_persona);
+        if ($request->user()->hasRole('conductor')) {
             $areas = false;
         }
 
-        if (auth()->user()->hasRole('jefe-area')) {
-            $query->whereIn('id_area', auth()->user()->persona->encargadoAreas()->pluck('id_area'));
-            $areas = auth()->user()->persona->encargadoAreas()->pluck('id_area')->toArray();
+        if ($request->user()->hasRole('jefe-area')) {
+            $areas = $request->user()->persona->encargadoAreas()->pluck('id_area')->toArray();
         }
 
         $conductores = Area::conductores($areas)?->map(function ($conductor) {
@@ -65,14 +52,9 @@ class OperacionDiariaController extends Controller
         })->toArray();
 
 
-
-        $actividades = $query->orderBy('created_at', 'desc')
-            ->paginate(10)
-            ->withQueryString();
-
         return inertia('Operacion/Index', [
             'actividades' => $actividades,
-            'filters'     => $request->only(['nro_placa', 'fecha_desde', 'fecha_hasta', 'id_conductor', 'estado_operacion']),
+            'filters'     => $filters,
             'conductores' => $conductores,
             'flash'       => [
                 'success' => session('success'),
@@ -88,7 +70,7 @@ class OperacionDiariaController extends Controller
     {
         //
 
-        $conductor = auth()->user()->persona;
+        $conductor = request()->user()->persona;
         $conductor->load('conductor');
         $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
 
@@ -104,79 +86,19 @@ class OperacionDiariaController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(OperacionStoreRequest $request)
+    public function store(OperacionStoreRequest $request, CreateOperacionDiariaAction $action)
     {
 
         try {
-            DB::beginTransaction();
-
-            $vehiculo = Vehiculo::findOrFail($request->id_vehiculo);
-
-            $area = $vehiculo->areasAsignadas()->first();
-
-            $actividades = $request->actividades_realizadas;
-
-            $datos = $request->all();
-            $datos['id_area'] = $area->id;
-
-            $operacionDiaria = OperacionDiaria::create($datos);
-
-
-            $this->guardarActividadesRealizadas($operacionDiaria, $actividades);
-
-
-            // dd($operacionDiaria->actividadesRealizadas());
-
-            if ($request->filled('observaciones') && $request->input('notificar_observaciones') == true) {
-                event(new \App\Events\ObservacionOperacionEvent($operacionDiaria));
-            }
-
-            DB::commit();
+            $operacionDiaria = $action->execute($request->validated());
 
             return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria creada exitosamente.');
         } catch (\Exception $e) {
-            DB::rollBack();
             return redirect()->back()->with('error', 'Error al crear la operación diaria: ' . $e->getMessage());
         }
     }
 
-    private function guardarActividadesRealizadas(OperacionDiaria $operacion, array $actividades)
-    {
-        //se busca primero ver si la actividad ya existe en la base de datos verificando el nombre_normalizado, sino existe se crea una nueva actividad
-        // se guard en la tabla actividad_realizada, la relacion y los detalles, verificar que no re registre 2 veces la misma actividad contodos los campos iguales
 
-        $operacion->actividadesRealizadas()->detach();
-
-        foreach ($actividades as $actividadData) {
-            $nombreNormalizado = Str::of($actividadData['actividad'])
-                ->lower()->ascii()->trim();
-
-            $actividad = Actividad::firstOrCreate(
-                ['nombre_normalizado' => $nombreNormalizado],
-                [
-                    'nombre_actividad' => $actividadData['actividad'],
-                    'unidad_medida' => $actividadData['unidad_medida'],
-                    'id_area' => $operacion->id_area,
-                    'estado_actividad' => 'ACTIVO',
-                    'ultimo_uso' => now(),
-
-                ]
-            );
-
-            // eliminar la relación si ya existe para evitar duplicados
-
-
-            $operacion->actividadesRealizadas()->attach($actividad->id, [
-                'origen' => $actividadData['origen'],
-                'destino' => $actividadData['destino'],
-                'lugar' => $actividadData['lugar'],
-                'cantidad' => $actividadData['cantidad'],
-                'unidad_medida' => $actividadData['unidad_medida'],
-                'hora_inicio' => $actividadData['hora_inicio'],
-                'hora_fin' => $actividadData['hora_fin'],
-            ]);
-        }
-    }
 
     /**
      * Display the specified resource.
@@ -198,7 +120,7 @@ class OperacionDiariaController extends Controller
     public function edit(OperacionDiaria $operacionDiaria)
     {
 
-        $conductor = auth()->user()->persona;
+        $conductor = request()->user()->persona;
         $conductor->load('conductor');
         $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
 
@@ -214,30 +136,13 @@ class OperacionDiariaController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(OperacionStoreRequest $request, OperacionDiaria $operacionDiaria)
+    public function update(OperacionStoreRequest $request, OperacionDiaria $operacionDiaria, UpdateOperacionDiariaAction $action)
     {
         try {
-            DB::beginTransaction();
-
-            $actividades = $request->actividades_realizadas;
-            $datos = $request->all();
-
-            $observacionesOriginales = $operacionDiaria->observaciones;
-            $operacionDiaria->update($datos);
-
-
-            $this->guardarActividadesRealizadas($operacionDiaria, $actividades);
-
-
-            if ($request->filled('observaciones') && $request->input('notificar_observaciones') == true && $datos['observaciones'] !== $observacionesOriginales) {
-                event(new \App\Events\ObservacionOperacionEvent($operacionDiaria));
-            }
-
-            DB::commit();
+            $operacionDiaria = $action->execute($operacionDiaria, $request->validated());
 
             return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria actualizada exitosamente.');
         } catch (\Exception $e) {
-            DB::rollBack();
             return redirect()->back()->with('error', 'Error al actualizar la operación diaria: ' . $e->getMessage());
         }
     }
@@ -245,9 +150,24 @@ class OperacionDiariaController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(OperacionDiaria $operacionDiaria)
     {
-        //
+        if ($operacionDiaria->estado === 'VERIFICADO') {
+            return redirect()->back()->with('error', 'No se puede eliminar una operación diaria que ya ha sido verificada.');
+        }
+
+        try {
+
+            $operacionDiaria->actividadesRealizadas()->detach();
+
+            $operacionDiaria->delete();
+
+
+            return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria eliminada exitosamente.');
+        } catch (\Exception $e) {
+
+            return redirect()->back()->with('error', 'Error al eliminar la operación diaria: ' . $e->getMessage());
+        }
     }
 
     public function validarActividad(Request $request)
@@ -284,7 +204,7 @@ class OperacionDiariaController extends Controller
     {
         $operacion = OperacionDiaria::findOrFail($request->id_operacion);
         $operacion->estado = 'VERIFICADO';
-        $operacion->id_verificador = auth()->user()->id_persona;
+        $operacion->id_verificador = request()->user()->id_persona;
         $operacion->save();
 
         return redirect()->route('operacion-diaria.show', $operacion->id)

@@ -28,10 +28,21 @@ class Vehiculo extends Model
 
     protected $table = 'vehiculo';
 
+    protected $appends = [
+        'url_fotografia',
+    ];
 
     public function uniqueIds(): array
     {
         return ['uuid'];
+    }
+
+    public function getUrlFotografiaAttribute()
+    {
+        if ($this->fotografia) {
+            return asset('storage/' . $this->fotografia);
+        }
+        return null;
     }
 
     // Relaciones

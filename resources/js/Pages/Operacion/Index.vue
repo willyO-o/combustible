@@ -6,6 +6,8 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Multiselect from '@vueform/multiselect'
 import '@vueform/multiselect/themes/default.css'
 
+import { confirm, showToast } from '@/Utils/alertUtil'
+
 const props = defineProps({
     actividades: Object,
     filters: Object,
@@ -40,10 +42,22 @@ function clearFilters() {
     filters.value = { nro_placa: '', fecha_desde: '', fecha_hasta: '', id_conductor: '', estado_operacion: '' }
 }
 
-function confirmDelete(carga) {
-    if (confirm(`¿Eliminar la carga del — ${carga.vehiculo?.nro_placa}?`)) {
-        router.delete(route('operacion-diaria.destroy', carga.id))
-    }
+const confirmDelete = async (operacion) => {
+
+    const result = await confirm(`¿Eliminar la opracion del — ${operacion.nro}?`, '¡Esta acción no se puede deshacer!')
+    if (!result) return
+
+    router.delete(route('operacion-diaria.destroy', operacion.id),
+        {
+            _method: 'DELETE',
+        },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                showToast('Operación diaria eliminada')
+            },
+        },
+    )
 }
 
 const estadoBadge = (estado) => {
@@ -199,9 +213,9 @@ const estadoBadge = (estado) => {
                                 </td>
                                 <td>
                                     <span class="badge" :class="estadoBadge(actividad.estado)">{{ actividad.estado
-                                        }}</span>
+                                    }}</span>
                                     <small class="text-muted d-block"> {{ actividad.verificador?.nombre_completo
-                                    }}</small>
+                                        }}</small>
 
                                 </td>
 
