@@ -52,6 +52,15 @@ class UserSeeder extends Seeder
             'operacion-diaria.verificar',
         ];
     }
+    private function permisosOperacionDiariaJefe(): array
+    {
+        return [
+            'operacion-diaria.ver',
+            'operacion-diaria.informe',
+            'operacion-diaria.reporte.pdf',
+            'operacion-diaria.verificar',
+        ];
+    }
 
     private function permisosCargasCombustible(): array
     {
@@ -229,10 +238,12 @@ class UserSeeder extends Seeder
     private function permisosParaJefeArea(): array
     {
         return [
-            ...$this->permisosOperacionVehiculo(),
+            ...$this->permisosVales(),
+            ...$this->permisosCargasCombustible(),
+            ...$this->permisosMantenimiento(),
+            ...$this->permisosOperacionDiariaJefe(),
             ...$this->permisosCatalogos(),
-            'operacion-diaria.verificar'
-            ,
+            'operacion-diaria.verificar',
         ];
     }
 

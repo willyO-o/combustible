@@ -16,6 +16,7 @@ return new class extends Migration
             $table->integer('nro_vale');
             $table->integer('gestion');
             $table->dateTime('fecha_emision');
+            $table->dateTime('fecha_vencimiento');
             $table->decimal('litros', 10, 2);
             $table->decimal('precio', 10, 2);
             $table->foreignId('id_vehiculo')->constrained('vehiculo')->onDelete('restrict')->onUpdate('cascade');

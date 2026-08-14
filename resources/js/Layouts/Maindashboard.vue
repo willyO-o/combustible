@@ -29,7 +29,6 @@ const customClass = computed(() =>
 const page = usePage();
 watch(() => page.props.flash, (flash) => {
 
-    console.log("update: ", page.props);
 
     if (flash.success) {
         showToast(flash.success);

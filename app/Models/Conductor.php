@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'id',
@@ -57,7 +58,7 @@ class Conductor extends Model
     public function asignacionesActivas()
     {
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
-            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle','id_vehiculo','id_conductor'])
+            ->withPivot(['id', 'estado_asignacion', 'fecha_asignacion', 'fecha_culminacion', 'detalle', 'id_vehiculo', 'id_conductor'])
             ->where(function ($query) {
                 $query->where('asignacion.estado_asignacion', 'ACTIVO')
                     ->orWhere('asignacion.estado_asignacion', 'PROVISIONAL');
@@ -88,8 +89,6 @@ class Conductor extends Model
                 ],
             ];
         });
-
-
     }
 
     public function historialAsignacionesVehiculos()
@@ -120,5 +119,36 @@ class Conductor extends Model
     public function mantenimientos()
     {
         return $this->hasMany(Mantenimiento::class, 'id_conductor');
+    }
+
+    public function areas()
+    {
+        return Area::whereExists(function ($query) {
+            $query->select(DB::raw(1))
+                ->from('vehiculo_area')
+                ->whereColumn('vehiculo_area.id_area', 'area.id')
+                ->where(function ($query) {
+                    $query->whereNull('vehiculo_area.fecha_culminacion')
+                        ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
+                })
+                ->where(function ($query) {
+                    $query->where('vehiculo_area.estado_asignacion', 'ACTIVO')
+                        ->orWhere('vehiculo_area.estado_asignacion', 'PROVISIONAL');
+                })
+                ->whereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('asignacion')
+                        ->whereColumn('asignacion.id_vehiculo', 'vehiculo_area.id_vehiculo')
+                        ->where('asignacion.id_conductor', $this->id)
+                        ->where(function ($query) {
+                            $query->where('asignacion.estado_asignacion', 'ACTIVO')
+                                ->orWhere('asignacion.estado_asignacion', 'PROVISIONAL');
+                        })
+                        ->where(function ($query) {
+                            $query->whereNull('asignacion.fecha_culminacion')
+                                ->orWhere('asignacion.fecha_culminacion', '>', now());
+                        });
+                });
+        })->get();
     }
 }

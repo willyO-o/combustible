@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use App\Casts\ParametrosVale;
 
@@ -26,5 +27,11 @@ class ParametrosEmpresa extends Model
         return [
             'parametros_vale' => ParametrosVale::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(fn() => Cache::forget('parametros_empresa'));
+        static::deleted(fn() => Cache::forget('parametros_empresa'));
     }
 }

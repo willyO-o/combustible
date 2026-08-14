@@ -51,9 +51,6 @@ const confirmDelete = async (operacion) => {
     router.delete(route('operacion-diaria.destroy', operacion.id),
         {
             preserveScroll: true,
-            onSuccess: () => {
-                showToast('Operación diaria eliminada')
-            },
         },
     )
 }
@@ -230,12 +227,12 @@ const estadoBadge = (estado) => {
                                             <i class="ri-file-pdf-line"></i>
                                         </a>
 
-                                        <Link :href="route('operacion-diaria.edit', actividad.id)"
+                                        <Link v-can="'operacion-diaria.editar'" v-if="actividad.estado != 'VERIFICADO'" :href="route('operacion-diaria.edit', actividad.id)"
                                             class="btn btn-sm btn-icon btn-warning-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
 
-                                        <button type="button" class="btn btn-sm btn-icon btn-danger-light"
+                                        <button  v-can="'operacion-diaria.eliminar'" v-if="actividad.estado != 'VERIFICADO'" type="button" class="btn btn-sm btn-icon btn-danger-light"
                                             title="Eliminar" @click="confirmDelete(actividad)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>

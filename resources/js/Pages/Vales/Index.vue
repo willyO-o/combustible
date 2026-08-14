@@ -157,7 +157,7 @@ const formatDate = (date) => {
                                 <th>Fecha Emisión</th>
                                 <th>Vehículo</th>
                                 <th>Conductor</th>
-                                <th>Grifo</th>
+                                <th>Estación de Servicio</th>
                                 <th class="text-end">Litros</th>
                                 <th class="text-end">P/U (Bs)</th>
                                 <th class="text-end">Precio Total (Bs)</th>

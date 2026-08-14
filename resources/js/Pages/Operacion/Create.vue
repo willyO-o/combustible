@@ -6,11 +6,12 @@ import Multiselect from '@vueform/multiselect'
 import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Modal from '@/Components/Modal.vue'; // Ajusta la ruta según tu proyecto
-
-defineOptions({ layout: Maindashboard })
+import TextareaAutocomplete from '@/Components/TextareaAutocomplete.vue'
 
 
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
+
+defineOptions({ layout: Maindashboard })
 
 
 const estaAbiertoModal = ref(false) // Estado para controlar la visibilidad del modal;
@@ -23,6 +24,7 @@ const props = defineProps({
     conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
     vehiculosAsignados: Array, // [{ id, label }] vehículos asignados al conductor (si hay uno)
     operacion: Object, // { id, label } de la operación (si se está editando una operación existente)
+    actividadesSugeridas: Array, // [{ id, nombre_actividad, unidad_medida }] actividades sugeridas para el conductor
 })
 
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
@@ -128,11 +130,7 @@ function submit() {
             }
             return out
         })
-        .post(routeName,{
-            onSuccess: () =>{
-
-            }
-        })
+        .post(routeName)
 }
 
 const agregarActividad = () => {
@@ -165,8 +163,6 @@ const agregarActividad = () => {
     });
 
 }
-
-
 
 
 
@@ -528,9 +524,13 @@ onMounted(() => {
                             <label class="form-label fw-medium">
                                 Actividad <span class="text-danger">*</span>
                             </label>
-                            <textarea v-model="formActividad.actividad" type="text" class="form-control" rows="4"
-                                :class="{ 'is-invalid': formActividad.errors.actividad }"
-                                placeholder="Descripción de la actividad"></textarea>
+                            <TextareaAutocomplete :suggestions="actividadesSugeridas"
+                             option-value="nombre_actividad" option-label="nombre_actividad"
+                             v-model="formActividad.actividad" placeholder="Escribe o selecciona una actividad"
+                             @select="opt=>{ formActividad.unidad_medida = opt.unidad_medida }" :invalid="formActividad.errors.actividad !== undefined"
+                             />
+
+
 
                             <div v-if="formActividad.errors.actividad" class="text-danger small mt-1">{{
                                 formActividad.errors.actividad }}</div>

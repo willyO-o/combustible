@@ -17,8 +17,6 @@ class ValeRequest extends FormRequest
         $vale = $this->route('vale');
 
         return [
-            'nro_vale'     => ['required', 'integer', 'min:1', Rule::unique('vale', 'nro_vale')->ignore($vale?->id)->whereNull('deleted_at')],
-            'fecha_emision'=> ['required', 'date'],
             'litros'       => ['required', 'numeric', 'min:0.01', 'max:9999.99'],
             'precio'       => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
             'id_vehiculo'  => ['required', 'integer', 'exists:vehiculo,id'],
@@ -38,7 +36,7 @@ class ValeRequest extends FormRequest
             'precio'        => 'precio',
             'id_vehiculo'   => 'vehículo',
             'id_conductor'  => 'conductor',
-            'id_grifo'      => 'grifo',
+            'id_grifo'      => 'estación de servicio',
             'estado_vale'   => 'estado',
             'id_tipo_combustible' => 'tipo de combustible',
         ];

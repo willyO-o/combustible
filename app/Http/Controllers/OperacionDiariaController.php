@@ -69,17 +69,24 @@ class OperacionDiariaController extends Controller
     public function create()
     {
         //
+        if (!request()->user()->hasRole('conductor')) {
+            abort(403, 'No autorizado. Solo los conductores pueden registrar operaciones diarias.');
+        }
 
         $conductor = request()->user()->persona;
         $conductor->load('conductor');
         $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
 
 
+        $areas = $conductor->conductor->areas()->pluck('id')->toArray();
+
+        $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
 
         return inertia('Operacion/Create', [
             'conductor' => $conductor,
             'vehiculosAsignados' => $vehiculosAsignados,
             'operacion' => null,
+            'actividadesSugeridas' => $actividadesSugeridas,
         ]);
     }
 
@@ -126,10 +133,15 @@ class OperacionDiariaController extends Controller
 
         $operacionDiaria->actividades_realizadas_edit = $operacionDiaria->actividadesRealizadasEdit();
 
+        $areas = $conductor->conductor->areas()->pluck('id')->toArray();
+
+        $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
+
         return inertia('Operacion/Create', [
             'conductor' => $conductor,
             'vehiculosAsignados' => $vehiculosAsignados,
             'operacion' => $operacionDiaria->load(['vehiculo', 'area']),
+            'actividadesSugeridas' => $actividadesSugeridas,
         ]);
     }
 

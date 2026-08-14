@@ -43,8 +43,8 @@ class ValeController extends Controller
         if ($request->filled('id_conductor')) {
             $query->where('id_conductor', $request->id_conductor);
         }
-        if (auth()->user()->hasRole('conductor')) {
-            $idConductor = auth()->user()->persona->id;
+        if ($request->user()->hasRole('conductor')) {
+            $idConductor = $request->user()->id_persona;
             $query->where('id_conductor', $idConductor);
         }
 
@@ -66,7 +66,7 @@ class ValeController extends Controller
 
     public function create(): Response
     {
-        $nextNroVale = (Vale::withTrashed()->max('nro_vale') ?? 0) + 1;
+        $nextNroVale = Vale::siguienteNroValeProvisional();
 
         $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
             ->orderBy('tipo_combustible', 'asc')
@@ -76,31 +76,51 @@ class ValeController extends Controller
                 'label' => $t->tipo_combustible,
             ]);
 
-        $nextNroVale = str_pad($nextNroVale, 6, '0', STR_PAD_LEFT);
+        $grifos = Grifo::where('estado_grifo', 'ACTIVO')
+            ->get(['id', 'razon_social', 'ciudad']);
+
+
         return Inertia::render('Vales/Create', [
             'nextNroVale' => $nextNroVale,
             'tiposCombustible' => $tiposCombustible,
+            'grifos' => $grifos,
+            'vale' => null,
         ]);
     }
 
     public function store(ValeRequest $request): RedirectResponse
     {
-        Vale::create($request->all());
+        $vale = Vale::create($request->validated());
 
         return redirect()->route('vales.index')
-            ->with('success', "Vale #{$request->nro_vale} registrado exitosamente.");
+            ->with('success', "Vale #{$vale->nro} registrado exitosamente.");
     }
 
     public function edit(Vale $vale): Response
     {
         $vale->load(['vehiculo', 'conductor', 'grifo']);
 
-        return Inertia::render('Vales/Edit', [
+
+        $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
+            ->orderBy('tipo_combustible', 'asc')
+            ->get(['id', 'tipo_combustible'])
+            ->map(fn($t) => [
+                'id'    => $t->id,
+                'label' => $t->tipo_combustible,
+            ]);
+
+
+        $grifos = Grifo::where('estado_grifo', 'ACTIVO')
+            ->get(['id', 'razon_social', 'ciudad']);
+
+
+        return Inertia::render('Vales/Create', [
             'vale' => $vale,
             // Enviamos el objeto completo para que el select muestre el valor actual
-            'vehiculoActual'   => $vale->vehiculo  ? ['id' => $vale->vehiculo->id,  'label' => "{$vale->vehiculo->nro_placa}" . ($vale->vehiculo->marca ? " — {$vale->vehiculo->marca}" : '')] : null,
-            'conductorActual'  => $vale->conductor ? ['id' => $vale->conductor->id, 'label' => trim("{$vale->conductor->nombres} {$vale->conductor->paterno} {$vale->conductor->materno}") . " (CI: {$vale->conductor->ci})"] : null,
-            'grifoActual'      => $vale->grifo     ? ['id' => $vale->grifo->id,     'label' => "{$vale->grifo->razon_social}" . ($vale->grifo->ciudad ? " — {$vale->grifo->ciudad}" : '')] : null,
+            'vehiculoActual'   => $vale->vehiculo  ? ['id' => $vale->vehiculo->id,  'label' => "{$vale->vehiculo->codigo} — {$vale->vehiculo->nro_placa}" . ($vale->vehiculo->marca ? " — {$vale->vehiculo->marca}" : '')] : null,
+            'conductorActual'  => $vale->conductor ? ['id' => $vale->conductor->id, 'label' => trim("{$vale->conductor->persona->nombre_completo}") . " (CI: {$vale->conductor->persona->ci})"] : null,
+            'tiposCombustible' => $tiposCombustible,
+            'grifos' => $grifos,
         ]);
     }
 
@@ -290,7 +310,7 @@ class ValeController extends Controller
     public function imprimirVale(Vale $vale)
     {
         // dd($vale);
-        $vale->load(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible','user']);
+        $vale->load(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible', 'user']);
 
         $reporte = new Reportes();
         $reporte->generarVale($vale);
