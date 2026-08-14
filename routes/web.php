@@ -27,6 +27,14 @@ Route::get('/', function () {
     ]);
 });
 
+// ── Documentación de la API (Swagger UI) ────────────────────────────────────
+// Sirve una página estática con Swagger UI apuntando al archivo público
+// public/docs/openapi.yaml, que se mantiene desacoplado de Laravel: el
+// contenido de la documentación se edita ahí, no en anotaciones PHP.
+Route::get('/api/documentation', function () {
+    return view('docs.swagger');
+})->name('api.documentation');
+
 // Route::get('/dashboard', function () {
 //     return Inertia::render('Dashboard');
 // })->middleware(['auth', 'verified'])->name('dashboard');

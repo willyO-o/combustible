@@ -1,0 +1,1257 @@
+openapi: 3.0.3
+
+info:
+  title: API Gestión de Combustible y Flota
+  description: |
+    API REST para la gestión de operaciones diarias de la flota vehicular, autenticación de usuarios
+    y parámetros generales del sistema.
+
+    Este archivo se mantiene **desacoplado del código de Laravel**: se edita directamente aquí y se sirve
+    como archivo estático, sin depender de anotaciones en los controladores.
+
+    ## Autenticación
+
+    La mayoría de los endpoints requieren un token **JWT**. Flujo recomendado:
+
+    1. Llamar a `POST /auth/login` con `email` y `password` para obtener un `access_token`.
+    2. Enviar dicho token en la cabecera `Authorization: Bearer {access_token}` en cada petición protegida.
+    3. Cuando el token esté por expirar, llamar a `POST /auth/refresh` (con el token actual todavía vigente)
+       para obtener uno nuevo.
+    4. Llamar a `POST /auth/logout` para invalidar el token de forma explícita.
+
+    ## Formato de errores
+
+    - **422 Unprocessable Content**: error de validación. Responde `{ "success": false, "message": "...", "errors": { "campo": ["mensaje"] } }`.
+    - **401 Unauthorized**: token ausente, inválido o expirado.
+    - **403 Forbidden**: el usuario está autenticado pero no tiene permiso sobre el recurso solicitado.
+    - **404 Not Found**: el recurso indicado en la ruta no existe.
+    - **500 Internal Server Error**: error inesperado del servidor. Responde `{ "message": "...", "error": "..." }`.
+
+    ## Usuarios de prueba
+
+    Estas cuentas existen en el seeder de la aplicación (`UserSeeder`) y sirven para probar la
+    API con cada rol desde `POST /auth/login`:
+
+    | Rol         | Email                    | Contraseña      | Alcance de `GET /operacion-diaria` |
+    |-------------|--------------------------|-----------------|-------------------------------------|
+    | conductor   | conductor@gmail.com      | `conductor123`  | Solo sus propias operaciones |
+    | conductor   | conductor2@gmail.com     | `conductor123`  | Solo sus propias operaciones |
+    | conductor   | conductor3@gmail.com     | `conductor123`  | Solo sus propias operaciones |
+    | jefe-area   | jefearea1@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
+    | jefe-area   | jefearea2@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
+    | jefe-area   | jefearea3@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
+    | super-admin | super-admin@gmail.com    | `superadmin123` | Sin restricción |
+  version: "1.0.0"
+  contact:
+    name: Equipo de Desarrollo — Combustible
+  license:
+    name: Uso interno
+
+servers:
+  - url: /api/v1
+    description: |
+      Servidor actual (relativo al origen desde el que se abre esta documentación).
+      Se usa una URL relativa a propósito para que "Try it out" funcione sin
+      configuración adicional sin importar el host/puerto real (127.0.0.1:8000,
+      localhost, un dominio de Herd/Valet, staging, etc.) — evita que el botón
+      "Execute" intente conectarse a un origen distinto al que realmente sirve la API.
+  - url: https://{host}/api/v1
+    description: Otro entorno accedido por dominio absoluto (staging / producción)
+    variables:
+      host:
+        default: tu-dominio.example.com
+
+tags:
+  - name: Autenticación
+    description: Login, refresco y cierre de sesión mediante JWT.
+  - name: Parámetros
+    description: Parámetros generales de la aplicación y catálogos/colecciones de apoyo (vehículos asignados, grifos, tipos de combustible, etc.).
+  - name: Operación Diaria
+    description: Registro, consulta, actualización y eliminación de las operaciones diarias de los vehículos, incluyendo las actividades realizadas en cada una.
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ──────────────────────────────────────────────────────────────────────
+  # AUTENTICACIÓN
+  # ──────────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión
+      description: Autentica al usuario con `email` y `password` y devuelve un token JWT.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: conductor@gmail.com
+              password: conductor123
+              remember: false
+      responses:
+        '200':
+          description: Login exitoso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                access_token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEyLCJpYXQiOjE3NTUxMDAwMDAsImV4cCI6MTc1NTEwMzYwMH0.abc123def456
+                token_type: bearer
+                expires_in: 3600
+                user:
+                  name: Conductor User
+                  email: conductor@gmail.com
+                  nombre_completo: Juan Pérez Quispe
+                  nombres: Juan
+                  paterno: Pérez
+                  materno: Quispe
+                  ci: "7451236"
+                  f_nacimiento_formatted: 12/05/1990
+                  foto_url: http://localhost/storage/personas/juan.jpg
+                  celular: "70012345"
+                  roles: [conductor]
+        '401':
+          description: Credenciales incorrectas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Credenciales incorrectas.
+        '422':
+          description: Datos de entrada inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                success: false
+                message: Datos de entrada inválidos.
+                errors:
+                  email: ["El campo email es obligatorio."]
+                  password: ["El campo password debe tener al menos 6 caracteres."]
+
+  /auth/logout:
+    post:
+      tags: [Autenticación]
+      summary: Cerrar sesión
+      description: Invalida el token JWT actual. Requiere autenticación.
+      responses:
+        '200':
+          description: Sesión cerrada correctamente.
+          content:
+            application/json:
+              example:
+                success: true
+                message: Sesión cerrada correctamente.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Autenticación]
+      summary: Refrescar token
+      description: |
+        Genera un nuevo token JWT a partir del token actual (todavía vigente o recientemente
+        expirado, según configuración del blacklist). Requiere enviar el token actual en la cabecera
+        `Authorization`.
+      responses:
+        '200':
+          description: Token refrescado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: El token expiró y no pudo refrescarse, es inválido, o no se encontró.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                expirado:
+                  value:
+                    success: false
+                    message: El token ha expirado y no puede ser refrescado.
+                invalido:
+                  value:
+                    success: false
+                    message: Token inválido.
+                no_encontrado:
+                  value:
+                    success: false
+                    message: No se encontró el token.
+
+  /auth/me:
+    get:
+      tags: [Autenticación]
+      summary: Usuario autenticado
+      description: Devuelve los datos del usuario actualmente autenticado, incluyendo su relación `persona`.
+      responses:
+        '200':
+          description: Datos del usuario.
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  id: 12
+                  name: Conductor User
+                  email: conductor@gmail.com
+                  id_persona: 45
+                  persona:
+                    id: 45
+                    ci: "7451236"
+                    nombres: Juan
+                    paterno: Pérez
+                    materno: Quispe
+                    celular: "70012345"
+                    estado_persona: ACTIVO
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ──────────────────────────────────────────────────────────────────────
+  # PARÁMETROS
+  # ──────────────────────────────────────────────────────────────────────
+  /parametros:
+    get:
+      tags: [Parámetros]
+      summary: Parámetros generales de la aplicación
+      description: Devuelve información general de configuración de la app (nombre, entorno, url, logo, etc.).
+      responses:
+        '200':
+          description: Parámetros generales.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParametrosGenerales'
+              example:
+                api_version: "1.0"
+                app_name: Combustible
+                app_env: production
+                app_debug: false
+                app_url: http://localhost
+                timezone: America/La_Paz
+                locale: es
+                url_logo: http://localhost/images/logo.png
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /parametros/colecciones:
+    get:
+      tags: [Parámetros]
+      summary: Colecciones y catálogos de apoyo
+      description: |
+        Devuelve los catálogos y colecciones necesarios para alimentar formularios del cliente:
+        vehículos actualmente asignados al conductor autenticado, estaciones de servicio activas,
+        tipos de combustible activos, y los valores enumerados usados por otros módulos
+        (cargas de combustible, solicitudes de mantenimiento).
+
+        Requiere que el usuario autenticado tenga una `persona` con un registro de `conductor`
+        asociado (`$request->user()->persona->conductor`).
+      responses:
+        '200':
+          description: Colecciones disponibles para el usuario autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColeccionesResponse'
+              example:
+                data:
+                  vehiculos:
+                    - id: 8
+                      uuid: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                      nro_placa: 1234-ABC
+                      codigo: VOLQ-08
+                      anio: "2018"
+                      marca: Volvo
+                      modelo: FMX
+                      estado_vehiculo: ACTIVO
+                      id_tipo_combustible: 1
+                      id_tipo_vehiculo: 3
+                      url_fotografia: http://localhost/storage/vehiculos/volq-08.jpg
+                      tipo_medicion: kilometraje
+                  estaciones_servicio:
+                    - id: 1
+                      nombre_grifo: Grifo Central YPFB
+                      estado_grifo: ACTIVO
+                  tipos_combustible:
+                    - id: 1
+                      nombre_tipo_combustible: Diésel
+                      estado_tipo_combustible: ACTIVO
+                  cargas_combustible:
+                    tipos_carga: [VALE, PREPAGO]
+                    tipos_respaldo_digital: [FACTURA, NOTA, COMPROBANTE, OTRO]
+                    estado_carga: [PENDIENTE, USADO, ANULADO]
+                  solicitudes_mantenimiento:
+                    tipos_mantenimiento: [PREVENTIVO, CORRECTIVO]
+                    estado: [PENDIENTE, APROBADA, RECHAZADA, ANULADA]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: El usuario autenticado no tiene una `persona`/`conductor` asociado.
+          content:
+            application/json:
+              example:
+                message: "Error al obtener colecciones."
+                error: "Attempt to read property \"conductor\" on null"
+
+  # ──────────────────────────────────────────────────────────────────────
+  # OPERACIÓN DIARIA
+  # ──────────────────────────────────────────────────────────────────────
+  /operacion-diaria:
+    get:
+      tags: [Operación Diaria]
+      summary: Listar operaciones diarias
+      description: |
+        Lista paginada de operaciones diarias, ordenadas por fecha de creación descendente.
+
+        Las restricciones de visibilidad dependen del rol del usuario autenticado:
+        - **conductor**: solo ve sus propias operaciones (`id_conductor` = persona del usuario).
+        - **jefe-area**: solo ve las operaciones de las áreas que tiene a su cargo.
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: nro_placa
+          in: query
+          description: Filtra por placa o código del vehículo (coincidencia parcial).
+          schema: { type: string }
+          example: 1234-ABC
+        - name: fecha_desde
+          in: query
+          description: Filtra operaciones cuya `fecha_inicio` sea igual o posterior a esta fecha.
+          schema: { type: string, format: date }
+          example: "2026-08-01"
+        - name: fecha_hasta
+          in: query
+          description: Filtra operaciones cuya `fecha_inicio` sea igual o anterior a esta fecha.
+          schema: { type: string, format: date }
+          example: "2026-08-31"
+        - name: estado_operacion
+          in: query
+          description: Filtra por estado exacto de la operación.
+          schema:
+            type: string
+            enum: [PENDIENTE, EN_PROGRESO, FINALIZADO, VERIFICADO, OBSERVADO]
+          example: FINALIZADO
+        - name: per_page
+          in: query
+          description: Cantidad de resultados por página.
+          schema: { type: integer, default: 10 }
+          example: 15
+      responses:
+        '200':
+          description: Listado paginado de operaciones diarias.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperacionDiariaPaginada'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Operación Diaria]
+      summary: Registrar una nueva operación diaria
+      description: |
+        Crea una nueva operación diaria para el vehículo indicado, junto con las actividades
+        realizadas durante la jornada.
+
+        El `id_conductor` se asigna automáticamente a partir del usuario autenticado
+        (`auth()->user()->id_persona`) y el `nro_operacion` se autogenera de forma correlativa;
+        **no deben enviarse en el cuerpo de la petición**.
+
+        El `id_area` se determina automáticamente a partir del área actualmente asignada al
+        vehículo. Si el vehículo no tiene un área asignada, la petición falla con `422`.
+
+        Reglas condicionales relevantes:
+        - Si el vehículo tiene `tipo_medicion = kilometraje`, `kilometraje_inicio` es obligatorio.
+        - Si el vehículo tiene `tipo_medicion = horometro`, `horometro_inicio` es obligatorio.
+        - `kilometraje_fin` es obligatorio si se envió `kilometraje_inicio`, y debe ser mayor a este.
+        - `horometro_fin` es obligatorio si se envió `horometro_inicio`, y debe ser mayor a este.
+        - `kilometraje_inicio` / `horometro_inicio` no pueden ser inferiores a la última lectura
+          registrada para el vehículo (según el último registro de carga de combustible).
+        - Cada actividad realizada debe indicar `lugar`, o alternativamente `origen` **y** `destino`.
+        - Si se envían `observaciones` y `notificar_observaciones: true`, se dispara una notificación
+          (`ObservacionOperacionEvent`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperacionDiariaStoreRequest'
+            examples:
+              con_kilometraje:
+                summary: Vehículo medido por kilometraje, con lugar único
+                value:
+                  id_vehiculo: 8
+                  turno: DIA
+                  fecha_inicio: "2026-08-13 07:00"
+                  fecha_fin: "2026-08-13 17:00"
+                  kilometraje_inicio: 15420.50
+                  kilometraje_fin: 15510.00
+                  horas_trabajadas: 9.5
+                  observaciones: "Se detectó ruido leve en el motor al arrancar."
+                  notificar_observaciones: true
+                  actividades_realizadas:
+                    - actividad: Acarreo de material
+                      lugar: Cancha de acopio
+                      cantidad: 6
+                      unidad_medida: viajes
+                      hora_inicio: "07:15"
+                      hora_fin: "11:00"
+                    - actividad: Transporte de mineral
+                      origen: Cancha de acopio
+                      destino: Chancado primario
+                      cantidad: 120
+                      unidad_medida: m3
+                      hora_inicio: "11:30"
+                      hora_fin: "16:45"
+              con_horometro:
+                summary: Vehículo medido por horómetro (p.ej. maquinaria pesada)
+                value:
+                  id_vehiculo: 15
+                  turno: NOCHE
+                  fecha_inicio: "2026-08-13 19:00"
+                  fecha_fin: "2026-08-14 06:00"
+                  horometro_inicio: 3210.00
+                  horometro_fin: 3221.50
+                  horas_trabajadas: 11
+                  notificar_observaciones: false
+                  actividades_realizadas:
+                    - actividad: Nivelación de terreno
+                      lugar: Plataforma norte
+                      cantidad: 8
+                      unidad_medida: horas
+                      hora_inicio: "19:30"
+                      hora_fin: "03:30"
+      responses:
+        '201':
+          description: Operación diaria creada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperacionDiariaCreateResponse'
+              example:
+                message: Operación diaria creada exitosamente.
+                data:
+                  id: 101
+                  nro_operacion: 101
+                  nro: "00101"
+                  id_conductor: 45
+                  id_vehiculo: 8
+                  id_area: 3
+                  turno: DIA
+                  fecha_inicio: "13/08/2026 07:00"
+                  fecha_fin: "13/08/2026 17:00"
+                  fecha_i_f: "2026-08-13 07:00"
+                  fecha_f_f: "2026-08-13 17:00"
+                  kilometraje_inicio: "15420.50"
+                  kilometraje_fin: "15510.00"
+                  horometro_inicio: null
+                  horometro_fin: null
+                  horas_trabajadas: "9.50"
+                  id_verificador: null
+                  estado: PENDIENTE
+                  observaciones: "Se detectó ruido leve en el motor al arrancar."
+                  created_at: "13/08/2026 07:05"
+                  updated_at: "2026-08-13T07:05:00.000000Z"
+                  conductor:
+                    id: 45
+                    persona:
+                      id: 45
+                      nombres: Juan
+                      paterno: Pérez
+                      materno: Quispe
+                  vehiculo:
+                    id: 8
+                    nro_placa: 1234-ABC
+                    codigo: VOLQ-08
+                    tipo_medicion: kilometraje
+                  area:
+                    id: 3
+                    nombre_area: Operaciones Mina Norte
+                  actividadesRealizadas:
+                    - id: 1
+                      nombre_actividad: Acarreo de material
+                      pivot:
+                        origen: null
+                        destino: null
+                        lugar: Cancha de acopio
+                        cantidad: "6.00"
+                        unidad_medida: viajes
+                        hora_inicio: "07:15"
+                        hora_fin: "11:00"
+        '422':
+          description: |
+            Error de validación, o el vehículo no tiene un área asignada
+            (`AreaNoAsignadaException`).
+          content:
+            application/json:
+              examples:
+                validacion:
+                  summary: Error de validación de campos
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      id_vehiculo: ["El campo id vehiculo seleccionado es inválido."]
+                      actividades_realizadas: ["Debe agregar al menos una actividad realizada."]
+                sin_area:
+                  summary: Vehículo sin área asignada
+                  value:
+                    message: "Error: El conductor no tiene un área asignada."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Error inesperado al crear la operación diaria.
+          content:
+            application/json:
+              example:
+                message: Error al crear la operación diaria.
+                error: "SQLSTATE[23000]: Integrity constraint violation..."
+
+  /operacion-diaria/{operacionDiaria}:
+    parameters:
+      - name: operacionDiaria
+        in: path
+        required: true
+        description: Identificador (`id`) de la operación diaria.
+        schema: { type: integer }
+        example: 101
+
+    get:
+      tags: [Operación Diaria]
+      summary: Obtener el detalle de una operación diaria
+      description: Devuelve la operación diaria con sus relaciones (conductor, vehículo, área, verificador y actividades realizadas).
+      responses:
+        '200':
+          description: Detalle de la operación diaria.
+          content:
+            application/json:
+              example:
+                data:
+                  id: 101
+                  nro: "00101"
+                  turno: DIA
+                  estado: FINALIZADO
+                  conductor: { id: 45, persona: { nombres: Juan, paterno: Pérez } }
+                  vehiculo: { id: 8, nro_placa: 1234-ABC, tipo_medicion: kilometraje }
+                  area: { id: 3, nombre_area: Operaciones Mina Norte }
+                  verificador: null
+                  actividadesRealizadas:
+                    - id: 1
+                      nombre_actividad: Acarreo de material
+                      pivot: { lugar: Cancha de acopio, cantidad: "6.00", unidad_medida: viajes, hora_inicio: "07:15", hora_fin: "11:00" }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Operación Diaria]
+      summary: Actualizar una operación diaria
+      description: |
+        Actualiza una operación diaria existente y sincroniza sus actividades realizadas
+        (`UpdateOperacionDiariaAction`). Reutiliza `OperacionStoreRequest`, la misma Form Request
+        del registro — ver `OperacionDiariaUpdateRequest` para el detalle exacto de qué campos
+        siguen siendo obligatorios y cuáles pasan a ser opcionales en esta operación.
+
+        - **No es un parche parcial real**: solo `id_vehiculo`, `kilometraje_inicio`,
+          `kilometraje_fin`, `horometro_inicio` y `horometro_fin` son opcionales aquí. `turno`,
+          `fecha_inicio`, `fecha_fin`, `horas_trabajadas`, `notificar_observaciones` y
+          `actividades_realizadas` **siguen siendo obligatorios**, igual que en el registro.
+        - `actividades_realizadas` **reemplaza por completo** el conjunto de actividades
+          previamente registradas para esta operación (se resincroniza, no se agrega de forma
+          incremental) — y al ser obligatorio, debe reenviarse siempre completo, incluidas las
+          actividades que no cambiaron.
+        - Si `observaciones` cambia respecto al valor original y `notificar_observaciones: true`,
+          se dispara `ObservacionOperacionEvent` (a diferencia del registro, aquí solo notifica
+          cuando el texto de las observaciones efectivamente cambió).
+        - A diferencia de `POST /operacion-diaria` y `GET /operacion-diaria/{id}`, la operación
+          devuelta en `data` **no incluye las relaciones anidadas** (`conductor`, `vehiculo`,
+          `area`, `actividadesRealizadas`), ya que el controlador no las recarga explícitamente
+          antes de responder — solo los campos propios de la operación diaria.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperacionDiariaUpdateRequest'
+            example:
+              kilometraje_fin: 15525.00
+              horas_trabajadas: 10
+              estado: FINALIZADO
+      responses:
+        '200':
+          description: Operación diaria actualizada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperacionDiariaUpdateResponse'
+              example:
+                message: Operación diaria actualizada exitosamente.
+                data:
+                  id: 101
+                  nro_operacion: 101
+                  nro: "00101"
+                  id_conductor: 45
+                  id_vehiculo: 8
+                  id_area: 3
+                  turno: DIA
+                  fecha_inicio: "13/08/2026 07:00"
+                  fecha_fin: "13/08/2026 17:00"
+                  fecha_i_f: "2026-08-13 07:00"
+                  fecha_f_f: "2026-08-13 17:00"
+                  kilometraje_inicio: "15420.50"
+                  kilometraje_fin: "15525.00"
+                  horometro_inicio: null
+                  horometro_fin: null
+                  horas_trabajadas: "10.00"
+                  id_verificador: null
+                  estado: FINALIZADO
+                  observaciones: "Se detectó ruido leve en el motor al arrancar."
+                  created_at: "13/08/2026 07:05"
+                  updated_at: "2026-08-13T17:05:00.000000Z"
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                success: false
+                message: Los datos enviados no son válidos.
+                errors:
+                  kilometraje_fin: ["El kilometraje fin debe ser mayor que kilometraje inicio."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Error inesperado al actualizar la operación diaria.
+          content:
+            application/json:
+              example:
+                message: Error al actualizar la operación diaria.
+                error: "SQLSTATE[23000]: Integrity constraint violation..."
+
+    patch:
+      tags: [Operación Diaria]
+      summary: Actualizar una operación diaria (alias de PUT)
+      description: |
+        Alias de `PUT` sobre el mismo recurso: misma Form Request, misma acción
+        (`UpdateOperacionDiariaAction`) y mismo formato de respuesta. **No se comporta como un
+        PATCH parcial** — ver las notas en `PUT` sobre qué campos siguen siendo obligatorios
+        (`turno`, `fecha_inicio`, `fecha_fin`, `horas_trabajadas`, `notificar_observaciones` y
+        `actividades_realizadas`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperacionDiariaUpdateRequest'
+      responses:
+        '200':
+          description: Operación diaria actualizada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperacionDiariaUpdateResponse'
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Error inesperado al actualizar la operación diaria.
+          content:
+            application/json:
+              example:
+                message: Error al actualizar la operación diaria.
+                error: "SQLSTATE[23000]: Integrity constraint violation..."
+
+    delete:
+      tags: [Operación Diaria]
+      summary: Eliminar una operación diaria
+      description: |
+        Elimina la operación diaria y desvincula (`detach`) sus actividades realizadas.
+        No se permite eliminar operaciones cuyo `estado` sea `VERIFICADO`.
+      responses:
+        '200':
+          description: Operación diaria eliminada exitosamente.
+          content:
+            application/json:
+              example:
+                success: true
+                message: Operación diaria eliminada exitosamente.
+        '403':
+          description: La operación ya fue verificada y no puede eliminarse.
+          content:
+            application/json:
+              example:
+                success: false
+                message: No se puede eliminar una operación diaria que ya ha sido verificada.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Error inesperado al eliminar.
+          content:
+            application/json:
+              example:
+                success: false
+                message: "Error al eliminar la operación diaria: ..."
+
+  /operacion-actividad/validar:
+    post:
+      tags: [Operación Diaria]
+      summary: Validar los datos de una actividad (antes de agregarla al formulario)
+      description: |
+        Valida el formato de una actividad realizada de forma independiente, útil para
+        interfaces que arman el arreglo `actividades_realizadas` de forma incremental antes de
+        enviar el `POST /operacion-diaria` (o `PUT`) definitivo.
+
+        **Importante:** este endpoint **solo valida y devuelve en eco los datos recibidos**
+        (`data` = los campos validados, tal cual se enviaron); no persiste nada en la base de
+        datos ni agrega la actividad a ninguna operación diaria existente. La responsabilidad de
+        acumular las actividades validadas y enviarlas dentro de `actividades_realizadas` recae
+        en el cliente.
+
+        **Nota técnica:** aquí la regla `lugar` OR (`origen` **y** `destino`) sí se exige de forma
+        estricta (`origen`/`destino` son `required_without:lugar`). Al enviar el mismo elemento
+        dentro del arreglo `actividades_realizadas` de `POST`/`PUT /operacion-diaria`, la regla
+        equivalente para `origen`/`destino` apunta por error a `actividades_realizadas.*.actividad`
+        en vez de a `...*.lugar`; como `actividad` siempre es obligatorio y por tanto siempre está
+        presente, esa condición nunca se activa allí — en la práctica, dentro de esas dos rutas
+        solo `lugar` queda realmente exigido (a menos que se envíe `origen`), y `destino` nunca es
+        forzado por el validador. Es decir: validar una actividad aquí puede ser más estricto que
+        enviarla directamente dentro de `actividades_realizadas`. Se documenta tal como se
+        comporta hoy.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActividadRealizadaInput'
+            example:
+              actividad: Acarreo de material
+              lugar: Cancha de acopio
+              cantidad: 6
+              unidad_medida: viajes
+              hora_inicio: "07:15"
+              hora_fin: "11:00"
+      responses:
+        '200':
+          description: Actividad válida. Se devuelven en eco los datos validados (no se persiste nada).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidarActividadResponse'
+              example:
+                message: Actividad agregada exitosamente.
+                data:
+                  actividad: Acarreo de material
+                  lugar: Cancha de acopio
+                  cantidad: 6
+                  unidad_medida: viajes
+                  hora_inicio: "07:15"
+                  hora_fin: "11:00"
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                message: "The actividad field is required."
+                errors:
+                  actividad: ["The actividad field is required."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token JWT obtenido en `POST /auth/login`. Enviar como
+        `Authorization: Bearer {access_token}`.
+
+  responses:
+    Unauthorized:
+      description: No autenticado, token ausente/inválido/expirado.
+      content:
+        application/json:
+          example:
+            message: Unauthenticated.
+    NotFound:
+      description: El recurso solicitado no existe.
+      content:
+        application/json:
+          example:
+            message: "No query results for model [App\\Models\\OperacionDiaria] 999"
+
+  schemas:
+    # ── Genéricos ─────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string, example: "Ha ocurrido un error." }
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string, example: "Los datos enviados no son válidos." }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          example:
+            campo: ["mensaje de error"]
+
+    # ── Autenticación ─────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: conductor@gmail.com }
+        password: { type: string, format: password, minLength: 6, example: conductor123 }
+        remember:
+          type: boolean
+          default: false
+          description: Si es `true`, el token se emite con un TTL extendido (`JWT_REMEMBER_TTL`, por defecto 30 días) en lugar del TTL estándar.
+          example: false
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token: { type: string, example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9... }
+        token_type: { type: string, example: bearer }
+        expires_in: { type: integer, description: Segundos hasta la expiración del token., example: 3600 }
+        user:
+          type: object
+          properties:
+            name: { type: string, example: Conductor User }
+            email: { type: string, format: email, example: conductor@gmail.com }
+            nombre_completo: { type: string, nullable: true, example: Juan Pérez Quispe }
+            nombres: { type: string, nullable: true, example: Juan }
+            paterno: { type: string, nullable: true, example: Pérez }
+            materno: { type: string, nullable: true, example: Quispe }
+            ci: { type: string, nullable: true, example: "7451236" }
+            f_nacimiento_formatted: { type: string, nullable: true, example: 12/05/1990 }
+            foto_url: { type: string, nullable: true, example: http://localhost/storage/personas/juan.jpg }
+            celular: { type: string, nullable: true, example: "70012345" }
+            roles:
+              type: array
+              items: { type: string }
+              example: [conductor]
+
+    # ── Parámetros ────────────────────────────────────────────────────
+    ParametrosGenerales:
+      type: object
+      properties:
+        api_version: { type: string, example: "1.0" }
+        app_name: { type: string, example: Combustible }
+        app_env: { type: string, example: production }
+        app_debug: { type: boolean, example: false }
+        app_url: { type: string, example: http://localhost }
+        timezone: { type: string, example: America/La_Paz }
+        locale: { type: string, example: es }
+        url_logo: { type: string, example: http://localhost/images/logo.png }
+
+    VehiculoAsignado:
+      type: object
+      properties:
+        id: { type: integer, example: 8 }
+        uuid: { type: string, format: uuid, example: 3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+        nro_placa: { type: string, example: 1234-ABC }
+        codigo: { type: string, nullable: true, example: VOLQ-08 }
+        anio: { type: string, nullable: true, example: "2018" }
+        marca: { type: string, nullable: true, example: Volvo }
+        modelo: { type: string, nullable: true, example: FMX }
+        estado_vehiculo: { type: string, enum: [ACTIVO, RETIRADO, VENDIDO], example: ACTIVO }
+        id_tipo_combustible: { type: integer, example: 1 }
+        id_tipo_vehiculo: { type: integer, example: 3 }
+        url_fotografia: { type: string, nullable: true, example: http://localhost/storage/vehiculos/volq-08.jpg }
+        tipo_medicion:
+          type: string
+          enum: [kilometraje, horometro]
+          description: Determina si la operación diaria de este vehículo exige kilometraje u horómetro.
+          example: kilometraje
+
+    Grifo:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        nombre_grifo: { type: string, example: Grifo Central YPFB }
+        estado_grifo: { type: string, enum: [ACTIVO, INACTIVO], example: ACTIVO }
+
+    TipoCombustible:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        nombre_tipo_combustible: { type: string, example: Diésel }
+        estado_tipo_combustible: { type: string, enum: [ACTIVO, INACTIVO], example: ACTIVO }
+
+    ColeccionesResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            vehiculos:
+              type: array
+              items: { $ref: '#/components/schemas/VehiculoAsignado' }
+            estaciones_servicio:
+              type: array
+              items: { $ref: '#/components/schemas/Grifo' }
+            tipos_combustible:
+              type: array
+              items: { $ref: '#/components/schemas/TipoCombustible' }
+            cargas_combustible:
+              type: object
+              properties:
+                tipos_carga: { type: array, items: { type: string }, example: [VALE, PREPAGO] }
+                tipos_respaldo_digital: { type: array, items: { type: string }, example: [FACTURA, NOTA, COMPROBANTE, OTRO] }
+                estado_carga: { type: array, items: { type: string }, example: [PENDIENTE, USADO, ANULADO] }
+            solicitudes_mantenimiento:
+              type: object
+              properties:
+                tipos_mantenimiento: { type: array, items: { type: string }, example: [PREVENTIVO, CORRECTIVO] }
+                estado: { type: array, items: { type: string }, example: [PENDIENTE, APROBADA, RECHAZADA, ANULADA] }
+
+    # ── Operación Diaria ──────────────────────────────────────────────
+    ActividadRealizadaInput:
+      type: object
+      description: |
+        Una actividad realizada durante la operación diaria. Debe indicarse `lugar`,
+        o alternativamente `origen` **y** `destino` (por ejemplo, para actividades de transporte).
+      required: [actividad, cantidad, unidad_medida, hora_inicio, hora_fin]
+      properties:
+        actividad:
+          type: string
+          minLength: 3
+          description: Nombre de la actividad (p.ej. "Acarreo de material").
+          example: Acarreo de material
+        lugar:
+          type: string
+          nullable: true
+          description: Lugar donde se realizó la actividad. Obligatorio si no se envían `origen`/`destino`.
+          example: Cancha de acopio
+        origen:
+          type: string
+          nullable: true
+          description: Punto de origen (usado junto con `destino` en actividades de transporte).
+          example: Cancha de acopio
+        destino:
+          type: string
+          nullable: true
+          description: Punto de destino (usado junto con `origen` en actividades de transporte).
+          example: Chancado primario
+        cantidad:
+          type: number
+          format: float
+          minimum: 1
+          description: Cantidad realizada, en la unidad indicada por `unidad_medida` (viajes, m3, horas, etc.).
+          example: 6
+        unidad_medida:
+          type: string
+          example: viajes
+        hora_inicio:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Hora de inicio de la actividad, formato `HH:mm`.
+          example: "07:15"
+        hora_fin:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Hora de fin de la actividad, formato `HH:mm`.
+          example: "11:00"
+
+    OperacionDiariaStoreRequest:
+      type: object
+      description: Cuerpo esperado por `POST /operacion-diaria`. `id_conductor`, `id_area` y `nro_operacion` se calculan en el servidor y no deben enviarse.
+      required: [id_vehiculo, turno, fecha_inicio, fecha_fin, horas_trabajadas, notificar_observaciones, actividades_realizadas]
+      properties:
+        id_vehiculo:
+          type: integer
+          description: Debe existir en la tabla `vehiculo`.
+          example: 8
+        turno:
+          type: string
+          enum: [DIA, NOCHE]
+          example: DIA
+        fecha_inicio:
+          type: string
+          format: date-time
+          example: "2026-08-13 07:00"
+        fecha_fin:
+          type: string
+          format: date-time
+          description: Debe ser posterior a `fecha_inicio`.
+          example: "2026-08-13 17:00"
+        kilometraje_inicio:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Obligatorio si el vehículo tiene `tipo_medicion = kilometraje`. No puede ser menor a la última lectura registrada del vehículo.
+          example: 15420.50
+        kilometraje_fin:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Obligatorio si se envía `kilometraje_inicio`. Debe ser mayor a `kilometraje_inicio`.
+          example: 15510.00
+        horometro_inicio:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Obligatorio si el vehículo tiene `tipo_medicion = horometro`. No puede ser menor a la última lectura registrada del vehículo.
+          example: null
+        horometro_fin:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Obligatorio si se envía `horometro_inicio`. Debe ser mayor a `horometro_inicio`.
+          example: null
+        horas_trabajadas:
+          type: number
+          format: float
+          minimum: 0
+          example: 9.5
+        observaciones:
+          type: string
+          nullable: true
+          minLength: 10
+          example: "Se detectó ruido leve en el motor al arrancar."
+        notificar_observaciones:
+          type: boolean
+          description: Si es `true` y hay `observaciones`, dispara una notificación al área correspondiente.
+          example: true
+        actividades_realizadas:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ActividadRealizadaInput' }
+
+    OperacionDiariaUpdateRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `PUT`/`PATCH /operacion-diaria/{id}`. **No es un parche parcial
+        real**: `OperacionStoreRequest::rules()` solo relaja a `sometimes` (opcional) los campos
+        `id_vehiculo`, `kilometraje_inicio`, `kilometraje_fin`, `horometro_inicio` y
+        `horometro_fin`. El resto — `turno`, `fecha_inicio`, `fecha_fin`, `horas_trabajadas`,
+        `notificar_observaciones` y `actividades_realizadas` — sigue siendo **obligatorio**, sin
+        excepción por tratarse de una actualización, y debe reenviarse completo en cada petición
+        (incluyendo las actividades que no cambiaron, ya que se resincronizan por completo).
+      required: [turno, fecha_inicio, fecha_fin, horas_trabajadas, notificar_observaciones, actividades_realizadas]
+      properties:
+        id_vehiculo:
+          type: integer
+          description: Opcional en la actualización (a diferencia del registro, donde es obligatorio). Si se envía, debe existir en la tabla `vehiculo`.
+          example: 8
+        turno:
+          type: string
+          enum: [DIA, NOCHE]
+          example: DIA
+        fecha_inicio:
+          type: string
+          format: date-time
+          example: "2026-08-13 07:00"
+        fecha_fin:
+          type: string
+          format: date-time
+          description: Debe ser posterior a `fecha_inicio`.
+          example: "2026-08-13 17:00"
+        kilometraje_inicio:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Opcional en la actualización. Si se envía, no puede ser menor a la última lectura registrada del vehículo.
+          example: 15420.50
+        kilometraje_fin:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Opcional en la actualización. Si se envía, debe ser mayor a `kilometraje_inicio`.
+          example: 15525.00
+        horometro_inicio:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Opcional en la actualización. Si se envía, no puede ser menor a la última lectura registrada del vehículo.
+          example: null
+        horometro_fin:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Opcional en la actualización. Si se envía, debe ser mayor a `horometro_inicio`.
+          example: null
+        horas_trabajadas:
+          type: number
+          format: float
+          minimum: 0
+          example: 10
+        observaciones:
+          type: string
+          nullable: true
+          minLength: 10
+          example: "Se detectó ruido leve en el motor al arrancar."
+        notificar_observaciones:
+          type: boolean
+          description: Si `observaciones` cambia respecto a su valor original y esto es `true`, dispara una notificación al área correspondiente.
+          example: true
+        actividades_realizadas:
+          type: array
+          minItems: 1
+          description: Sigue siendo obligatorio en la actualización. Reemplaza por completo el conjunto de actividades existente (no se agrega de forma incremental).
+          items: { $ref: '#/components/schemas/ActividadRealizadaInput' }
+        estado:
+          type: string
+          enum: [PENDIENTE, EN_PROGRESO, FINALIZADO, VERIFICADO, OBSERVADO]
+          example: FINALIZADO
+
+    ActividadRealizada:
+      type: object
+      description: Actividad realizada tal como se devuelve en las respuestas (catálogo `actividad` + datos específicos en `pivot`).
+      properties:
+        id: { type: integer, example: 1 }
+        nombre_actividad: { type: string, example: Acarreo de material }
+        unidad_medida: { type: string, nullable: true, example: viajes }
+        pivot:
+          type: object
+          properties:
+            id: { type: integer, example: 501 }
+            origen: { type: string, nullable: true, example: null }
+            destino: { type: string, nullable: true, example: null }
+            lugar: { type: string, nullable: true, example: Cancha de acopio }
+            cantidad: { type: string, example: "6.00" }
+            unidad_medida: { type: string, example: viajes }
+            hora_inicio: { type: string, example: "07:15" }
+            hora_fin: { type: string, example: "11:00" }
+
+    OperacionDiaria:
+      type: object
+      properties:
+        id: { type: integer, example: 101 }
+        nro_operacion: { type: integer, description: Correlativo autogenerado., example: 101 }
+        nro: { type: string, description: "`nro_operacion` formateado con ceros a la izquierda (5 dígitos).", example: "00101" }
+        id_conductor: { type: integer, example: 45 }
+        id_vehiculo: { type: integer, example: 8 }
+        id_area: { type: integer, example: 3 }
+        turno: { type: string, enum: [DIA, NOCHE], example: DIA }
+        fecha_inicio: { type: string, description: "Formateada como `d/m/Y H:i`.", example: "13/08/2026 07:00" }
+        fecha_fin: { type: string, nullable: true, example: "13/08/2026 17:00" }
+        fecha_i_f: { type: string, description: "`fecha_inicio` en formato `Y-m-d H:i` (útil para inputs de formulario).", example: "2026-08-13 07:00" }
+        fecha_f_f: { type: string, nullable: true, example: "2026-08-13 17:00" }
+        kilometraje_inicio: { type: string, nullable: true, example: "15420.50" }
+        kilometraje_fin: { type: string, nullable: true, example: "15510.00" }
+        horometro_inicio: { type: string, nullable: true, example: null }
+        horometro_fin: { type: string, nullable: true, example: null }
+        horas_trabajadas: { type: string, nullable: true, example: "9.50" }
+        id_verificador: { type: integer, nullable: true, example: null }
+        estado:
+          type: string
+          enum: [PENDIENTE, EN_PROGRESO, FINALIZADO, VERIFICADO, OBSERVADO]
+          example: PENDIENTE
+        observaciones: { type: string, nullable: true, example: "Se detectó ruido leve en el motor al arrancar." }
+        created_at: { type: string, example: "13/08/2026 07:05" }
+        updated_at: { type: string, format: date-time, example: "2026-08-13T07:05:00.000000Z" }
+        conductor:
+          type: object
+          description: Presente cuando la relación fue cargada (`with`/`load`).
+          properties:
+            id: { type: integer, example: 45 }
+            persona:
+              type: object
+              properties:
+                id: { type: integer, example: 45 }
+                nombres: { type: string, example: Juan }
+                paterno: { type: string, example: Pérez }
+                materno: { type: string, example: Quispe }
+        vehiculo:
+          type: object
+          properties:
+            id: { type: integer, example: 8 }
+            nro_placa: { type: string, example: 1234-ABC }
+            codigo: { type: string, nullable: true, example: VOLQ-08 }
+            tipo_medicion: { type: string, enum: [kilometraje, horometro], example: kilometraje }
+        area:
+          type: object
+          properties:
+            id: { type: integer, example: 3 }
+            nombre_area: { type: string, example: Operaciones Mina Norte }
+        verificador:
+          type: object
+          nullable: true
+          description: Presente solo en `GET /operacion-diaria/{id}` (no se carga en el listado ni al crear).
+        actividadesRealizadas:
+          type: array
+          items: { $ref: '#/components/schemas/ActividadRealizada' }
+
+    OperacionDiariaCreateResponse:
+      type: object
+      properties:
+        message: { type: string, example: Operación diaria creada exitosamente. }
+        data: { $ref: '#/components/schemas/OperacionDiaria' }
+
+    OperacionDiariaUpdateResponse:
+      type: object
+      properties:
+        message: { type: string, example: Operación diaria actualizada exitosamente. }
+        data:
+          allOf:
+            - $ref: '#/components/schemas/OperacionDiaria'
+          description: |
+            A diferencia de la respuesta de `store`/`show`, aquí normalmente **no** vienen
+            presentes las claves `conductor`, `vehiculo`, `area` ni `actividadesRealizadas`
+            (el controlador no recarga esas relaciones antes de responder).
+
+    ValidarActividadResponse:
+      type: object
+      description: Eco de los datos validados de `POST /operacion-actividad/validar`. No representa un recurso persistido.
+      properties:
+        message: { type: string, example: Actividad agregada exitosamente. }
+        data: { $ref: '#/components/schemas/ActividadRealizadaInput' }
+
+    OperacionDiariaPaginada:
+      type: object
+      description: Estructura estándar de paginación de Laravel (`LengthAwarePaginator`).
+      properties:
+        current_page: { type: integer, example: 1 }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/OperacionDiaria' }
+        first_page_url: { type: string, example: "http://localhost/api/v1/operacion-diaria?page=1" }
+        from: { type: integer, nullable: true, example: 1 }
+        last_page: { type: integer, example: 5 }
+        last_page_url: { type: string, example: "http://localhost/api/v1/operacion-diaria?page=5" }
+        next_page_url: { type: string, nullable: true, example: "http://localhost/api/v1/operacion-diaria?page=2" }
+        path: { type: string, example: "http://localhost/api/v1/operacion-diaria" }
+        per_page: { type: integer, example: 10 }
+        prev_page_url: { type: string, nullable: true, example: null }
+        to: { type: integer, nullable: true, example: 10 }
+        total: { type: integer, example: 42 }

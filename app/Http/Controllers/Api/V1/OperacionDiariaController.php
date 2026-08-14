@@ -81,9 +81,16 @@ class OperacionDiariaController extends Controller
         try {
             $operacionDiaria = $action->execute($operacionDiaria, $request->validated());
 
-            return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria actualizada exitosamente.');
+            return response()->json([
+                'message' => 'Operación diaria actualizada exitosamente.',
+                'data'    => $operacionDiaria,
+            ]);
+
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Error al actualizar la operación diaria: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error al actualizar la operación diaria.',
+                'error'   => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -133,6 +140,9 @@ class OperacionDiariaController extends Controller
 
         // Agregar la actividad al arreglo de actividades_realizadas
 
-        return redirect()->route('operacion-diaria.create')->with('success', 'Actividad agregada exitosamente.');
+        return response()->json([
+            'message' => 'Actividad agregada exitosamente.',
+            'data'    => $validated,
+        ]);
     }
 }
