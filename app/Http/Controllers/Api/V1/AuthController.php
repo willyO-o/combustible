@@ -116,12 +116,27 @@ class AuthController extends Controller
      */
     private function respondWithToken(string $token): JsonResponse
     {
+        $userData = auth('api')->user();
+
+        $userData->load('persona');
+
         return response()->json([
-            'success'      => true,
             'access_token' => $token,
             'token_type'   => 'bearer',
             'expires_in'   => auth('api')->factory()->getTTL() * 60,
-            'user'         => auth('api')->user(),
+            'user'         => [
+                'name'     => $userData->name,
+                'email'    => $userData->email,
+                'nombre_completo'  => $userData->persona->nombre_completo ?? null,
+                'nombres'  => $userData->persona->nombres ?? null,
+                'paterno'  => $userData->persona->paterno ?? null,
+                'materno'  => $userData->persona->materno ?? null,
+                'ci'       => $userData->persona->ci ?? null,
+                'f_nacimiento_formatted' => $userData->persona->f_nacimiento_formatted ?? null,
+                'foto_url' => $userData->persona->foto_url ?? null,
+                'celular' => $userData->persona->celular ?? null,
+                'roles'    => $userData->roles->pluck('name'), // Retorna solo los nombres de los roles
+            ],
         ]);
     }
 }

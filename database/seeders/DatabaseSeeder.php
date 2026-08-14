@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             VehiculoSeeder::class,
             UserSeeder::class,
             AsignacionSeeder::class,
+            ParametrosEmpresaSeeder::class,
         ]);
     }
 }
