@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 import { showToast, confirm , showError} from '@/Utils/alertUtil.js'
 
@@ -108,7 +109,6 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
 
     <Head title="Conductores" />
 
-    <Maindashboard>
         <!-- Page header -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -298,5 +298,4 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
                 </nav>
             </div>
         </div>
-    </Maindashboard>
 </template>

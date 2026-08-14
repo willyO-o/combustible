@@ -5,7 +5,11 @@ import Multiselect from '@vueform/multiselect'
 import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 
+
 import InputError from '@/Components/InputError.vue';
+
+
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     carga: Object,
@@ -205,7 +209,6 @@ onMounted(() => {
 <template>
 
     <Head title="Editar Carga de Combustible" />
-    <Maindashboard>
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
                 <nav>
@@ -524,7 +527,6 @@ onMounted(() => {
                 </button>
             </div>
         </form>
-    </Maindashboard>
 </template>
 
 <style>

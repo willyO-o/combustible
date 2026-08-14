@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     vehiculo: Object,
@@ -22,7 +23,6 @@ const fotoPreview = ref(
 
     <Head title="Ver detalles del Vehículo" />
 
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -166,5 +166,4 @@ const fotoPreview = ref(
 
         <!-- Botones -->
 
-    </Maindashboard>
 </template>

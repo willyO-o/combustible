@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 import ValeDetalleModal from '@/Components/ValeDetalleModal.vue'
 
 const props = defineProps({
@@ -71,7 +72,6 @@ const formatDate = (date) => {
 
     <Head title="Vales" />
 
-    <Maindashboard>
         <!-- Page header -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -250,5 +250,4 @@ const formatDate = (date) => {
         <!-- Modal Detalle Vale -->
         <ValeDetalleModal :vale-id="selectedValeId" @close="closeDetalle" />
 
-    </Maindashboard>
 </template>

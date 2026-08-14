@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     conductor: Object,
@@ -45,7 +46,6 @@ function submit() {
 <template>
     <Head title="Editar Conductor" />
 
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -250,5 +250,4 @@ function submit() {
                 </button>
             </div>
         </form>
-    </Maindashboard>
 </template>

@@ -1,6 +1,7 @@
 <script setup>
 // import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Maindashboard from '@/Layouts/Maindashboard.vue';
+defineOptions({ layout: Maindashboard })
 import CardAnalitic from '@/Components/CardAnalitic.vue';
 
 import { Head } from '@inertiajs/vue3';
@@ -150,12 +151,9 @@ onMounted(() => {
 
     <Head title="Dashboard" />
 
-    <Maindashboard>
-        <template #header>
             <h2 class="text-xl font-semibold leading-tight text-gray-800">
                 Dashboard
             </h2>
-        </template>
 
         <div class="row row-cols-xxl-4 row-cols-md-3 row-cols-1">
             <div className="col" v-for='(idx) in infoCards' :key='idx.id'>
@@ -194,5 +192,4 @@ onMounted(() => {
             </div>
         </div>
 
-    </Maindashboard>
 </template>

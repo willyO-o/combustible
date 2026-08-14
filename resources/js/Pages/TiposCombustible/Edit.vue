@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 
 const props = defineProps({
@@ -21,7 +22,6 @@ function submit() {
 <template>
     <Head title="Editar Tipo de Combustible" />
 
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -147,5 +147,4 @@ function submit() {
                 </div>
             </div>
         </div>
-    </Maindashboard>
 </template>

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 import { showToast, confirm } from '@/Utils/alertUtil.js'
 
 const props = defineProps({
@@ -51,7 +52,6 @@ const costoTotalRepuestos = () => {
 
 <template>
     <Head :title="`Orden de Mantenimiento #${orden.id}`" />
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -283,5 +283,4 @@ const costoTotalRepuestos = () => {
                 </div>
             </div>
         </div>
-    </Maindashboard>
 </template>

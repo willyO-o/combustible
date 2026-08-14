@@ -3,6 +3,8 @@ import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 
+defineOptions({ layout: Maindashboard })
+
 const props = defineProps({
     cargas:  Object,
     filters: Object,
@@ -53,7 +55,6 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
 
 <template>
     <Head title="Cargas de Combustible" />
-    <Maindashboard>
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
                 <nav><ol class="breadcrumb mb-1">
@@ -210,5 +211,4 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
                 </nav>
             </div>
         </div>
-    </Maindashboard>
 </template>

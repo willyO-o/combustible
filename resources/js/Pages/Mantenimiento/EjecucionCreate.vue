@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     orden: Object,
@@ -86,7 +87,6 @@ agregarItem()
 
 <template>
     <Head :title="`Registrar Ejecución – Orden #${orden.id}`" />
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -362,5 +362,4 @@ agregarItem()
                 </button>
             </div>
         </form>
-    </Maindashboard>
 </template>

@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     vehiculos: Array,
@@ -65,7 +66,6 @@ const costoPorLitro = computed(() => {
 
 <template>
     <Head title="Reporte de Cargas de Combustible" />
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -231,5 +231,4 @@ const costoPorLitro = computed(() => {
                 </div>
             </div>
         </div>
-    </Maindashboard>
 </template>

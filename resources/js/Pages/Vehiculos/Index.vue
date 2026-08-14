@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     vehiculos: Object,
@@ -69,7 +70,6 @@ onMounted(() => {
 
     <Head title="Vehículos" />
 
-    <Maindashboard>
         <!-- Page header -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -262,5 +262,4 @@ onMounted(() => {
                 </nav>
             </div>
         </div>
-    </Maindashboard>
 </template>

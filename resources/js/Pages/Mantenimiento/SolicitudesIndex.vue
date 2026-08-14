@@ -2,6 +2,7 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 import { showToast, confirm } from '@/Utils/alertUtil.js'
 import { Modal } from 'bootstrap'
 
@@ -111,7 +112,6 @@ const tipoBadge = (tipo) => {
 
 <template>
     <Head title="Solicitudes de Mantenimiento" />
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -333,5 +333,4 @@ const tipoBadge = (tipo) => {
                 </nav>
             </div>
         </div>
-    </Maindashboard>
 </template>

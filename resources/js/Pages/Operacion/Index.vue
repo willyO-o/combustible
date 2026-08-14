@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 import Multiselect from '@vueform/multiselect'
 import '@vueform/multiselect/themes/default.css'
@@ -49,9 +50,6 @@ const confirmDelete = async (operacion) => {
 
     router.delete(route('operacion-diaria.destroy', operacion.id),
         {
-            _method: 'DELETE',
-        },
-        {
             preserveScroll: true,
             onSuccess: () => {
                 showToast('Operación diaria eliminada')
@@ -78,7 +76,6 @@ const estadoBadge = (estado) => {
 <template>
 
     <Head title="Operaciones Diarias" />
-    <Maindashboard>
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
                 <nav>
@@ -265,5 +262,4 @@ const estadoBadge = (estado) => {
                 </nav>
             </div>
         </div>
-    </Maindashboard>
 </template>

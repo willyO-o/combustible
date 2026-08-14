@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 import SearchSelect from '@/Components/SearchSelect.vue'
 
 import { ref, watch } from 'vue'
@@ -57,7 +58,6 @@ const vehiculoSeleccionado = (vehiculo) => {
 
     <Head title="Nuevo Vale" />
 
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -254,5 +254,4 @@ const vehiculoSeleccionado = (vehiculo) => {
                 </button>
             </div>
         </form>
-    </Maindashboard>
 </template>

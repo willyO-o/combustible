@@ -28,13 +28,7 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('auth:api')->group(function () {
     Route::resource('operacion-diaria', OperacionDiariaController::class)
-    ->parameters(['operacion-diaria' => 'operacionDiaria'])->except(['create', 'edit'])->names([
-        'index'   => 'api.v1.operacion-diaria.index',
-        'store'   => 'api.v1.operacion-diaria.store',
-        'show'    => 'api.v1.operacion-diaria.show',
-        'update'  => 'api.v1.operacion-diaria.update',
-        'destroy' => 'api.v1.operacion-diaria.destroy',
-    ]);
+    ->parameters(['operacion-diaria' => 'operacionDiaria'])->except(['create', 'edit'])->names('api.v1.operacion-diaria');
 
     Route::post('operacion-actividad/validar', [OperacionDiariaController::class, 'validarActividad'])
         ->name('api.v1.operacion-diaria.agregar-actividad');

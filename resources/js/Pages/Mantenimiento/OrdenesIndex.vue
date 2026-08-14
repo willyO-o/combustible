@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     ordenes: Object,
@@ -55,7 +56,6 @@ const ordenBadge = (tipo) =>
 
 <template>
     <Head title="Órdenes de Mantenimiento" />
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -221,5 +221,4 @@ const ordenBadge = (tipo) =>
                 </nav>
             </div>
         </div>
-    </Maindashboard>
 </template>

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 import { confirm , showToast} from '@/Utils/alertUtil'
 
 const props = defineProps({
@@ -47,7 +48,6 @@ const verificarOperacion =  async () => {
 
     <Head title="Detalle de Operación" />
 
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <nav>
@@ -492,7 +492,6 @@ const verificarOperacion =  async () => {
                 </div>
             </div>
         </div>
-    </Maindashboard>
 </template>
 
 <style scoped>

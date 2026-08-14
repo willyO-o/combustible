@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     solicitud: Object,
@@ -25,7 +26,6 @@ const tipoBadge = (tipo) => {
 
 <template>
     <Head title="Detalle Solicitud de Mantenimiento" />
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -156,5 +156,4 @@ const tipoBadge = (tipo) => {
                 </div>
             </div>
         </div>
-    </Maindashboard>
 </template>

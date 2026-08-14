@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     grifos:  Object,
@@ -56,7 +57,6 @@ const estadoBadge = (estado) =>
 <template>
     <Head title="Grifos" />
 
-    <Maindashboard>
         <!-- Page header -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -240,5 +240,4 @@ const estadoBadge = (estado) =>
                 </nav>
             </div>
         </div>
-    </Maindashboard>
 </template>

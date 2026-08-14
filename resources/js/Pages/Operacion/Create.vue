@@ -7,6 +7,8 @@ import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Modal from '@/Components/Modal.vue'; // Ajusta la ruta según tu proyecto
 
+defineOptions({ layout: Maindashboard })
+
 
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
@@ -126,7 +128,11 @@ function submit() {
             }
             return out
         })
-        .post(routeName)
+        .post(routeName,{
+            onSuccess: () =>{
+
+            }
+        })
 }
 
 const agregarActividad = () => {
@@ -186,7 +192,6 @@ onMounted(() => {
 <template>
 
     <Head title="Nueva Carga de Combustible" />
-    <Maindashboard>
         <!-- Breadcrumb -->
         <div v-if="!isMobile"
             class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -632,7 +637,6 @@ onMounted(() => {
                 </div>
             </form>
         </Modal>
-    </Maindashboard>
 </template>
 
 <style>
