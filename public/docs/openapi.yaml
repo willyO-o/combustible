@@ -344,6 +344,14 @@ paths:
           description: Cantidad de resultados por página.
           schema: { type: integer, default: 10 }
           example: 15
+        - name: page
+          in: query
+          description: |
+            Número de página a obtener (paginación estándar de Laravel — `Builder::paginate()`
+            lo resuelve automáticamente desde este query param, sin que el controlador lo lea
+            explícitamente). Si se omite, se asume `1`.
+          schema: { type: integer, default: 1, minimum: 1 }
+          example: 2
       responses:
         '200':
           description: Listado paginado de operaciones diarias.
@@ -1249,6 +1257,15 @@ components:
         from: { type: integer, nullable: true, example: 1 }
         last_page: { type: integer, example: 5 }
         last_page_url: { type: string, example: "http://localhost/api/v1/operacion-diaria?page=5" }
+        links:
+          type: array
+          description: Lista de enlaces de paginación (anterior, cada número de página, siguiente), lista para renderizar controles de paginación.
+          items:
+            type: object
+            properties:
+              url: { type: string, nullable: true, example: "http://localhost/api/v1/operacion-diaria?page=2" }
+              label: { type: string, example: "2" }
+              active: { type: boolean, example: true }
         next_page_url: { type: string, nullable: true, example: "http://localhost/api/v1/operacion-diaria?page=2" }
         path: { type: string, example: "http://localhost/api/v1/operacion-diaria" }
         per_page: { type: integer, example: 10 }
