@@ -39,7 +39,7 @@ class ListValeAction
         }
 
         if (! empty($filtros['estado_vale'])) {
-            $query->where('estado', $filtros['estado_vale']);
+            $query->where('estado_vale', $filtros['estado_vale']);
         }
 
         $this->aplicarRestriccionesPorRol($query, $user);
