@@ -68,6 +68,8 @@ tags:
     description: Parámetros generales de la aplicación y catálogos/colecciones de apoyo (vehículos asignados, grifos, tipos de combustible, etc.).
   - name: Operación Diaria
     description: Registro, consulta, actualización y eliminación de las operaciones diarias de los vehículos, incluyendo las actividades realizadas en cada una.
+  - name: Vales
+    description: Consulta, registro, actualización y eliminación de vales de combustible.
 
 security:
   - bearerAuth: []
@@ -788,6 +790,183 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  # ──────────────────────────────────────────────────────────────────────
+  # VALES
+  # ──────────────────────────────────────────────────────────────────────
+  /vales:
+    get:
+      tags: [Vales]
+      summary: Listar vales de combustible
+      description: |
+        Lista paginada de vales de combustible, ordenados por `nro_vale` y `gestion`
+        descendente.
+
+        Las restricciones de visibilidad dependen del rol del usuario autenticado:
+        - **conductor**: solo ve sus propios vales (`id_conductor` = persona del usuario).
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: nro_vale
+          in: query
+          description: |
+            Filtra por número de vale. Compara tanto contra `nro_vale` de forma exacta
+            como contra la combinación `nro_vale/gestion` (p.ej. `"2/2026"`).
+          schema: { type: string }
+          example: "2"
+        - name: fecha_desde
+          in: query
+          description: Filtra vales cuya `fecha_emision` sea igual o posterior a esta fecha.
+          schema: { type: string, format: date }
+          example: "2026-08-01"
+        - name: fecha_hasta
+          in: query
+          description: Filtra vales cuya `fecha_emision` sea igual o anterior a esta fecha.
+          schema: { type: string, format: date }
+          example: "2026-08-31"
+        - name: estado_vale
+          in: query
+          description: Filtra por estado exacto del vale.
+          schema:
+            type: string
+            enum: [PENDIENTE, USADO, ANULADO]
+          example: PENDIENTE
+        - name: id_conductor
+          in: query
+          description: Filtra por conductor. Ignorado para usuarios con rol `conductor`, que siempre quedan restringidos a su propio `id_conductor`.
+          schema: { type: integer }
+          example: 1
+        - name: per_page
+          in: query
+          description: Cantidad de resultados por página.
+          schema: { type: integer, default: 10 }
+          example: 10
+        - name: page
+          in: query
+          description: |
+            Número de página a obtener (paginación estándar de Laravel — `Builder::paginate()`
+            lo resuelve automáticamente desde este query param, sin que el controlador lo lea
+            explícitamente). Si se omite, se asume `1`.
+          schema: { type: integer, default: 1, minimum: 1 }
+          example: 1
+      responses:
+        '200':
+          description: Listado paginado de vales de combustible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValePaginada'
+              example:
+                current_page: 1
+                data:
+                  - id: 2
+                    nro_vale: 2
+                    gestion: 2026
+                    fecha_emision: "2026-08-14 21:42"
+                    fecha_vencimiento: "2026-08-14 22:42"
+                    litros: "30.00"
+                    precio: "6.97"
+                    id_vehiculo: 1
+                    id_conductor: 1
+                    id_grifo: 2
+                    estado_vale: PENDIENTE
+                    id_tipo_combustible: 3
+                    id_user: 2
+                    nro: "000002/2026"
+                    fecha_emision_f: "14/08/2026"
+                    fecha_vencimiento_f: "14/08/2026"
+                    vehiculo:
+                      id: 1
+                      nro_placa: 148-JLK
+                      codigo: PM-TRA-0001
+                      marca: Volvo
+                      modelo: null
+                      fotografia: vehiculos/CaPy03xlQuLTZhLkBPlZi0QlXmfDKkDpmwjgd5BS.jpg
+                      url_fotografia: http://localhost:8000/storage/vehiculos/CaPy03xlQuLTZhLkBPlZi0QlXmfDKkDpmwjgd5BS.jpg
+                    conductor:
+                      id: 1
+                      persona:
+                        id: 1
+                        nombres: Juan
+                        paterno: García
+                        materno: López
+                        ci: "1234567"
+                        foto: conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg
+                        fecha_nacimiento: "1990-05-15T04:00:00.000000Z"
+                        foto_url: http://localhost:8000/storage/conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg
+                        edad: 36
+                        f_nacimiento_formatted: "15/05/1990"
+                        nombre_completo: Juan García López
+                    grifo:
+                      id: 2
+                      razon_social: Gasolinera Central S.A.
+                      ciudad: La Paz
+                  - id: 1
+                    nro_vale: 1
+                    gestion: 2026
+                    fecha_emision: "2026-08-14 21:19"
+                    fecha_vencimiento: "2026-08-15 21:19"
+                    litros: "25.00"
+                    precio: "6.96"
+                    id_vehiculo: 1
+                    id_conductor: 1
+                    id_grifo: 2
+                    estado_vale: PENDIENTE
+                    id_tipo_combustible: 3
+                    id_user: 2
+                    nro: "000001/2026"
+                    fecha_emision_f: "14/08/2026"
+                    fecha_vencimiento_f: "15/08/2026"
+                    vehiculo:
+                      id: 1
+                      nro_placa: 148-JLK
+                      codigo: PM-TRA-0001
+                      marca: Volvo
+                      modelo: null
+                      fotografia: vehiculos/CaPy03xlQuLTZhLkBPlZi0QlXmfDKkDpmwjgd5BS.jpg
+                      url_fotografia: http://localhost:8000/storage/vehiculos/CaPy03xlQuLTZhLkBPlZi0QlXmfDKkDpmwjgd5BS.jpg
+                    conductor:
+                      id: 1
+                      persona:
+                        id: 1
+                        nombres: Juan
+                        paterno: García
+                        materno: López
+                        ci: "1234567"
+                        foto: conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg
+                        fecha_nacimiento: "1990-05-15T04:00:00.000000Z"
+                        foto_url: http://localhost:8000/storage/conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg
+                        edad: 36
+                        f_nacimiento_formatted: "15/05/1990"
+                        nombre_completo: Juan García López
+                    grifo:
+                      id: 2
+                      razon_social: Gasolinera Central S.A.
+                      ciudad: La Paz
+                first_page_url: "http://localhost:8000/api/v1/vales?page=1"
+                from: 1
+                last_page: 1
+                last_page_url: "http://localhost:8000/api/v1/vales?page=1"
+                links:
+                  - url: null
+                    label: "&laquo; Anterior"
+                    page: null
+                    active: false
+                  - url: "http://localhost:8000/api/v1/vales?page=1"
+                    label: "1"
+                    page: 1
+                    active: true
+                  - url: null
+                    label: "Siguiente &raquo;"
+                    page: null
+                    active: false
+                next_page_url: null
+                path: "http://localhost:8000/api/v1/vales"
+                per_page: 10
+                prev_page_url: null
+                to: 2
+                total: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1272,3 +1451,99 @@ components:
         prev_page_url: { type: string, nullable: true, example: null }
         to: { type: integer, nullable: true, example: 10 }
         total: { type: integer, example: 42 }
+
+    # ── Vales ─────────────────────────────────────────────────────────
+    ValeVehiculo:
+      type: object
+      description: Vehículo asociado al vale, tal como se devuelve en el listado (subconjunto de columnas).
+      properties:
+        id: { type: integer, example: 1 }
+        nro_placa: { type: string, example: 148-JLK }
+        codigo: { type: string, nullable: true, example: PM-TRA-0001 }
+        marca: { type: string, nullable: true, example: Volvo }
+        modelo: { type: string, nullable: true, example: null }
+        fotografia: { type: string, nullable: true, example: vehiculos/CaPy03xlQuLTZhLkBPlZi0QlXmfDKkDpmwjgd5BS.jpg }
+        url_fotografia: { type: string, nullable: true, example: http://localhost:8000/storage/vehiculos/CaPy03xlQuLTZhLkBPlZi0QlXmfDKkDpmwjgd5BS.jpg }
+
+    ValeConductor:
+      type: object
+      description: Conductor asociado al vale, con su relación `persona` (subconjunto de columnas).
+      properties:
+        id: { type: integer, example: 1 }
+        persona:
+          type: object
+          properties:
+            id: { type: integer, example: 1 }
+            nombres: { type: string, example: Juan }
+            paterno: { type: string, example: García }
+            materno: { type: string, nullable: true, example: López }
+            ci: { type: string, nullable: true, example: "1234567" }
+            foto: { type: string, nullable: true, example: conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg }
+            fecha_nacimiento: { type: string, format: date-time, nullable: true, example: "1990-05-15T04:00:00.000000Z" }
+            foto_url: { type: string, nullable: true, example: http://localhost:8000/storage/conductores/EmtgAtJKBQlpLmnxjY7W4VLw91eXG4Ct6e97IARI.jpg }
+            edad: { type: integer, nullable: true, description: Calculada a partir de `fecha_nacimiento`., example: 36 }
+            f_nacimiento_formatted: { type: string, nullable: true, description: "`fecha_nacimiento` formateada como `d/m/Y`.", example: "15/05/1990" }
+            nombre_completo: { type: string, description: "Concatenación de `nombres`, `paterno` y `materno`.", example: Juan García López }
+
+    ValeGrifo:
+      type: object
+      description: Estación de servicio donde se emitió el vale (subconjunto de columnas).
+      properties:
+        id: { type: integer, example: 2 }
+        razon_social: { type: string, example: Gasolinera Central S.A. }
+        ciudad: { type: string, nullable: true, example: La Paz }
+
+    Vale:
+      type: object
+      properties:
+        id: { type: integer, example: 2 }
+        nro_vale: { type: integer, description: Correlativo del vale dentro de la gestión., example: 2 }
+        gestion: { type: integer, example: 2026 }
+        fecha_emision: { type: string, example: "2026-08-14 21:42" }
+        fecha_vencimiento: { type: string, nullable: true, example: "2026-08-14 22:42" }
+        litros: { type: string, example: "30.00" }
+        precio: { type: string, example: "6.97" }
+        id_vehiculo: { type: integer, example: 1 }
+        id_conductor: { type: integer, example: 1 }
+        id_grifo: { type: integer, example: 2 }
+        estado_vale:
+          type: string
+          enum: [PENDIENTE, USADO, ANULADO]
+          example: PENDIENTE
+        id_tipo_combustible: { type: integer, example: 3 }
+        id_user: { type: integer, description: Usuario que registró el vale., example: 2 }
+        nro: { type: string, description: "`nro_vale` formateado con ceros a la izquierda (6 dígitos) seguido de `/gestion`.", example: "000002/2026" }
+        fecha_emision_f: { type: string, description: "`fecha_emision` formateada como `d/m/Y`.", example: "14/08/2026" }
+        fecha_vencimiento_f: { type: string, nullable: true, description: "`fecha_vencimiento` formateada como `d/m/Y`.", example: "14/08/2026" }
+        vehiculo: { $ref: '#/components/schemas/ValeVehiculo' }
+        conductor: { $ref: '#/components/schemas/ValeConductor' }
+        grifo: { $ref: '#/components/schemas/ValeGrifo' }
+
+    ValePaginada:
+      type: object
+      description: Estructura estándar de paginación de Laravel (`LengthAwarePaginator`), con `withQueryString()` aplicado.
+      properties:
+        current_page: { type: integer, example: 1 }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Vale' }
+        first_page_url: { type: string, example: "http://localhost:8000/api/v1/vales?page=1" }
+        from: { type: integer, nullable: true, example: 1 }
+        last_page: { type: integer, example: 1 }
+        last_page_url: { type: string, example: "http://localhost:8000/api/v1/vales?page=1" }
+        links:
+          type: array
+          description: Lista de enlaces de paginación (anterior, cada número de página, siguiente), lista para renderizar controles de paginación.
+          items:
+            type: object
+            properties:
+              url: { type: string, nullable: true, example: "http://localhost:8000/api/v1/vales?page=1" }
+              label: { type: string, example: "1" }
+              page: { type: integer, nullable: true, example: 1 }
+              active: { type: boolean, example: true }
+        next_page_url: { type: string, nullable: true, example: null }
+        path: { type: string, example: "http://localhost:8000/api/v1/vales" }
+        per_page: { type: integer, example: 10 }
+        prev_page_url: { type: string, nullable: true, example: null }
+        to: { type: integer, nullable: true, example: 2 }
+        total: { type: integer, example: 2 }
