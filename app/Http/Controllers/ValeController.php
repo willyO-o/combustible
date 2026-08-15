@@ -13,6 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Support\Facades\DB;
 
 use App\Libraries\Reportes;
 
@@ -77,7 +78,7 @@ class ValeController extends Controller
             ]);
 
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
-            ->get(['id', 'razon_social', 'ciudad']);
+            ->get(['id', 'razon_social', 'ciudad', 'es_principal']);
 
 
         return Inertia::render('Vales/Create', [
@@ -90,10 +91,18 @@ class ValeController extends Controller
 
     public function store(ValeRequest $request): RedirectResponse
     {
-        $vale = Vale::create($request->validated());
+        try {
+            DB::beginTransaction();
+            $vale = Vale::create($request->validated());
 
-        return redirect()->route('vales.index')
-            ->with('success', "Vale #{$vale->nro} registrado exitosamente.");
+            DB::commit();
+            return redirect()->route('vales.index')
+                ->with('success', "Vale #{$vale->nro} registrado exitosamente.");
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            return redirect()->route('vales.index')
+                ->with('error', "Error al registrar el vale: {$th->getMessage()}");
+        }
     }
 
     public function edit(Vale $vale): Response
@@ -111,7 +120,7 @@ class ValeController extends Controller
 
 
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
-            ->get(['id', 'razon_social', 'ciudad']);
+            ->get(['id', 'razon_social', 'ciudad', 'es_principal']);
 
 
         return Inertia::render('Vales/Create', [
@@ -129,15 +138,20 @@ class ValeController extends Controller
         $vale->update($request->validated());
 
         return redirect()->route('vales.index')
-            ->with('success', "Vale #{$vale->nro_vale} actualizado exitosamente.");
+            ->with('success', "Vale #{$vale->nro} actualizado exitosamente.");
     }
 
     public function destroy(Vale $vale): RedirectResponse
     {
+        if($vale->estado_vale === 'USADO') {
+            return redirect()->route('vales.index')
+                ->with('error', "No se puede eliminar el Vale #{$vale->nro} porque ya ha sido usado.");
+        }
+
         $vale->delete();
 
         return redirect()->route('vales.index')
-            ->with('success', "Vale #{$vale->nro_vale} eliminado exitosamente.");
+            ->with('success', "Vale #{$vale->nro} eliminado exitosamente.");
     }
 
 
@@ -152,21 +166,24 @@ class ValeController extends Controller
         $vehiculos = Vehiculo::with('conductorAsignado')->where('estado_vehiculo', 'ACTIVO')
             ->where(function ($query) use ($q) {
                 $query->where('nro_placa', 'like', "%{$q}%")
-                    ->orWhere('marca', 'like', "%{$q}%");
+                    ->orWhere('marca', 'like', "%{$q}%")
+                    ->orWhere('codigo', 'like', "%{$q}%");
             })
             ->limit(20)
             ->get()
             ->map(fn($v) => [
                 'id'    => $v->id,
-                'label' => "{$v->nro_placa}" . ($v->marca ? " — {$v->marca}" : '') . ($v->anio ? " ({$v->anio})" : ''),
+                'label' => "{$v->codigo} —  {$v->nro_placa}" . ($v->marca ? " — {$v->marca}" : '') . ($v->anio ? " ({$v->anio})" : ''),
                 'meta'  => [
                     'id_conductor' => $v->conductorAsignado ? $v->conductorAsignado->id : null,
                     'id_tipo_vehiculo' => $v->id_tipo_vehiculo,
+                    'codigo' => $v->codigo,
                     'id_tipo_combustible' => $v->id_tipo_combustible,
                     'tipo_medicion' => $v->tipo_medicion,
                     'marca' => $v->marca,
                     'nro_placa' => $v->nro_placa,
                     'anio' => $v->anio,
+                    'modelo' => $v->modelo,
                 ],
             ]);
 
@@ -281,7 +298,8 @@ class ValeController extends Controller
         return response()->json([
             'id'                => $vale->id,
             'nro'               => $vale->nro,
-            'fecha_emision'     => $vale->fecha_emision_f,
+            'fecha_emision'     => $vale->fecha_emision?->format('Y-m-d H:i'),
+            'fecha_vencimiento'     => $vale->fecha_vencimiento->format('Y-m-d H:i'),
             'litros'            => $vale->litros,
             'precio'            => $vale->precio,
             'total'             => $total,

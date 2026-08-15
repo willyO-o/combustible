@@ -36,7 +36,7 @@ const paramsConductor = ref({ id_vehiculo: null })
 // Extraemos el id antes de enviar
 function submit() {
 
-    const ruta=props.vale ? route('vales.update', props.vale.id) : route('vales.store')
+    const ruta = props.vale ? route('vales.update', props.vale.id) : route('vales.store')
     form
         .transform((data) => ({
             ...data,
@@ -53,11 +53,20 @@ function submit() {
 
 const vehiculoSeleccionado = (vehiculo) => {
 
-
+    form.id_grifo = null
     form.id_tipo_combustible = vehiculo?.meta.id_tipo_combustible ?? null
 
     paramsConductor.value = {
         id_vehiculo: vehiculo?.id ?? null,
+    }
+
+
+
+    if (vehiculo?.meta?.tipo_medicion == 'horometro') {
+
+        //extraer la extacion de servicio que tenga el valor del campo es_pricipal = true y asignar su id al campo id_grifo
+        const grifoPrincipal = props.grifos.find(g => g.es_principal);
+        form.id_grifo = grifoPrincipal ? grifoPrincipal.id : null;
     }
 
 
@@ -147,9 +156,11 @@ const vehiculoSeleccionado = (vehiculo) => {
                                 </label>
 
 
-                                <select  v-model="form.id_grifo" class="form-select"
+                                <select v-model="form.id_grifo" class="form-select"
                                     :class="{ 'is-invalid': form.errors.id_grifo }">
-                                    <option v-for="grifo in props.grifos" :key="grifo.id" :value="grifo.id">{{ grifo.razon_social }} - {{ grifo.ciudad }}</option>
+                                    <option :value="null" disabled>Seleccione una opcion...</option>
+                                    <option v-for="grifo in props.grifos" :key="grifo.id" :value="grifo.id">{{
+                                        grifo.razon_social }} - {{ grifo.ciudad }}</option>
                                 </select>
 
                                 <div v-if="form.errors.id_grifo" class="text-danger small mt-1">{{
@@ -228,6 +239,7 @@ const vehiculoSeleccionado = (vehiculo) => {
                                 </label>
                                 <select v-model="form.id_tipo_combustible" class="form-select"
                                     :class="{ 'is-invalid': form.errors.id_tipo_combustible }">
+                                    <option :value="null" disabled>Seleccione una opcion...</option>
                                     <option v-for="tipo in tiposCombustible" :key="tipo.id" :value="tipo.id">{{
                                         tipo.label }}</option>
                                 </select>

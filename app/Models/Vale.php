@@ -34,7 +34,7 @@ class Vale extends Model
     {
         return [
             'fecha_emision' => 'datetime:Y-m-d H:i',
-            'fecha_vencimiento' => 'datetime',
+            'fecha_vencimiento' => 'datetime:Y-m-d H:i',
         ];
     }
 

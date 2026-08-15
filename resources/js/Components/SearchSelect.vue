@@ -104,8 +104,8 @@ watch(
 <template>
     <Multiselect ref="multiselectRef" :model-value="modelValue" @update:model-value="onSelected" @clear="onCleared"
         @change="onChange" @search-change="onSearchChange" :options="search" :object="object" :value-prop="valueProp"
-        :label="labelProp" :searchable="true" :min-chars="minCharsProp" :delay="300" :resolve-on-load="false"
-        :placeholder="placeholder" no-results-text="No se encontraron resultados"
+        :filter-results="false" :label="labelProp" :searchable="true" :min-chars="minCharsProp" :delay="300"
+        :resolve-on-load="false" :placeholder="placeholder" no-results-text="No se encontraron resultados"
         :class="{ 'is-invalid-multiselect': invalid }">
         <template #nooptions>
             <div class="multiselect-no-options">

@@ -73,6 +73,7 @@ class GrifoSeeder extends Seeder
                     'ciudad' => $grifo['ciudad'],
                     'telefono' => $grifo['telefono'],
                     'estado_grifo' => $grifo['estado_grifo'],
+                    'es_principal' => $grifo['es_principal'] ?? false,
                 ]
             );
         }

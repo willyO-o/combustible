@@ -2,6 +2,8 @@
 import { ref, watch } from 'vue'
 import axios from 'axios'
 
+import { formatDate,  getExpirationStatus } from '@/Utils/dateUtil'
+
 const props = defineProps({
     valeId: { type: Number, default: null },
 })
@@ -98,7 +100,7 @@ const fmt = (val, decimals = 2) =>
                                     </span>
                                 </div>
                                 <small class="text-muted">
-                                    <i class="ri-calendar-line me-1"></i>{{ vale.fecha_emision }}
+                                    <i class="ri-calendar-line me-1"></i>{{ formatDate(vale.fecha_emision, true) }}
                                 </small>
                             </div>
 
@@ -270,6 +272,14 @@ const fmt = (val, decimals = 2) =>
                             <div v-else-if="vale.estado_vale === 'PENDIENTE'" class="alert alert-warning-transparent mb-3">
                                 <i class="ri-time-line me-2"></i>
                                 Este vale aún no ha sido utilizado.
+                                <span v-if="vale.fecha_vencimiento" class="d-block mt-1">
+                                    <i class="ri-calendar-line me-1"></i>
+                                    Vence el {{ formatDate(vale.fecha_vencimiento, true) }}
+                                    <span class="fw-semibold" :class="`text-${getExpirationStatus(vale.fecha_vencimiento).color}`">
+                                        ({{ getExpirationStatus(vale.fecha_vencimiento).text }})
+
+                                    </span>
+                                </span>
                             </div>
 
                             <!-- Vale ANULADO -->
