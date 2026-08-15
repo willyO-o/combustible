@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ValeRequest;
+use App\Actions\Vale\ListValeAction;
 use App\Models\Conductor;
 use App\Models\Grifo;
 use App\Models\Vale;
@@ -25,39 +26,16 @@ class ValeController extends Controller
     /*  CRUD                                                               */
     /* ------------------------------------------------------------------ */
 
-    public function index(Request $request): Response
+    public function index(Request $request, ListValeAction $listValeAction): Response
     {
-        $query = Vale::with(['vehiculo', 'conductor.persona', 'grifo']);
+        $filters = $request->only(['nro_vale', 'fecha_desde', 'fecha_hasta', 'estado_vale', 'id_conductor']);
 
-        if ($request->filled('nro_vale')) {
-            $query->where('nro_vale', $request->nro_vale);
-        }
-        if ($request->filled('fecha_desde')) {
-            $query->whereDate('fecha_emision', '>=', $request->fecha_desde);
-        }
-        if ($request->filled('fecha_hasta')) {
-            $query->whereDate('fecha_emision', '<=', $request->fecha_hasta);
-        }
-        if ($request->filled('estado_vale')) {
-            $query->where('estado_vale', $request->estado_vale);
-        }
-        if ($request->filled('id_conductor')) {
-            $query->where('id_conductor', $request->id_conductor);
-        }
-        if ($request->user()->hasRole('conductor')) {
-            $idConductor = $request->user()->id_persona;
-            $query->where('id_conductor', $idConductor);
-        }
 
-        $vales = $query
-            ->orderBy('fecha_emision', 'desc')
-            ->orderBy('nro_vale', 'desc')
-            ->paginate(10)
-            ->withQueryString();
+        $vales = $listValeAction->execute($filters, $request->user());
 
         return Inertia::render('Vales/Index', [
             'vales'   => $vales,
-            'filters' => $request->only(['nro_vale', 'fecha_desde', 'fecha_hasta', 'estado_vale', 'id_conductor']),
+            'filters' => $filters,
             'flash'   => [
                 'success' => session('success'),
                 'error'   => session('error'),
@@ -143,7 +121,7 @@ class ValeController extends Controller
 
     public function destroy(Vale $vale): RedirectResponse
     {
-        if($vale->estado_vale === 'USADO') {
+        if ($vale->estado_vale === 'USADO') {
             return redirect()->route('vales.index')
                 ->with('error', "No se puede eliminar el Vale #{$vale->nro} porque ya ha sido usado.");
         }

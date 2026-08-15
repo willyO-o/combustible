@@ -109,7 +109,7 @@ const estadoBadge = (estado) => {
             <div class="row g-3">
                 <div class="col-sm-6 col-xl-3">
                     <label class="form-label">Nro. Vale</label>
-                    <input v-model="filters.nro_vale" type="number" class="form-control"
+                    <input v-model="filters.nro_vale" type="text" class="form-control"
                         placeholder="Buscar por nro..." />
                 </div>
                 <div class="col-sm-6 col-xl-2">
@@ -187,6 +187,7 @@ const estadoBadge = (estado) => {
                                 </span>
                             </td>
                             <td>
+                                <span class="fw-medium d-block">{{ vale.vehiculo?.codigo ?? '—' }}</span>
                                 <span class="fw-medium">{{ vale.vehiculo?.nro_placa ?? '—' }}</span>
                                 <small v-if="vale.vehiculo?.marca" class="text-muted d-block">{{ vale.vehiculo.marca
                                 }}</small>
@@ -218,7 +219,7 @@ const estadoBadge = (estado) => {
                                         title="Ver detalles" @click="openDetalle(vale.id)">
                                         <i class="ri-eye-line"></i>
                                     </button>
-                                    <Link v-can="'vales.editar'" :href="route('vales.edit', vale.id)"
+                                    <Link v-can="'vales.editar'" v-if="vale.estado_vale != 'USADO'" :href="route('vales.edit', vale.id)"
                                         class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                         <i class="ri-edit-line"></i>
                                     </Link>

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\OperacionDiariaController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\ParametrosController;
+use App\Http\Controllers\Api\V1\ValeController;
 /*
 |--------------------------------------------------------------------------
 | API Routes — v1
@@ -35,4 +36,7 @@ Route::middleware('auth:api')->group(function () {
 
     Route::get('parametros', [ParametrosController::class, 'index'])->name('api.v1.parametros.index');
     Route::get('parametros/colecciones', [ParametrosController::class, 'colecciones'])->name('api.v1.parametros.colecciones');
+
+    Route::resource('vales', ValeController::class)
+        ->parameters(['vales' => 'vale'])->except(['create', 'edit'])->names('api.v1.vales');
 });
