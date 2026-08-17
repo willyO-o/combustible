@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\CargaCombustible\CreateCargaCombustibleAction;
+use App\Actions\CargaCombustible\ListCargaCombustibleAction;
 use App\Http\Requests\CargaCombustibleRequest;
 use App\Models\CargaCombustible;
 use App\Models\Grifo;
@@ -15,14 +17,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Actions\CargaCombustible\CreateCargaCombustibleAction;
-use App\Actions\CargaCombustible\ListCargaCombustibleAction;
 
 class CargaCombustibleController extends Controller
 {
-
     /* ------------------------------------------------------------------ */
-    /*  CRUD                                                               */
+    /*  CRUD */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request, ListCargaCombustibleAction $listCargaCombustibleAction): Response
@@ -32,11 +31,11 @@ class CargaCombustibleController extends Controller
         $cargas = $listCargaCombustibleAction->execute($filters, $request->user(), $request->input('per_page', 10));
 
         return Inertia::render('CargasCombustible/Index', [
-            'cargas'  => $cargas,
+            'cargas' => $cargas,
             'filters' => $filters,
-            'flash'   => [
+            'flash' => [
                 'success' => session('success'),
-                'error'   => session('error'),
+                'error' => session('error'),
             ],
         ]);
     }
@@ -49,9 +48,9 @@ class CargaCombustibleController extends Controller
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
             ->orderBy('razon_social')
             ->get(['id', 'razon_social', 'ciudad'])
-            ->map(fn($g) => [
-                'id'    => $g->id,
-                'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : ''),
+            ->map(fn ($g) => [
+                'id' => $g->id,
+                'label' => $g->razon_social.($g->ciudad ? " — {$g->ciudad}" : ''),
             ]);
 
         // verificar si el rol es conductor y obtener el conductor asignado al usuario autenticado
@@ -62,21 +61,20 @@ class CargaCombustibleController extends Controller
             $conductor = request()->user()->persona;
             $conductor->load('conductor');
 
-
             $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
 
             $valesConductor = Vale::where('estado_vale', 'PENDIENTE')
                 ->where('id_conductor', $conductor->id)
                 ->orderBy('fecha_emision', 'desc')
-                ->get()->map(fn($v) => [
-                    'id'    => $v->id,
+                ->get()->map(fn ($v) => [
+                    'id' => $v->id,
                     'label' => "Vale #{$v->nro} — {$v->litros} Lt ({$v->fecha_emision_f})",
-                    'meta'  => [
-                        'litros'        => $v->litros,
+                    'meta' => [
+                        'litros' => $v->litros,
                         'fecha_emision' => $v->fecha_emision_f,
-                        'precio'        => $v->precio,
-                        'id_grifo'      => $v->id_grifo,
-                    ]
+                        'precio' => $v->precio,
+                        'id_grifo' => $v->id_grifo,
+                    ],
                 ]);
         }
 
@@ -100,7 +98,7 @@ class CargaCombustibleController extends Controller
             return redirect()->route('cargas.index')
                 ->with('success', 'Carga de combustible registrada exitosamente.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Error al registrar la carga de combustible: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error al registrar la carga de combustible: '.$e->getMessage());
         }
     }
 
@@ -115,35 +113,35 @@ class CargaCombustibleController extends Controller
         }
 
         // dd($carga->vehiculo->conductoresAsignados);
-        return Inertia::render('CargasCombustible/Edit', [
+        return Inertia::render('CargasCombustible/Create', [
             'carga' => $carga,
             'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
                 ->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']),
             'grifos' => Grifo::where('estado_grifo', 'ACTIVO')
                 ->orderBy('razon_social')
                 ->get(['id', 'razon_social', 'ciudad'])
-                ->map(fn($g) => [
-                    'id'    => $g->id,
-                    'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : ''),
+                ->map(fn ($g) => [
+                    'id' => $g->id,
+                    'label' => $g->razon_social.($g->ciudad ? " — {$g->ciudad}" : ''),
                 ]),
             'conductores' => $carga->vehiculo->conductoresAsignadosOpt(),
             // Objetos actuales para los SearchSelects
-            'vehiculoActual'  => $carga->vehiculo  ? [
+            'vehiculoActual' => $carga->vehiculo ? [
                 'id' => $carga->vehiculo->id,
-                'label' => "{$carga->vehiculo->nro_placa}" . " — {$carga->vehiculo->marca} ({$carga->vehiculo->anio})",
+                'label' => "{$carga->vehiculo->nro_placa}"." — {$carga->vehiculo->marca} ({$carga->vehiculo->anio})",
                 'meta' => [
                     'id_tipo_combustible' => $carga->vehiculo->id_tipo_combustible,
-                    'tipo_medicion' => $carga->vehiculo->tipo_medicion
+                    'tipo_medicion' => $carga->vehiculo->tipo_medicion,
 
-                ]
+                ],
             ] : null,
-            'conductorActual' => $carga->conductor ? ['id' => $carga->conductor->id,  'label' => trim("{$carga->conductor->persona->nombre_completo}") . " (CI: {$carga->conductor->persona->ci})"] : null,
-            'valeActual'      => $carga->vale      ? ['id' => $carga->vale->id,       'label' => "Vale #{$carga->vale->nro_vale} — {$carga->vale->litros} Lt"] : null,
+            'conductorActual' => $carga->conductor ? ['id' => $carga->conductor->id,  'label' => trim("{$carga->conductor->persona->nombre_completo}")." (CI: {$carga->conductor->persona->ci})"] : null,
+            'valeActual' => $carga->vale ? ['id' => $carga->vale->id,       'label' => "Vale #{$carga->vale->nro_vale} — {$carga->vale->litros} Lt"] : null,
             'conductor' => $conductor,
         ]);
     }
 
-    public function update(CargaCombustibleRequest $request, CargaCombustible $carga,): RedirectResponse
+    public function update(CargaCombustibleRequest $request, CargaCombustible $carga): RedirectResponse
     {
         $data = $request->validated();
         unset($data['respaldo_count']);
@@ -181,7 +179,7 @@ class CargaCombustibleController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                             */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     private function processRespaldos1(Request $request, CargaCombustible $carga): void
@@ -189,52 +187,129 @@ class CargaCombustibleController extends Controller
         $count = (int) $request->input('respaldo_count', 0);
 
         for ($i = 0; $i < $count; $i++) {
-            if (!$request->hasFile("respaldo_archivo_{$i}")) {
+            if (! $request->hasFile("respaldo_archivo_{$i}")) {
                 continue;
             }
 
-            $archivo     = $request->file("respaldo_archivo_{$i}");
+            $archivo = $request->file("respaldo_archivo_{$i}");
             $tipoArchivo = str_starts_with($archivo->getMimeType(), 'image/') ? 'IMAGEN' : 'PDF';
-            $ruta        = $archivo->store("respaldos/{$carga->id}", 'public');
+            $ruta = $archivo->store("respaldos/{$carga->id}", 'public');
 
             RespaldoDigital::create([
-                'ruta_respaldo'        => $ruta,
-                'tipo_respaldo'        => $request->input("respaldo_tipo_{$i}", 'OTRO'),
-                'tipo_archivo'         => $tipoArchivo,
+                'ruta_respaldo' => $ruta,
+                'tipo_respaldo' => $request->input("respaldo_tipo_{$i}", 'OTRO'),
+                'tipo_archivo' => $tipoArchivo,
                 'id_carga_combustible' => $carga->id,
-                'id_incidencia'        => null,
+                'id_incidencia' => null,
             ]);
         }
     }
+
     private function processRespaldos(Request $request, CargaCombustible $carga): void
     {
-        //capturar respaldos
+        // capturar respaldos
         $respaldos = $request->input('respaldos', []);
         // dd($respaldos, $request->file('respaldos', []));
 
-
         foreach ($request->file('respaldos', []) as $index => $archivo) {
-            if (!$archivo) {
+            if (! $archivo) {
                 continue;
             }
 
             // dd($archivo["archivo"]->getMimeType());
 
-            $tipoArchivo = str_starts_with($archivo["archivo"]->getMimeType(), 'image/') ? 'IMAGEN' : 'PDF';
-            $ruta        = $archivo["archivo"]->store("respaldos/{$tipoArchivo}", 'public');
+            $tipoArchivo = str_starts_with($archivo['archivo']->getMimeType(), 'image/') ? 'IMAGEN' : 'PDF';
+            $ruta = $archivo['archivo']->store("respaldos/{$tipoArchivo}", 'public');
 
             RespaldoDigital::create([
-                'ruta_respaldo'        => $ruta,
-                'tipo_respaldo'        => $respaldos[$index]['tipo'] ?? 'OTRO',
-                'tipo_archivo'         => $tipoArchivo,
+                'ruta_respaldo' => $ruta,
+                'tipo_respaldo' => $respaldos[$index]['tipo'] ?? 'OTRO',
+                'tipo_archivo' => $tipoArchivo,
                 'id_carga_combustible' => $carga->id,
             ]);
         }
     }
 
-        /* ------------------------------------------------------------------ */
-    /*  Endpoints JSON                                                      */
     /* ------------------------------------------------------------------ */
+    /*  Endpoints JSON */
+    /* ------------------------------------------------------------------ */
+
+    /** Detalle completo de una carga de combustible (para el modal de detalle) */
+    public function detalle(CargaCombustible $carga): JsonResponse
+    {
+        $carga->load([
+            'vehiculo',
+            'conductor.persona',
+            'grifo',
+            'tipoCombustible',
+            'usuario',
+            'vale.grifo',
+            'vale.tipoCombustible',
+            'respaldosDigitales',
+        ]);
+
+        $total = round($carga->litros * $carga->precio, 2);
+
+        $vale = null;
+        if ($carga->vale) {
+            $v = $carga->vale;
+            $vale = [
+                'id' => $v->id,
+                'nro' => $v->nro,
+                'fecha_emision' => $v->fecha_emision_f,
+                'fecha_vencimiento' => $v->fecha_vencimiento_f,
+                'litros' => $v->litros,
+                'precio' => $v->precio,
+                'total' => round($v->litros * $v->precio, 2),
+                'estado_vale' => $v->estado_vale,
+                'tipo_combustible' => $v->tipoCombustible?->tipo_combustible,
+                'grifo' => $v->grifo ? [
+                    'razon_social' => $v->grifo->razon_social,
+                    'ciudad' => $v->grifo->ciudad,
+                    'nit' => $v->grifo->nit,
+                ] : null,
+            ];
+        }
+
+        return response()->json([
+            'id' => $carga->id,
+            'fecha_carga' => $carga->fecha_carga_formateada,
+            'litros' => $carga->litros,
+            'precio' => $carga->precio,
+            'total' => $total,
+            'kilometraje' => $carga->kilometraje,
+            'horometro' => $carga->horometro,
+            'nro_factura' => $carga->nro_factura,
+            'tipo_carga' => $carga->tipo_carga,
+            'estado_carga' => $carga->estado_carga,
+            'tipo_combustible' => $carga->tipoCombustible?->tipo_combustible,
+            'vehiculo' => $carga->vehiculo ? [
+                'nro_placa' => $carga->vehiculo->nro_placa,
+                'codigo' => $carga->vehiculo->codigo,
+                'marca' => $carga->vehiculo->marca,
+                'modelo' => $carga->vehiculo->modelo,
+                'anio' => $carga->vehiculo->anio,
+                'tipo_medicion' => $carga->vehiculo->tipo_medicion,
+            ] : null,
+            'conductor' => $carga->conductor ? [
+                'nombre_completo' => $carga->conductor->persona?->nombre_completo,
+                'ci' => $carga->conductor->persona?->ci,
+            ] : null,
+            'grifo' => $carga->grifo ? [
+                'razon_social' => $carga->grifo->razon_social,
+                'ciudad' => $carga->grifo->ciudad,
+                'nit' => $carga->grifo->nit,
+            ] : null,
+            'vale' => $vale,
+            'respaldos' => $carga->respaldosDigitales->map(fn ($r) => [
+                'id' => $r->id,
+                'ruta_respaldo' => $r->ruta_respaldo,
+                'tipo_respaldo' => $r->tipo_respaldo,
+                'tipo_archivo' => $r->tipo_archivo,
+            ]),
+            'registrado_por' => $carga->usuario?->name,
+        ]);
+    }
 
     /** Info del vehículo: tipo_combustible + conductorAsignado ACTIVO */
     public function vehiculoInfo(int $id): JsonResponse
@@ -242,16 +317,15 @@ class CargaCombustibleController extends Controller
         $vehiculo = Vehiculo::with(['tipoCombustible'])->findOrFail($id);
         $conductor = $vehiculo->conductorAsignado;
 
-
         return response()->json([
             'tipo_combustible' => $vehiculo->tipoCombustible ? [
-                'id'    => $vehiculo->tipoCombustible->id,
+                'id' => $vehiculo->tipoCombustible->id,
                 'label' => $vehiculo->tipoCombustible->tipo_combustible,
             ] : null,
             'conductor' => $conductor ? [
-                'id'    => $conductor->id,
+                'id' => $conductor->id,
                 'label' => trim("{$conductor->persona->nombres} {$conductor->persona->paterno} {$conductor->persona->materno}")
-                    . " (CI: {$conductor->persona->ci})",
+                    ." (CI: {$conductor->persona->ci})",
             ] : null,
         ]);
     }
@@ -259,10 +333,10 @@ class CargaCombustibleController extends Controller
     /** Búsqueda de vales PENDIENTE (opcional filtrar por vehículo) */
     public function searchVales(Request $request): JsonResponse
     {
-        $q          = $request->input('q', '');
+        $q = $request->input('q', '');
         $idVehiculo = $request->input('id_vehiculo');
 
-        if (!$q && !$idVehiculo) {
+        if (! $q && ! $idVehiculo) {
             return response()->json([]);
         }
         $query = Vale::where('estado_vale', 'PENDIENTE');
@@ -282,15 +356,15 @@ class CargaCombustibleController extends Controller
         }
 
         $vales = $query->limit(20)->get()
-            ->map(fn($v) => [
-                'id'    => $v->id,
+            ->map(fn ($v) => [
+                'id' => $v->id,
                 'label' => "Vale #{$v->nro} — {$v->litros} Lt ({$v->fecha_emision_f})",
                 'meta' => [
                     'litros' => $v->litros,
                     'fecha_emision' => $v->fecha_emision_f,
                     'precio' => $v->precio,
                     'id_grifo' => $v->id_grifo,
-                ]
+                ],
             ]);
 
         return response()->json($vales);

@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'fecha_carga',
@@ -44,7 +44,6 @@ class CargaCombustible extends Model
         return $this->fecha_carga ? $this->fecha_carga->format('d/m/Y H:i') : '—';
     }
 
-
     // Relaciones
     public function vehiculo()
     {
@@ -76,6 +75,11 @@ class CargaCombustible extends Model
         return $this->hasMany(RespaldoDigital::class, 'id_carga_combustible');
     }
 
+    public function usuario()
+    {
+        return $this->belongsTo(User::class, 'id_usuario');
+    }
+
     // asigar id usuario al crear una carga de combustible
     protected static function boot()
     {
@@ -86,11 +90,9 @@ class CargaCombustible extends Model
         });
     }
 
-
-
-    static function reporteCargaCombustibleMes($anio = null)
+    public static function reporteCargaCombustibleMes($anio = null)
     {
-        if (!$anio) {
+        if (! $anio) {
             $anio = now()->year;
         }
 
@@ -115,7 +117,7 @@ class CargaCombustible extends Model
             ->groupByRaw('MONTH(fecha_carga)')
             ->orderByRaw('MONTH(fecha_carga)')
             ->get()
-            ->mapWithKeys(function ($item)  use ($months) {
+            ->mapWithKeys(function ($item) use ($months) {
                 return [$item->mes => [
                     'mes' => $months[$item->mes],
                     'total_litros' => $item->total_litros,

@@ -15,14 +15,23 @@ const props = defineProps({
     tiposCombustible: Array,
     grifos: Array,
     conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
-    valesConductor: Array, // [{ id, nro_vale, fecha_emision, litros }] vales PENDIENTE del conductor (si hay uno)
-    vehiculosAsignados: Array, // [{ id, label }] vehículos asignados al conductor (si hay uno)
+    valesConductor: { type: Array, default: () => [] }, // [{ id, nro_vale, fecha_emision, litros }] vales PENDIENTE del conductor (si hay uno)
+    vehiculosAsignados: { type: Array, default: () => [] }, // [{ id, label }] vehículos asignados al conductor (si hay uno)
+
+    // ── Props exclusivos del modo edición ──────────────────────────────
+    carga: { type: Object, default: null },          // registro a editar (null en modo creación)
+    vehiculoActual: { type: Object, default: null },  // { id, label, meta } del vehículo de la carga
+    conductorActual: { type: Object, default: null }, // { id, label } del conductor de la carga
+    valeActual: { type: Object, default: null },      // { id, label } del vale de la carga
+    conductores: { type: Array, default: () => [] },  // conductores asignados al vehículo de la carga
 })
 
-const valesVehiculo = ref(props.valesConductor || [])
+const isEdit = computed(() => !!props.carga)
+
+const valesVehiculo = ref(isEdit.value ? (props.valeActual ? [props.valeActual] : []) : (props.valesConductor || []))
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
 
-const conductoresOpt = ref([])   // [{ id, label }] conductores activos (para búsqueda async)
+const conductoresOpt = ref(isEdit.value && props.conductorActual ? [props.conductorActual] : [])
 
 
 
@@ -33,29 +42,34 @@ const conductoresOpt = ref([])   // [{ id, label }] conductores activos (para b�
 const today = new Date().toISOString().substring(0, 10)
 
 const form = useForm({
-    fecha_carga: today,
-    litros: '',
-    precio: '',
-    kilometraje: '',
-    horometro: '',
-    nro_factura: '',
-    tipo_carga: 'VALE',
-    estado_carga: 'REGISTRADO',
-    id_vehiculo: null,
-    id_grifo: null,
-    id_tipo_combustible: '',
-    id_conductor: null,
-    id_vale: null,
+    ...(isEdit.value ? { _method: 'PUT' } : {}),
+    fecha_carga: isEdit.value
+        ? String(props.carga.fecha_carga).substring(0, 10)
+        : today,
+    litros: isEdit.value ? props.carga.litros : '',
+    precio: isEdit.value ? props.carga.precio : '',
+    kilometraje: isEdit.value ? (props.carga.kilometraje ?? '') : '',
+    horometro: isEdit.value ? (props.carga.horometro ?? '') : '',
+    nro_factura: isEdit.value ? (props.carga.nro_factura ?? '') : '',
+    tipo_carga: isEdit.value ? props.carga.tipo_carga : 'VALE',
+    estado_carga: isEdit.value ? (props.carga.estado_carga ?? 'REGISTRADO') : 'REGISTRADO',
+    id_vehiculo: isEdit.value ? (props.vehiculoActual?.id ?? null) : null,
+    id_grifo: isEdit.value ? (props.carga.id_grifo ?? null) : null,
+    id_tipo_combustible: isEdit.value ? props.carga.id_tipo_combustible : '',
+    id_conductor: isEdit.value ? (props.carga.id_conductor ?? null) : null,
+    id_vale: isEdit.value ? (props.valeActual?.id ?? null) : null,
     respaldo_count: 0,
+    respaldos_eliminar: [],
 })
 
 /* ------------------------------------------------------------------ */
-/*  Auto-relleno al seleccionar vehículo                               */
+/*  Auto-relleno al seleccionar vehículo (solo creación)                */
 /* ------------------------------------------------------------------ */
-const conductorAutoFill = ref(null)   // { id, label } del conductor asignado
+const conductorAutoFill = ref(isEdit.value ? (props.conductorActual ?? null) : null)   // { id, label } del conductor asignado
 const loadingVehiculo = ref(false)
 
 watch(() => form.id_vehiculo, async (val) => {
+    if (isEdit.value) return
 
 
 
@@ -103,7 +117,7 @@ watch(() => form.id_vale, (val) => {
 /*  Respaldos digitales                                                */
 /* ------------------------------------------------------------------ */
 const tiposRespaldo = ['FACTURA', 'NOTA', 'COMPROBANTE', 'OTRO']
-const respaldos = ref([])   // [{ archivo, tipo_respaldo, preview, previewType }]
+const respaldos = ref([])   // [{ archivo, tipo_respaldo, preview, previewType }] — nuevos a subir
 
 function agregarRespaldo() {
     if (respaldos.value.length >= 5) return
@@ -129,6 +143,19 @@ function onArchivoChange(e, idx) {
     }
 }
 
+// Respaldos ya guardados (solo en edición), con opción de eliminar
+const respaldosVisibles = computed(() =>
+    (props.carga?.respaldos_digitales ?? []).filter(r => !form.respaldos_eliminar.includes(r.id))
+)
+
+function marcarEliminar(respaldoId) {
+    if (confirm('¿Eliminar este respaldo?')) {
+        form.respaldos_eliminar.push(respaldoId)
+    }
+}
+
+const respaldoUrl = (ruta) => `/storage/${ruta}`
+
 /* ------------------------------------------------------------------ */
 /*  Resumen de monto total                                             */
 /* ------------------------------------------------------------------ */
@@ -142,20 +169,21 @@ const totalMonto = computed(() => {
 /*  Envío                                                              */
 /* ------------------------------------------------------------------ */
 function submit() {
-    form
-        .transform((data) => {
-            const out = {
-                ...data,
-                id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
-                id_grifo: data.id_grifo?.id ?? data.id_grifo,
-                id_conductor: data.id_conductor?.id ?? data.id_conductor,
-                id_vale: data.id_vale?.id ?? data.id_vale ?? null,
-                respaldo_count: respaldos.value.filter(r => r.archivo).length,
-                respaldos : respaldos.value
-            }
-            return out
-        })
-        .post(route('cargas.store'), { forceFormData: true })
+    const transformed = form.transform((data) => ({
+        ...data,
+        id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
+        id_grifo: data.id_grifo?.id ?? data.id_grifo,
+        id_conductor: data.id_conductor?.id ?? data.id_conductor,
+        id_vale: data.id_vale?.id ?? data.id_vale ?? null,
+        respaldo_count: respaldos.value.filter(r => r.archivo).length,
+        respaldos: respaldos.value,
+    }))
+
+    if (isEdit.value) {
+        transformed.post(route('cargas.update', props.carga.id), { forceFormData: true })
+    } else {
+        transformed.post(route('cargas.store'), { forceFormData: true })
+    }
 }
 
 
@@ -186,10 +214,11 @@ const valeSeleccionado = (e) => {
 
 
 
-const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
+const tipoMedicion = ref(isEdit.value ? (props.vehiculoActual?.meta?.tipo_medicion ?? '') : '') // 'kilometraje' o 'horometro'
 
 const cambioVehiculo = async (vehiculoId) => {
 
+    if (isEdit.value) return
 
 
 
@@ -259,6 +288,9 @@ const cambioVehiculo = async (vehiculoId) => {
 
 
 onMounted(() => {
+    // En edición no hay auto-relleno: los campos ya vienen bloqueados con los datos guardados.
+    if (isEdit.value) return
+
     // Si hay un conductor asignado desde el servidor, auto-seleccionarlo
 
     if (props.conductor) {
@@ -275,7 +307,7 @@ onMounted(() => {
 
 <template>
 
-    <Head title="Nueva Carga de Combustible" />
+    <Head :title="isEdit ? 'Editar Carga de Combustible' : 'Nueva Carga de Combustible'" />
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -287,14 +319,29 @@ onMounted(() => {
                         <li class="breadcrumb-item">
                             <Link :href="route('cargas.index')">Cargas</Link>
                         </li>
-                        <li class="breadcrumb-item active">Nueva</li>
+                        <li class="breadcrumb-item active">{{ isEdit ? 'Editar' : 'Nueva' }}</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Registrar Carga de Combustible</h1>
+                <h1 class="page-title fw-medium fs-18 mb-0">
+                    {{ isEdit ? 'Editar Carga de Combustible' : 'Registrar Carga de Combustible' }}
+                    <template v-if="isEdit">
+                        <span class="text-primary">— {{ carga.vehiculo?.nro_placa }}</span>
+                        <span class="text-muted fs-14 ms-2">{{ carga.fecha_carga }}</span>
+                    </template>
+                </h1>
             </div>
             <Link :href="route('cargas.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver
             </Link>
+        </div>
+
+        <div v-if="isEdit" class="alert alert-info-transparent d-flex align-items-center gap-2 mb-4">
+            <i class="ri-lock-line fs-16"></i>
+            <small>
+                Los datos originales de la carga (vehículo, conductor, vale, tipo de combustible, grifo, fecha,
+                litros y precio) quedan bloqueados. Solo puedes actualizar el <strong>kilometraje/horómetro</strong>
+                y los <strong>respaldos digitales</strong>.
+            </small>
         </div>
 
         <form @submit.prevent="submit">
@@ -321,7 +368,12 @@ onMounted(() => {
                                     <label class="form-label fw-medium">
                                         Vehículo <span class="text-danger">*</span>
                                     </label>
-                                    <Multiselect v-if="props.conductor" v-model="form.id_vehiculo"
+
+                                    <Multiselect v-if="isEdit" v-model="form.id_vehiculo"
+                                        :options="vehiculoActual ? [vehiculoActual] : []" value-prop="id" label="label"
+                                        :searchable="false" :disabled="true" placeholder="—" />
+
+                                    <Multiselect v-else-if="props.conductor" v-model="form.id_vehiculo"
                                         :options="vehiculosAsignadosOpt" value-prop="id" label="label"
                                         @change="cambioVehiculo" placeholder="Seleccionar vehículo" />
 
@@ -345,10 +397,10 @@ onMounted(() => {
                                 <div class="col-12">
                                     <label class="form-label fw-medium">
                                         Tipo de Combustible <span class="text-danger">*</span>
-                                        <span v-if="form.id_vehiculo"
+                                        <span v-if="form.id_vehiculo && !isEdit"
                                             class="badge bg-success-transparent text-success ms-2 fs-10">Auto-llenado</span>
                                     </label>
-                                    <select v-model="form.id_tipo_combustible" class="form-select"
+                                    <select v-model="form.id_tipo_combustible" class="form-select" :disabled="isEdit"
                                         :class="{ 'is-invalid': form.errors.id_tipo_combustible }">
                                         <option value="">— Seleccionar —</option>
                                         <option v-for="tc in tiposCombustible" :key="tc.id" :value="tc.id">
@@ -367,7 +419,7 @@ onMounted(() => {
                                             class="badge bg-success-transparent text-success ms-2 fs-10">
                                             Asignado activo
                                         </span>
-                                        <span v-else-if="form.id_vehiculo && !conductorAutoFill"
+                                        <span v-else-if="form.id_vehiculo && !conductorAutoFill && !isEdit"
                                             class="badge bg-warning-transparent text-warning ms-2 fs-10">
                                             Sin asignación activa
                                         </span>
@@ -376,6 +428,7 @@ onMounted(() => {
                                     <Multiselect v-model="form.id_conductor" :options="conductoresOpt" value-prop="id" label="label"
                                         :searchable="true" :filter-results="true" placeholder="Buscar conductor..."
                                         no-options-text="Sin conductores activos" no-results-text="Sin resultados"
+                                        :disabled="isEdit"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
                                     <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                         form.errors.id_conductor }}</div>
@@ -401,7 +454,7 @@ onMounted(() => {
                                         Nro de Vale <span class="text-muted small">(Si aplica)</span>
                                     </label>
 
-                                    <select v-model="form.id_vale" class="form-select"
+                                    <select v-model="form.id_vale" class="form-select" :disabled="isEdit"
                                         :class="{ 'is-invalid': form.errors.id_vale }" @change="valeSeleccionado">
                                         <option :value="null">— Seleccione —</option>
                                         <option v-for="vale in valesVehiculo" :key="vale.id" :value="vale.id">
@@ -422,11 +475,12 @@ onMounted(() => {
                                     <label class="form-label fw-medium">Tipo de Carga <span
                                             class="text-danger">*</span></label>
                                     <select v-model="form.tipo_carga" class="form-select"
-                                        :class="{ 'is-invalid': form.errors.tipo_carga }" :disabled="!!form.id_vale">
+                                        :class="{ 'is-invalid': form.errors.tipo_carga }"
+                                        :disabled="isEdit || !!form.id_vale">
                                         <option value="VALE">VALE</option>
                                         <option value="PREPAGO">PREPAGO</option>
                                     </select>
-                                    <small v-if="form.id_vale" class="text-info">
+                                    <small v-if="form.id_vale && !isEdit" class="text-info">
                                         <i class="ri-information-line me-1"></i>Bloqueado: hay un vale seleccionado
                                     </small>
                                 </div>
@@ -439,6 +493,7 @@ onMounted(() => {
                                     <Multiselect v-model="form.id_grifo" :options="grifos" value-prop="id" label="label"
                                         :searchable="true" :filter-results="true" placeholder="Buscar grifo..."
                                         no-options-text="Sin grifos activos" no-results-text="Sin resultados"
+                                        :disabled="isEdit"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_grifo }" />
                                     <div v-if="form.errors.id_grifo" class="text-danger small mt-1">{{
                                         form.errors.id_grifo }}</div>
@@ -460,7 +515,7 @@ onMounted(() => {
                                 <div class="col-sm-6">
                                     <label class="form-label fw-medium">Fecha de Carga <span
                                             class="text-danger">*</span></label>
-                                    <input v-model="form.fecha_carga" type="date" class="form-control"
+                                    <input v-model="form.fecha_carga" type="date" class="form-control" :disabled="isEdit"
                                         :class="{ 'is-invalid': form.errors.fecha_carga }" />
                                     <div v-if="form.errors.fecha_carga" class="invalid-feedback">{{
                                         form.errors.fecha_carga }}</div>
@@ -468,7 +523,7 @@ onMounted(() => {
 
                                 <div v-if="!props.conductor" class="col-sm-6">
                                     <label class="form-label fw-medium">Estado</label>
-                                    <select v-model="form.estado_carga" class="form-select"
+                                    <select v-model="form.estado_carga" class="form-select" :disabled="isEdit"
                                         :class="{ 'is-invalid': form.errors.estado_carga }">
                                         <option value="REGISTRADO">REGISTRADO</option>
                                         <option value="VERIFICADO">VERIFICADO</option>
@@ -480,7 +535,7 @@ onMounted(() => {
                                     <label class="form-label fw-medium">Litros <span
                                             class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <input v-model="form.litros" type="text"   v-decimal="2"
+                                        <input v-model="form.litros" type="text"   v-decimal="2" :disabled="isEdit"
                                             class="form-control" :class="{ 'is-invalid': form.errors.litros }"
                                             placeholder="0.00" />
                                         <span class="input-group-text">Lt</span>
@@ -494,7 +549,7 @@ onMounted(() => {
                                             class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text">Bs</span>
-                                        <input v-model="form.precio" type="text"   v-decimal="2"
+                                        <input v-model="form.precio" type="text"   v-decimal="2" :disabled="isEdit"
                                             class="form-control" :class="{ 'is-invalid': form.errors.precio }"
                                             placeholder="0.00" />
                                         <div v-if="form.errors.precio" class="invalid-feedback">{{ form.errors.precio }}
@@ -503,7 +558,10 @@ onMounted(() => {
                                 </div>
 
                                 <div v-if="tipoMedicion === 'kilometraje'" class="col-sm-6">
-                                    <label class="form-label fw-medium">Kilometraje</label>
+                                    <label class="form-label fw-medium">
+                                        Kilometraje
+                                        <span v-if="isEdit" class="badge bg-success-transparent text-success ms-1 fs-10">Editable</span>
+                                    </label>
                                     <div class="input-group">
                                         <input v-model="form.kilometraje" type="text" class="form-control"  v-decimal="1"
                                             :class="{ 'is-invalid': form.errors.kilometraje }" placeholder="0"
@@ -516,7 +574,10 @@ onMounted(() => {
                                 </div>
 
                                 <div v-if="tipoMedicion === 'horometro'" class="col-sm-6">
-                                    <label class="form-label fw-medium">Horometro</label>
+                                    <label class="form-label fw-medium">
+                                        Horometro
+                                        <span v-if="isEdit" class="badge bg-success-transparent text-success ms-1 fs-10">Editable</span>
+                                    </label>
                                     <div class="input-group">
                                         <input v-model="form.horometro" type="text" class="form-control"  v-decimal="1"
                                             :class="{ 'is-invalid': form.errors.horometro }" placeholder="0"
@@ -531,7 +592,7 @@ onMounted(() => {
 
                                 <div class="col-sm-6">
                                     <label class="form-label fw-medium">Nro. Factura</label>
-                                    <input v-model="form.nro_factura" type="text" class="form-control"
+                                    <input v-model="form.nro_factura" type="text" class="form-control" :disabled="isEdit"
                                         placeholder="Nro de factura..." maxlength="50" />
                                 </div>
 
@@ -565,7 +626,33 @@ onMounted(() => {
                             </button>
                         </div>
                         <div class="card-body">
-                            <div v-if="respaldos.length === 0" class="text-center text-muted py-3">
+
+                            <!-- Existentes (solo edición) -->
+                            <div v-if="isEdit && respaldosVisibles.length > 0" class="mb-3">
+                                <p class="text-muted small mb-2">Respaldos guardados:</p>
+                                <div v-for="resp in respaldosVisibles" :key="resp.id"
+                                    class="d-flex align-items-center gap-2 border rounded-2 p-2 mb-2">
+                                    <span class="badge"
+                                        :class="resp.tipo_archivo === 'PDF' ? 'bg-danger-transparent text-danger' : 'bg-info-transparent text-info'">
+                                        <i :class="resp.tipo_archivo === 'PDF' ? 'ri-file-pdf-line' : 'ri-image-line'"
+                                            class="me-1"></i>
+                                        {{ resp.tipo_archivo }}
+                                    </span>
+                                    <span class="badge bg-secondary-transparent text-secondary">{{ resp.tipo_respaldo
+                                        }}</span>
+                                    <a :href="respaldoUrl(resp.ruta_respaldo)" target="_blank"
+                                        class="btn btn-sm btn-outline-primary py-0">
+                                        <i class="ri-eye-line me-1"></i>Ver
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 ms-auto"
+                                        @click="marcarEliminar(resp.id)">
+                                        <i class="ri-delete-bin-line"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div v-if="respaldos.length === 0 && (!isEdit || respaldosVisibles.length === 0)"
+                                class="text-center text-muted py-3">
                                 <i class="ri-file-upload-line fs-3 d-block mb-2"></i>
                                 <small>Haz clic en "Agregar" para adjuntar facturas, notas u otros documentos</small>
                             </div>
@@ -616,7 +703,7 @@ onMounted(() => {
                 <button type="submit" class="btn btn-primary btn-wave" :disabled="form.processing">
                     <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                     <i v-else class="ri-save-line me-1"></i>
-                    {{ form.processing ? 'Guardando...' : 'Guardar Carga' }}
+                    {{ form.processing ? (isEdit ? 'Actualizando...' : 'Guardando...') : (isEdit ? 'Actualizar Carga' : 'Guardar Carga') }}
                 </button>
             </div>
         </form>

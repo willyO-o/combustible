@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import CargaCombustibleDetalleModal from '@/Components/CargaCombustibleDetalleModal.vue'
 
 defineOptions({ layout: Maindashboard })
 
@@ -10,6 +11,11 @@ const props = defineProps({
     filters: Object,
     flash:   Object,
 })
+
+const cargaDetalleId = ref(null)
+function verDetalle(carga) {
+    cargaDetalleId.value = carga.id
+}
 
 const filters = ref({
     nro_placa:   props.filters?.nro_placa   ?? '',
@@ -185,6 +191,9 @@ const tipoBadge = (tipo) =>
 
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
+                                        <button type="button" class="btn btn-sm btn-icon btn-primary-light" title="Ver detalle" @click="verDetalle(carga)">
+                                            <i class="ri-eye-line"></i>
+                                        </button>
                                         <Link  v-if="carga.estado != 'REGISTRADO'" :href="route('cargas.edit', carga.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
@@ -211,4 +220,6 @@ const tipoBadge = (tipo) =>
                 </nav>
             </div>
         </div>
+
+        <CargaCombustibleDetalleModal :cargaId="cargaDetalleId" @close="cargaDetalleId = null" />
 </template>

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 #[Fillable([
     'id_vehiculo',
     'nro_solicitud',
+    'gestion',
     'id_conductor',
     'id_usuario_registra',
     'tipo_mantenimiento',
@@ -69,14 +70,45 @@ class SolicitudMantenimiento extends Model
     }
 
 
+
+    public static function siguienteNroMantenimientoProvisional(int $gestion): string
+    {
+        $gestion = now()->month >= 11 ? now()->year + 1 : now()->year;
+
+        $ultimo = self::where('gestion', $gestion)
+            ->orderBy('nro_solicitud', 'desc')
+            ->first();
+
+        $siguienteNro = $ultimo ? $ultimo->nro_solicitud + 1 : 1;
+
+        return str_pad($siguienteNro, 6, '0', STR_PAD_LEFT) . '/' . $gestion;
+    }
+
+
+    protected function calcularGestion(): int
+    {
+        // Si el mes actual es noviembre (11) o diciembre (12),
+        // la gestión ya pertenece al año siguiente
+        return now()->month >= 11 ? now()->year + 1 : now()->year;
+    }
+
+    public static function siguienteNroVale(int $gestion): int
+    {
+        $ultimo = self::where('gestion', $gestion)
+            ->lockForUpdate()
+            ->orderBy('nro_solicitud', 'desc')
+            ->first();
+
+        return $ultimo ? $ultimo->nro_solicitud + 1 : 1;
+    }
+
     protected static function boot(): void
     {
         parent::boot();
 
         static::creating(function ($solicitudMantenimiento) {
-            $ultimoNroSolicitud = self::max('nro_solicitud');
-            $nuevoNroSolicitud = $ultimoNroSolicitud ? $ultimoNroSolicitud + 1 : 1;
-            $solicitudMantenimiento->nro_solicitud = $nuevoNroSolicitud;
+            $solicitudMantenimiento->gestion = $solicitudMantenimiento->calcularGestion();
+            $solicitudMantenimiento->nro_solicitud = self::siguienteNroVale($solicitudMantenimiento->gestion);
         });
     }
 }
