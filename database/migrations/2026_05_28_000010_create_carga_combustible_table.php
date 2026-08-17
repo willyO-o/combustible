@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('carga_combustible', function (Blueprint $table) {
             $table->id();
-            $table->date('fecha_carga');
+            $table->dateTime('fecha_carga');
             $table->decimal('litros', 10, 2);
             $table->decimal('precio', 10, 2);
             $table->decimal('kilometraje', 12, 2)->nullable();

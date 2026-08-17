@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 //soft delete
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Services\ParametrosEmpresaService;
 
 #[Fillable([
     'nro_vale',
@@ -44,12 +43,12 @@ class Vale extends Model
     }
     public function getFechaEmisionFAttribute()
     {
-        return $this->fecha_emision ? $this->fecha_emision->format('d/m/Y') : null;
+        return $this->fecha_emision ? $this->fecha_emision->format('d/m/Y H:i') : null;
     }
 
     public function getFechaVencimientoFAttribute()
     {
-        return $this->fecha_vencimiento ? $this->fecha_vencimiento->format('d/m/Y') : null;
+        return $this->fecha_vencimiento ? $this->fecha_vencimiento->format('d/m/Y H:i') : null;
     }
 
     // Relaciones

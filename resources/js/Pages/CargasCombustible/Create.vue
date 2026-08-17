@@ -151,13 +151,8 @@ function submit() {
                 id_conductor: data.id_conductor?.id ?? data.id_conductor,
                 id_vale: data.id_vale?.id ?? data.id_vale ?? null,
                 respaldo_count: respaldos.value.filter(r => r.archivo).length,
+                respaldos : respaldos.value
             }
-            respaldos.value.forEach((r, i) => {
-                if (r.archivo) {
-                    out[`respaldo_archivo_${i}`] = r.archivo
-                    out[`respaldo_tipo_${i}`] = r.tipo_respaldo
-                }
-            })
             return out
         })
         .post(route('cargas.store'), { forceFormData: true })

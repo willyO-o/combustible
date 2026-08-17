@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\OperacionDiariaController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\ParametrosController;
 use App\Http\Controllers\Api\V1\ValeController;
+use App\Http\Controllers\Api\V1\CargaCombustibleController;
 /*
 |--------------------------------------------------------------------------
 | API Routes — v1
@@ -37,6 +38,11 @@ Route::middleware('auth:api')->group(function () {
     Route::get('parametros', [ParametrosController::class, 'index'])->name('api.v1.parametros.index');
     Route::get('parametros/colecciones', [ParametrosController::class, 'colecciones'])->name('api.v1.parametros.colecciones');
 
+    Route::get('vales/pendientes', [ValeController::class, 'valesPendientes'])->name('api.v1.vales.pendientes');
+
     Route::resource('vales', ValeController::class)
         ->parameters(['vales' => 'vale'])->except(['create', 'edit'])->names('api.v1.vales');
+
+    Route::resource('cargas', CargaCombustibleController::class)
+        ->parameters(['cargas' => 'carga'])->except(['create', 'edit'])->names('api.v1.cargas');
 });

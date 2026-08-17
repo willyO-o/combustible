@@ -30,9 +30,18 @@ class CargaCombustible extends Model
     protected function casts()
     {
         return [
-            'fecha_carga' => 'date',
+            'fecha_carga' => 'date:Y-m-d H:i',
             'id_usuario' => 'integer',
         ];
+    }
+
+    protected $appends = [
+        'fecha_carga_formateada',
+    ];
+
+    public function getFechaCargaFormateadaAttribute()
+    {
+        return $this->fecha_carga ? $this->fecha_carga->format('d/m/Y H:i') : '—';
     }
 
 

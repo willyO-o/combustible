@@ -8,11 +8,8 @@ use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OperacionStoreRequest;
 
-use App\Models\Actividad;
 use App\Models\OperacionDiaria;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use App\Exceptions\AreaNoAsignadaException;
 use Illuminate\Http\Request;
 
@@ -53,7 +50,6 @@ class OperacionDiariaController extends Controller
                 'message' => 'Error: El conductor no tiene un área asignada.',
             ], 422);
         } catch (\Exception $e) {
-            DB::rollBack();
 
             return response()->json([
                 'message' => 'Error al crear la operación diaria.',

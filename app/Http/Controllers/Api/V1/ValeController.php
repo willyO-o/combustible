@@ -20,54 +20,42 @@ class ValeController extends Controller
         $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10), true);
 
         return response()->json($vales);
-
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function valesPendientes(Request $request, ListValeAction $listValeAction)
     {
-        //
-    }
+        $vales = $listValeAction->execute([], $request->user(), $request->input('per_page', 10), true);
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
+        // modificar los campos pendientes para que solo se muestren los que tienen estado pendiente y fecha de vencimiento mayor o igual a la fecha actual
+        $valesPendientes = $vales->map(function ($vale) {
+            return [
+                'id' => $vale->id,
+                'nro_vale' => $vale->nro_vale,
+                'nro'=> $vale->nro,
+                'gestion' => $vale->gestion,
+                'fecha_emision' => $vale->fecha_emision->format('Y-m-d H:i'),
+                'fecha_vencimiento' => $vale->fecha_vencimiento->format('Y-m-d H:i'),
+                'litros' => $vale->litros,
+                'precio' => $vale->precio,
+                'id_vehiculo' => $vale->id_vehiculo,
+                'id_conductor' => $vale->id_conductor,
+                'id_grifo' => $vale->id_grifo,
+                'estado_vale' => $vale->estado_vale,
+                'id_tipo_combustible' => $vale->id_tipo_combustible,
+                'id_user' => $vale->id_user,
+                'grifo' => [
+                    'id' => 3,
+                    'razon_social' => 'Combustibles Oruro S.R.L.',
+                    'ciudad' => 'Oruro',
+                ],
+            ];
+        });
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'data' => $valesPendientes,
+        ]);
     }
 }

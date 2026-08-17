@@ -15,7 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Facades\DB;
+use App\Actions\CargaCombustible\CreateCargaCombustibleAction;
+use App\Actions\CargaCombustible\ListCargaCombustibleAction;
 
 class CargaCombustibleController extends Controller
 {
@@ -24,39 +25,15 @@ class CargaCombustibleController extends Controller
     /*  CRUD                                                               */
     /* ------------------------------------------------------------------ */
 
-    public function index(Request $request): Response
+    public function index(Request $request, ListCargaCombustibleAction $listCargaCombustibleAction): Response
     {
-        $query = CargaCombustible::with(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible', 'vale']);
+        $filters = $request->only(['nro_placa', 'fecha_desde', 'fecha_hasta', 'tipo_carga', 'estado_carga']);
 
-        if ($request->filled('nro_placa')) {
-            $query->whereHas('vehiculo', fn($q) => $q->where('nro_placa', 'like', '%' . $request->nro_placa . '%'));
-        }
-        if ($request->filled('fecha_desde')) {
-            $query->whereDate('fecha_carga', '>=', $request->fecha_desde);
-        }
-        if ($request->filled('fecha_hasta')) {
-            $query->whereDate('fecha_carga', '<=', $request->fecha_hasta);
-        }
-        if ($request->filled('tipo_carga')) {
-            $query->where('tipo_carga', $request->tipo_carga);
-        }
-        if ($request->filled('estado_carga')) {
-            $query->where('estado_carga', $request->estado_carga);
-        }
-        if (auth()->user()->hasRole('conductor')) {
-            // $query->whereHas('conductor.user', fn($q) => $q->where('id', auth()->id()));
-            $query->where('id_conductor', auth()->user()->id_persona);
-        }
-
-        $cargas = $query
-            ->orderBy('id', 'desc')
-            ->orderBy('fecha_carga', 'desc')
-            ->paginate(10)
-            ->withQueryString();
+        $cargas = $listCargaCombustibleAction->execute($filters, $request->user(), $request->input('per_page', 10));
 
         return Inertia::render('CargasCombustible/Index', [
             'cargas'  => $cargas,
-            'filters' => $request->only(['nro_placa', 'fecha_desde', 'fecha_hasta', 'tipo_carga', 'estado_carga']),
+            'filters' => $filters,
             'flash'   => [
                 'success' => session('success'),
                 'error'   => session('error'),
@@ -81,8 +58,8 @@ class CargaCombustibleController extends Controller
         $conductor = null;
         $vehiculosAsignados = [];
         $valesConductor = [];
-        if (auth()->user()->hasRole('conductor')) {
-            $conductor = auth()->user()->persona;
+        if (request()->user()->hasRole('conductor')) {
+            $conductor = request()->user()->persona;
             $conductor->load('conductor');
 
 
@@ -101,7 +78,6 @@ class CargaCombustibleController extends Controller
                         'id_grifo'      => $v->id_grifo,
                     ]
                 ]);
-
         }
 
         // dd($conductor->conductor->asignacioneActivas);
@@ -115,42 +91,26 @@ class CargaCombustibleController extends Controller
         ]);
     }
 
-    public function store(CargaCombustibleRequest $request): RedirectResponse
+    public function store(CargaCombustibleRequest $request, CreateCargaCombustibleAction $action): RedirectResponse
     {
-        $data = $request->all();
-        unset($data['respaldo_count']);
 
         try {
-            DB::beginTransaction();
-
-            $carga = CargaCombustible::create($data);
-
-            $this->processRespaldos($request, $carga);
-
-            $vale = Vale::find($data['id_vale']);
-
-            $vale->update([
-                'estado_vale' => 'USADO',
-            ]);
-
-
-            DB::commit();
+            $carga = $action->execute($request);
 
             return redirect()->route('cargas.index')
                 ->with('success', 'Carga de combustible registrada exitosamente.');
         } catch (\Exception $e) {
-            DB::rollBack();
             return redirect()->back()->with('error', 'Error al registrar la carga de combustible: ' . $e->getMessage());
         }
     }
 
     public function edit(CargaCombustible $carga): Response
     {
-        $carga->load(['vehiculo.tipoCombustible', 'vehiculo','conductor', 'grifo', 'tipoCombustible', 'vale', 'respaldosDigitales']);
+        $carga->load(['vehiculo.tipoCombustible', 'vehiculo', 'conductor', 'grifo', 'tipoCombustible', 'vale', 'respaldosDigitales']);
 
         $conductor = null;
-        if(auth()->user()->hasRole('conductor')) {
-            $conductor = auth()->user()->persona;
+        if (request()->user()->hasRole('conductor')) {
+            $conductor = request()->user()->persona;
             $conductor->load('conductor');
         }
 
@@ -170,7 +130,7 @@ class CargaCombustibleController extends Controller
             // Objetos actuales para los SearchSelects
             'vehiculoActual'  => $carga->vehiculo  ? [
                 'id' => $carga->vehiculo->id,
-                'label' => "{$carga->vehiculo->nro_placa}" . " — {$carga->vehiculo->marca} ({$carga->vehiculo->anio})" ,
+                'label' => "{$carga->vehiculo->nro_placa}" . " — {$carga->vehiculo->marca} ({$carga->vehiculo->anio})",
                 'meta' => [
                     'id_tipo_combustible' => $carga->vehiculo->id_tipo_combustible,
                     'tipo_medicion' => $carga->vehiculo->tipo_medicion
@@ -183,7 +143,7 @@ class CargaCombustibleController extends Controller
         ]);
     }
 
-    public function update(CargaCombustibleRequest $request, CargaCombustible $carga): RedirectResponse
+    public function update(CargaCombustibleRequest $request, CargaCombustible $carga,): RedirectResponse
     {
         $data = $request->validated();
         unset($data['respaldo_count']);
@@ -224,7 +184,7 @@ class CargaCombustibleController extends Controller
     /*  Helpers                                                             */
     /* ------------------------------------------------------------------ */
 
-    private function processRespaldos(Request $request, CargaCombustible $carga): void
+    private function processRespaldos1(Request $request, CargaCombustible $carga): void
     {
         $count = (int) $request->input('respaldo_count', 0);
 
@@ -243,6 +203,31 @@ class CargaCombustibleController extends Controller
                 'tipo_archivo'         => $tipoArchivo,
                 'id_carga_combustible' => $carga->id,
                 'id_incidencia'        => null,
+            ]);
+        }
+    }
+    private function processRespaldos(Request $request, CargaCombustible $carga): void
+    {
+        //capturar respaldos
+        $respaldos = $request->input('respaldos', []);
+        // dd($respaldos, $request->file('respaldos', []));
+
+
+        foreach ($request->file('respaldos', []) as $index => $archivo) {
+            if (!$archivo) {
+                continue;
+            }
+
+            // dd($archivo["archivo"]->getMimeType());
+
+            $tipoArchivo = str_starts_with($archivo["archivo"]->getMimeType(), 'image/') ? 'IMAGEN' : 'PDF';
+            $ruta        = $archivo["archivo"]->store("respaldos/{$tipoArchivo}", 'public');
+
+            RespaldoDigital::create([
+                'ruta_respaldo'        => $ruta,
+                'tipo_respaldo'        => $respaldos[$index]['tipo'] ?? 'OTRO',
+                'tipo_archivo'         => $tipoArchivo,
+                'id_carga_combustible' => $carga->id,
             ]);
         }
     }
@@ -277,7 +262,7 @@ class CargaCombustibleController extends Controller
         $q          = $request->input('q', '');
         $idVehiculo = $request->input('id_vehiculo');
 
-        if(!$q && !$idVehiculo) {
+        if (!$q && !$idVehiculo) {
             return response()->json([]);
         }
         $query = Vale::where('estado_vale', 'PENDIENTE');
@@ -291,8 +276,8 @@ class CargaCombustibleController extends Controller
                 ->orWhere('nro_vale', 'like', "%{$nro}%");
         }
 
-        if(auth()->user()->hasRole('conductor')) {
-            $idConductor = auth()->user()->persona->id;
+        if (request()->user()->hasRole('conductor')) {
+            $idConductor = request()->user()->persona->id;
             $query->where('id_conductor', $idConductor);
         }
 

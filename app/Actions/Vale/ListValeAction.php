@@ -8,7 +8,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class ListValeAction
 {
-    public function execute(array $filtros, User $user, int $perPage = 10, $api = false): LengthAwarePaginator
+    public function execute(array $filtros, User $user, int $perPage = 10, $soloPendientes=false): LengthAwarePaginator
     {
 
         $query = Vale::select([
@@ -41,6 +41,14 @@ class ListValeAction
         if (! empty($filtros['estado_vale'])) {
             $query->where('estado_vale', $filtros['estado_vale']);
         }
+
+        if($soloPendientes){
+            //solo pendientes con el estado inferior a ahora el campo tien fecha y hora
+            $query->where("estado_vale", "PENDIENTE")
+            ->where("fecha_vencimiento", ">=", now());
+
+        }
+
 
         $this->aplicarRestriccionesPorRol($query, $user);
 

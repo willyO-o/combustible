@@ -19,6 +19,9 @@ const filters = ref({
     estado_carga: props.filters?.estado_carga ?? '',
 })
 
+console.log('cargas', props.cargas);
+
+
 let debounceTimer = null
 watch(filters, (val) => {
     clearTimeout(debounceTimer)
@@ -50,7 +53,6 @@ const estadoBadge = (estado) => {
 const tipoBadge = (tipo) =>
     tipo === 'VALE' ? 'bg-primary-transparent text-primary' : 'bg-warning-transparent text-warning'
 
-const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 </script>
 
 <template>
@@ -126,20 +128,19 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover text-nowrap mb-0">
+                    <table class="table table-hover text-wrap mb-0">
                         <thead class="table-light">
                             <tr>
                                 <th>Fecha</th>
                                 <th>Vehículo</th>
                                 <th>Conductor</th>
-                                <th>Grifo</th>
+                                <th>Estacio servicio</th>
                                 <th>Combustible</th>
                                 <th class="text-end">Litros</th>
                                 <th class="text-end">P/U (Bs)</th>
                                 <th class="text-end">Precio Total (Bs)</th>
                                 <th>Tipo</th>
                                 <th>Estado</th>
-                                <th>Respaldos</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
                         </thead>
@@ -151,25 +152,29 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
                                 </td>
                             </tr>
                             <tr v-for="carga in cargas.data" :key="carga.id">
-                                <td>{{ formatDate(carga.fecha_carga) }}</td>
-                                <td>
+                                <td>{{ (carga.fecha_carga_formateada) }}</td>
+                                <td class="text-nowrap">
+                                    <span class="fw-semibold d-block" >{{ carga.vehiculo?.codigo ?? '—' }}</span>
                                     <span class="fw-semibold">{{ carga.vehiculo?.nro_placa ?? '—' }}</span>
                                     <small v-if="carga.vehiculo?.marca" class="text-muted d-block">{{ carga.vehiculo.marca }}</small>
                                 </td>
                                 <td>
                                     {{ carga.conductor?.persona?.nombre_completo ?? '—' }}
                                 </td>
-                                <td>{{ carga.grifo?.razon_social ?? '—' }}</td>
+                                <td>
+                                    {{ carga.grifo?.razon_social ?? '—' }}
+                                </td>
                                 <td>
                                     <span class="badge bg-warning-transparent text-warning">
                                         {{ carga.tipo_combustible?.tipo_combustible ?? '—' }}
                                     </span>
                                 </td>
                                 <td class="text-end fw-medium">{{ Number(carga.litros).toFixed(2) }}</td>
-                                <td class="text-end fw-medium">Bs {{ Number(carga.precio).toFixed(2) }}</td>
-                                <td class="text-end fw-medium">Bs {{ (Number(carga.litros) * Number(carga.precio)).toFixed(2) }}</td>
+                                <td class="text-end fw-medium"> {{ Number(carga.precio).toFixed(2) }}</td>
+                                <td class="text-end fw-medium"> {{ (Number(carga.litros) * Number(carga.precio)).toFixed(2) }}</td>
                                 <td>
                                     <span class="badge" :class="tipoBadge(carga.tipo_carga)">{{ carga.tipo_carga }}</span>
+                                    <span class="s" >{{ carga?.vale?.nro }}</span>
                                 </td>
                                 <td>
                                     <span v-if="carga.estado_carga" class="badge" :class="estadoBadge(carga.estado_carga)">
@@ -177,18 +182,13 @@ const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-BO', { day: '2-
                                     </span>
                                     <span v-else class="text-muted">—</span>
                                 </td>
-                                <td class="text-center">
-                                    <span v-if="carga.respaldos_digitales_count > 0" class="badge bg-info-transparent text-info">
-                                        <i class="ri-attachment-2 me-1"></i>{{ carga.respaldos_digitales_count }}
-                                    </span>
-                                    <span v-else class="text-muted small">—</span>
-                                </td>
+
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
-                                        <Link :href="route('cargas.edit', carga.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
+                                        <Link  v-if="carga.estado != 'REGISTRADO'" :href="route('cargas.edit', carga.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
-                                        <button type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar" @click="confirmDelete(carga)">
+                                        <button v-if="carga.estado != 'REGISTRADO'" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar" @click="confirmDelete(carga)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>
                                     </div>
