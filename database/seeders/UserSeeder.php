@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use App\Models\EncargadoArea;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -40,6 +40,7 @@ class UserSeeder extends Seeder
             'vales.eliminar',
         ];
     }
+
     private function permisosOperacionDiaria(): array
     {
         return [
@@ -52,6 +53,7 @@ class UserSeeder extends Seeder
             'operacion-diaria.verificar',
         ];
     }
+
     private function permisosOperacionDiariaJefe(): array
     {
         return [
@@ -167,6 +169,16 @@ class UserSeeder extends Seeder
         ];
     }
 
+    private function permisosPersonas(): array
+    {
+        return [
+            'personas.ver',
+            'personas.crear',
+            'personas.editar',
+            'personas.eliminar',
+        ];
+    }
+
     /**
      * Todos los catálogos (conductores, vehículos, grifos, tipos-*) agrupados,
      * útil porque varios roles (admin, jefe de transporte) los comparten.
@@ -209,6 +221,7 @@ class UserSeeder extends Seeder
             ...$this->permisosCatalogos(),
             ...$this->permisosUsuarios(),
             ...$this->permisosAreas(),
+            ...$this->permisosPersonas(),
         ];
     }
 
@@ -384,7 +397,6 @@ class UserSeeder extends Seeder
         ];
 
         $rol = $this->crearRolConPermisos('jefe-area', $this->permisosParaJefeArea());
-
 
         $idArea = 1; // Asignar áreas 1, 2 y 3 a los jefes de área 1
         foreach ($personas as $persona) {

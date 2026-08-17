@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('conductor', function (Blueprint $table) {
-            $table->foreignId('id')->constrained('persona')->onDelete('restrict');
+            $table->foreignId('id')->primary()->constrained('persona')->onDelete('restrict');
             $table->enum('estado_conductor', ['ACTIVO', 'INACTIVO', 'RETIRADO'])->default('ACTIVO');
             $table->timestamps();
             $table->softDeletes();

@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Personas\UpdatePersonaAction;
 use App\Http\Requests\UserPasswordRequest;
 use App\Http\Requests\UserRequest;
-use App\Models\Rol;
+use App\Models\Area;
+use App\Models\Persona;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,27 +20,26 @@ class UserController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = User::with('roles');
+        $query = User::with('persona.conductor', 'persona.encargadoAreas');
 
         if ($request->filled('name')) {
-            $query->where('name', 'like', '%' . $request->name . '%');
+            $query->where('name', 'like', '%'.$request->name.'%');
         }
         if ($request->filled('email')) {
-            $query->where('email', 'like', '%' . $request->email . '%');
+            $query->where('email', 'like', '%'.$request->email.'%');
         }
-        if ($request->filled('id_rol')) {
-            $query->whereHas('roles', fn($q) => $q->where('rol.id', $request->id_rol));
+        if ($request->filled('estado_usuario')) {
+            $query->where('estado_usuario', $request->estado_usuario);
         }
 
         $usuarios = $query->orderBy('name')->paginate(10)->withQueryString();
 
         return Inertia::render('Usuarios/Index', [
             'usuarios' => $usuarios,
-            'roles'    => Rol::where('estado_rol', 'ACTIVO')->orderBy('rol')->get(['id', 'rol']),
-            'filters'  => $request->only(['name', 'email', 'id_rol']),
-            'flash'    => [
+            'filters' => $request->only(['name', 'email', 'estado_usuario']),
+            'flash' => [
                 'success' => session('success'),
-                'error'   => session('error'),
+                'error' => session('error'),
             ],
         ]);
     }
@@ -44,62 +47,100 @@ class UserController extends Controller
     public function create(): Response
     {
         return Inertia::render('Usuarios/Create', [
-            'roles' => Rol::where('estado_rol', 'ACTIVO')->orderBy('rol')->get(['id', 'rol']),
+            'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
         ]);
     }
 
-    public function store(UserRequest $request): RedirectResponse
+    public function store(UserRequest $request, UpdatePersonaAction $action): RedirectResponse
     {
-        $usuario = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        if ($request->filled('roles')) {
-            $usuario->roles()->sync($request->roles);
+        if (! auth()->user()->hasRole('administrador')) {
+            abort(403);
         }
 
+        $persona = Persona::findOrFail($request->id_persona);
+
+        $action->execute($persona, $this->datosPersonaParaAction($persona, $request));
+
         return redirect()->route('usuarios.index')
-            ->with('success', "Usuario {$usuario->name} creado exitosamente.");
+            ->with('success', "Usuario para {$persona->nombres} creado exitosamente.");
     }
 
     public function edit(User $usuario): Response
     {
-        $usuario->load('roles');
+        $usuario->load(['persona.conductor.asignacionesActivas', 'persona.encargadoAreas']);
+
+        $persona = $usuario->persona;
 
         return Inertia::render('Usuarios/Edit', [
-            'usuario'     => $usuario,
-            'roles'       => Rol::where('estado_rol', 'ACTIVO')->orderBy('rol')->get(['id', 'rol']),
-            'rolesActual' => $usuario->roles->pluck('id')->toArray(),
+            'usuario' => $usuario,
+            'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
+            'vehiculoActual' => $persona?->conductor?->asignacionesActivas->first(),
+            'areaActual' => $persona?->encargadoAreas->first(),
         ]);
     }
 
-    public function update(UserRequest $request, User $usuario): RedirectResponse
+    public function update(UserRequest $request, User $usuario, UpdatePersonaAction $action): RedirectResponse
     {
-        $usuario->update([
-            'name'  => $request->name,
-            'email' => $request->email,
-        ]);
+        if (! auth()->user()->hasRole('administrador')) {
+            abort(403);
+        }
 
-        $usuario->roles()->sync($request->roles ?? []);
+        $persona = $usuario->persona;
+
+        if ($persona) {
+            $action->execute($persona, $this->datosPersonaParaAction($persona, $request));
+        } else {
+            // Cuentas de sistema sin persona vinculada (ej. administradores sembrados
+            // directamente): solo se gestionan sus datos propios de usuario.
+            $usuario->update([
+                'email' => $request->email,
+                'estado_usuario' => $request->estado_usuario,
+            ]);
+        }
 
         return redirect()->route('usuarios.index')
             ->with('success', "Usuario {$usuario->name} actualizado exitosamente.");
     }
 
-    public function destroy(User $usuario): RedirectResponse
+    public function cambiarEstado(Request $request, User $usuario): RedirectResponse
     {
-        if ($usuario->id === auth()->id()) {
-            return redirect()->route('usuarios.index')
-                ->with('error', 'No puedes eliminar tu propio usuario.');
+        if (! auth()->user()->hasRole('administrador')) {
+            abort(403);
         }
 
-        $usuario->roles()->detach();
-        $usuario->delete();
+        $request->validate([
+            'estado_usuario' => ['required', Rule::in(['ACTIVO', 'INACTIVO'])],
+        ]);
+
+        if ($usuario->id === auth()->id() && $request->estado_usuario === 'INACTIVO') {
+            return redirect()->route('usuarios.index')
+                ->with('error', 'No puedes inactivar tu propio usuario.');
+        }
+
+        $usuario->update(['estado_usuario' => $request->estado_usuario]);
 
         return redirect()->route('usuarios.index')
-            ->with('success', "Usuario eliminado exitosamente.");
+            ->with('success', "Usuario {$usuario->name} marcado como {$request->estado_usuario}.");
+    }
+
+    public function searchPersonasSinUsuario(Request $request): JsonResponse
+    {
+        $q = $request->input('q', '');
+
+        $personas = Persona::whereDoesntHave('user')
+            ->where(function ($query) use ($q) {
+                $query->where('ci', 'like', "%{$q}%")
+                    ->orWhere('nombres', 'like', "%{$q}%")
+                    ->orWhere('paterno', 'like', "%{$q}%");
+            })
+            ->limit(20)
+            ->get()
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'label' => "{$p->ci} — {$p->nombre_completo}",
+            ]);
+
+        return response()->json($personas);
     }
 
     public function editPassword(User $usuario): Response
@@ -117,5 +158,28 @@ class UserController extends Controller
 
         return redirect()->route('usuarios.index')
             ->with('success', "Contraseña de {$usuario->name} actualizada exitosamente.");
+    }
+
+    /**
+     * Construye el array que UpdatePersonaAction espera, partiendo de los
+     * datos ya guardados de la persona (que este formulario no vuelve a
+     * pedir) y superponiendo los campos de usuario/tipo que sí envía.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosPersonaParaAction(Persona $persona, UserRequest $request): array
+    {
+        return array_merge([
+            'ci' => $persona->ci,
+            'nombres' => $persona->nombres,
+            'paterno' => $persona->paterno,
+            'materno' => $persona->materno,
+            'celular' => $persona->celular,
+            'direccion' => $persona->direccion,
+            'fecha_nacimiento' => $persona->fecha_nacimiento?->format('Y-m-d'),
+            'estado_persona' => $persona->estado_persona,
+        ], $request->validated(), [
+            'crear_usuario' => true,
+        ]);
     }
 }

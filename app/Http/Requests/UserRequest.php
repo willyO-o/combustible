@@ -4,7 +4,6 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 class UserRequest extends FormRequest
 {
@@ -16,27 +15,47 @@ class UserRequest extends FormRequest
     public function rules(): array
     {
         $usuario = $this->route('usuario');
-        $isEdit  = $this->isMethod('PUT') || $this->isMethod('PATCH');
+        $isEdit = $this->isMethod('PUT') || $this->isMethod('PATCH');
+        // En edición, una cuenta de sistema sin persona vinculada (ej. administradores
+        // sembrados directamente) no tiene tipo/rol operativo que gestionar aquí.
+        $requiereTipo = ! $isEdit || $usuario?->persona !== null;
 
         return [
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($usuario?->id)],
-            'password' => $isEdit
-                ? ['nullable', 'string', Password::min(8)->letters()->numbers()]
-                : ['required', 'string', Password::min(8)->letters()->numbers(), 'confirmed'],
-            'password_confirmation' => $isEdit ? ['nullable'] : ['required'],
-            'roles'    => ['nullable', 'array'],
-            'roles.*'  => ['integer', 'exists:rol,id'],
+            'id_persona' => [
+                Rule::requiredIf(! $isEdit),
+                'exists:persona,id',
+                Rule::unique('users', 'id_persona'),
+            ],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($usuario?->id)],
+            'estado_usuario' => ['required', Rule::in(['ACTIVO', 'INACTIVO'])],
+
+            'tipo' => ['nullable', Rule::requiredIf($requiereTipo), Rule::in(['conductor', 'jefe-area', 'personal'])],
+
+            'estado_conductor' => ['required_if:tipo,conductor', Rule::in(['ACTIVO', 'INACTIVO', 'RETIRADO'])],
+            'id_vehiculo' => ['nullable', 'exists:vehiculo,id'],
+            'fecha_asignacion' => ['nullable', 'date'],
+
+            'id_area' => ['required_if:tipo,jefe-area', 'exists:area,id'],
+            'tipo_encargo' => ['required_if:tipo,jefe-area', Rule::in(['TITULAR', 'SUPLENTE'])],
+            'fecha_inicio_encargo' => ['nullable', 'date'],
+            'motivo_encargo' => ['nullable', 'string', 'max:255'],
         ];
     }
 
     public function attributes(): array
     {
         return [
-            'name'     => 'nombre',
-            'email'    => 'correo electrónico',
-            'password' => 'contraseña',
-            'roles'    => 'roles',
+            'id_persona' => 'persona',
+            'email' => 'correo electrónico',
+            'estado_usuario' => 'estado del usuario',
+            'tipo' => 'tipo de registro',
+            'estado_conductor' => 'estado del conductor',
+            'id_vehiculo' => 'vehículo',
+            'fecha_asignacion' => 'fecha de asignación',
+            'id_area' => 'área',
+            'tipo_encargo' => 'tipo de encargo',
+            'fecha_inicio_encargo' => 'fecha de inicio del encargo',
+            'motivo_encargo' => 'motivo',
         ];
     }
 }

@@ -86,7 +86,10 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Tipos de Vehículo', icon: Svgicons.TipoVehiculoIcon, type: 'link', path: '/tipos-vehiculo', active: false, selected: false, dirchange: false, permission: 'tipos-vehiculo.ver'
   },
   {
-    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'roles.ver', 'permisos.ver']
+    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'roles.ver', 'permisos.ver']
+  },
+  {
+    title: 'Personas', icon: Svgicons.UsuarioIcon, type: 'link', path: '/personas', active: false, selected: false, dirchange: false, permission: 'personas.ver'
   },
   {
     title: 'Usuarios', icon: Svgicons.UsuarioIcon, type: 'link', path: '/usuarios', active: false, selected: false, dirchange: false, permission: 'usuarios.ver'

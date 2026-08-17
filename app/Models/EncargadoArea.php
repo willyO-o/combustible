@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
 #[Fillable([
     'id_persona',
@@ -13,10 +13,10 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'fecha_reasignacion',
     'fecha_fin',
     'motivo',
-    'estado_encargo'
+    'estado_encargo',
 ])]
 
-class EncargadoArea extends Model
+class EncargadoArea extends Pivot
 {
     //
     protected $table = 'encargado_area';

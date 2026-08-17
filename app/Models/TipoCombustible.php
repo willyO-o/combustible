@@ -2,16 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
 #[Fillable([
     'tipo_combustible',
     'estado_tipo_combustible',
 ])]
 class TipoCombustible extends Model
 {
-    protected $table = 'tipo_combustible';
+    use HasFactory;
 
+    protected $table = 'tipo_combustible';
 
     // Relaciones
     public function vehiculos()

@@ -3,8 +3,11 @@
 use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\CargasCombustibleReportController;
 use App\Http\Controllers\ConductorController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GrifoController;
 use App\Http\Controllers\MantenimientoController;
+use App\Http\Controllers\OperacionDiariaController;
+use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TipoCombustibleController;
 use App\Http\Controllers\TipoMantenimientoController;
@@ -12,13 +15,13 @@ use App\Http\Controllers\TipoVehiculoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValeController;
 use App\Http\Controllers\VehiculoController;
-use App\Http\Controllers\OperacionDiariaController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return redirect()->route('login');
+
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
@@ -39,7 +42,7 @@ Route::get('/api/documentation', function () {
 //     return Inertia::render('Dashboard');
 // })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
+Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -49,6 +52,10 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('conductores', ConductorController::class)
         ->parameters(['conductores' => 'conductor']);
+
+    Route::resource('personas', PersonaController::class)
+        ->parameters(['personas' => 'persona'])
+        ->except(['show']);
 
     Route::resource('tipos-combustible', TipoCombustibleController::class)
         ->parameters(['tipos-combustible' => 'tipoCombustible']);
@@ -60,10 +67,13 @@ Route::middleware('auth')->group(function () {
         ->parameters(['tipos-vehiculo' => 'tipoVehiculo']);
 
     // Usuarios
-    Route::get('usuarios/{usuario}/password',  [UserController::class, 'editPassword'])->name('usuarios.edit-password');
-    Route::put('usuarios/{usuario}/password',  [UserController::class, 'updatePassword'])->name('usuarios.update-password');
+    Route::get('usuarios/{usuario}/password', [UserController::class, 'editPassword'])->name('usuarios.edit-password');
+    Route::put('usuarios/{usuario}/password', [UserController::class, 'updatePassword'])->name('usuarios.update-password');
+    Route::patch('usuarios/{usuario}/estado', [UserController::class, 'cambiarEstado'])->name('usuarios.estado');
+    Route::get('/search/personas-sin-usuario', [UserController::class, 'searchPersonasSinUsuario'])->name('search.personas-sin-usuario');
     Route::resource('usuarios', UserController::class)
-        ->parameters(['usuarios' => 'usuario']);
+        ->parameters(['usuarios' => 'usuario'])
+        ->except(['destroy', 'show']);
 
     Route::resource('grifos', GrifoController::class)
         ->parameters(['grifos' => 'grifo']);
@@ -72,9 +82,9 @@ Route::middleware('auth')->group(function () {
         ->parameters(['vehiculos' => 'vehiculo']);
 
     // Vales
-    Route::get('/search/vehiculos',   [ValeController::class, 'searchVehiculos'])->name('search.vehiculos');
+    Route::get('/search/vehiculos', [ValeController::class, 'searchVehiculos'])->name('search.vehiculos');
     Route::get('/search/conductores', [ValeController::class, 'searchConductores'])->name('search.conductores');
-    Route::get('/search/grifos',      [ValeController::class, 'searchGrifos'])->name('search.grifos');
+    Route::get('/search/grifos', [ValeController::class, 'searchGrifos'])->name('search.grifos');
 
     Route::resource('vales', ValeController::class)
         ->parameters(['vales' => 'vale']);
@@ -83,7 +93,7 @@ Route::middleware('auth')->group(function () {
 
     // Cargas de Combustible
     Route::get('/cargas-combustible/vehiculo-info/{id}', [CargaCombustibleController::class, 'vehiculoInfo'])->name('cargas.vehiculo-info');
-    Route::get('/search/vales-carga',                    [CargaCombustibleController::class, 'searchVales'])->name('search.vales-carga');
+    Route::get('/search/vales-carga', [CargaCombustibleController::class, 'searchVales'])->name('search.vales-carga');
     Route::resource('cargas', CargaCombustibleController::class)
         ->parameters(['cargas' => 'carga']);
 
@@ -91,20 +101,20 @@ Route::middleware('auth')->group(function () {
     // Paso 1: Solicitudes (Chofer registra solicitud/alarma)
     Route::prefix('mantenimiento')->name('mantenimiento.')->group(function () {
         // Solicitudes
-        Route::get('solicitudes',               [MantenimientoController::class, 'indexSolicitudes'])->name('solicitudes.index');
-        Route::get('solicitudes/crear',         [MantenimientoController::class, 'createSolicitud'])->name('solicitudes.create');
-        Route::post('solicitudes',              [MantenimientoController::class, 'storeSolicitud'])->name('solicitudes.store');
-        Route::get('solicitudes/{solicitud}',   [MantenimientoController::class, 'showSolicitud'])->name('solicitudes.show');
-        Route::get('solicitud-imprimir/{solicitud}',   [MantenimientoController::class, 'imprimirSolicitud'])->name('solicitudes.imprimir');
+        Route::get('solicitudes', [MantenimientoController::class, 'indexSolicitudes'])->name('solicitudes.index');
+        Route::get('solicitudes/crear', [MantenimientoController::class, 'createSolicitud'])->name('solicitudes.create');
+        Route::post('solicitudes', [MantenimientoController::class, 'storeSolicitud'])->name('solicitudes.store');
+        Route::get('solicitudes/{solicitud}', [MantenimientoController::class, 'showSolicitud'])->name('solicitudes.show');
+        Route::get('solicitud-imprimir/{solicitud}', [MantenimientoController::class, 'imprimirSolicitud'])->name('solicitudes.imprimir');
 
         // Órdenes de trabajo (Paso 2 – Jefe de Transportes)
-        Route::get('ordenes',                   [MantenimientoController::class, 'indexOrdenes'])->name('ordenes.index');
-        Route::get('ordenes/crear',             [MantenimientoController::class, 'createOrden'])->name('ordenes.create');
-        Route::post('ordenes',                  [MantenimientoController::class, 'storeOrden'])->name('ordenes.store');
-        Route::get('ordenes/{orden}',           [MantenimientoController::class, 'showOrden'])->name('ordenes.show');
-        Route::get('ordenes/{orden}/editar',    [MantenimientoController::class, 'editOrden'])->name('ordenes.edit');
-        Route::put('ordenes/{orden}',           [MantenimientoController::class, 'updateOrden'])->name('ordenes.update');
-        Route::patch('ordenes/{orden}/estado',  [MantenimientoController::class, 'cambiarEstadoOrden'])->name('ordenes.estado');
+        Route::get('ordenes', [MantenimientoController::class, 'indexOrdenes'])->name('ordenes.index');
+        Route::get('ordenes/crear', [MantenimientoController::class, 'createOrden'])->name('ordenes.create');
+        Route::post('ordenes', [MantenimientoController::class, 'storeOrden'])->name('ordenes.store');
+        Route::get('ordenes/{orden}', [MantenimientoController::class, 'showOrden'])->name('ordenes.show');
+        Route::get('ordenes/{orden}/editar', [MantenimientoController::class, 'editOrden'])->name('ordenes.edit');
+        Route::put('ordenes/{orden}', [MantenimientoController::class, 'updateOrden'])->name('ordenes.update');
+        Route::patch('ordenes/{orden}/estado', [MantenimientoController::class, 'cambiarEstadoOrden'])->name('ordenes.estado');
 
         // Ejecución / registro de trabajo realizado (Paso 3 – Jefe de Transportes)
         Route::get('ordenes/{orden}/ejecucion', [MantenimientoController::class, 'createEjecucion'])->name('ordenes.ejecucion.create');
@@ -118,10 +128,7 @@ Route::middleware('auth')->group(function () {
 
     });
 
-        Route::get('reportes/operacion-diaria/pdf/{operacionDiaria}', [OperacionDiariaController::class, 'generarPDF'])->name('operacion-diaria.reporte.pdf');
-
-
-
+    Route::get('reportes/operacion-diaria/pdf/{operacionDiaria}', [OperacionDiariaController::class, 'generarPDF'])->name('operacion-diaria.reporte.pdf');
 
     //  Actividades de los operadores de transporte
     Route::post('operacion-diaria/verificar', [OperacionDiariaController::class, 'verificarOperacion'])->name('operacion-diaria.verificar');
@@ -133,4 +140,4 @@ Route::middleware('auth')->group(function () {
 
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 #[Fillable([
@@ -13,9 +14,9 @@ use Illuminate\Support\Facades\DB;
 ])]
 class Area extends Model
 {
-    //
-    protected $table = 'area';
+    use HasFactory;
 
+    protected $table = 'area';
 
     public function vehiculos()
     {
@@ -97,7 +98,7 @@ class Area extends Model
         });
     }
 
-    public  function encargadosUser()
+    public function encargadosUser()
     {
         return $this->belongsToMany(
             User::class,

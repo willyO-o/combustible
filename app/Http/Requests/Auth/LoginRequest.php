@@ -50,6 +50,14 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if (Auth::user()->estado_usuario === 'INACTIVO') {
+            Auth::logout();
+
+            throw ValidationException::withMessages([
+                'email' => 'Esta cuenta ha sido dada de baja.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

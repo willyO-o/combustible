@@ -12,14 +12,13 @@ use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
-
-
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'id_persona', 'estado_usuario'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements JWTSubject
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
     use HasRoles;
 
     public function getJWTIdentifier(): mixed
@@ -49,23 +48,4 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasOne(Persona::class, 'id', 'id_persona');
     }
-
-
-
-
-
-
-
-    static function boot(): void
-    {
-        parent::boot();
-
-        static::created(function ($user) {
-            $user->roles()->attach(1); // Asignar el rol con ID 2 al usuario recién creado
-        });
-
-        //
-    }
-
-
 }

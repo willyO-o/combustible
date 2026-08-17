@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'nro_placa',
@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 ])]
 class Vehiculo extends Model
 {
-    use SoftDeletes, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'vehiculo';
 
@@ -40,8 +40,9 @@ class Vehiculo extends Model
     public function getUrlFotografiaAttribute()
     {
         if ($this->fotografia) {
-            return asset('storage/' . $this->fotografia);
+            return asset('storage/'.$this->fotografia);
         }
+
         return null;
     }
 
@@ -75,6 +76,7 @@ class Vehiculo extends Model
             'id_conductor'         // Llave foránea en la tabla Asignacion que apunta al Conductor
         )->where('asignacion.estado_asignacion', 'ACTIVO');
     }
+
     public function conductores()
     {
         return $this->hasManyThrough(
@@ -100,14 +102,13 @@ class Vehiculo extends Model
         });
     }
 
-
     public function conductoresAsignadosOpt()
     {
         return $this->conductoresAsignados->map(function ($conductor) {
             return [
                 'id' => $conductor->id,
                 'label' => "{$conductor->persona->nombre_completo} (CI: {$conductor->persona->ci})",
-                'meta' => []
+                'meta' => [],
             ];
         });
     }
@@ -146,7 +147,7 @@ class Vehiculo extends Model
                 'fecha_asignacion',
                 'fecha_reasignacion',
                 'fecha_culminacion',
-                'estado_asignacion'
+                'estado_asignacion',
             ])
             ->withTimestamps();
     }

@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use \Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'ci',
@@ -20,11 +21,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 
 class Persona extends Model
 {
-    //
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'persona';
-
 
     protected function casts(): array
     {
@@ -33,8 +32,8 @@ class Persona extends Model
         ];
     }
 
-    //agregar campos para foto en appends
-    protected $appends = ['foto_url', 'edad', 'f_nacimiento_formatted', 'nombre_completo'];
+    // agregar campos para foto en appends
+    protected $appends = ['foto_url', 'edad', 'f_nacimiento_formatted', 'nombre_completo', 'tipo_actual'];
 
     public function getNombreCompletoAttribute()
     {
@@ -43,7 +42,7 @@ class Persona extends Model
 
     public function getEdadAttribute()
     {
-        return  $this->fecha_nacimiento ? $this->fecha_nacimiento->age : null;
+        return $this->fecha_nacimiento ? $this->fecha_nacimiento->age : null;
     }
 
     public function getFNacimientoFormattedAttribute()
@@ -53,7 +52,29 @@ class Persona extends Model
 
     public function getFotoUrlAttribute()
     {
-        return $this->foto ? asset('storage/' . $this->foto) : null;
+        return $this->foto ? asset('storage/'.$this->foto) : null;
+    }
+
+    /**
+     * Rol operativo actual de la persona, derivado de sus registros
+     * relacionados: 'conductor', 'jefe-area', 'personal' (solo tiene
+     * usuario) o null (sin usuario ni rol asignado).
+     */
+    public function getTipoActualAttribute()
+    {
+        if ($this->conductor) {
+            return 'conductor';
+        }
+
+        if ($this->encargadoAreas()->exists()) {
+            return 'jefe-area';
+        }
+
+        if ($this->user) {
+            return 'personal';
+        }
+
+        return null;
     }
 
     public function user()
@@ -86,7 +107,7 @@ class Persona extends Model
             'id_persona',
             'id_area'
         )->using(EncargadoArea::class)
-        ->withPivot('id', 'tipo_encargo', 'fecha_inicio', 'fecha_reasignacion', 'fecha_fin', 'motivo', 'estado_encargo');
+            ->withPivot('id', 'tipo_encargo', 'fecha_inicio', 'fecha_reasignacion', 'fecha_fin', 'motivo', 'estado_encargo');
     }
 
     public function encargadoAreas()
