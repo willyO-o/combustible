@@ -44,9 +44,9 @@ class CargaCombustibleRequest extends FormRequest
                 return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
             }), 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
             'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id'],
-            'id_grifo' => ['required', 'integer', 'exists:grifo,id'],
-            'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
-            'id_conductor' => [$this->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
+            // 'id_grifo' => ['required', 'integer', 'exists:grifo,id'],
+            // 'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
+            // 'id_conductor' => [$this->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
             'id_vale' => ['nullable', 'integer', 'exists:vale,id',
                 Rule::when($this->filled('id_vale') && ! $valeSinCambios, [
                     Rule::exists('vale', 'id')->where(function ($query) {

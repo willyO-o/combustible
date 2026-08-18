@@ -70,6 +70,14 @@ tags:
     description: Registro, consulta, actualización y eliminación de las operaciones diarias de los vehículos, incluyendo las actividades realizadas en cada una.
   - name: Vales
     description: Consulta, registro, actualización y eliminación de vales de combustible.
+  - name: Carga de Combustible
+    description: Registro y consulta de cargas de combustible efectuadas por los conductores, junto con sus respaldos digitales (facturas, notas, comprobantes).
+  - name: Solicitudes de Mantenimiento
+    description: |
+      Paso 1 del flujo de mantenimiento: el conductor (o quien registre en su nombre) reporta
+      una solicitud o alarma de mantenimiento preventivo/correctivo para un vehículo. Por ahora
+      solo se documentan los endpoints de **listado** y **registro**; el resto del flujo
+      (aprobación, orden de trabajo, ejecución) se documentará más adelante, una vez probado.
 
 security:
   - bearerAuth: []
@@ -801,6 +809,12 @@ paths:
         Lista paginada de vales de combustible, ordenados por `nro_vale` y `gestion`
         descendente.
 
+        **Siempre** queda restringida a vales pendientes y vigentes: el controlador invoca
+        `ListValeAction::execute()` con `soloPendientes = true` de forma fija (a diferencia de
+        `GET /vales/pendientes`, que expone el mismo comportamiento en un formato distinto, este
+        endpoint sí acepta filtros adicionales). Esto agrega siempre, sin importar los filtros
+        recibidos, las condiciones `estado_vale = PENDIENTE` **y** `fecha_vencimiento >= ahora`.
+
         Las restricciones de visibilidad dependen del rol del usuario autenticado:
         - **conductor**: solo ve sus propios vales (`id_conductor` = persona del usuario).
         - Otros roles: sin restricción adicional.
@@ -824,7 +838,11 @@ paths:
           example: "2026-08-31"
         - name: estado_vale
           in: query
-          description: Filtra por estado exacto del vale.
+          description: |
+            Filtra por estado exacto del vale. **En la práctica solo `PENDIENTE` puede devolver
+            resultados**: como el endpoint ya restringe siempre a `estado_vale = PENDIENTE` (ver
+            arriba), enviar `USADO` o `ANULADO` aquí combina ambas condiciones con `AND` y la
+            consulta nunca encuentra coincidencias (lista vacía).
           schema:
             type: string
             enum: [PENDIENTE, USADO, ANULADO]
@@ -966,6 +984,364 @@ paths:
                 total: 2
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /vales/pendientes:
+    get:
+      tags: [Vales]
+      summary: Listar vales pendientes (formato simplificado, sin paginar)
+      description: |
+        Devuelve los vales con `estado_vale = PENDIENTE` y `fecha_vencimiento >= ahora`, utilizado para el select del vale en la carga
+        del combustible en un
+        formato aplanado (sin las claves de paginación de Laravel — solo `data`).
+
+        A diferencia de `GET /vales`, **no acepta ningún filtro de query** (`nro_vale`,
+        `fecha_desde`, `fecha_hasta`, `estado_vale`, `id_conductor` son ignorados; el
+        controlador llama a `ListValeAction::execute([], ...)` con el arreglo de filtros vacío
+        de forma fija). Las restricciones de visibilidad por rol son las mismas que en
+        `GET /vales`:
+        - **conductor**: solo ve sus propios vales (`id_conductor` = persona del usuario).
+
+        **Nota técnica:** el campo `grifo` de cada vale devuelto **no** refleja el grifo real
+        del vale (`id_grifo`) — el controlador lo hardcodea siempre con el mismo objeto fijo
+        (`id: 3, razon_social: "Combustibles Oruro S.R.L.", ciudad: "Oruro"`). Se documenta tal
+        como se comporta hoy.
+      parameters:
+        - name: per_page
+          in: query
+          description: Cantidad de resultados por página.
+          schema: { type: integer, default: 10 }
+          example: 10
+        - name: page
+          in: query
+          description: |
+            Número de página a obtener (paginación estándar de Laravel — `Builder::paginate()`
+            lo resuelve automáticamente desde este query param). Si se omite, se asume `1`. La
+            respuesta no incluye metadatos para saber si existe una página siguiente.
+          schema: { type: integer, default: 1, minimum: 1 }
+          example: 1
+      responses:
+        '200':
+          description: Listado (sin metadatos de paginación) de vales pendientes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValePendienteResponse'
+              example:
+                data:
+                  - id: 2
+                    nro_vale: 2
+                    nro: "000002/2026"
+                    gestion: 2026
+                    fecha_emision: "2026-08-14 21:42"
+                    fecha_vencimiento: "2026-08-14 22:42"
+                    litros: "30.00"
+                    precio: "6.97"
+                    id_vehiculo: 1
+                    id_conductor: 1
+                    id_grifo: 2
+                    estado_vale: PENDIENTE
+                    id_tipo_combustible: 3
+                    id_user: 2
+                    grifo:
+                      id: 3
+                      razon_social: Combustibles Oruro S.R.L.
+                      ciudad: Oruro
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ──────────────────────────────────────────────────────────────────────
+  # CARGA DE COMBUSTIBLE
+  # ──────────────────────────────────────────────────────────────────────
+  /cargas:
+    get:
+      tags: [Carga de Combustible]
+      summary: Listar cargas de combustible
+      description: |
+        Lista paginada de cargas de combustible, ordenadas por `fecha_carga` e `id` descendente.
+
+        Las restricciones de visibilidad dependen del rol del usuario autenticado:
+        - **conductor**: solo ve sus propias cargas (`id_conductor` = persona del usuario).
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: nro_placa
+          in: query
+          description: Filtra por placa o código del vehículo (coincidencia parcial).
+          schema: { type: string }
+          example: 1234-ABC
+        - name: fecha_desde
+          in: query
+          description: Filtra cargas cuya `fecha_carga` sea igual o posterior a esta fecha.
+          schema: { type: string, format: date }
+          example: "2026-08-01"
+        - name: fecha_hasta
+          in: query
+          description: Filtra cargas cuya `fecha_carga` sea igual o anterior a esta fecha.
+          schema: { type: string, format: date }
+          example: "2026-08-31"
+        - name: tipo_carga
+          in: query
+          description: Filtra por tipo exacto de carga.
+          schema: { type: string, enum: [VALE, PREPAGO] }
+          example: PREPAGO
+        - name: estado_carga
+          in: query
+          description: Filtra por estado exacto de la carga.
+          schema: { type: string, enum: [REGISTRADO, VERIFICADO, ANULADO] }
+          example: REGISTRADO
+        - name: per_page
+          in: query
+          description: Cantidad de resultados por página.
+          schema: { type: integer, default: 10 }
+          example: 10
+        - name: page
+          in: query
+          description: |
+            Número de página a obtener (paginación estándar de Laravel — `Builder::paginate()`
+            lo resuelve automáticamente desde este query param). Si se omite, se asume `1`.
+          schema: { type: integer, default: 1, minimum: 1 }
+          example: 1
+      responses:
+        '200':
+          description: Listado paginado de cargas de combustible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargaCombustiblePaginada'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Carga de Combustible]
+      summary: Registrar una nueva carga de combustible
+      description: |
+        Registra una carga de combustible junto con sus respaldos digitales.
+
+        **Debe enviarse obligatoriamente como `multipart/form-data`** (no `application/json`),
+        ya que el campo `respaldos` adjunta uno o más archivos (imagen o PDF) por carga.
+
+        `id_usuario` se asigna automáticamente al usuario autenticado (evento `creating` del
+        modelo `CargaCombustible`) y no debe enviarse.
+
+        ## Reglas condicionales relevantes
+
+        - `litros` y `precio` son obligatorios **solo si no se envía `id_vale`**. Si se envía
+          `id_vale`, ambos valores se ignoran y se copian automáticamente desde el vale
+          referenciado.
+        - `kilometraje` es obligatorio si el vehículo indicado (`id_vehiculo`) tiene
+          `tipo_medicion = kilometraje`; `horometro` es obligatorio si tiene
+          `tipo_medicion = horometro`. En ambos casos, el valor no puede ser inferior a la
+          última lectura registrada para ese vehículo (regla `GreaterThanPreviousReading`,
+          comparada contra la carga más reciente de ese `id_vehiculo`).
+        - `id_conductor` es obligatorio si el usuario autenticado tiene el rol `conductor`;
+          opcional para el resto de roles.
+        - Si se envía `id_vale`, debe referenciar un vale con `estado_vale = PENDIENTE`, del
+          mismo `id_vehiculo`, y aún no vencido (`fecha_vencimiento > ahora`). Al registrarse la
+          carga, ese vale queda marcado como `USADO`.
+
+        ## Envío de los respaldos digitales (`respaldos`)
+
+        `respaldos` es un arreglo; cada elemento agrega **dos** campos al `multipart/form-data`
+        usando la notación de arreglos de PHP, con `archivo` (el binario) y `tipo` (texto):
+
+        ```
+        respaldos[0][archivo] = (factura.jpg)
+        respaldos[0][tipo]    = FACTURA
+        respaldos[1][archivo] = (nota.pdf)
+        respaldos[1][tipo]    = NOTA
+        ```
+
+        Por cada elemento con archivo presente: el tipo de archivo (`IMAGEN` o `PDF`) se
+        detecta automáticamente según el MIME type del binario recibido, el archivo se guarda
+        en `storage/respaldos/{IMAGEN|PDF}`, y se crea un registro en `respaldo_digital` con
+        `tipo_respaldo` = el `tipo` enviado para ese mismo índice (`OTRO` si se omite). Ver los
+        valores válidos de `tipo` en `GET /parametros/colecciones` →
+        `cargas_combustible.tipos_respaldo_digital`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CargaCombustibleStoreRequest'
+      responses:
+        '201':
+          description: Carga de combustible creada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargaCombustibleStoreResponse'
+              example:
+                message: Carga de combustible creada exitosamente
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              example:
+                message: The given data was invalid.
+                errors:
+                  fecha_carga: ["El campo fecha de carga es obligatorio."]
+                  id_vehiculo: ["El campo vehículo es obligatorio."]
+                  tipo_carga: ["El campo tipo de carga es obligatorio."]
+                  kilometraje: ["El kilometraje es obligatorio para vehículos con medición por kilometraje."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Error inesperado al crear la carga de combustible.
+          content:
+            application/json:
+              example:
+                message: Error al crear la carga de combustible.
+                error: "SQLSTATE[23000]: Integrity constraint violation..."
+
+  # ──────────────────────────────────────────────────────────────────────
+  # SOLICITUDES DE MANTENIMIENTO
+  # ──────────────────────────────────────────────────────────────────────
+  /solicitudes-mantenimiento:
+    get:
+      tags: [Solicitudes de Mantenimiento]
+      summary: Listar solicitudes de mantenimiento
+      description: |
+        Lista paginada de solicitudes de mantenimiento, ordenadas por `id` descendente.
+
+        Las restricciones de visibilidad dependen del rol del usuario autenticado:
+        - **conductor**: solo ve sus propias solicitudes (`id_conductor` = persona del usuario).
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: estado
+          in: query
+          description: Filtra por estado exacto de la solicitud.
+          schema: { type: string, enum: [PENDIENTE, APROBADA, RECHAZADA, ANULADA] }
+          example: PENDIENTE
+        - name: tipo_mantenimiento
+          in: query
+          description: Filtra por tipo exacto de mantenimiento.
+          schema: { type: string, enum: [PREVENTIVO, CORRECTIVO] }
+          example: PREVENTIVO
+        - name: id_vehiculo
+          in: query
+          description: Filtra por vehículo.
+          schema: { type: integer }
+          example: 1
+        - name: per_page
+          in: query
+          description: Cantidad de resultados por página.
+          schema: { type: integer, default: 10 }
+          example: 10
+        - name: page
+          in: query
+          description: |
+            Número de página a obtener (paginación estándar de Laravel — `Builder::paginate()`
+            lo resuelve automáticamente desde este query param). Si se omite, se asume `1`.
+          schema: { type: integer, default: 1, minimum: 1 }
+          example: 1
+      responses:
+        '200':
+          description: Listado paginado de solicitudes de mantenimiento.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudMantenimientoPaginada'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Solicitudes de Mantenimiento]
+      summary: Registrar una nueva solicitud de mantenimiento
+      description: |
+        Registra una nueva solicitud/alarma de mantenimiento para un vehículo (Paso 1 del
+        flujo de mantenimiento).
+
+        Se envía como `application/json`. Los siguientes campos se calculan/asignan
+        automáticamente en el servidor y **no deben enviarse**:
+        - `nro_solicitud` y `gestion`: correlativo autogenerado dentro de la gestión actual
+          (si el mes actual es noviembre o diciembre, la gestión ya corresponde al año
+          siguiente).
+        - `estado`: siempre queda en `PENDIENTE` al registrar.
+        - `id_usuario_registra`: el usuario autenticado.
+        - `id_conductor`: si se omite y el usuario autenticado tiene el rol `conductor`, se
+          asigna automáticamente su propia persona (`id_conductor` = `id_persona` del usuario).
+          Para el resto de roles, si se omite, la solicitud queda sin conductor asociado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudMantenimientoStoreRequest'
+            example:
+              id_vehiculo: "1"
+              tipo_mantenimiento: PREVENTIVO
+              descripcion_problema: hay derrame de aceite
+              kilometraje_actual: "123"
+              horometro_actual: ""
+              fecha_solicitud: "2026-08-18T00:24"
+              observacion: "a sdasdasd asdasdasdasdasd"
+      responses:
+        '201':
+          description: Solicitud de mantenimiento registrada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudMantenimientoStoreResponse'
+              example:
+                message: Solicitud de mantenimiento registrada exitosamente.
+                data:
+                  id: 12
+                  id_vehiculo: 1
+                  nro_solicitud: 12
+                  gestion: 2026
+                  id_conductor: 1
+                  id_usuario_registra: 2
+                  tipo_mantenimiento: PREVENTIVO
+                  descripcion_problema: hay derrame de aceite
+                  kilometraje_actual: 123
+                  horometro: null
+                  fecha_solicitud: "2026-08-18T00:24:00.000000Z"
+                  estado: PENDIENTE
+                  observacion: "a sdasdasd asdasdasdasdasd"
+                  nro: "000012"
+                  fecha: "18/08/2026"
+                  created_at: "2026-08-17T14:30:00.000000Z"
+                  updated_at: "2026-08-17T14:30:00.000000Z"
+                  vehiculo:
+                    id: 1
+                    nro_placa: 148-JLK
+                    codigo: PM-TRA-0001
+                    marca: Volvo
+                    tipo_medicion: kilometraje
+                  conductor:
+                    id: 1
+                    persona:
+                      id: 1
+                      nombres: Juan
+                      paterno: García
+                      materno: López
+                  usuarioRegistra:
+                    id: 2
+                    name: Jefe de Transportes
+                    email: jefe@example.com
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              example:
+                message: The given data was invalid.
+                errors:
+                  id_vehiculo: ["Debe seleccionar un vehículo."]
+                  tipo_mantenimiento: ["Debe indicar el tipo de mantenimiento."]
+                  descripcion_problema: ["La descripción del problema o mantenimiento es obligatoria."]
+                  fecha_solicitud: ["La fecha de solicitud es obligatoria."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Error inesperado al registrar la solicitud de mantenimiento.
+          content:
+            application/json:
+              example:
+                message: Error al registrar la solicitud de mantenimiento.
+                error: "SQLSTATE[23000]: Integrity constraint violation..."
 
 components:
   securitySchemes:
@@ -1547,3 +1923,444 @@ components:
         prev_page_url: { type: string, nullable: true, example: null }
         to: { type: integer, nullable: true, example: 2 }
         total: { type: integer, example: 2 }
+
+    ValePendiente:
+      type: object
+      description: |
+        Representación aplanada de un vale, devuelta únicamente por `GET /vales/pendientes`
+        (distinta del recurso `Vale` estándar: sin `fecha_emision_f`/`fecha_vencimiento_f`, y
+        con `grifo` fijo — ver la nota técnica del endpoint).
+      properties:
+        id: { type: integer, example: 2 }
+        nro_vale: { type: integer, example: 2 }
+        nro: { type: string, description: "`nro_vale` formateado con ceros a la izquierda (6 dígitos) seguido de `/gestion`.", example: "000002/2026" }
+        gestion: { type: integer, example: 2026 }
+        fecha_emision: { type: string, description: "Formateada como `Y-m-d H:i`.", example: "2026-08-14 21:42" }
+        fecha_vencimiento: { type: string, description: "Formateada como `Y-m-d H:i`.", example: "2026-08-14 22:42" }
+        litros: { type: string, example: "30.00" }
+        precio: { type: string, example: "6.97" }
+        id_vehiculo: { type: integer, example: 1 }
+        id_conductor: { type: integer, example: 1 }
+        id_grifo: { type: integer, description: "Grifo real del vale — no confundir con el objeto `grifo` de esta misma respuesta (ver nota técnica).", example: 2 }
+        estado_vale: { type: string, enum: [PENDIENTE], example: PENDIENTE }
+        id_tipo_combustible: { type: integer, example: 3 }
+        id_user: { type: integer, example: 2 }
+        grifo:
+          type: object
+          description: "**Siempre el mismo valor fijo, sin relación con `id_grifo`** (ver nota técnica del endpoint)."
+          properties:
+            id: { type: integer, example: 3 }
+            razon_social: { type: string, example: Combustibles Oruro S.R.L. }
+            ciudad: { type: string, example: Oruro }
+
+    ValePendienteResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ValePendiente' }
+
+    # ── Genéricos de modelo completo (sin restricción de columnas) ──────
+    # Usados por Carga de Combustible y Solicitudes de Mantenimiento: a
+    # diferencia de `VehiculoAsignado`/`Grifo`/`TipoCombustible`/`ValeConductor`
+    # (que sí restringen columnas en su `with()`), estos endpoints cargan las
+    # relaciones sin `select` ni `'relacion:col1,col2'`, por lo que devuelven
+    # el modelo completo tal cual está en base de datos.
+    Vehiculo:
+      type: object
+      description: Vehículo completo (todas las columnas), a diferencia de `VehiculoAsignado`.
+      properties:
+        id: { type: integer, example: 8 }
+        uuid: { type: string, format: uuid, example: 3fa85f64-5717-4562-b3fc-2c963f66afa6 }
+        nro_placa: { type: string, nullable: true, example: 1234-ABC }
+        codigo: { type: string, nullable: true, example: VOLQ-08 }
+        anio: { type: string, nullable: true, example: "2018" }
+        modelo: { type: string, nullable: true, example: FMX }
+        marca: { type: string, nullable: true, example: Volvo }
+        estado_vehiculo: { type: string, enum: [ACTIVO, RETIRADO, VENDIDO], example: ACTIVO }
+        id_tipo_combustible: { type: integer, example: 1 }
+        id_tipo_vehiculo: { type: integer, example: 3 }
+        fotografia: { type: string, nullable: true, description: Ruta relativa en el disco `public`., example: vehiculos/volq-08.jpg }
+        url_fotografia: { type: string, nullable: true, example: http://localhost/storage/vehiculos/volq-08.jpg }
+        detalles: { type: string, nullable: true }
+        tipo_medicion: { type: string, enum: [kilometraje, horometro], example: kilometraje }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, nullable: true }
+
+    Persona:
+      type: object
+      description: Persona completa (todas las columnas), tal como se devuelve dentro de `Conductor`.
+      properties:
+        id: { type: integer, example: 1 }
+        ci: { type: string, example: "1234567" }
+        nombres: { type: string, example: Juan }
+        paterno: { type: string, nullable: true, example: García }
+        materno: { type: string, nullable: true, example: López }
+        foto: { type: string, nullable: true, example: conductores/juan.jpg }
+        foto_url: { type: string, nullable: true, example: http://localhost/storage/conductores/juan.jpg }
+        celular: { type: string, nullable: true, example: "70012345" }
+        direccion: { type: string, nullable: true, example: "Av. Siempre Viva" }
+        fecha_nacimiento: { type: string, format: date, nullable: true, example: "1990-05-15" }
+        estado_persona: { type: string, enum: [ACTIVO, INACTIVO, RETIRADO], example: ACTIVO }
+        edad: { type: integer, nullable: true, example: 36 }
+        f_nacimiento_formatted: { type: string, nullable: true, example: "15/05/1990" }
+        nombre_completo: { type: string, example: Juan García López }
+        tipo_actual: { type: string, nullable: true, enum: [conductor, jefe-area, personal], example: conductor }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Conductor:
+      type: object
+      description: Conductor completo, con su `persona` cargada.
+      properties:
+        id: { type: integer, description: "Mismo valor que `persona.id` (la tabla `conductor` comparte PK con `persona`).", example: 1 }
+        estado_conductor: { type: string, enum: [ACTIVO, INACTIVO, RETIRADO], example: ACTIVO }
+        persona: { $ref: '#/components/schemas/Persona' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Usuario:
+      type: object
+      description: Usuario del sistema (p.ej. quien registró una solicitud u operación).
+      properties:
+        id: { type: integer, example: 2 }
+        name: { type: string, example: Jefe de Transportes }
+        email: { type: string, format: email, example: jefe@example.com }
+        id_persona: { type: integer, nullable: true, example: 7 }
+        estado_usuario: { type: string, enum: [ACTIVO, INACTIVO], example: ACTIVO }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    DefaultValidationErrorResponse:
+      type: object
+      description: |
+        Formato **estándar** de error de validación de Laravel (`ValidationException` sin
+        personalizar). A diferencia de `ValidationErrorResponse` (usado por endpoints cuya
+        Form Request sobreescribe `failedValidation()`, como `OperacionStoreRequest`), aquí
+        **no** se envuelve con la clave `success`, y el `message` de nivel superior queda fijo
+        en inglés (`"The given data was invalid."`) sin traducir. Los mensajes dentro de
+        `errors` sí están en español cuando la Form Request los define en `messages()`/`attributes()`,
+        o a través de `lang/es/validation.php` en caso contrario.
+      properties:
+        message: { type: string, example: "The given data was invalid." }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          example:
+            campo: ["mensaje de error"]
+
+    # ── Carga de Combustible ─────────────────────────────────────────────
+    GrifoCompleto:
+      type: object
+      description: Grifo/estación de servicio completa, a diferencia de `Grifo` (usado en `colecciones`, con columnas renombradas y restringidas).
+      properties:
+        id: { type: integer, example: 2 }
+        razon_social: { type: string, example: Gasolinera Central S.A. }
+        nit: { type: string, example: "1234567890" }
+        direccion: { type: string, nullable: true, example: "Av. 6 de Agosto" }
+        ciudad: { type: string, nullable: true, example: La Paz }
+        telefono: { type: string, nullable: true, example: "22345678" }
+        estado_grifo: { type: string, enum: [ACTIVO, INACTIVO], example: ACTIVO }
+        es_principal: { type: boolean, example: false }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    TipoCombustibleCompleto:
+      type: object
+      description: Tipo de combustible completo, a diferencia de `TipoCombustible` (usado en `colecciones`, con columnas renombradas).
+      properties:
+        id: { type: integer, example: 3 }
+        tipo_combustible: { type: string, example: Diésel }
+        estado_tipo_combustible: { type: string, enum: [ACTIVO, INACTIVO], example: ACTIVO }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CargaCombustible:
+      type: object
+      properties:
+        id: { type: integer, example: 15 }
+        fecha_carga: { type: string, description: "Formateada como `Y-m-d H:i` por el cast del modelo.", example: "2026-08-17 14:30" }
+        litros: { type: string, example: "50.00" }
+        precio: { type: string, example: "10.00" }
+        kilometraje: { type: string, nullable: true, example: "15600.00" }
+        horometro: { type: string, nullable: true, example: null }
+        id_vehiculo: { type: integer, example: 8 }
+        id_grifo: { type: integer, example: 2 }
+        id_tipo_combustible: { type: integer, example: 3 }
+        id_conductor: { type: integer, example: 1 }
+        id_vale: { type: integer, nullable: true, example: null }
+        nro_factura: { type: string, nullable: true, example: "F-00123" }
+        tipo_carga: { type: string, enum: [VALE, PREPAGO], example: PREPAGO }
+        estado_carga: { type: string, nullable: true, enum: [REGISTRADO, VERIFICADO, ANULADO], example: REGISTRADO }
+        id_usuario: { type: integer, nullable: true, description: Usuario que registró la carga (asignado automáticamente al crear)., example: 2 }
+        fecha_carga_formateada: { type: string, description: "`fecha_carga` formateada como `d/m/Y H:i`.", example: "17/08/2026 14:30" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        vehiculo: { $ref: '#/components/schemas/Vehiculo' }
+        grifo: { $ref: '#/components/schemas/GrifoCompleto' }
+        tipoCombustible: { $ref: '#/components/schemas/TipoCombustibleCompleto' }
+        conductor: { $ref: '#/components/schemas/Conductor' }
+        vale:
+          description: |
+            Presente solo si la carga se generó a partir de un vale (`id_vale` no nulo). A
+            diferencia del recurso `Vale` de `GET /vales`, aquí no vienen cargadas las
+            relaciones anidadas del vale (`vehiculo`, `conductor`, `grifo`).
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Vale'
+
+    CargaCombustiblePaginada:
+      type: object
+      description: Estructura estándar de paginación de Laravel (`LengthAwarePaginator`).
+      properties:
+        current_page: { type: integer, example: 1 }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CargaCombustible' }
+        first_page_url: { type: string, example: "http://localhost/api/v1/cargas?page=1" }
+        from: { type: integer, nullable: true, example: 1 }
+        last_page: { type: integer, example: 1 }
+        last_page_url: { type: string, example: "http://localhost/api/v1/cargas?page=1" }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              url: { type: string, nullable: true }
+              label: { type: string, example: "1" }
+              active: { type: boolean, example: true }
+        next_page_url: { type: string, nullable: true, example: null }
+        path: { type: string, example: "http://localhost/api/v1/cargas" }
+        per_page: { type: integer, example: 10 }
+        prev_page_url: { type: string, nullable: true, example: null }
+        to: { type: integer, nullable: true, example: 1 }
+        total: { type: integer, example: 1 }
+
+    CargaCombustibleStoreRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `POST /cargas`, enviado como `multipart/form-data`. `id_usuario`
+        se asigna automáticamente al usuario autenticado y no debe enviarse.
+      required: [fecha_carga, id_vehiculo, id_grifo, id_tipo_combustible, tipo_carga]
+      properties:
+        fecha_carga:
+          type: string
+          format: date-time
+          example: "2026-08-17 14:30"
+        litros:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0.01
+          maximum: 9999.99
+          description: Obligatorio si no se envía `id_vale`. Si se envía `id_vale`, este valor se ignora y se toma automáticamente del vale.
+          example: 50
+        precio:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0.01
+          maximum: 99999.99
+          description: Obligatorio si no se envía `id_vale`. Si se envía `id_vale`, este valor se ignora y se toma automáticamente del vale.
+          example: 10
+        kilometraje:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Obligatorio si el vehículo (`id_vehiculo`) tiene `tipo_medicion = kilometraje`. No puede ser menor a la última lectura registrada para ese vehículo.
+          example: 15600
+        horometro:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Obligatorio si el vehículo (`id_vehiculo`) tiene `tipo_medicion = horometro`. No puede ser menor a la última lectura registrada para ese vehículo.
+          example: null
+        id_vehiculo:
+          type: integer
+          description: Debe existir en la tabla `vehiculo`.
+          example: 8
+        id_grifo:
+          type: integer
+          description: requerido en caso de que no se envíe `id_vale`. Debe existir en la tabla `grifo` y tener `estado_grifo = ACTIVO`.
+          example: 2
+        id_tipo_combustible:
+          type: integer
+          description: requerido en caso de que no se envíe `id_vale`. Debe existir en la tabla `tipo_combustible` y tener `estado_tipo_combustible = ACTIVO`.
+          example: 3
+        id_vale:
+          type: integer
+          nullable: true
+          description: |
+            Si se envía, debe referenciar un vale con `estado_vale = PENDIENTE`, del mismo
+            `id_vehiculo`, y aún no vencido. Al registrar la carga, el vale queda marcado como
+            `USADO` y sus `litros`/`precio` se copian a la carga.
+          example: null
+        nro_factura:
+          type: string
+          nullable: true
+          maxLength: 50
+          example: "F-00123"
+        tipo_carga:
+          type: string
+          enum: [VALE, PREPAGO]
+          description: Tipo de carga de combustible. Si se envía `VALE`, `id_vale` es obligatorio y `litros`/`precio` se ignoran. Si se envía `PREPAGO`, `id_vale` debe ser nulo y `litros`/`precio` son obligatorios.
+          example: PREPAGO
+        estado_carga:
+          type: string
+          nullable: true
+          enum: [REGISTRADO, VERIFICADO, ANULADO]
+          description: Opcional; si se omite, la carga queda registrada sin estado (`null`).
+          example: REGISTRADO
+        respaldos[0][archivo]:
+          type: string
+          format: binary
+          description: |
+            Archivo (imagen o PDF) del primer respaldo digital. Repetir incrementando el
+            índice (`respaldos[1][archivo]`, `respaldos[2][archivo]`, ...) para adjuntar más de
+            un respaldo. El tipo de archivo (`IMAGEN`/`PDF`) se detecta automáticamente por su
+            MIME type. hasta 5 archivos. Tamaño máximo por archivo: 2 MB.
+        respaldos[0][tipo]:
+          type: string
+          enum: [FACTURA, NOTA, COMPROBANTE, OTRO]
+          default: OTRO
+          description: Tipo de respaldo correspondiente a cada `respaldos[0][archivo]`.
+          example: FACTURA
+
+    CargaCombustibleStoreResponse:
+      type: object
+      description: A diferencia de otros endpoints de registro de esta API, aquí la respuesta **no** incluye la carga creada (`data`).
+      properties:
+        message: { type: string, example: "Carga de combustible creada exitosamente" }
+
+    # ── Solicitudes de Mantenimiento ─────────────────────────────────────
+    SolicitudMantenimiento:
+      type: object
+      properties:
+        id: { type: integer, example: 12 }
+        id_vehiculo: { type: integer, example: 1 }
+        nro_solicitud: { type: integer, description: Correlativo autogenerado dentro de la gestión., example: 12 }
+        gestion: { type: integer, description: "Año de gestión (si la solicitud se registra en noviembre o diciembre, pertenece a la gestión del año siguiente).", example: 2026 }
+        id_conductor: { type: integer, nullable: true, example: 1 }
+        id_usuario_registra: { type: integer, nullable: true, example: 2 }
+        tipo_mantenimiento: { type: string, enum: [PREVENTIVO, CORRECTIVO], example: PREVENTIVO }
+        descripcion_problema: { type: string, example: hay derrame de aceite }
+        kilometraje_actual: { type: integer, nullable: true, example: 123 }
+        horometro:
+          type: integer
+          nullable: true
+          description: |
+            Columna presente en la base de datos, pero no expuesta actualmente en
+            `SolicitudMantenimientoRequest` ni en el `#[Fillable]` del modelo: cualquier valor
+            enviado (p.ej. `horometro_actual`) se descarta y esta columna siempre viene `null`
+            a través de esta API.
+          example: null
+        fecha_solicitud: { type: string, format: date-time, example: "2026-08-18T00:24:00.000000Z" }
+        estado: { type: string, enum: [PENDIENTE, APROBADA, RECHAZADA, ANULADA], example: PENDIENTE }
+        observacion: { type: string, nullable: true, example: "a sdasdasd asdasdasdasdasd" }
+        nro: { type: string, description: "`nro_solicitud` formateado con ceros a la izquierda (6 dígitos).", example: "000012" }
+        fecha: { type: string, description: "`fecha_solicitud` formateada como `d/m/Y`.", example: "18/08/2026" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        vehiculo: { $ref: '#/components/schemas/Vehiculo' }
+        conductor:
+          allOf: [{ $ref: '#/components/schemas/Conductor' }]
+          nullable: true
+        usuarioRegistra:
+          allOf: [{ $ref: '#/components/schemas/Usuario' }]
+          nullable: true
+        planMantenimiento:
+          type: object
+          nullable: true
+          description: |
+            Orden de trabajo generada a partir de esta solicitud (Paso 2 del flujo de
+            mantenimiento, aún no documentado). Normalmente `null` justo después del registro.
+
+    SolicitudMantenimientoPaginada:
+      type: object
+      description: Estructura estándar de paginación de Laravel (`LengthAwarePaginator`).
+      properties:
+        current_page: { type: integer, example: 1 }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/SolicitudMantenimiento' }
+        first_page_url: { type: string, example: "http://localhost/api/v1/solicitudes-mantenimiento?page=1" }
+        from: { type: integer, nullable: true, example: 1 }
+        last_page: { type: integer, example: 1 }
+        last_page_url: { type: string, example: "http://localhost/api/v1/solicitudes-mantenimiento?page=1" }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              url: { type: string, nullable: true }
+              label: { type: string, example: "1" }
+              active: { type: boolean, example: true }
+        next_page_url: { type: string, nullable: true, example: null }
+        path: { type: string, example: "http://localhost/api/v1/solicitudes-mantenimiento" }
+        per_page: { type: integer, example: 10 }
+        prev_page_url: { type: string, nullable: true, example: null }
+        to: { type: integer, nullable: true, example: 1 }
+        total: { type: integer, example: 1 }
+
+    SolicitudMantenimientoStoreRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `POST /solicitudes-mantenimiento`. `nro_solicitud`, `gestion` y
+        `estado` (siempre `PENDIENTE` al registrar) se calculan en el servidor, e
+        `id_usuario_registra` se asigna al usuario autenticado — ninguno de estos debe
+        enviarse.
+      required: [id_vehiculo, tipo_mantenimiento, descripcion_problema, fecha_solicitud]
+      properties:
+        id_vehiculo:
+          type: integer
+          description: Debe existir en la tabla `vehiculo`.
+          example: 1
+        id_conductor:
+          type: integer
+          nullable: true
+          description: |
+            Opcional. Si se omite y el usuario autenticado tiene el rol `conductor`, se asigna
+            automáticamente su propia persona (`id_conductor` = `id_persona` del usuario).
+          example: 1
+        tipo_mantenimiento:
+          type: string
+          enum: [PREVENTIVO, CORRECTIVO]
+          example: PREVENTIVO
+        descripcion_problema:
+          type: string
+          maxLength: 1000
+          example: hay derrame de aceite
+        kilometraje_actual:
+          type: integer
+          nullable: true
+          minimum: 0
+          example: 123
+        fecha_solicitud:
+          type: string
+          format: date-time
+          example: "2026-08-18T00:24"
+        observacion:
+          type: string
+          nullable: true
+          maxLength: 500
+          example: "a sdasdasd asdasdasdasdasd"
+        horometro_actual:
+          type: string
+          nullable: true
+          description: |
+            **No se persiste actualmente.** Se acepta en el cuerpo de la petición (algunos
+            clientes lo envían junto con `kilometraje_actual`), pero `SolicitudMantenimientoRequest`
+            no lo valida ni el modelo lo declara en su `#[Fillable]`, por lo que se descarta
+            silenciosamente y no se guarda en base de datos.
+          example: ""
+
+    SolicitudMantenimientoStoreResponse:
+      type: object
+      properties:
+        message: { type: string, example: Solicitud de mantenimiento registrada exitosamente. }
+        data: { $ref: '#/components/schemas/SolicitudMantenimiento' }

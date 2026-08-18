@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Actions\CargaCombustible\CreateCargaCombustibleAction;
 use App\Actions\CargaCombustible\ListCargaCombustibleAction;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\CargaCombustibleRequest;
 use App\Models\CargaCombustible;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CargaCombustibleController extends Controller
 {
@@ -36,21 +36,21 @@ class CargaCombustibleController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(CargaCombustibleRequest $request, CreateCargaCombustibleAction $action ): JsonResponse
+    public function store(CargaCombustibleRequest $request, CreateCargaCombustibleAction $action): JsonResponse
     {
-        //crea un trycatch
-        try{
+        // crea un trycatch
+        try {
 
-            $datos = $request->validated();
-            $action->execute($datos);
+            // La acción necesita la instancia de Request completa (no el arreglo validado):
+            // internamente lee id_vale con $request->filled()/->all() y reenvía la request tal
+            // cual a SincronizarRespaldoCargaAction para leer los archivos de "respaldos".
+            $action->execute($request);
 
             return response()->json([
                 'message' => 'Carga de combustible creada exitosamente',
             ], 201);
 
-
-
-        }catch (Exception $e){
+        } catch (Exception $e) {
             return response()->json([
                 'message' => 'Error al crear la carga de combustible',
                 'error' => $e->getMessage(),
