@@ -22,8 +22,6 @@ class ValeRequest extends FormRequest
             'id_vehiculo'  => ['required', 'integer', 'exists:vehiculo,id'],
             'id_conductor' => ['required', 'integer', 'exists:conductor,id'],
             'id_grifo'     => ['required', 'integer', 'exists:grifo,id'],
-            'estado_vale'  => ['required', Rule::in(['PENDIENTE', 'USADO', 'ANULADO'])],
-            'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
         ];
     }
 

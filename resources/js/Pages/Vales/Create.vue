@@ -232,33 +232,8 @@ const vehiculoSeleccionado = (vehiculo) => {
                                 </div>
                             </div>
 
-                            <!-- Estado -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-medium">
-                                    Tipo de Combustible <span class="text-danger">*</span>
-                                </label>
-                                <select v-model="form.id_tipo_combustible" class="form-select"
-                                    :class="{ 'is-invalid': form.errors.id_tipo_combustible }">
-                                    <option :value="null" disabled>Seleccione una opcion...</option>
-                                    <option v-for="tipo in tiposCombustible" :key="tipo.id" :value="tipo.id">{{
-                                        tipo.label }}</option>
-                                </select>
-                                <div v-if="form.errors.id_tipo_combustible" class="invalid-feedback">{{
-                                    form.errors.id_tipo_combustible }}</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-medium">
-                                    Estado <span class="text-danger">*</span>
-                                </label>
-                                <select v-model="form.estado_vale" class="form-select"
-                                    :class="{ 'is-invalid': form.errors.estado_vale }">
-                                    <option value="PENDIENTE">PENDIENTE</option>
-                                    <option value="USADO">USADO</option>
-                                    <option value="ANULADO">ANULADO</option>
-                                </select>
-                                <div v-if="form.errors.estado_vale" class="invalid-feedback">{{
-                                    form.errors.estado_vale }}</div>
-                            </div>
+
+
                             <!-- Resumen precio/litros -->
                             <div v-if="form.litros && form.precio" class="col-12">
                                 <div class="alert alert-info py-2 mb-0">

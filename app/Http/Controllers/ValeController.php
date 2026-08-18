@@ -71,7 +71,12 @@ class ValeController extends Controller
     {
         try {
             DB::beginTransaction();
-            $vale = Vale::create($request->validated());
+            $datos=$request->validated();
+
+            $vehiculo = Vehiculo::find($datos['id_vehiculo']);
+            $datos['id_tipo_combustible'] = $vehiculo->id_tipo_combustible;
+            $datos['estado_vale'] = 'PENDIENTE';
+            $vale = Vale::create($datos);
 
             DB::commit();
             return redirect()->route('vales.index')

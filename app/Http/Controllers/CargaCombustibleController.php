@@ -182,27 +182,6 @@ class CargaCombustibleController extends Controller
     /*  Helpers */
     /* ------------------------------------------------------------------ */
 
-    private function processRespaldos1(Request $request, CargaCombustible $carga): void
-    {
-        $count = (int) $request->input('respaldo_count', 0);
-
-        for ($i = 0; $i < $count; $i++) {
-            if (! $request->hasFile("respaldo_archivo_{$i}")) {
-                continue;
-            }
-
-            $archivo = $request->file("respaldo_archivo_{$i}");
-            $tipoArchivo = str_starts_with($archivo->getMimeType(), 'image/') ? 'IMAGEN' : 'PDF';
-            $ruta = $archivo->store("respaldos/{$carga->id}", 'public');
-
-            RespaldoDigital::create([
-                'ruta_respaldo' => $ruta,
-                'tipo_respaldo' => $request->input("respaldo_tipo_{$i}", 'OTRO'),
-                'tipo_archivo' => $tipoArchivo,
-                'id_carga_combustible' => $carga->id,
-            ]);
-        }
-    }
 
     private function processRespaldos(Request $request, CargaCombustible $carga): void
     {
