@@ -15,5 +15,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/*.php | .ai/rules/migrations.md |
 | app/Models/**, app/Models/*.php | .ai/rules/models.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
-| app/Http/Requests/**/*.php | .ai/rules/requests.md |
+| app/Http/Requests/**/*.php, app/Http/Requests/*.php | .ai/rules/requests.md |
 | routes/*.php | .ai/rules/routes.md |

@@ -18,7 +18,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-
         Schema::create('intervalo_mantenimiento_tipo', function (Blueprint $table) {
             $table->id();
             $table->foreignId('id_tipo_vehiculo')->constrained('tipo_vehiculo')->onDelete('restrict');
@@ -27,6 +26,8 @@ return new class extends Migration
             $table->integer('frecuencia')->nullable();
             $table->enum('estado', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
             $table->timestamps();
+
+            $table->unique(['id_tipo_vehiculo', 'id_tipo_mantenimiento'], 'unique_tipo_vehiculo_tipo_mantenimiento');
         });
     }
 

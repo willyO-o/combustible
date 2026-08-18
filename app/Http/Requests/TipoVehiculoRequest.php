@@ -14,19 +14,36 @@ class TipoVehiculoRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('tipo_vehiculo')?->id;
+        $id = $this->route('tipoVehiculo')?->id;
 
         return [
-            'tipo_vehiculo'        => ['required', 'string', 'max:150', Rule::unique('tipo_vehiculo', 'tipo_vehiculo')->ignore($id)],
+            'tipo_vehiculo' => ['required', 'string', 'max:150', Rule::unique('tipo_vehiculo', 'tipo_vehiculo')->ignore($id)],
             'estado_tipo_vehiculo' => ['required', Rule::in(['ACTIVO', 'INACTIVO'])],
+
+            // Intervalos de mantenimiento (referencia para futuras alertas): a lo
+            // sumo un intervalo por tipo de mantenimiento.
+            'intervalos' => ['nullable', 'array'],
+            'intervalos.*.id_tipo_mantenimiento' => ['required', 'distinct', 'exists:tipo_mantenimiento,id'],
+            'intervalos.*.tipo_medicion' => ['required', Rule::in(['kilometraje', 'horometro'])],
+            'intervalos.*.frecuencia' => ['required', 'integer', 'min:1'],
         ];
     }
 
     public function attributes(): array
     {
         return [
-            'tipo_vehiculo'        => 'tipo de vehículo',
+            'tipo_vehiculo' => 'tipo de vehículo',
             'estado_tipo_vehiculo' => 'estado',
+            'intervalos.*.id_tipo_mantenimiento' => 'tipo de mantenimiento',
+            'intervalos.*.tipo_medicion' => 'medición',
+            'intervalos.*.frecuencia' => 'frecuencia',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'intervalos.*.id_tipo_mantenimiento.distinct' => 'Sólo puede haber un intervalo por tipo de mantenimiento.',
         ];
     }
 }
