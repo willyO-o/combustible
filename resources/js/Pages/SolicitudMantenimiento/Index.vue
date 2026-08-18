@@ -298,7 +298,7 @@ const tipoBadge = (tipo) => {
                                             class="btn btn-outline-primary btn-wave" title="Ver detalle">
                                             <i class="ri-file-list-3-line"></i>
                                         </Link>
-                                        <!-- <Link v-if="s.estado === 'PENDIENTE' && !s.plan_mantenimiento" -->
+                                        <!-- <Link v-if="s.estado === 'PENDIENTE' && !s.orden_trabajo" -->
                                          <Link v-if="false" >
                                             :href="route('mantenimiento.ordenes.create', { solicitud: s.id })"
                                             class="btn btn-outline-success btn-wave" title="Generar orden de trabajo">

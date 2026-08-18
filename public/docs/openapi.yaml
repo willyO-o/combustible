@@ -2273,7 +2273,7 @@ components:
         usuarioRegistra:
           allOf: [{ $ref: '#/components/schemas/Usuario' }]
           nullable: true
-        planMantenimiento:
+        ordenTrabajo:
           type: object
           nullable: true
           description: |

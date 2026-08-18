@@ -10,7 +10,7 @@ class ListSolicitudesMantenimientoAction
 {
     public function execute(array $filters, User $user, int $perPage = 10): LengthAwarePaginator
     {
-        $query = SolicitudMantenimiento::with(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'planMantenimiento']);
+        $query = SolicitudMantenimiento::with(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo']);
 
         if (! empty($filters['estado'])) {
             $query->where('estado', $filters['estado']);

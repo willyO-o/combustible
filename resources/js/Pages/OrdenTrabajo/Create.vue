@@ -1,44 +1,45 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     vehiculos: Array,
-    tiposMantenimiento: Array,
     talleres: Array,
+    usuarios: Array,
     solicitudesPendientes: Array,
     solicitudPreseleccionada: Object,
 })
 
 // Si llegó preseleccionada una solicitud, pre-rellenar el formulario
 const form = useForm({
-    id_vehiculo:                  props.solicitudPreseleccionada?.id_vehiculo ?? '',
-    id_tipo_mantenimiento:        '',
-    id_solicitud_mantenimiento:   props.solicitudPreseleccionada?.id ?? '',
-    id_taller:                    '',
-    tipo_mantenimiento:           props.solicitudPreseleccionada?.tipo_mantenimiento ?? 'PREVENTIVO',
-    tipo_orden:                   'INTERNO',
-    descripcion_trabajo_ordenado: props.solicitudPreseleccionada?.descripcion_problema ?? '',
-    kilometraje_programado:       '',
-    fecha_programada:             '',
-    frecuencia_km:                '',
-    frecuencia_mes:               '',
-    observacion:                  '',
+    id_vehiculo:                props.solicitudPreseleccionada?.id_vehiculo ?? '',
+    id_conductor:                props.solicitudPreseleccionada?.id_conductor ?? '',
+    id_solicitud_mantenimiento: props.solicitudPreseleccionada?.id ?? '',
+    id_taller:                  '',
+    id_usuario_ejecuta:         '',
+    tipo_mantenimiento:         props.solicitudPreseleccionada?.tipo_mantenimiento ?? 'PREVENTIVO',
+    nota_emisor:                props.solicitudPreseleccionada?.descripcion_problema ?? '',
+    kilometraje_actual:         props.solicitudPreseleccionada?.kilometraje_actual ?? '',
+    horometro_actual:           props.solicitudPreseleccionada?.horometro_actual ?? '',
+    observacion:                '',
 })
 
 // Al seleccionar solicitud origen, copiar datos
 function onSolicitudChange() {
     const s = props.solicitudesPendientes.find(x => x.id == form.id_solicitud_mantenimiento)
     if (s) {
-        form.id_vehiculo            = s.id_vehiculo
-        form.tipo_mantenimiento     = s.tipo_mantenimiento
-        form.descripcion_trabajo_ordenado = s.descripcion_problema
+        form.id_vehiculo          = s.id_vehiculo
+        form.id_conductor         = s.id_conductor ?? ''
+        form.tipo_mantenimiento   = s.tipo_mantenimiento
+        form.nota_emisor          = s.descripcion_problema
+        form.kilometraje_actual   = s.kilometraje_actual ?? ''
+        form.horometro_actual     = s.horometro_actual ?? ''
     }
 }
 
-const requiereTaller = computed(() => form.tipo_orden === 'EXTERNO')
+const esExterno = computed(() => !!form.id_taller)
 
 function submit() {
     form.post(route('mantenimiento.ordenes.store'))
@@ -46,7 +47,7 @@ function submit() {
 </script>
 
 <template>
-    <Head title="Nueva Orden de Mantenimiento" />
+    <Head title="Nueva Orden de Trabajo" />
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -54,12 +55,12 @@ function submit() {
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
                         <li class="breadcrumb-item">
-                            <Link :href="route('mantenimiento.ordenes.index')">Órdenes Mantenimiento</Link>
+                            <Link :href="route('mantenimiento.ordenes.index')">Órdenes de Trabajo</Link>
                         </li>
                         <li class="breadcrumb-item active">Nueva Orden</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Generar Orden de Trabajo</h1>
+                <h1 class="page-title fw-medium fs-18 mb-0">Emitir Orden de Trabajo</h1>
             </div>
             <Link :href="route('mantenimiento.ordenes.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver
@@ -83,7 +84,7 @@ function submit() {
                 <div class="card-header">
                     <div class="card-title">
                         <i class="ri-file-list-3-line me-2 text-primary"></i>
-                        Paso 2 – Orden de Trabajo Interno / Externo
+                        Paso 2 – Emisión de Orden de Trabajo
                     </div>
                 </div>
                 <div class="card-body">
@@ -117,24 +118,22 @@ function submit() {
                             </div>
                         </div>
 
-                        <!-- Tipo de mantenimiento (catálogo) -->
+                        <!-- Responsable de ejecución -->
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">
-                                Tipo de Mantenimiento <span class="text-danger">*</span>
+                                Responsable de Ejecución <span class="text-danger">*</span>
                             </label>
-                            <select v-model="form.id_tipo_mantenimiento" class="form-select"
-                                :class="{ 'is-invalid': form.errors.id_tipo_mantenimiento }">
+                            <select v-model="form.id_usuario_ejecuta" class="form-select"
+                                :class="{ 'is-invalid': form.errors.id_usuario_ejecuta }">
                                 <option value="">— Seleccione —</option>
-                                <option v-for="t in tiposMantenimiento" :key="t.id" :value="t.id">
-                                    {{ t.tipo_mantenimiento }}
-                                </option>
+                                <option v-for="u in usuarios" :key="u.id" :value="u.id">{{ u.name }}</option>
                             </select>
-                            <div v-if="form.errors.id_tipo_mantenimiento" class="invalid-feedback">
-                                {{ form.errors.id_tipo_mantenimiento }}
+                            <div v-if="form.errors.id_usuario_ejecuta" class="invalid-feedback">
+                                {{ form.errors.id_usuario_ejecuta }}
                             </div>
                         </div>
 
-                        <!-- Preventivo / Correctivo -->
+                        <!-- Categoría -->
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">
                                 Categoría <span class="text-danger">*</span>
@@ -146,82 +145,47 @@ function submit() {
                             </select>
                         </div>
 
-                        <!-- Interno / Externo -->
+                        <!-- Taller (si se deja vacío la orden es interna) -->
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">
-                                Tipo de Orden <span class="text-danger">*</span>
-                            </label>
-                            <select v-model="form.tipo_orden" class="form-select"
-                                :class="{ 'is-invalid': form.errors.tipo_orden }">
-                                <option value="INTERNO">Interno</option>
-                                <option value="EXTERNO">Externo (Taller)</option>
-                            </select>
-                        </div>
-
-                        <!-- Taller (sólo externo) -->
-                        <div class="col-sm-6 col-xl-4">
-                            <label class="form-label fw-medium">
-                                Taller
-                                <span v-if="requiereTaller" class="text-danger">*</span>
-                                <span v-else class="text-muted">(sólo externo)</span>
+                                Taller Externo
+                                <span class="text-muted">(vacío = orden interna)</span>
                             </label>
                             <select v-model="form.id_taller" class="form-select"
-                                :disabled="!requiereTaller"
                                 :class="{ 'is-invalid': form.errors.id_taller }">
-                                <option value="">— Seleccione taller —</option>
+                                <option value="">— Interno —</option>
                                 <option v-for="t in talleres" :key="t.id" :value="t.id">
                                     {{ t.razon_social }} ({{ t.nit }})
                                 </option>
                             </select>
                             <div v-if="form.errors.id_taller" class="invalid-feedback">{{ form.errors.id_taller }}</div>
+                            <small class="text-muted">
+                                Orden {{ esExterno ? 'EXTERNA' : 'INTERNA' }}
+                            </small>
                         </div>
 
-                        <!-- Descripción del trabajo a realizar -->
+                        <!-- Km actual -->
+                        <div class="col-sm-6 col-xl-4">
+                            <label class="form-label fw-medium">Kilometraje Actual</label>
+                            <div class="input-group">
+                                <input v-model="form.kilometraje_actual" type="number" min="0"
+                                    class="form-control" :class="{ 'is-invalid': form.errors.kilometraje_actual }"
+                                    placeholder="Ej: 85000" />
+                                <span class="input-group-text">km</span>
+                                <div v-if="form.errors.kilometraje_actual" class="invalid-feedback">
+                                    {{ form.errors.kilometraje_actual }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Nota del emisor -->
                         <div class="col-12">
-                            <label class="form-label fw-medium">Descripción del Trabajo a Realizar</label>
-                            <textarea v-model="form.descripcion_trabajo_ordenado" rows="3"
-                                class="form-control" :class="{ 'is-invalid': form.errors.descripcion_trabajo_ordenado }"
+                            <label class="form-label fw-medium">Nota del Emisor (trabajo a realizar)</label>
+                            <textarea v-model="form.nota_emisor" rows="3"
+                                class="form-control" :class="{ 'is-invalid': form.errors.nota_emisor }"
                                 placeholder="Detalle el trabajo que se debe realizar..."></textarea>
-                            <div v-if="form.errors.descripcion_trabajo_ordenado" class="invalid-feedback">
-                                {{ form.errors.descripcion_trabajo_ordenado }}
-                            </div>
-                        </div>
-
-                        <div class="col-12"><hr class="my-1" /><p class="text-muted mb-0 small">Programación (opcional)</p></div>
-
-                        <!-- Km programado -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">Kilometraje Programado</label>
-                            <div class="input-group">
-                                <input v-model="form.kilometraje_programado" type="number" min="0"
-                                    class="form-control" placeholder="Ej: 90000" />
-                                <span class="input-group-text">km</span>
-                            </div>
-                        </div>
-
-                        <!-- Fecha programada -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">Fecha Programada</label>
-                            <input v-model="form.fecha_programada" type="date" class="form-control" />
-                        </div>
-
-                        <!-- Frecuencia km -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">Frecuencia (km)</label>
-                            <div class="input-group">
-                                <input v-model="form.frecuencia_km" type="number" min="0"
-                                    class="form-control" placeholder="Ej: 5000" />
-                                <span class="input-group-text">km</span>
-                            </div>
-                        </div>
-
-                        <!-- Frecuencia meses -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">Frecuencia (meses)</label>
-                            <div class="input-group">
-                                <input v-model="form.frecuencia_mes" type="number" min="0"
-                                    class="form-control" placeholder="Ej: 6" />
-                                <span class="input-group-text">meses</span>
+                            <div v-if="form.errors.nota_emisor" class="invalid-feedback">
+                                {{ form.errors.nota_emisor }}
                             </div>
                         </div>
 
@@ -240,7 +204,7 @@ function submit() {
                     <button type="submit" class="btn btn-primary btn-wave" :disabled="form.processing">
                         <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
                         <i v-else class="ri-file-list-3-line me-1"></i>
-                        Generar Orden de Trabajo
+                        Emitir Orden de Trabajo
                     </button>
                 </div>
             </div>

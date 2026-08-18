@@ -51,7 +51,7 @@ class SolicitudMantenimientoController extends Controller
      */
     public function show(SolicitudMantenimiento $solicitud): JsonResponse
     {
-        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'planMantenimiento.tipoMantenimiento']);
+        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo']);
 
         return response()->json([
             'data' => $solicitud,

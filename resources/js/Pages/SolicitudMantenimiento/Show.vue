@@ -44,7 +44,7 @@ const tipoBadge = (tipo) => {
                 <Link :href="route('mantenimiento.solicitudes.index')" class="btn btn-outline-secondary btn-wave">
                     <i class="ri-arrow-left-line me-1"></i> Volver
                 </Link>
-                <Link v-if="solicitud.estado === 'PENDIENTE' && !solicitud.plan_mantenimiento"
+                <Link v-if="solicitud.estado === 'PENDIENTE' && !solicitud.orden_trabajo"
                     :href="route('mantenimiento.ordenes.create', { solicitud: solicitud.id })"
                     class="btn btn-success btn-wave">
                     <i class="ri-file-list-3-line me-1"></i> Generar Orden de Trabajo
@@ -132,7 +132,7 @@ const tipoBadge = (tipo) => {
             </div>
 
             <!-- Orden de trabajo generada -->
-            <div v-if="solicitud.plan_mantenimiento" class="col-12">
+            <div v-if="solicitud.orden_trabajo" class="col-12">
                 <div class="card custom-card border border-success">
                     <div class="card-header bg-success-transparent">
                         <div class="card-title text-success">
@@ -142,13 +142,13 @@ const tipoBadge = (tipo) => {
                     </div>
                     <div class="card-body">
                         <p class="mb-1">
-                            Orden N° <strong>{{ solicitud.plan_mantenimiento.id }}</strong> —
+                            Orden N° <strong>{{ solicitud.orden_trabajo.nro }}</strong> —
                             Estado:
                             <span class="badge bg-primary-transparent text-primary">
-                                {{ solicitud.plan_mantenimiento.estado_plan }}
+                                {{ solicitud.orden_trabajo.estado_orden }}
                             </span>
                         </p>
-                        <Link :href="route('mantenimiento.ordenes.show', solicitud.plan_mantenimiento.id)"
+                        <Link :href="route('mantenimiento.ordenes.show', solicitud.orden_trabajo.id)"
                             class="btn btn-sm btn-outline-primary btn-wave mt-2">
                             <i class="ri-eye-line me-1"></i> Ver Orden
                         </Link>

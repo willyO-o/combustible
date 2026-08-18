@@ -12,7 +12,7 @@ const props = defineProps({
 })
 
 const filters = ref({
-    estado_plan: props.filters?.estado_plan ?? '',
+    estado_orden: props.filters?.estado_orden ?? '',
     tipo_mantenimiento: props.filters?.tipo_mantenimiento ?? '',
     tipo_orden: props.filters?.tipo_orden ?? '',
     id_vehiculo: props.filters?.id_vehiculo ?? '',
@@ -23,7 +23,7 @@ watch(filters, (val) => {
     clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
         router.get(route('mantenimiento.ordenes.index'), {
-            estado_plan:        val.estado_plan || undefined,
+            estado_orden:       val.estado_orden || undefined,
             tipo_mantenimiento: val.tipo_mantenimiento || undefined,
             tipo_orden:         val.tipo_orden || undefined,
             id_vehiculo:        val.id_vehiculo || undefined,
@@ -32,17 +32,16 @@ watch(filters, (val) => {
 }, { deep: true })
 
 function clearFilters() {
-    filters.value = { estado_plan: '', tipo_mantenimiento: '', tipo_orden: '', id_vehiculo: '' }
+    filters.value = { estado_orden: '', tipo_mantenimiento: '', tipo_orden: '', id_vehiculo: '' }
 }
 
 const estadoBadge = (estado) => {
     const map = {
-        BORRADOR:   'bg-secondary-transparent text-secondary',
-        PENDIENTE:  'bg-warning-transparent text-warning',
-        EN_PROCESO: 'bg-info-transparent text-info',
-        COMPLETADO: 'bg-success-transparent text-success',
-        VENCIDO:    'bg-danger-transparent text-danger',
-        ANULADO:    'bg-dark text-white',
+        PENDIENTE:     'bg-warning-transparent text-warning',
+        EN_EJECUCION:  'bg-info-transparent text-info',
+        CULMINADO:     'bg-success-transparent text-success',
+        CANCELADO:     'bg-dark text-white',
+        VERIFICADO:    'bg-primary-transparent text-primary',
     }
     return map[estado] ?? 'bg-light text-dark'
 }
@@ -55,14 +54,14 @@ const ordenBadge = (tipo) =>
 </script>
 
 <template>
-    <Head title="Órdenes de Mantenimiento" />
+    <Head title="Órdenes de Trabajo" />
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
                 <nav>
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
-                        <li class="breadcrumb-item active">Órdenes de Mantenimiento</li>
+                        <li class="breadcrumb-item active">Órdenes de Trabajo</li>
                     </ol>
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Órdenes de Trabajo – Mantenimiento</h1>
@@ -89,14 +88,13 @@ const ordenBadge = (tipo) =>
                 <div class="row g-3">
                     <div class="col-sm-6 col-xl-3">
                         <label class="form-label">Estado</label>
-                        <select v-model="filters.estado_plan" class="form-select">
+                        <select v-model="filters.estado_orden" class="form-select">
                             <option value="">Todos</option>
-                            <option value="BORRADOR">Borrador</option>
                             <option value="PENDIENTE">Pendiente</option>
-                            <option value="EN_PROCESO">En Proceso</option>
-                            <option value="COMPLETADO">Completado</option>
-                            <option value="VENCIDO">Vencido</option>
-                            <option value="ANULADO">Anulado</option>
+                            <option value="EN_EJECUCION">En Ejecución</option>
+                            <option value="CULMINADO">Culminado</option>
+                            <option value="CANCELADO">Cancelado</option>
+                            <option value="VERIFICADO">Verificado</option>
                         </select>
                     </div>
                     <div class="col-sm-6 col-xl-3">
@@ -147,12 +145,12 @@ const ordenBadge = (tipo) =>
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
+                                <th>Nro</th>
                                 <th>Vehículo</th>
                                 <th>Tipo Mant.</th>
                                 <th>Tipo Orden</th>
-                                <th>Fecha Orden</th>
-                                <th>Fecha Prog.</th>
-                                <th>Taller</th>
+                                <th>Fecha Emisión</th>
+                                <th>Responsable</th>
                                 <th>Estado</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
@@ -166,28 +164,28 @@ const ordenBadge = (tipo) =>
                             </tr>
                             <tr v-for="(o, idx) in ordenes.data" :key="o.id">
                                 <td>{{ idx + 1 }}</td>
+                                <td>{{ o.nro }}</td>
                                 <td>
                                     <span class="fw-medium">{{ o.vehiculo?.nro_placa ?? '—' }}</span>
                                     <br /><small class="text-muted">{{ o.vehiculo?.marca ?? '' }}</small>
                                 </td>
-                                <td><span class="badge" :class="tipoBadge(o.tipo_mantenimiento)">{{ o.tipo_mantenimiento.tipo_mantenimiento }}</span></td>
+                                <td><span class="badge" :class="tipoBadge(o.tipo_mantenimiento)">{{ o.tipo_mantenimiento }}</span></td>
                                 <td><span class="badge" :class="ordenBadge(o.tipo_orden)">{{ o.tipo_orden }}</span></td>
-                                <td>{{ o.fecha_orden ?? '—' }}</td>
-                                <td>{{ o.fecha_programada ?? '—' }}</td>
-                                <td>{{ o.taller?.razon_social ?? (o.tipo_orden === 'INTERNO' ? 'Interno' : '—') }}</td>
-                                <td><span class="badge" :class="estadoBadge(o.estado_plan)">{{ o.estado_plan }}</span></td>
+                                <td>{{ o.fecha_emision?.substring(0, 10) ?? '—' }}</td>
+                                <td>{{ o.usuario_ejecuta?.name ?? '—' }}</td>
+                                <td><span class="badge" :class="estadoBadge(o.estado_orden)">{{ o.estado_orden }}</span></td>
                                 <td class="text-center">
                                     <div class="btn-group btn-group-sm">
                                         <Link :href="route('mantenimiento.ordenes.show', o.id)"
                                             class="btn btn-outline-primary btn-wave" title="Ver detalle">
                                             <i class="ri-eye-line"></i>
                                         </Link>
-                                        <Link v-if="['BORRADOR','PENDIENTE'].includes(o.estado_plan)"
+                                        <Link v-if="o.estado_orden === 'PENDIENTE'"
                                             :href="route('mantenimiento.ordenes.edit', o.id)"
                                             class="btn btn-outline-secondary btn-wave" title="Editar">
                                             <i class="ri-pencil-line"></i>
                                         </Link>
-                                        <Link v-if="['PENDIENTE','EN_PROCESO'].includes(o.estado_plan)"
+                                        <Link v-if="['PENDIENTE','EN_EJECUCION'].includes(o.estado_orden)"
                                             :href="route('mantenimiento.ordenes.ejecucion.create', o.id)"
                                             class="btn btn-outline-success btn-wave" title="Registrar ejecución">
                                             <i class="ri-tools-line"></i>

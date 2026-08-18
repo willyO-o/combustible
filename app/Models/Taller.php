@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'razon_social',
@@ -19,6 +19,6 @@ class Taller extends Model
 
     public function ordenesMantenimiento()
     {
-        return $this->hasMany(PlanMantenimiento::class, 'id_taller');
+        return $this->hasMany(OrdenTrabajo::class, 'id_taller');
     }
 }

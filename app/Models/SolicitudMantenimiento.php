@@ -35,7 +35,7 @@ class SolicitudMantenimiento extends Model
     public function getNroAttribute()
     {
         // rellenar con ceros a la izquierda hasta 6 dígitos
-        return $this->nro_solicitud ? str_pad($this->nro_solicitud, 6, '0', STR_PAD_LEFT) : null;
+        return $this->nro_solicitud ? str_pad($this->nro_solicitud, 6, '0', STR_PAD_LEFT).'/'.$this->gestion : null;
     }
 
     public function getFechaAttribute()
@@ -64,22 +64,9 @@ class SolicitudMantenimiento extends Model
         return $this->belongsTo(User::class, 'id_usuario_registra');
     }
 
-    public function planMantenimiento()
+    public function ordenTrabajo()
     {
-        return $this->hasOne(PlanMantenimiento::class, 'id_solicitud_mantenimiento');
-    }
-
-    public static function siguienteNroMantenimientoProvisional(int $gestion): string
-    {
-        $gestion = now()->month >= 11 ? now()->year + 1 : now()->year;
-
-        $ultimo = self::where('gestion', $gestion)
-            ->orderBy('nro_solicitud', 'desc')
-            ->first();
-
-        $siguienteNro = $ultimo ? $ultimo->nro_solicitud + 1 : 1;
-
-        return str_pad($siguienteNro, 6, '0', STR_PAD_LEFT).'/'.$gestion;
+        return $this->hasOne(OrdenTrabajo::class, 'id_solicitud_mantenimiento');
     }
 
     protected function calcularGestion(): int

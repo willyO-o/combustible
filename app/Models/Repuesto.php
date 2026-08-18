@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'nombre_repuesto',
@@ -17,8 +17,8 @@ class Repuesto extends Model
 {
     protected $table = 'repuesto';
 
-    public function mantenimientosRepuesto()
+    public function detallesMantenimiento()
     {
-        return $this->hasMany(MantenimientoRepuesto::class, 'id_repuesto');
+        return $this->hasMany(DetalleMantenimiento::class, 'id_repuesto');
     }
 }

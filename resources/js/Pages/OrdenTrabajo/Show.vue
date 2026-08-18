@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
@@ -7,18 +7,16 @@ import { showToast, confirm } from '@/Utils/alertUtil.js'
 
 const props = defineProps({
     orden: Object,
-    repuestos: Array,
     flash: Object,
 })
 
 const estadoBadge = (estado) => {
     const map = {
-        BORRADOR:   'bg-secondary-transparent text-secondary',
-        PENDIENTE:  'bg-warning-transparent text-warning',
-        EN_PROCESO: 'bg-info-transparent text-info',
-        COMPLETADO: 'bg-success-transparent text-success',
-        VENCIDO:    'bg-danger-transparent text-danger',
-        ANULADO:    'bg-dark text-white',
+        PENDIENTE:    'bg-warning-transparent text-warning',
+        EN_EJECUCION: 'bg-info-transparent text-info',
+        CULMINADO:    'bg-success-transparent text-success',
+        CANCELADO:    'bg-dark text-white',
+        VERIFICADO:   'bg-primary-transparent text-primary',
     }
     return map[estado] ?? 'bg-light text-dark'
 }
@@ -35,23 +33,18 @@ async function cambiarEstado(nuevoEstado) {
     if (!confirmar) return
 
     router.patch(route('mantenimiento.ordenes.estado', props.orden.id),
-        { estado_plan: nuevoEstado },
+        { estado_orden: nuevoEstado },
         { preserveScroll: true, onSuccess: () => showToast('Estado actualizado') }
     )
 }
 
-const tipoItemLabel = (tipo) => {
-    const map = { REPUESTO: 'Repuesto', ACEITE: 'Aceite', LLANTA: 'Llanta', INSUMO: 'Insumo', OTRO: 'Otro' }
-    return map[tipo] ?? tipo
-}
-
-const costoTotalRepuestos = () => {
-    return (props.orden.repuestos ?? []).reduce((acc, r) => acc + parseFloat(r.subtotal ?? 0), 0).toFixed(2)
-}
+const costoTotal = computed(() =>
+    (props.orden.detalles ?? []).reduce((acc, d) => acc + parseFloat(d.subtotal ?? 0), 0).toFixed(2)
+)
 </script>
 
 <template>
-    <Head :title="`Orden de Mantenimiento #${orden.id}`" />
+    <Head :title="`Orden de Trabajo #${orden.nro}`" />
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
             <div>
@@ -59,23 +52,23 @@ const costoTotalRepuestos = () => {
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
                         <li class="breadcrumb-item">
-                            <Link :href="route('mantenimiento.ordenes.index')">Órdenes Mantenimiento</Link>
+                            <Link :href="route('mantenimiento.ordenes.index')">Órdenes de Trabajo</Link>
                         </li>
-                        <li class="breadcrumb-item active">Orden #{{ orden.id }}</li>
+                        <li class="breadcrumb-item active">Orden #{{ orden.nro }}</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Orden de Trabajo #{{ orden.id }}</h1>
+                <h1 class="page-title fw-medium fs-18 mb-0">Orden de Trabajo #{{ orden.nro }}</h1>
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <Link :href="route('mantenimiento.ordenes.index')" class="btn btn-outline-secondary btn-wave">
                     <i class="ri-arrow-left-line me-1"></i> Volver
                 </Link>
-                <Link v-if="['BORRADOR','PENDIENTE'].includes(orden.estado_plan)"
+                <Link v-if="orden.estado_orden === 'PENDIENTE'"
                     :href="route('mantenimiento.ordenes.edit', orden.id)"
                     class="btn btn-outline-secondary btn-wave">
                     <i class="ri-pencil-line me-1"></i> Editar
                 </Link>
-                <Link v-if="['PENDIENTE','EN_PROCESO'].includes(orden.estado_plan)"
+                <Link v-if="['PENDIENTE','EN_EJECUCION'].includes(orden.estado_orden)"
                     :href="route('mantenimiento.ordenes.ejecucion.create', orden.id)"
                     class="btn btn-success btn-wave">
                     <i class="ri-tools-line me-1"></i> Registrar Ejecución
@@ -98,7 +91,7 @@ const costoTotalRepuestos = () => {
                             <i class="ri-file-list-3-line me-2 text-primary"></i>
                             Datos de la Orden
                         </div>
-                        <span class="badge fs-13" :class="estadoBadge(orden.estado_plan)">{{ orden.estado_plan }}</span>
+                        <span class="badge fs-13" :class="estadoBadge(orden.estado_orden)">{{ orden.estado_orden }}</span>
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
@@ -109,29 +102,24 @@ const costoTotalRepuestos = () => {
                             <div class="col-sm-6">
                                 <label class="form-label text-muted mb-0">Tipo de Mantenimiento</label>
                                 <p>
-                                    <span class="badge me-1" :class="tipoBadge(orden.tipo_mantenimiento)">{{ orden.tipo_mantenimiento.tipo_mantenimiento }}</span>
+                                    <span class="badge me-1" :class="tipoBadge(orden.tipo_mantenimiento)">{{ orden.tipo_mantenimiento }}</span>
                                     <span class="badge" :class="ordenBadge(orden.tipo_orden)">{{ orden.tipo_orden }}</span>
                                 </p>
                             </div>
                             <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Categoría de Mantenimiento</label>
-                                <p>{{ orden.tipo_mantenimiento?.tipo_mantenimiento ?? orden.tipo_mantenimiento }}</p>
+                                <label class="form-label text-muted mb-0">Fecha de Emisión</label>
+                                <p>{{ orden.fecha_emision?.substring(0, 16).replace('T', ' ') ?? '—' }}</p>
                             </div>
                             <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Fecha de Orden</label>
-                                <p>{{ orden.fecha_orden ?? '—' }}</p>
+                                <label class="form-label text-muted mb-0">Km / Horómetro Actual</label>
+                                <p>
+                                    {{ orden.kilometraje_actual != null ? orden.kilometraje_actual.toLocaleString() + ' km' : '—' }}
+                                    <span v-if="orden.horometro_actual != null"> / {{ orden.horometro_actual }} h</span>
+                                </p>
                             </div>
-                            <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Fecha Programada</label>
-                                <p>{{ orden.fecha_programada ?? '—' }}</p>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Km Programado</label>
-                                <p>{{ orden.kilometraje_programado != null ? orden.kilometraje_programado.toLocaleString() + ' km' : '—' }}</p>
-                            </div>
-                            <div v-if="orden.descripcion_trabajo_ordenado" class="col-12">
-                                <label class="form-label text-muted mb-0">Trabajo Ordenado</label>
-                                <p style="white-space:pre-wrap;">{{ orden.descripcion_trabajo_ordenado }}</p>
+                            <div v-if="orden.nota_emisor" class="col-12">
+                                <label class="form-label text-muted mb-0">Nota del Emisor</label>
+                                <p style="white-space:pre-wrap;">{{ orden.nota_emisor }}</p>
                             </div>
                             <div v-if="orden.taller" class="col-sm-6">
                                 <label class="form-label text-muted mb-0">Taller</label>
@@ -146,53 +134,33 @@ const costoTotalRepuestos = () => {
                 </div>
 
                 <!-- Ejecución (Paso 3) -->
-                <div v-if="orden.estado_plan === 'COMPLETADO'" class="card custom-card">
+                <div v-if="['CULMINADO','VERIFICADO'].includes(orden.estado_orden)" class="card custom-card">
                     <div class="card-header bg-success-transparent">
                         <div class="card-title text-success">
                             <i class="ri-checkbox-circle-line me-2"></i>
-                            Registro de Ejecución
+                            Ejecución
                         </div>
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Fecha Inicio</label>
-                                <p>{{ orden.fecha_inicio ?? '—' }}</p>
+                                <label class="form-label text-muted mb-0">Fecha Ejecución</label>
+                                <p>{{ orden.fecha_ejecucion?.substring(0, 16).replace('T', ' ') ?? '—' }}</p>
                             </div>
                             <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Fecha Fin</label>
-                                <p>{{ orden.fecha_fin ?? '—' }}</p>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Km al Mantenimiento</label>
-                                <p>{{ orden.kilometraje_al_mantenimiento != null ? orden.kilometraje_al_mantenimiento.toLocaleString() + ' km' : '—' }}</p>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Ejecutado por</label>
-                                <p>{{ orden.usuario_ejecuta?.name ?? '—' }}</p>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label text-muted mb-0">Trabajo Realizado</label>
-                                <p style="white-space:pre-wrap;">{{ orden.trabajo_realizado }}</p>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Costo Mano de Obra</label>
-                                <p class="fw-medium">Bs {{ Number(orden.costo_mano_obra ?? 0).toFixed(2) }}</p>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label text-muted mb-0">Costo Total</label>
-                                <p class="fw-bold text-success fs-15">Bs {{ Number(orden.costo_total ?? 0).toFixed(2) }}</p>
+                                <label class="form-label text-muted mb-0">Fecha Culminación</label>
+                                <p>{{ orden.fecha_culminacion?.substring(0, 16).replace('T', ' ') ?? '—' }}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Materiales utilizados -->
-                <div v-if="orden.repuestos && orden.repuestos.length > 0" class="card custom-card mt-4">
+                <!-- Detalle de repuestos / insumos / mano de obra -->
+                <div v-if="orden.detalles && orden.detalles.length > 0" class="card custom-card mt-4">
                     <div class="card-header">
                         <div class="card-title">
                             <i class="ri-archive-line me-2"></i>
-                            Repuestos / Insumos Utilizados
+                            Detalle del Trabajo Realizado
                         </div>
                     </div>
                     <div class="card-body p-0">
@@ -201,29 +169,27 @@ const costoTotalRepuestos = () => {
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
-                                        <th>Tipo</th>
+                                        <th>Tipo de Mantenimiento</th>
                                         <th>Ítem</th>
-                                        <th>Unidad</th>
                                         <th class="text-end">Cantidad</th>
                                         <th class="text-end">Costo Unit.</th>
                                         <th class="text-end">Subtotal</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="(r, idx) in orden.repuestos" :key="r.id">
+                                    <tr v-for="(d, idx) in orden.detalles" :key="d.id">
                                         <td>{{ idx + 1 }}</td>
-                                        <td><span class="badge bg-secondary-transparent text-secondary">{{ tipoItemLabel(r.tipo_item) }}</span></td>
-                                        <td>{{ r.repuesto?.nombre_repuesto ?? r.nombre_item ?? '—' }}</td>
-                                        <td>{{ r.unidad_medida }}</td>
-                                        <td class="text-end">{{ r.cantidad_utilizada }}</td>
-                                        <td class="text-end">Bs {{ Number(r.costo_unitario).toFixed(2) }}</td>
-                                        <td class="text-end fw-medium">Bs {{ Number(r.subtotal).toFixed(2) }}</td>
+                                        <td>{{ d.tipo_mantenimiento?.tipo_mantenimiento ?? '—' }}</td>
+                                        <td>{{ d.repuesto?.nombre_repuesto ?? d.detalle ?? '—' }}</td>
+                                        <td class="text-end">{{ d.cantidad }}</td>
+                                        <td class="text-end">Bs {{ Number(d.costo_unitario).toFixed(2) }}</td>
+                                        <td class="text-end fw-medium">Bs {{ Number(d.subtotal).toFixed(2) }}</td>
                                     </tr>
                                 </tbody>
                                 <tfoot class="table-light">
                                     <tr>
-                                        <td colspan="6" class="text-end fw-bold">Total Repuestos / Insumos:</td>
-                                        <td class="text-end fw-bold text-primary">Bs {{ costoTotalRepuestos() }}</td>
+                                        <td colspan="5" class="text-end fw-bold">Total:</td>
+                                        <td class="text-end fw-bold text-primary">Bs {{ costoTotal }}</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -253,31 +219,31 @@ const costoTotalRepuestos = () => {
                 <div class="card custom-card mb-3">
                     <div class="card-header"><div class="card-title"><i class="ri-user-settings-line me-2"></i>Responsables</div></div>
                     <div class="card-body">
-                        <p class="mb-1 text-muted small">Jefe de Transportes</p>
-                        <p class="fw-medium mb-3">{{ orden.usuario_jefe?.name ?? '—' }}</p>
-                        <p v-if="orden.usuario_ejecuta" class="mb-1 text-muted small">Ejecutado por</p>
-                        <p v-if="orden.usuario_ejecuta" class="fw-medium">{{ orden.usuario_ejecuta?.name ?? '—' }}</p>
+                        <p class="mb-1 text-muted small">Emitido por</p>
+                        <p class="fw-medium mb-3">{{ orden.usuario_emite?.name ?? '—' }}</p>
+                        <p class="mb-1 text-muted small">Responsable de Ejecución</p>
+                        <p class="fw-medium mb-0">{{ orden.usuario_ejecuta?.name ?? '—' }}</p>
                     </div>
                 </div>
 
                 <!-- Cambiar estado -->
-                <div v-if="orden.estado_plan !== 'COMPLETADO'" class="card custom-card">
+                <div v-if="!['CANCELADO','VERIFICADO'].includes(orden.estado_orden)" class="card custom-card">
                     <div class="card-header"><div class="card-title">Cambiar Estado</div></div>
                     <div class="card-body d-flex flex-column gap-2">
-                        <button v-if="orden.estado_plan === 'BORRADOR'"
-                            class="btn btn-warning btn-wave w-100"
-                            @click="cambiarEstado('PENDIENTE')">
-                            Aprobar → Pendiente
-                        </button>
-                        <button v-if="orden.estado_plan === 'PENDIENTE'"
+                        <button v-if="orden.estado_orden === 'PENDIENTE'"
                             class="btn btn-info btn-wave w-100"
-                            @click="cambiarEstado('EN_PROCESO')">
-                            Iniciar → En Proceso
+                            @click="cambiarEstado('EN_EJECUCION')">
+                            Iniciar → En Ejecución
                         </button>
-                        <button v-if="['BORRADOR','PENDIENTE','EN_PROCESO'].includes(orden.estado_plan)"
+                        <button v-if="orden.estado_orden === 'CULMINADO'"
+                            class="btn btn-primary btn-wave w-100"
+                            @click="cambiarEstado('VERIFICADO')">
+                            Verificar Orden
+                        </button>
+                        <button v-if="['PENDIENTE','EN_EJECUCION'].includes(orden.estado_orden)"
                             class="btn btn-outline-danger btn-wave w-100"
-                            @click="cambiarEstado('ANULADO')">
-                            Anular Orden
+                            @click="cambiarEstado('CANCELADO')">
+                            Cancelar Orden
                         </button>
                     </div>
                 </div>
