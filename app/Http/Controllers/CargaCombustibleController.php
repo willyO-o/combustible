@@ -63,17 +63,25 @@ class CargaCombustibleController extends Controller
 
             $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
 
-            $valesConductor = Vale::where('estado_vale', 'PENDIENTE')
+            $valesConductor = Vale::with(['grifo', 'tipoCombustible'])
+                ->where('estado_vale', 'PENDIENTE')
                 ->where('id_conductor', $conductor->id)
                 ->orderBy('fecha_emision', 'desc')
                 ->get()->map(fn ($v) => [
                     'id' => $v->id,
                     'label' => "Vale #{$v->nro} — {$v->litros} Lt ({$v->fecha_emision_f})",
                     'meta' => [
+                        'nro' => $v->nro,
                         'litros' => $v->litros,
                         'fecha_emision' => $v->fecha_emision_f,
                         'precio' => $v->precio,
+                        'id_vehiculo' => $v->id_vehiculo,
                         'id_grifo' => $v->id_grifo,
+                        'grifo_label' => $v->grifo ? $v->grifo->razon_social.($v->grifo->ciudad ? " — {$v->grifo->ciudad}" : '') : null,
+                        'id_conductor' => $v->id_conductor,
+                        'conductor_label' => trim($conductor->nombre_completo)." (CI: {$conductor->ci})",
+                        'id_tipo_combustible' => $v->id_tipo_combustible,
+                        'tipo_combustible_label' => $v->tipoCombustible?->tipo_combustible,
                     ],
                 ]);
         }
@@ -163,6 +171,12 @@ class CargaCombustibleController extends Controller
         $data = $request->validated();
         unset($data['respaldo_count']);
 
+        // Si la carga tiene (o vuelve a tener) un vale, el tipo de carga es
+        // siempre VALE, sin importar lo enviado.
+        if (! empty($data['id_vale'])) {
+            $data['tipo_carga'] = 'VALE';
+        }
+
         $carga->update($data);
 
         // Eliminar respaldos marcados
@@ -235,6 +249,7 @@ class CargaCombustibleController extends Controller
             'litros' => $vale->litros,
             'precio' => $vale->precio,
             'id_tipo_combustible' => $vale->id_tipo_combustible,
+            'tipo_combustible' => $vale->tipoCombustible?->tipo_combustible,
             'id_vehiculo' => $vale->id_vehiculo,
             'id_conductor' => $vale->id_conductor,
             'id_grifo' => $vale->id_grifo,
@@ -388,7 +403,7 @@ class CargaCombustibleController extends Controller
         if (! $q && ! $idVehiculo) {
             return response()->json([]);
         }
-        $query = Vale::where('estado_vale', 'PENDIENTE');
+        $query = Vale::with(['conductor.persona', 'grifo', 'tipoCombustible'])->where('estado_vale', 'PENDIENTE');
 
         if ($idVehiculo) {
             $query->where('id_vehiculo', $idVehiculo);
@@ -409,10 +424,17 @@ class CargaCombustibleController extends Controller
                 'id' => $v->id,
                 'label' => "Vale #{$v->nro} — {$v->litros} Lt ({$v->fecha_emision_f})",
                 'meta' => [
+                    'nro' => $v->nro,
                     'litros' => $v->litros,
                     'fecha_emision' => $v->fecha_emision_f,
                     'precio' => $v->precio,
+                    'id_vehiculo' => $v->id_vehiculo,
                     'id_grifo' => $v->id_grifo,
+                    'grifo_label' => $v->grifo ? $v->grifo->razon_social.($v->grifo->ciudad ? " — {$v->grifo->ciudad}" : '') : null,
+                    'id_conductor' => $v->id_conductor,
+                    'conductor_label' => $v->conductor ? trim("{$v->conductor->persona->nombre_completo}")." (CI: {$v->conductor->persona->ci})" : null,
+                    'id_tipo_combustible' => $v->id_tipo_combustible,
+                    'tipo_combustible_label' => $v->tipoCombustible?->tipo_combustible,
                 ],
             ]);
 

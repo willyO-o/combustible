@@ -25,13 +25,15 @@ class CreateCargaCombustibleAction
                 // El vehículo, conductor, grifo, tipo de combustible, litros y
                 // precio vienen del vale y sólo se muestran como información en
                 // el formulario: se fuerzan aquí para que no puedan alterarse
-                // manipulando la petición.
+                // manipulando la petición. Si hay vale, el tipo de carga es
+                // siempre VALE, independientemente de lo que se haya enviado.
                 $datos['id_vehiculo'] = $vale->id_vehiculo;
                 $datos['id_conductor'] = $vale->id_conductor;
                 $datos['id_grifo'] = $vale->id_grifo;
                 $datos['id_tipo_combustible'] = $vale->id_tipo_combustible;
                 $datos['litros'] = $vale->litros;
                 $datos['precio'] = $vale->precio;
+                $datos['tipo_carga'] = 'VALE';
 
                 $cargaCombustible = CargaCombustible::create($datos);
 

@@ -330,7 +330,7 @@ class CargaCombustibleControllerTest extends TestCase
         $response->assertSessionHas('error', "El vale #{$vale->nro} ya tiene una carga de combustible registrada.");
     }
 
-    public function test_store_usando_un_vale_ignora_conductor_litros_y_precio_manipulados(): void
+    public function test_store_usando_un_vale_ignora_conductor_litros_precio_y_tipo_carga_manipulados(): void
     {
         $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
         $conductor = $this->crearConductor();
@@ -338,10 +338,11 @@ class CargaCombustibleControllerTest extends TestCase
         $tipoCombustible = TipoCombustible::factory()->create();
         $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible);
 
-        // Conductor/litros/precio distintos a los del vale, simulando una
-        // petición manipulada: el controlador debe ignorarlos y usar siempre
-        // los datos del vale (id_vehiculo sí queda cross-validado contra el
-        // vale por CargaCombustibleRequest, así que aquí se mantiene correcto).
+        // Conductor/litros/precio/tipo_carga distintos a los del vale,
+        // simulando una petición manipulada: el controlador debe ignorarlos
+        // y usar siempre los datos del vale, incluyendo forzar tipo_carga a
+        // VALE (id_vehiculo sí queda cross-validado contra el vale por
+        // CargaCombustibleRequest, así que aquí se mantiene correcto).
         $otroConductor = $this->crearConductor();
 
         $response = $this->post(route('cargas.store'), [
@@ -355,7 +356,7 @@ class CargaCombustibleControllerTest extends TestCase
             'id_tipo_combustible' => $tipoCombustible->id,
             'id_vale' => $vale->id,
             'nro_factura' => 'F-100',
-            'tipo_carga' => 'VALE',
+            'tipo_carga' => 'PREPAGO',
         ]);
 
         $response->assertSessionDoesntHaveErrors();
@@ -366,7 +367,49 @@ class CargaCombustibleControllerTest extends TestCase
         $this->assertSame($conductor->id, $carga->id_conductor);
         $this->assertEquals(40, (float) $carga->litros);
         $this->assertEquals(9.5, (float) $carga->precio);
+        $this->assertSame('VALE', $carga->tipo_carga);
         $this->assertSame('F-100', $carga->nro_factura);
         $this->assertSame('USADO', $vale->fresh()->estado_vale);
+    }
+
+    public function test_update_con_vale_fuerza_tipo_carga_vale_aunque_se_envie_prepago(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible, ['estado_vale' => 'USADO']);
+
+        $carga = CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => $vale->litros,
+            'precio' => $vale->precio,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'id_vale' => $vale->id,
+            'tipo_carga' => 'VALE',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $response = $this->put(route('cargas.update', $carga->id), [
+            'fecha_carga' => $carga->fecha_carga->format('Y-m-d'),
+            'litros' => $carga->litros,
+            'precio' => $carga->precio,
+            'kilometraje' => 1200,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'id_vale' => $vale->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $response->assertRedirect(route('cargas.index'));
+        $this->assertSame('VALE', $carga->fresh()->tipo_carga);
     }
 }
