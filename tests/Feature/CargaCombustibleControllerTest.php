@@ -288,6 +288,46 @@ class CargaCombustibleControllerTest extends TestCase
         $response = $this->get(route('cargas.create', ['vale' => $vale->id]));
 
         $response->assertRedirect(route('vales.index'));
+        $response->assertSessionHas('error');
+    }
+
+    public function test_create_redirige_a_vales_si_el_vale_no_existe(): void
+    {
+        $response = $this->get(route('cargas.create', ['vale' => 999999]));
+
+        $response->assertRedirect(route('vales.index'));
+        $response->assertSessionHas('error', 'El vale seleccionado no existe.');
+    }
+
+    public function test_create_redirige_a_vales_si_el_vale_ya_tiene_una_carga_registrada(): void
+    {
+        // Estado inconsistente: el vale sigue PENDIENTE pero ya existe una
+        // carga de combustible que lo referencia (no debería pasar en el
+        // flujo normal, pero se valida como defensa adicional).
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible);
+
+        CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => $vale->litros,
+            'precio' => $vale->precio,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'id_vale' => $vale->id,
+            'tipo_carga' => 'VALE',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $response = $this->get(route('cargas.create', ['vale' => $vale->id]));
+
+        $response->assertRedirect(route('vales.index'));
+        $response->assertSessionHas('error', "El vale #{$vale->nro} ya tiene una carga de combustible registrada.");
     }
 
     public function test_store_usando_un_vale_ignora_conductor_litros_y_precio_manipulados(): void

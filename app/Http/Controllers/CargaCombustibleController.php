@@ -87,9 +87,10 @@ class CargaCombustibleController extends Controller
             $vale = Vale::with(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible'])
                 ->find($request->input('vale'));
 
-            if (! $vale || $vale->estado_vale !== 'PENDIENTE' || $vale->fecha_vencimiento->isPast()) {
-                return redirect()->route('vales.index')
-                    ->with('error', 'El vale seleccionado no está disponible para su uso.');
+            $error = $vale ? $this->validarValeDisponible($vale) : 'El vale seleccionado no existe.';
+
+            if ($error) {
+                return redirect()->route('vales.index')->with('error', $error);
             }
 
             $valePreseleccionado = $this->formatearValePreseleccionado($vale);
@@ -197,6 +198,28 @@ class CargaCombustibleController extends Controller
     /* ------------------------------------------------------------------ */
     /*  Helpers */
     /* ------------------------------------------------------------------ */
+
+    /**
+     * Verifica que el vale pueda usarse para registrar una carga, antes de
+     * cargar el formulario (evita llenarlo en vano si ya no corresponde).
+     * Devuelve el motivo del rechazo, o null si el vale está disponible.
+     */
+    private function validarValeDisponible(Vale $vale): ?string
+    {
+        if ($vale->estado_vale !== 'PENDIENTE') {
+            return "El vale #{$vale->nro} ya no está pendiente (estado actual: {$vale->estado_vale}).";
+        }
+
+        if ($vale->fecha_vencimiento->isPast()) {
+            return "El vale #{$vale->nro} está vencido.";
+        }
+
+        if ($vale->cargasCombustible()->exists()) {
+            return "El vale #{$vale->nro} ya tiene una carga de combustible registrada.";
+        }
+
+        return null;
+    }
 
     /**
      * Datos del vale a mostrar como sólo información en el formulario de
