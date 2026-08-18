@@ -16,13 +16,16 @@ class VehiculoController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Vehiculo::with(['tipoCombustible', 'tipoVehiculo','conductorAsignado.persona']);
+        $query = Vehiculo::with(['tipoCombustible', 'tipoVehiculo', 'conductorAsignado.persona']);
 
         if ($request->filled('nro_placa')) {
-            $query->where('nro_placa', 'like', '%' . $request->nro_placa . '%');
+            $query->where('nro_placa', 'like', '%'.$request->nro_placa.'%');
+        }
+        if ($request->filled('codigo')) {
+            $query->where('codigo', 'like', '%'.$request->codigo.'%');
         }
         if ($request->filled('marca')) {
-            $query->where('marca', 'like', '%' . $request->marca . '%');
+            $query->where('marca', 'like', '%'.$request->marca.'%');
         }
         if ($request->filled('estado_vehiculo')) {
             $query->where('estado_vehiculo', $request->estado_vehiculo);
@@ -37,12 +40,12 @@ class VehiculoController extends Controller
             ->withQueryString();
 
         return Inertia::render('Vehiculos/Index', [
-            'vehiculos'       => $vehiculos,
-            'tiposVehiculo'   => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
-            'filters'         => $request->only(['nro_placa', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo']),
-            'flash'           => [
+            'vehiculos' => $vehiculos,
+            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
+            'filters' => $request->only(['nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo']),
+            'flash' => [
                 'success' => session('success'),
-                'error'   => session('error'),
+                'error' => session('error'),
             ],
         ]);
     }
@@ -50,8 +53,9 @@ class VehiculoController extends Controller
     public function create(): Response
     {
         return Inertia::render('Vehiculos/Create', [
+            'vehiculo' => null,
             'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']),
-            'tiposVehiculo'    => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
+            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
         ]);
     }
 
@@ -73,16 +77,17 @@ class VehiculoController extends Controller
     {
         // $historialAsignaciones = $vehiculo->historialAsignacionesConductores()->get();
         return Inertia::render('Vehiculos/Show', [
-            'vehiculo'             => $vehiculo->load(['tipoCombustible', 'tipoVehiculo']),
+            'vehiculo' => $vehiculo->load(['tipoCombustible', 'tipoVehiculo']),
             'historialAsignaciones' => [],
         ]);
     }
+
     public function edit(Vehiculo $vehiculo): Response
     {
-        return Inertia::render('Vehiculos/Edit', [
-            'vehiculo'         => $vehiculo->load(['tipoCombustible', 'tipoVehiculo']),
+        return Inertia::render('Vehiculos/Create', [
+            'vehiculo' => $vehiculo->load(['tipoCombustible', 'tipoVehiculo']),
             'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']),
-            'tiposVehiculo'    => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
+            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
         ]);
     }
 

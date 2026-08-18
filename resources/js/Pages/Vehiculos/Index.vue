@@ -13,6 +13,7 @@ const props = defineProps({
 
 const filters = ref({
     nro_placa: props.filters?.nro_placa ?? '',
+    codigo: props.filters?.codigo ?? '',
     marca: props.filters?.marca ?? '',
     estado_vehiculo: props.filters?.estado_vehiculo ?? '',
     id_tipo_vehiculo: props.filters?.id_tipo_vehiculo ?? '',
@@ -28,6 +29,7 @@ watch(
                 route('vehiculos.index'),
                 {
                     nro_placa: val.nro_placa || undefined,
+                    codigo: val.codigo || undefined,
                     marca: val.marca || undefined,
                     estado_vehiculo: val.estado_vehiculo || undefined,
                     id_tipo_vehiculo: val.id_tipo_vehiculo || undefined,
@@ -40,7 +42,7 @@ watch(
 )
 
 function clearFilters() {
-    filters.value = { nro_placa: '', marca: '', estado_vehiculo: '', id_tipo_vehiculo: '' }
+    filters.value = { nro_placa: '', codigo: '', marca: '', estado_vehiculo: '', id_tipo_vehiculo: '' }
 }
 
 function confirmDelete(vehiculo) {
@@ -109,6 +111,11 @@ onMounted(() => {
                         <label class="form-label">Nro. Placa</label>
                         <input v-model="filters.nro_placa" type="text" class="form-control"
                             placeholder="Buscar por placa..." />
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <label class="form-label">Código</label>
+                        <input v-model="filters.codigo" type="text" class="form-control"
+                            placeholder="Buscar por código..." />
                     </div>
                     <div class="col-sm-6 col-xl-3">
                         <label class="form-label">Marca</label>
@@ -190,7 +197,9 @@ onMounted(() => {
                                         </div>
                                         <div>
                                             <span class="d-block fw-semibold">{{ vehiculo.nro_placa }}</span>
-                                            <span class="text-muted fs-13"> {{ vehiculo.marca ?? '—' }} </span>
+                                            <span class="text-muted fs-13">
+                                                {{ vehiculo.marca ?? '—' }} {{ vehiculo.modelo ?? '' }}
+                                            </span>
                                         </div>
                                     </div>
 

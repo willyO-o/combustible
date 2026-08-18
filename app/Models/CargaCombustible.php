@@ -135,4 +135,7 @@ class CargaCombustible extends Model
             ->values()
             ->toArray();
     }
+
+    // agregar id_condigor al crear una carga de combustible, si el usuario tiene rol conductor, asignar el id_conductor del usuario logueado
+
 }

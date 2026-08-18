@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'id_vehiculo',
@@ -30,11 +30,11 @@ class SolicitudMantenimiento extends Model
         ];
     }
 
-    protected $appends = ["nro", "fecha"];
+    protected $appends = ['nro', 'fecha'];
 
     public function getNroAttribute()
     {
-        //rellenar con ceros a la izquierda hasta 6 dígitos
+        // rellenar con ceros a la izquierda hasta 6 dígitos
         return $this->nro_solicitud ? str_pad($this->nro_solicitud, 6, '0', STR_PAD_LEFT) : null;
     }
 
@@ -42,7 +42,6 @@ class SolicitudMantenimiento extends Model
     {
         return $this->fecha_solicitud?->format('d/m/Y');
     }
-
 
     // Relaciones
     public function vehiculo()
@@ -70,8 +69,6 @@ class SolicitudMantenimiento extends Model
         return $this->hasOne(PlanMantenimiento::class, 'id_solicitud_mantenimiento');
     }
 
-
-
     public static function siguienteNroMantenimientoProvisional(int $gestion): string
     {
         $gestion = now()->month >= 11 ? now()->year + 1 : now()->year;
@@ -82,9 +79,8 @@ class SolicitudMantenimiento extends Model
 
         $siguienteNro = $ultimo ? $ultimo->nro_solicitud + 1 : 1;
 
-        return str_pad($siguienteNro, 6, '0', STR_PAD_LEFT) . '/' . $gestion;
+        return str_pad($siguienteNro, 6, '0', STR_PAD_LEFT).'/'.$gestion;
     }
-
 
     protected function calcularGestion(): int
     {
@@ -112,6 +108,10 @@ class SolicitudMantenimiento extends Model
             $solicitudMantenimiento->nro_solicitud = self::siguienteNroVale($solicitudMantenimiento->gestion);
 
             $solicitudMantenimiento->fecha_solicitud = now();
+
+            $solicitudMantenimiento->estado = 'PENDIENTE';
+            $solicitudMantenimiento->id_conductor = auth()->user()->id_persona;
+            $solicitudMantenimiento->id_usuario_registra = auth()->id();
         });
     }
 }

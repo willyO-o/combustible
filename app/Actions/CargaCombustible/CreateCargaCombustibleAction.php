@@ -3,20 +3,17 @@
 namespace App\Actions\CargaCombustible;
 
 use App\Actions\Respaldo\SincronizarRespaldoCargaAction;
-use Illuminate\Support\Facades\DB;
 use App\Models\CargaCombustible;
 use App\Models\Vale;
-
+use Illuminate\Support\Facades\DB;
 
 class CreateCargaCombustibleAction
 {
-
     public function __construct(private SincronizarRespaldoCargaAction $sincronizarRespaldos) {}
 
     public function execute($request)
     {
         //
-
 
         return DB::transaction(function () use ($request) {
 
@@ -27,6 +24,8 @@ class CreateCargaCombustibleAction
 
                 $datos['litros'] = $vale->litros;
                 $datos['precio'] = $vale->precio;
+                $datos['id_grifo'] = $vale->id_grifo;
+                $datos['id_tipo_combustible'] = $vale->id_tipo_combustible;
 
                 $cargaCombustible = CargaCombustible::create($datos);
 
@@ -38,7 +37,6 @@ class CreateCargaCombustibleAction
             }
 
             $this->sincronizarRespaldos->execute($request, $cargaCombustible);
-
 
             return $cargaCombustible;
         });

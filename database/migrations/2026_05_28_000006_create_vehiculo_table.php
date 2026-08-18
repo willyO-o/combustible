@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('nro_placa', 20)->nullable()->unique();
             $table->string('codigo', 50)->nullable();
             $table->string('anio', 4)->nullable();
-            $table->string('modelo', 4)->nullable();
+            $table->string('modelo', 100)->nullable();
             $table->string('marca', 50)->nullable();
             $table->enum('estado_vehiculo', ['ACTIVO', 'RETIRADO', 'VENDIDO'])->default('ACTIVO');
             $table->foreignId('id_tipo_combustible')->constrained('tipo_combustible')->onDelete('restrict')->onUpdate('cascade');
