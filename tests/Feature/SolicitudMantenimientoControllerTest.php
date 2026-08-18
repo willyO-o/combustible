@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Conductor;
 use App\Models\OrdenTrabajo;
+use App\Models\Persona;
 use App\Models\SolicitudMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -37,6 +39,18 @@ class SolicitudMantenimientoControllerTest extends TestCase
             'fecha_solicitud' => now(),
             'estado' => 'PENDIENTE',
         ], $overrides));
+    }
+
+    private function crearUsuarioConductor(): User
+    {
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+
+        $persona = Persona::factory()->create();
+        $conductor = Conductor::create(['id' => $persona->id, 'estado_conductor' => 'ACTIVO']);
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+
+        return $user;
     }
 
     public function test_index_lista_las_solicitudes(): void
@@ -83,6 +97,39 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('SolicitudMantenimiento/Show')
             ->where('solicitud.orden_trabajo.id', $orden->id)
+        );
+    }
+
+    public function test_create_esta_bloqueado_para_usuarios_que_no_son_conductor(): void
+    {
+        $response = $this->get(route('mantenimiento.solicitudes.create'));
+
+        $response->assertForbidden();
+    }
+
+    public function test_store_esta_bloqueado_para_usuarios_que_no_son_conductor(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+
+        $response = $this->post(route('mantenimiento.solicitudes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'descripcion_problema' => 'Cambio de aceite',
+        ]);
+
+        $response->assertForbidden();
+        $this->assertDatabaseCount('solicitud_mantenimiento', 0);
+    }
+
+    public function test_create_es_accesible_para_un_usuario_conductor(): void
+    {
+        $conductor = $this->crearUsuarioConductor();
+
+        $response = $this->actingAs($conductor)->get(route('mantenimiento.solicitudes.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('SolicitudMantenimiento/Create')
         );
     }
 }

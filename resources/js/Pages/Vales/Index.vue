@@ -184,7 +184,7 @@ const puedeUsarse = (vale) =>
                             </td>
                             <td>{{ formatDate(vale.fecha_emision, true) }}</td>
                             <td>
-                                <small class="d-block badge"> {{ formatDate(vale.fecha_vencimiento, true) }}</small>
+                                <small class="d-block badge text-muted"> {{ formatDate(vale.fecha_vencimiento, true) }}</small>
                                 <span class="badge"
                                     :class="`text-${getExpirationStatus(vale.fecha_vencimiento).color}`">
                                     {{ getExpirationStatus(vale.fecha_vencimiento).text }}

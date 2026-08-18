@@ -63,9 +63,16 @@ class SolicitudMantenimientoController extends Controller
 
     /**
      * Formulario para crear una solicitud (Paso 1).
+     *
+     * Sólo los conductores registran solicitudes de mantenimiento: el
+     * vehículo y el conductor se determinan a partir de su propia persona.
      */
     public function create(): Response
     {
+        if (! auth()->user()->hasRole('conductor')) {
+            abort(403, 'Sólo los conductores pueden registrar solicitudes de mantenimiento.');
+        }
+
         $conductores = Conductor::join('persona', 'conductor.id', '=', 'persona.id')
             ->orderBy('persona.nombres')
             ->get();
@@ -89,6 +96,8 @@ class SolicitudMantenimientoController extends Controller
 
     /**
      * Guarda la solicitud de mantenimiento.
+     *
+     * El acceso ya queda restringido a conductores por SolicitudMantenimientoRequest::authorize().
      */
     public function store(SolicitudMantenimientoRequest $request): RedirectResponse
     {

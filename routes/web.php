@@ -5,6 +5,7 @@ use App\Http\Controllers\CargasCombustibleReportController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GrifoController;
+use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\OperacionDiariaController;
 use App\Http\Controllers\OrdenTrabajoController;
 use App\Http\Controllers\PersonaController;
@@ -81,6 +82,10 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('vehiculos', VehiculoController::class)
         ->parameters(['vehiculos' => 'vehiculo']);
+
+    // Notificaciones (dropdown del header)
+    Route::post('notificaciones/{notificacion}/marcar-leida', [NotificacionController::class, 'marcarLeida'])->name('notificaciones.marcar-leida');
+    Route::post('notificaciones/marcar-todas-leidas', [NotificacionController::class, 'marcarTodasLeidas'])->name('notificaciones.marcar-todas-leidas');
 
     // Vales
     Route::get('/search/vehiculos', [ValeController::class, 'searchVehiculos'])->name('search.vehiculos');

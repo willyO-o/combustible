@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Models\Asignacion;
 use App\Models\Conductor;
 use App\Models\Persona;
 use App\Models\SolicitudMantenimiento;
@@ -30,6 +31,20 @@ class SolicitudMantenimientoControllerTest extends TestCase
         return Conductor::create(['id' => $persona->id, 'estado_conductor' => 'ACTIVO']);
     }
 
+    /**
+     * El id_vehiculo de una solicitud sólo valida si el vehículo está asignado
+     * (asignación ACTIVA) al conductor autenticado.
+     */
+    private function crearAsignacion(Conductor $conductor, Vehiculo $vehiculo): Asignacion
+    {
+        return Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+    }
+
     private function crearSolicitud(array $overrides = []): SolicitudMantenimiento
     {
         return SolicitudMantenimiento::create(array_merge([
@@ -45,11 +60,14 @@ class SolicitudMantenimientoControllerTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('administrador');
+        $this->actingAs($admin, 'api');
 
+        // El modelo asigna el conductor/usuario a partir del usuario autenticado al
+        // crear (ver boot() de SolicitudMantenimiento), de ahí el actingAs() previo.
         $this->crearSolicitud();
         $this->crearSolicitud();
 
-        $response = $this->actingAs($admin, 'api')
+        $response = $this
             ->getJson(route('api.v1.solicitudes-mantenimiento.index'));
 
         $response->assertOk();
@@ -62,7 +80,16 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $user = User::factory()->create(['id_persona' => $conductor->id]);
         $user->assignRole('conductor');
 
-        $this->crearSolicitud(['id_conductor' => $conductor->id]);
+        $otroConductor = $this->crearConductor();
+        $otroUser = User::factory()->create(['id_persona' => $otroConductor->id]);
+        $otroUser->assignRole('conductor');
+
+        // El modelo asigna id_conductor a partir del usuario autenticado al crear
+        // (ver boot() de SolicitudMantenimiento), de ahí el actingAs() por cada una.
+        $this->actingAs($user, 'api');
+        $this->crearSolicitud();
+
+        $this->actingAs($otroUser, 'api');
         $this->crearSolicitud(); // de otro conductor
 
         $response = $this->actingAs($user, 'api')
@@ -73,6 +100,33 @@ class SolicitudMantenimientoControllerTest extends TestCase
     }
 
     public function test_crea_una_solicitud_de_mantenimiento(): void
+    {
+        $conductor = $this->crearConductor();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+        $vehiculo = Vehiculo::factory()->create();
+        $this->crearAsignacion($conductor, $vehiculo);
+
+        $response = $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.solicitudes-mantenimiento.store'), [
+                'id_vehiculo' => $vehiculo->id,
+                'tipo_mantenimiento' => 'CORRECTIVO',
+                'descripcion_problema' => 'Falla en el motor',
+                'kilometraje_actual' => 15000,
+                'fecha_solicitud' => now()->toDateString(),
+            ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.estado', 'PENDIENTE');
+        $response->assertJsonPath('data.id_usuario_registra', $user->id);
+        $this->assertDatabaseHas('solicitud_mantenimiento', [
+            'id_vehiculo' => $vehiculo->id,
+            'descripcion_problema' => 'Falla en el motor',
+            'estado' => 'PENDIENTE',
+        ]);
+    }
+
+    public function test_store_rechaza_a_usuarios_que_no_son_conductor(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('administrador');
@@ -86,14 +140,8 @@ class SolicitudMantenimientoControllerTest extends TestCase
                 'fecha_solicitud' => now()->toDateString(),
             ]);
 
-        $response->assertCreated();
-        $response->assertJsonPath('data.estado', 'PENDIENTE');
-        $response->assertJsonPath('data.id_usuario_registra', $admin->id);
-        $this->assertDatabaseHas('solicitud_mantenimiento', [
-            'id_vehiculo' => $vehiculo->id,
-            'descripcion_problema' => 'Falla en el motor',
-            'estado' => 'PENDIENTE',
-        ]);
+        $response->assertStatus(403);
+        $this->assertDatabaseCount('solicitud_mantenimiento', 0);
     }
 
     public function test_una_solicitud_creada_por_un_conductor_se_asocia_automaticamente(): void
@@ -102,12 +150,14 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $user = User::factory()->create(['id_persona' => $conductor->id]);
         $user->assignRole('conductor');
         $vehiculo = Vehiculo::factory()->create();
+        $this->crearAsignacion($conductor, $vehiculo);
 
         $response = $this->actingAs($user, 'api')
             ->postJson(route('api.v1.solicitudes-mantenimiento.store'), [
                 'id_vehiculo' => $vehiculo->id,
                 'tipo_mantenimiento' => 'PREVENTIVO',
                 'descripcion_problema' => 'Mantenimiento programado',
+                'kilometraje_actual' => 15000,
                 'fecha_solicitud' => now()->toDateString(),
             ]);
 
@@ -117,28 +167,34 @@ class SolicitudMantenimientoControllerTest extends TestCase
 
     public function test_valida_los_campos_requeridos_al_crear(): void
     {
-        $admin = User::factory()->create();
-        $admin->assignRole('administrador');
+        $conductor = $this->crearConductor();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
 
-        $response = $this->actingAs($admin, 'api')
+        $response = $this->actingAs($user, 'api')
             ->postJson(route('api.v1.solicitudes-mantenimiento.store'), []);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['id_vehiculo', 'tipo_mantenimiento', 'descripcion_problema', 'fecha_solicitud']);
+            ->assertJsonValidationErrors(['id_vehiculo', 'tipo_mantenimiento', 'descripcion_problema']);
     }
 
     public function test_actualiza_una_solicitud_pendiente(): void
     {
-        $admin = User::factory()->create();
-        $admin->assignRole('administrador');
-        $solicitud = $this->crearSolicitud();
+        $conductor = $this->crearConductor();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
         $vehiculo = Vehiculo::factory()->create();
+        $this->crearAsignacion($conductor, $vehiculo);
+        $this->actingAs($user, 'api');
 
-        $response = $this->actingAs($admin, 'api')
+        $solicitud = $this->crearSolicitud();
+
+        $response = $this
             ->putJson(route('api.v1.solicitudes-mantenimiento.update', $solicitud->id), [
                 'id_vehiculo' => $vehiculo->id,
                 'tipo_mantenimiento' => 'CORRECTIVO',
                 'descripcion_problema' => 'Descripción actualizada',
+                'kilometraje_actual' => 15000,
                 'fecha_solicitud' => now()->toDateString(),
             ]);
 
@@ -149,9 +205,42 @@ class SolicitudMantenimientoControllerTest extends TestCase
 
     public function test_no_permite_actualizar_una_solicitud_que_no_esta_pendiente(): void
     {
+        $conductor = $this->crearConductor();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+        $vehiculo = Vehiculo::factory()->create();
+        $this->crearAsignacion($conductor, $vehiculo);
+        $this->actingAs($user, 'api');
+
+        // ::create() siempre fuerza estado = PENDIENTE (ver boot() del modelo), por lo
+        // que el estado APROBADA se aplica con un update() posterior, que no dispara ese hook.
+        $solicitud = $this->crearSolicitud(['id_vehiculo' => $vehiculo->id]);
+        $solicitud->update(['estado' => 'APROBADA']);
+
+        $response = $this
+            ->putJson(route('api.v1.solicitudes-mantenimiento.update', $solicitud->id), [
+                'id_vehiculo' => $vehiculo->id,
+                'tipo_mantenimiento' => 'CORRECTIVO',
+                'descripcion_problema' => 'No debería aplicarse',
+                'kilometraje_actual' => 15000,
+                'fecha_solicitud' => now()->toDateString(),
+            ]);
+
+        $response->assertStatus(403);
+        $this->assertSame('APROBADA', $solicitud->fresh()->estado);
+    }
+
+    public function test_update_rechaza_a_usuarios_que_no_son_conductor(): void
+    {
+        $conductor = $this->crearConductor();
+        $autor = User::factory()->create(['id_persona' => $conductor->id]);
+        $autor->assignRole('conductor');
+
         $admin = User::factory()->create();
         $admin->assignRole('administrador');
-        $solicitud = $this->crearSolicitud(['estado' => 'APROBADA']);
+
+        $this->actingAs($autor, 'api');
+        $solicitud = $this->crearSolicitud();
 
         $response = $this->actingAs($admin, 'api')
             ->putJson(route('api.v1.solicitudes-mantenimiento.update', $solicitud->id), [
@@ -162,16 +251,19 @@ class SolicitudMantenimientoControllerTest extends TestCase
             ]);
 
         $response->assertStatus(403);
-        $this->assertSame('APROBADA', $solicitud->fresh()->estado);
+        $this->assertSame('PENDIENTE', $solicitud->fresh()->estado);
+        $this->assertSame('Cambio de aceite', $solicitud->fresh()->descripcion_problema);
     }
 
     public function test_muestra_el_detalle_de_una_solicitud(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('administrador');
+        $this->actingAs($admin, 'api');
+
         $solicitud = $this->crearSolicitud();
 
-        $response = $this->actingAs($admin, 'api')
+        $response = $this
             ->getJson(route('api.v1.solicitudes-mantenimiento.show', $solicitud->id));
 
         $response->assertOk();

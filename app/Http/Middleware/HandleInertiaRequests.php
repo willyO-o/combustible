@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -45,6 +46,50 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+            'notificaciones' => [
+                'no_leidas' => fn () => $request->user()?->unreadNotifications()->count() ?? 0,
+                'items' => fn () => $request->user()
+                    ? $request->user()->notifications()->limit(10)->get()
+                        ->map(fn ($notificacion) => $this->formatearNotificacion($notificacion))
+                    : [],
+            ],
+        ];
+    }
+
+    /**
+     * Da forma a una notificación de base de datos para el dropdown del header.
+     *
+     * Cada nuevo tipo de notificación (identificado por data['tipo']) debe
+     * añadir su propio caso aquí con título, descripción e ícono.
+     *
+     * @return array<string, mixed>
+     */
+    private function formatearNotificacion(DatabaseNotification $notificacion): array
+    {
+        $data = $notificacion->data;
+        $tipo = $data['tipo'] ?? 'general';
+
+        [$titulo, $descripcion, $icono] = match ($tipo) {
+            'observacion_operacion' => [
+                'Observación en operación diaria',
+                $data['observaciones'] ?? '',
+                'ri-error-warning-line',
+            ],
+            default => [
+                'Notificación',
+                $data['mensaje'] ?? '',
+                'ri-notification-line',
+            ],
+        };
+
+        return [
+            'id' => $notificacion->id,
+            'titulo' => $titulo,
+            'descripcion' => $descripcion,
+            'icono' => $icono,
+            'url' => $data['url'] ?? null,
+            'leida' => $notificacion->read_at !== null,
+            'fecha' => $notificacion->created_at->diffForHumans(),
         ];
     }
 }

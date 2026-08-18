@@ -6,17 +6,16 @@ defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     vehiculos: Array,
-    conductores: Array,
-    conductor: Object,
 })
 
+// El conductor y la fecha/hora de la solicitud se asignan automáticamente
+// en el modelo (a partir del usuario autenticado y del momento del registro),
+// por lo que no se piden en el formulario.
 const form = useForm({
     id_vehiculo:          '',
-    id_conductor:         props.conductor?.id ?? '',
     tipo_mantenimiento:   'PREVENTIVO',
     descripcion_problema: '',
     kilometraje_actual:   '',
-    fecha_solicitud:      new Date().toISOString().substring(0, 16), // datetime-local
     observacion:          '',
 })
 
@@ -73,21 +72,6 @@ function submit() {
                             </div>
                         </div>
 
-                        <!-- Conductor -->
-                        <div class="col-sm-6 col-xl-4">
-                            <label class="form-label fw-medium">Conductor</label>
-                            <select :disabled="props.conductor" v-model="form.id_conductor" class="form-select"
-                                :class="{ 'is-invalid': form.errors.id_conductor }">
-                                <option value="">— Seleccione (opcional) —</option>
-                                <option v-for="c in conductores" :key="c.id" :value="c.id">
-                                    {{ c.ci }} – {{ c.nombres }} {{ c.paterno ?? '' }}
-                                </option>
-                            </select>
-                            <div v-if="form.errors.id_conductor" class="invalid-feedback">
-                                {{ form.errors.id_conductor }}
-                            </div>
-                        </div>
-
                         <!-- Tipo -->
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">
@@ -114,18 +98,6 @@ function submit() {
                                 <div v-if="form.errors.kilometraje_actual" class="invalid-feedback">
                                     {{ form.errors.kilometraje_actual }}
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Fecha solicitud -->
-                        <div class="col-sm-6 col-xl-4">
-                            <label class="form-label fw-medium">
-                                Fecha y Hora de Solicitud <span class="text-danger">*</span>
-                            </label>
-                            <input v-model="form.fecha_solicitud" type="datetime-local"
-                                class="form-control" :class="{ 'is-invalid': form.errors.fecha_solicitud }" />
-                            <div v-if="form.errors.fecha_solicitud" class="invalid-feedback">
-                                {{ form.errors.fecha_solicitud }}
                             </div>
                         </div>
 

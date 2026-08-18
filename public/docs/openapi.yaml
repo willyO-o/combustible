@@ -78,6 +78,10 @@ tags:
       una solicitud o alarma de mantenimiento preventivo/correctivo para un vehículo. Por ahora
       solo se documentan los endpoints de **listado** y **registro**; el resto del flujo
       (aprobación, orden de trabajo, ejecución) se documentará más adelante, una vez probado.
+  - name: Notificaciones
+    description: |
+      Notificaciones de base de datos (`illuminate/notifications`) del usuario autenticado
+      (observaciones de operaciones diarias, y las que se vayan añadiendo a futuro).
 
 security:
   - bearerAuth: []
@@ -1252,6 +1256,8 @@ paths:
         Registra una nueva solicitud/alarma de mantenimiento para un vehículo (Paso 1 del
         flujo de mantenimiento).
 
+        **Sólo disponible para el rol `conductor`**: cualquier otro rol recibe `403`.
+
         Se envía como `application/json`. Los siguientes campos se calculan/asignan
         automáticamente en el servidor y **no deben enviarse**:
         - `nro_solicitud` y `gestion`: correlativo autogenerado dentro de la gestión actual
@@ -1259,9 +1265,8 @@ paths:
           siguiente).
         - `estado`: siempre queda en `PENDIENTE` al registrar.
         - `id_usuario_registra`: el usuario autenticado.
-        - `id_conductor`: si se omite y el usuario autenticado tiene el rol `conductor`, se
-          asigna automáticamente su propia persona (`id_conductor` = `id_persona` del usuario).
-          Para el resto de roles, si se omite, la solicitud queda sin conductor asociado.
+        - `id_conductor`: se asigna siempre a la propia persona del usuario autenticado
+          (`id_conductor` = `id_persona` del usuario), sin importar lo que se envíe.
       requestBody:
         required: true
         content:
@@ -1335,6 +1340,12 @@ paths:
                   fecha_solicitud: ["La fecha de solicitud es obligatoria."]
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El usuario autenticado no tiene el rol `conductor`.
+          content:
+            application/json:
+              example:
+                message: Sólo los conductores pueden registrar solicitudes de mantenimiento.
         '500':
           description: Error inesperado al registrar la solicitud de mantenimiento.
           content:
@@ -1342,6 +1353,76 @@ paths:
               example:
                 message: Error al registrar la solicitud de mantenimiento.
                 error: "SQLSTATE[23000]: Integrity constraint violation..."
+
+  # ──────────────────────────────────────────────────────────────────────
+  # NOTIFICACIONES
+  # ──────────────────────────────────────────────────────────────────────
+  /notificaciones:
+    get:
+      tags: [Notificaciones]
+      summary: Listar mis notificaciones
+      description: |
+        Arreglo simple (sin paginar) con las notificaciones disponibles del usuario
+        autenticado, ordenadas por fecha de creación descendente. Sólo se devuelven las que
+        cumplen **al menos una** de estas condiciones:
+        - Aún no fueron leídas (`read_at` es `null`), sin importar su antigüedad.
+        - Fueron creadas hace menos de 2 días, aunque ya estén leídas.
+
+        Cada notificación se muestra ya formateada (`titulo`, `descripcion`, `icono`, `url`)
+        según su tipo (`data.tipo` en la tabla `notifications`); un tipo sin caso definido cae
+        en un formato genérico.
+      responses:
+        '200':
+          description: Notificaciones disponibles del usuario autenticado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notificacion' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notificaciones/{notificacion}/marcar-leida:
+    post:
+      tags: [Notificaciones]
+      summary: Marcar una notificación como leída
+      description: |
+        Marca como leída (`read_at`) una notificación del usuario autenticado. Sólo puede
+        marcar notificaciones propias: si el `id` pertenece a otro usuario, responde `404`
+        (no se filtra su existencia).
+      parameters:
+        - name: notificacion
+          in: path
+          required: true
+          description: UUID de la notificación (columna `id` de la tabla `notifications`).
+          schema: { type: string, format: uuid }
+          example: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90"
+      responses:
+        '200':
+          description: Notificación marcada como leída.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificacionMarcarLeidaResponse'
+              example:
+                message: Notificación marcada como leída.
+                data:
+                  id: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90"
+                  tipo: observacion_operacion
+                  titulo: Observación en operación diaria
+                  descripcion: Falta revisar presión de llantas
+                  icono: ri-error-warning-line
+                  url: "http://localhost/operacion-diaria/12"
+                  leida: true
+                  fecha: "2026-08-17T14:30:00+00:00"
+                  fecha_legible: hace 1 día
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
 components:
   securitySchemes:
@@ -2364,3 +2445,32 @@ components:
       properties:
         message: { type: string, example: Solicitud de mantenimiento registrada exitosamente. }
         data: { $ref: '#/components/schemas/SolicitudMantenimiento' }
+
+    Notificacion:
+      type: object
+      description: |
+        Notificación ya formateada para el consumo de la API a partir de la tabla
+        `notifications` (`data.tipo` determina `titulo`/`descripcion`/`icono`).
+      properties:
+        id: { type: string, format: uuid, example: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90" }
+        tipo: { type: string, example: observacion_operacion }
+        titulo: { type: string, example: Observación en operación diaria }
+        descripcion: { type: string, example: Falta revisar presión de llantas }
+        icono: { type: string, example: ri-error-warning-line }
+        url:
+          type: string
+          nullable: true
+          example: "http://localhost/operacion-diaria/12"
+        leida: { type: boolean, example: false }
+        fecha:
+          type: string
+          format: date-time
+          description: Fecha de creación en formato ISO-8601.
+          example: "2026-08-17T14:30:00+00:00"
+        fecha_legible: { type: string, example: hace 1 día }
+
+    NotificacionMarcarLeidaResponse:
+      type: object
+      properties:
+        message: { type: string, example: Notificación marcada como leída. }
+        data: { $ref: '#/components/schemas/Notificacion' }

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CargaCombustibleController;
+use App\Http\Controllers\Api\V1\NotificacionController;
 use App\Http\Controllers\Api\V1\OperacionDiariaController;
 use App\Http\Controllers\Api\V1\ParametrosController;
 use App\Http\Controllers\Api\V1\SolicitudMantenimientoController;
@@ -39,6 +40,9 @@ Route::middleware('auth:api')->group(function () {
 
     Route::get('parametros', [ParametrosController::class, 'index'])->name('api.v1.parametros.index');
     Route::get('parametros/colecciones', [ParametrosController::class, 'colecciones'])->name('api.v1.parametros.colecciones');
+
+    Route::get('notificaciones', [NotificacionController::class, 'index'])->name('api.v1.notificaciones.index');
+    Route::post('notificaciones/{notificacion}/marcar-leida', [NotificacionController::class, 'marcarLeida'])->name('api.v1.notificaciones.marcar-leida');
 
     Route::get('vales/pendientes', [ValeController::class, 'valesPendientes'])->name('api.v1.vales.pendientes');
 

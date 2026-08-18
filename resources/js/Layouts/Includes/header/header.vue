@@ -300,52 +300,59 @@
                                 fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                 stroke-width="16" />
                         </svg>
-                        <span class="header-icon-pulse bg-secondary rounded pulse pulse-secondary"></span>
+                        <span v-if="notificacionesNoLeidas > 0"
+                            class="header-icon-pulse bg-danger rounded pulse pulse-secondary"></span>
+                        <span v-if="notificacionesNoLeidas > 0"
+                            class="badge bg-danger rounded-pill header-icon-badge">{{ notificacionesNoLeidas }}</span>
                     </a>
                     <!-- End::header-link|dropdown-toggle -->
                     <!-- Start::main-header-dropdown -->
                     <div class="main-header-dropdown dropdown-menu dropdown-menu-end" data-popper-placement="none">
                         <div class="p-3 bg-primary text-fixed-white">
                             <div class="d-flex align-items-center justify-content-between">
-                                <p class="mb-0 fs-16">Notifications</p>
-                                <a href="javascript:void(0);" class="badge bg-light text-default border">Clear All</a>
+                                <p class="mb-0 fs-16">Notificaciones</p>
+                                <a v-if="notificacionesNoLeidas > 0" href="javascript:void(0);"
+                                    class="badge bg-light text-default border" @click="marcarTodasLeidas">Marcar
+                                    todas leídas</a>
                             </div>
                         </div>
                         <div class="dropdown-divider"></div>
-                        <PerfectScrollbar class="list-unstyled mb-0" id="header-notification-scroll">
-                <li :class="`dropdown-item position-relative ${idx.liClass}`" v-for="(idx) in Notifications"
-                    :key="idx.id">
-                    <Link href="#!" class="stretched-link"></Link>
-                    <div class="d-flex align-items-start gap-3">
-                        <div class="lh-1">
-                            <span class="avatar avatar-sm avatar-rounded bg-primary-transparent">
-                                <img v-if="idx.avatar" :src="idx.avatar" alt="">
-                                <i v-if="idx.icon" class="ri-notification-line fs-16"></i>
-                            </span>
-                        </div>
-                        <div class="flex-fill">
-                            <span class="d-block fw-semibold">{{ idx.title }}</span>
-                            <span class="d-block text-muted fs-12">{{ idx.description }}</span>
-                        </div>
-                        <div class="text-end">
-                            <span class="d-block mb-1 fs-12 text-muted">{{ idx.time }}</span>
-                            <span :class="`d-block text-primary ${idx.isUnread ? '' : 'd-none'} `"><i
-                                    class="ri-circle-fill fs-9"></i></span>
+                        <template v-if="notificaciones.length">
+                            <PerfectScrollbar class="list-unstyled mb-0" id="header-notification-scroll">
+                                <li :class="`dropdown-item position-relative ${idx.leida ? '' : 'bg-primary-transparent'}`"
+                                    v-for="(idx) in notificaciones" :key="idx.id">
+                                    <a href="javascript:void(0);" class="stretched-link"
+                                        @click="abrirNotificacion(idx)"></a>
+                                    <div class="d-flex align-items-start gap-3">
+                                        <div class="lh-1">
+                                            <span class="avatar avatar-sm avatar-rounded bg-primary-transparent">
+                                                <i :class="idx.icono" class="fs-16"></i>
+                                            </span>
+                                        </div>
+                                        <div class="flex-fill">
+                                            <span class="d-block fw-semibold">{{ idx.titulo }}</span>
+                                            <span class="d-block text-muted fs-12">{{ idx.descripcion }}</span>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="d-block mb-1 fs-12 text-muted text-nowrap">{{ idx.fecha }}</span>
+                                            <span :class="`d-block text-primary ${idx.leida ? 'd-none' : ''} `"><i
+                                                    class="ri-circle-fill fs-9"></i></span>
+                                        </div>
+                                    </div>
+                                </li>
+                            </PerfectScrollbar>
+                        </template>
+                        <div class="p-5 empty-item1" v-else>
+                            <div class="text-center">
+                                <span class="avatar avatar-xl avatar-rounded bg-secondary-transparent">
+                                    <i class="ri-notification-off-line fs-2"></i>
+                                </span>
+                                <h6 class="fw-medium mt-3">Sin notificaciones nuevas</h6>
+                            </div>
                         </div>
                     </div>
+                    <!-- End::main-header-dropdown -->
                 </li>
-                </PerfectScrollbar>
-                <div class="p-5 empty-item1 d-none">
-                    <div class="text-center">
-                        <span class="avatar avatar-xl avatar-rounded bg-secondary-transparent">
-                            <i class="ri-notification-off-line fs-2"></i>
-                        </span>
-                        <h6 class="fw-medium mt-3">No New Notifications</h6>
-                    </div>
-                </div>
-        </div>
-        <!-- End::main-header-dropdown -->
-        </li>
         <!-- End::header-element -->
 
         <!-- Start::header-element -->
@@ -501,13 +508,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Tooltip } from 'bootstrap';
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar';
 import 'vue3-perfect-scrollbar/style.css';
-import { Languages, Notifications, notificationNotes as initialNotificationNotes } from '@/Data/header';
+import { Languages, notificationNotes as initialNotificationNotes } from '@/Data/header';
 import { switcherStore } from '@/stores/switcher';
 import { MENUITEMS } from '@/Data/sidebar/nav';
 import { useAuthStore } from '@/stores/auth';
 import Quantity from '@/UI/quantity.vue';
 
-import { Link ,router} from '@inertiajs/vue3';
+import { Link, router, usePage, usePoll } from '@inertiajs/vue3';
 
 // Stores
 const switcher = switcherStore();
@@ -518,6 +525,36 @@ const isFullScreen = ref(false);
 const search = ref('');
 const showSuggestions = ref(false);
 const notificationNotes = ref([...initialNotificationNotes]);
+
+// Notificaciones del usuario (compartidas por HandleInertiaRequests)
+const page = usePage();
+const notificaciones = computed(() => (page.props as any).notificaciones?.items ?? []);
+const notificacionesNoLeidas = computed(() => (page.props as any).notificaciones?.no_leidas ?? 0);
+
+// Refresca las notificaciones en segundo plano sin recargar el resto de la página.
+usePoll(30000, { only: ['notificaciones'] });
+
+const abrirNotificacion = (item: { id: string; leida: boolean; url: string | null }) => {
+    if (!item.leida) {
+        router.post(route('notificaciones.marcar-leida', item.id), {}, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                if (item.url) router.visit(item.url);
+            },
+        });
+        return;
+    }
+
+    if (item.url) router.visit(item.url);
+};
+
+const marcarTodasLeidas = () => {
+    router.post(route('notificaciones.marcar-todas-leidas'), {}, {
+        preserveScroll: true,
+        preserveState: true,
+    });
+};
 
 // Functions
 const colorthemeFn = (value: string) => {
