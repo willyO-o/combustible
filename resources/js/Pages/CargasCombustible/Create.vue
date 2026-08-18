@@ -18,6 +18,9 @@ const props = defineProps({
     valesConductor: { type: Array, default: () => [] }, // [{ id, nro_vale, fecha_emision, litros }] vales PENDIENTE del conductor (si hay uno)
     vehiculosAsignados: { type: Array, default: () => [] }, // [{ id, label }] vehículos asignados al conductor (si hay uno)
 
+    // ── "Usar vale" desde el listado de vales (modo creación) ──────────
+    valePreseleccionado: { type: Object, default: null }, // { id, nro, litros, precio, id_vehiculo, vehiculo, id_conductor, conductor, id_grifo, grifo, id_tipo_combustible, tipo_medicion }
+
     // ── Props exclusivos del modo edición ──────────────────────────────
     carga: { type: Object, default: null },          // registro a editar (null en modo creación)
     vehiculoActual: { type: Object, default: null },  // { id, label, meta } del vehículo de la carga
@@ -27,11 +30,27 @@ const props = defineProps({
 })
 
 const isEdit = computed(() => !!props.carga)
+// "Usar vale": vehículo, conductor, grifo, litros y precio quedan bloqueados
+// (sólo información) y el resto del formulario se completa normalmente.
+const modoVale = computed(() => !isEdit.value && !!props.valePreseleccionado)
 
-const valesVehiculo = ref(isEdit.value ? (props.valeActual ? [props.valeActual] : []) : (props.valesConductor || []))
+const valesVehiculo = ref(
+    isEdit.value ? (props.valeActual ? [props.valeActual] : [])
+        : modoVale.value ? [{ id: props.valePreseleccionado.id, label: `Vale #${props.valePreseleccionado.nro} — ${props.valePreseleccionado.litros} Lt` }]
+            : (props.valesConductor || [])
+)
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
+const vehiculoBloqueadoOpt = computed(() => {
+    if (isEdit.value) return props.vehiculoActual ? [props.vehiculoActual] : []
+    if (modoVale.value) return props.valePreseleccionado.vehiculo ? [props.valePreseleccionado.vehiculo] : []
+    return []
+})
 
-const conductoresOpt = ref(isEdit.value && props.conductorActual ? [props.conductorActual] : [])
+const conductoresOpt = ref(
+    isEdit.value && props.conductorActual ? [props.conductorActual]
+        : modoVale.value && props.valePreseleccionado.conductor ? [props.valePreseleccionado.conductor]
+            : []
+)
 
 
 
@@ -46,18 +65,18 @@ const form = useForm({
     fecha_carga: isEdit.value
         ? String(props.carga.fecha_carga).substring(0, 10)
         : today,
-    litros: isEdit.value ? props.carga.litros : '',
-    precio: isEdit.value ? props.carga.precio : '',
+    litros: isEdit.value ? props.carga.litros : (modoVale.value ? props.valePreseleccionado.litros : ''),
+    precio: isEdit.value ? props.carga.precio : (modoVale.value ? props.valePreseleccionado.precio : ''),
     kilometraje: isEdit.value ? (props.carga.kilometraje ?? '') : '',
     horometro: isEdit.value ? (props.carga.horometro ?? '') : '',
     nro_factura: isEdit.value ? (props.carga.nro_factura ?? '') : '',
     tipo_carga: isEdit.value ? props.carga.tipo_carga : 'VALE',
     estado_carga: isEdit.value ? (props.carga.estado_carga ?? 'REGISTRADO') : 'REGISTRADO',
-    id_vehiculo: isEdit.value ? (props.vehiculoActual?.id ?? null) : null,
-    id_grifo: isEdit.value ? (props.carga.id_grifo ?? null) : null,
-    id_tipo_combustible: isEdit.value ? props.carga.id_tipo_combustible : '',
-    id_conductor: isEdit.value ? (props.carga.id_conductor ?? null) : null,
-    id_vale: isEdit.value ? (props.valeActual?.id ?? null) : null,
+    id_vehiculo: isEdit.value ? (props.vehiculoActual?.id ?? null) : (modoVale.value ? props.valePreseleccionado.id_vehiculo : null),
+    id_grifo: isEdit.value ? (props.carga.id_grifo ?? null) : (modoVale.value ? props.valePreseleccionado.id_grifo : null),
+    id_tipo_combustible: isEdit.value ? props.carga.id_tipo_combustible : (modoVale.value ? props.valePreseleccionado.id_tipo_combustible : ''),
+    id_conductor: isEdit.value ? (props.carga.id_conductor ?? null) : (modoVale.value ? props.valePreseleccionado.id_conductor : null),
+    id_vale: isEdit.value ? (props.valeActual?.id ?? null) : (modoVale.value ? props.valePreseleccionado.id : null),
     respaldo_count: 0,
     respaldos_eliminar: [],
 })
@@ -65,11 +84,15 @@ const form = useForm({
 /* ------------------------------------------------------------------ */
 /*  Auto-relleno al seleccionar vehículo (solo creación)                */
 /* ------------------------------------------------------------------ */
-const conductorAutoFill = ref(isEdit.value ? (props.conductorActual ?? null) : null)   // { id, label } del conductor asignado
+const conductorAutoFill = ref(
+    isEdit.value ? (props.conductorActual ?? null)
+        : modoVale.value ? (props.valePreseleccionado.conductor ?? null)
+            : null
+)   // { id, label } del conductor asignado
 const loadingVehiculo = ref(false)
 
 watch(() => form.id_vehiculo, async (val) => {
-    if (isEdit.value) return
+    if (isEdit.value || modoVale.value) return
 
 
 
@@ -214,7 +237,11 @@ const valeSeleccionado = (e) => {
 
 
 
-const tipoMedicion = ref(isEdit.value ? (props.vehiculoActual?.meta?.tipo_medicion ?? '') : '') // 'kilometraje' o 'horometro'
+const tipoMedicion = ref(
+    isEdit.value ? (props.vehiculoActual?.meta?.tipo_medicion ?? '')
+        : modoVale.value ? (props.valePreseleccionado.tipo_medicion ?? '')
+            : ''
+) // 'kilometraje' o 'horometro'
 
 const cambioVehiculo = async (vehiculoId) => {
 
@@ -288,8 +315,9 @@ const cambioVehiculo = async (vehiculoId) => {
 
 
 onMounted(() => {
-    // En edición no hay auto-relleno: los campos ya vienen bloqueados con los datos guardados.
-    if (isEdit.value) return
+    // En edición y en "usar vale" no hay auto-relleno: los campos ya vienen
+    // bloqueados con los datos guardados / los datos del vale.
+    if (isEdit.value || modoVale.value) return
 
     // Si hay un conductor asignado desde el servidor, auto-seleccionarlo
 
@@ -328,6 +356,9 @@ onMounted(() => {
                         <span class="text-primary">— {{ carga.vehiculo?.nro_placa }}</span>
                         <span class="text-muted fs-14 ms-2">{{ carga.fecha_carga }}</span>
                     </template>
+                    <template v-else-if="modoVale">
+                        <span class="text-primary">— Vale #{{ valePreseleccionado.nro }}</span>
+                    </template>
                 </h1>
             </div>
             <Link :href="route('cargas.index')" class="btn btn-outline-secondary btn-wave">
@@ -341,6 +372,16 @@ onMounted(() => {
                 Los datos originales de la carga (vehículo, conductor, vale, tipo de combustible, grifo, fecha,
                 litros y precio) quedan bloqueados. Solo puedes actualizar el <strong>kilometraje/horómetro</strong>
                 y los <strong>respaldos digitales</strong>.
+            </small>
+        </div>
+
+        <div v-else-if="modoVale" class="alert alert-info-transparent d-flex align-items-center gap-2 mb-4">
+            <i class="ri-lock-line fs-16"></i>
+            <small>
+                Estás usando el <strong>Vale #{{ valePreseleccionado.nro }}</strong>. El vehículo, conductor, grifo,
+                litros y precio vienen del vale y quedan bloqueados. Solo debes completar el
+                <strong>kilometraje/horómetro</strong>, el <strong>número de factura</strong> y los
+                <strong>respaldos digitales</strong>.
             </small>
         </div>
 
@@ -369,8 +410,8 @@ onMounted(() => {
                                         Vehículo <span class="text-danger">*</span>
                                     </label>
 
-                                    <Multiselect v-if="isEdit" v-model="form.id_vehiculo"
-                                        :options="vehiculoActual ? [vehiculoActual] : []" value-prop="id" label="label"
+                                    <Multiselect v-if="isEdit || modoVale" v-model="form.id_vehiculo"
+                                        :options="vehiculoBloqueadoOpt" value-prop="id" label="label"
                                         :searchable="false" :disabled="true" placeholder="—" />
 
                                     <Multiselect v-else-if="props.conductor" v-model="form.id_vehiculo"
@@ -400,7 +441,7 @@ onMounted(() => {
                                         <span v-if="form.id_vehiculo && !isEdit"
                                             class="badge bg-success-transparent text-success ms-2 fs-10">Auto-llenado</span>
                                     </label>
-                                    <select v-model="form.id_tipo_combustible" class="form-select" :disabled="isEdit"
+                                    <select v-model="form.id_tipo_combustible" class="form-select" :disabled="isEdit || modoVale"
                                         :class="{ 'is-invalid': form.errors.id_tipo_combustible }">
                                         <option value="">— Seleccionar —</option>
                                         <option v-for="tc in tiposCombustible" :key="tc.id" :value="tc.id">
@@ -426,9 +467,9 @@ onMounted(() => {
                                     </label>
 
                                     <Multiselect v-model="form.id_conductor" :options="conductoresOpt" value-prop="id" label="label"
-                                        :searchable="true" :filter-results="true" placeholder="Buscar conductor..."
+                                        :searchable="!isEdit && !modoVale" :filter-results="true" placeholder="Buscar conductor..."
                                         no-options-text="Sin conductores activos" no-results-text="Sin resultados"
-                                        :disabled="isEdit"
+                                        :disabled="isEdit || modoVale"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
                                     <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                         form.errors.id_conductor }}</div>
@@ -454,7 +495,7 @@ onMounted(() => {
                                         Nro de Vale <span class="text-muted small">(Si aplica)</span>
                                     </label>
 
-                                    <select v-model="form.id_vale" class="form-select" :disabled="isEdit"
+                                    <select v-model="form.id_vale" class="form-select" :disabled="isEdit || modoVale"
                                         :class="{ 'is-invalid': form.errors.id_vale }" @change="valeSeleccionado">
                                         <option :value="null">— Seleccione —</option>
                                         <option v-for="vale in valesVehiculo" :key="vale.id" :value="vale.id">
@@ -491,9 +532,9 @@ onMounted(() => {
                                 <div class="col-12">
                                     <label class="form-label fw-medium">Grifo <span class="text-danger">*</span></label>
                                     <Multiselect v-model="form.id_grifo" :options="grifos" value-prop="id" label="label"
-                                        :searchable="true" :filter-results="true" placeholder="Buscar grifo..."
+                                        :searchable="!isEdit && !modoVale" :filter-results="true" placeholder="Buscar grifo..."
                                         no-options-text="Sin grifos activos" no-results-text="Sin resultados"
-                                        :disabled="isEdit"
+                                        :disabled="isEdit || modoVale"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_grifo }" />
                                     <div v-if="form.errors.id_grifo" class="text-danger small mt-1">{{
                                         form.errors.id_grifo }}</div>
@@ -535,7 +576,7 @@ onMounted(() => {
                                     <label class="form-label fw-medium">Litros <span
                                             class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <input v-model="form.litros" type="text"   v-decimal="2" :disabled="isEdit"
+                                        <input v-model="form.litros" type="text"   v-decimal="2" :disabled="isEdit || modoVale"
                                             class="form-control" :class="{ 'is-invalid': form.errors.litros }"
                                             placeholder="0.00" />
                                         <span class="input-group-text">Lt</span>
@@ -549,7 +590,7 @@ onMounted(() => {
                                             class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text">Bs</span>
-                                        <input v-model="form.precio" type="text"   v-decimal="2" :disabled="isEdit"
+                                        <input v-model="form.precio" type="text"   v-decimal="2" :disabled="isEdit || modoVale"
                                             class="form-control" :class="{ 'is-invalid': form.errors.precio }"
                                             placeholder="0.00" />
                                         <div v-if="form.errors.precio" class="invalid-feedback">{{ form.errors.precio }}

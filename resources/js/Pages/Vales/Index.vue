@@ -65,6 +65,10 @@ const estadoBadge = (estado) => {
     return map[estado] ?? 'bg-secondary-transparent text-secondary'
 }
 
+// Sólo se puede usar un vale PENDIENTE y no vencido.
+const puedeUsarse = (vale) =>
+    vale.estado_vale === 'PENDIENTE' && getExpirationStatus(vale.fecha_vencimiento).text !== 'Expirado'
+
 
 </script>
 
@@ -219,6 +223,11 @@ const estadoBadge = (estado) => {
                                         title="Ver detalles" @click="openDetalle(vale.id)">
                                         <i class="ri-eye-line"></i>
                                     </button>
+                                    <Link v-can="'cargas-combustible.registrar'" v-if="puedeUsarse(vale)"
+                                        :href="route('cargas.create', { vale: vale.id })"
+                                        class="btn btn-sm btn-icon btn-success-light" title="Usar vale (registrar carga)">
+                                        <i class="ri-gas-station-line"></i>
+                                    </Link>
                                     <Link v-can="'vales.editar'" v-if="vale.estado_vale != 'USADO'" :href="route('vales.edit', vale.id)"
                                         class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                         <i class="ri-edit-line"></i>

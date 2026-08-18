@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -236,6 +237,96 @@ class CargaCombustibleControllerTest extends TestCase
         $response->assertSessionDoesntHaveErrors();
         $response->assertRedirect(route('cargas.index'));
         $this->assertEquals(150, (float) $carga->fresh()->horometro);
+        $this->assertSame('USADO', $vale->fresh()->estado_vale);
+    }
+
+    private function crearVale(Vehiculo $vehiculo, Conductor $conductor, Grifo $grifo, TipoCombustible $tipoCombustible, array $overrides = []): Vale
+    {
+        $this->crearParametrosEmpresa();
+
+        return Vale::create(array_merge([
+            'litros' => 40,
+            'precio' => 9.5,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'estado_vale' => 'PENDIENTE',
+            'id_tipo_combustible' => $tipoCombustible->id,
+        ], $overrides));
+    }
+
+    public function test_create_precarga_los_datos_del_vale_cuando_se_usa_desde_el_listado(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible);
+
+        $response = $this->get(route('cargas.create', ['vale' => $vale->id]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('CargasCombustible/Create')
+            ->where('valePreseleccionado.id', $vale->id)
+            ->where('valePreseleccionado.litros', fn ($litros) => (float) $litros === 40.0)
+            ->where('valePreseleccionado.precio', fn ($precio) => (float) $precio === 9.5)
+            ->where('valePreseleccionado.id_vehiculo', $vehiculo->id)
+            ->where('valePreseleccionado.id_conductor', $conductor->id)
+            ->where('valePreseleccionado.id_grifo', $grifo->id)
+        );
+    }
+
+    public function test_create_redirige_a_vales_si_el_vale_no_esta_pendiente(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible, ['estado_vale' => 'USADO']);
+
+        $response = $this->get(route('cargas.create', ['vale' => $vale->id]));
+
+        $response->assertRedirect(route('vales.index'));
+    }
+
+    public function test_store_usando_un_vale_ignora_conductor_litros_y_precio_manipulados(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible);
+
+        // Conductor/litros/precio distintos a los del vale, simulando una
+        // petición manipulada: el controlador debe ignorarlos y usar siempre
+        // los datos del vale (id_vehiculo sí queda cross-validado contra el
+        // vale por CargaCombustibleRequest, así que aquí se mantiene correcto).
+        $otroConductor = $this->crearConductor();
+
+        $response = $this->post(route('cargas.store'), [
+            'fecha_carga' => now()->format('Y-m-d'),
+            'litros' => 999,
+            'precio' => 999,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $otroConductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_vale' => $vale->id,
+            'nro_factura' => 'F-100',
+            'tipo_carga' => 'VALE',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $response->assertRedirect(route('cargas.index'));
+
+        $carga = CargaCombustible::latest('id')->first();
+        $this->assertSame($vehiculo->id, $carga->id_vehiculo);
+        $this->assertSame($conductor->id, $carga->id_conductor);
+        $this->assertEquals(40, (float) $carga->litros);
+        $this->assertEquals(9.5, (float) $carga->precio);
+        $this->assertSame('F-100', $carga->nro_factura);
         $this->assertSame('USADO', $vale->fresh()->estado_vale);
     }
 }

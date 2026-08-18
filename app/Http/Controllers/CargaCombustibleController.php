@@ -40,7 +40,7 @@ class CargaCombustibleController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response|RedirectResponse
     {
         $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
             ->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']);
@@ -80,12 +80,28 @@ class CargaCombustibleController extends Controller
 
         // dd($conductor->conductor->asignacioneActivas);
 
+        // "Usar vale" desde el listado de vales: precarga vehículo, conductor,
+        // grifo, litros y precio como sólo información (bloqueados en la vista).
+        $valePreseleccionado = null;
+        if ($request->filled('vale')) {
+            $vale = Vale::with(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible'])
+                ->find($request->input('vale'));
+
+            if (! $vale || $vale->estado_vale !== 'PENDIENTE' || $vale->fecha_vencimiento->isPast()) {
+                return redirect()->route('vales.index')
+                    ->with('error', 'El vale seleccionado no está disponible para su uso.');
+            }
+
+            $valePreseleccionado = $this->formatearValePreseleccionado($vale);
+        }
+
         return Inertia::render('CargasCombustible/Create', [
             'tiposCombustible' => $tiposCombustible,
             'grifos' => $grifos,
             'conductor' => $conductor,
             'valesConductor' => $valesConductor,
             'vehiculosAsignados' => $vehiculosAsignados,
+            'valePreseleccionado' => $valePreseleccionado,
         ]);
     }
 
@@ -182,6 +198,38 @@ class CargaCombustibleController extends Controller
     /*  Helpers */
     /* ------------------------------------------------------------------ */
 
+    /**
+     * Datos del vale a mostrar como sólo información en el formulario de
+     * "usar vale": vehículo, conductor, grifo, litros y precio quedan
+     * bloqueados en la vista; el controlador vuelve a forzarlos antes de
+     * insertar (ver CreateCargaCombustibleAction).
+     */
+    private function formatearValePreseleccionado(Vale $vale): array
+    {
+        return [
+            'id' => $vale->id,
+            'nro' => $vale->nro,
+            'litros' => $vale->litros,
+            'precio' => $vale->precio,
+            'id_tipo_combustible' => $vale->id_tipo_combustible,
+            'id_vehiculo' => $vale->id_vehiculo,
+            'id_conductor' => $vale->id_conductor,
+            'id_grifo' => $vale->id_grifo,
+            'tipo_medicion' => $vale->vehiculo?->tipo_medicion,
+            'vehiculo' => $vale->vehiculo ? [
+                'id' => $vale->vehiculo->id,
+                'label' => "{$vale->vehiculo->codigo} — {$vale->vehiculo->nro_placa}".($vale->vehiculo->marca ? " — {$vale->vehiculo->marca}" : ''),
+            ] : null,
+            'conductor' => $vale->conductor ? [
+                'id' => $vale->conductor->id,
+                'label' => trim("{$vale->conductor->persona->nombre_completo}")." (CI: {$vale->conductor->persona->ci})",
+            ] : null,
+            'grifo' => $vale->grifo ? [
+                'id' => $vale->grifo->id,
+                'label' => $vale->grifo->razon_social.($vale->grifo->ciudad ? " — {$vale->grifo->ciudad}" : ''),
+            ] : null,
+        ];
+    }
 
     private function processRespaldos(Request $request, CargaCombustible $carga): void
     {
