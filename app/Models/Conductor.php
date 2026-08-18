@@ -111,10 +111,7 @@ class Conductor extends Model
         return $this->hasMany(CargaCombustible::class, 'id_conductor');
     }
 
-    public function incidencias()
-    {
-        return $this->hasMany(Incidencia::class, 'id_conductor');
-    }
+
 
     public function mantenimientos()
     {

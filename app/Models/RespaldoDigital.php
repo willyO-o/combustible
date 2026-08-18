@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'tipo_respaldo',
     'tipo_archivo',
     'id_carga_combustible',
-    'id_incidencia',
 ])]
 class RespaldoDigital extends Model
 {
@@ -22,8 +21,5 @@ class RespaldoDigital extends Model
         return $this->belongsTo(CargaCombustible::class, 'id_carga_combustible');
     }
 
-    public function incidencia()
-    {
-        return $this->belongsTo(Incidencia::class, 'id_incidencia');
-    }
+
 }

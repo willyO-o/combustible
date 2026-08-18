@@ -200,7 +200,6 @@ class CargaCombustibleController extends Controller
                 'tipo_respaldo' => $request->input("respaldo_tipo_{$i}", 'OTRO'),
                 'tipo_archivo' => $tipoArchivo,
                 'id_carga_combustible' => $carga->id,
-                'id_incidencia' => null,
             ]);
         }
     }

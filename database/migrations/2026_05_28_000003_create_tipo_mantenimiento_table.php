@@ -17,6 +17,17 @@ return new class extends Migration
             $table->enum('estado_tipo_mantenimiento', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
             $table->timestamps();
         });
+
+
+        Schema::create('intervalo_mantenimiento_tipo', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('id_tipo_vehiculo')->constrained('tipo_vehiculo')->onDelete('restrict');
+            $table->foreignId('id_tipo_mantenimiento')->constrained('tipo_mantenimiento')->onDelete('restrict');
+            $table->enum('tipo_medicion', ['kilometraje', 'horometro'])->default('kilometraje');
+            $table->integer('frecuencia')->nullable();
+            $table->enum('estado', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
+            $table->timestamps();
+        });
     }
 
     /**
@@ -24,6 +35,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('intervalo_mantenimiento_tipo');
         Schema::dropIfExists('tipo_mantenimiento');
     }
 };
