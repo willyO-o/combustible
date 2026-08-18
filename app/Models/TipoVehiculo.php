@@ -27,4 +27,15 @@ class TipoVehiculo extends Model
     {
         return $this->hasMany(Vehiculo::class, 'id_tipo_vehiculo');
     }
+
+    public function tipoMantenimientos()
+    {
+        return $this->belongsToMany(
+            TipoMantenimiento::class,
+            'intervalo_mantenimiento_tipo',
+             'id_tipo_vehiculo',
+             'id_tipo_mantenimiento')
+            ->using(IntervaloMantenimientoTipo::class)
+            ->withPivot('id', 'tipo_medicion', 'frecuencia', 'estado');
+    }
 }

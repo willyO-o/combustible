@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             TipoCombustibleSeeder::class,
             TipoMantenimientoSeeder::class,
             TipoVehiculoSeeder::class,
+            IntervaloMantenimientoTipoSeeder::class,
             ConductorSeeder::class,
             GrifoSeeder::class,
             VehiculoSeeder::class,
