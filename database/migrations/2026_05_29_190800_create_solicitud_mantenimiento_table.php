@@ -29,7 +29,7 @@ return new class extends Migration
             $table->text('descripcion_problema');
 
             $table->integer('kilometraje_actual')->nullable();
-            $table->integer('horometro')->nullable();
+            $table->integer('horometro_actual')->nullable();
             $table->dateTime('fecha_solicitud');
 
             $table->enum('estado', ['PENDIENTE', 'APROBADA', 'RECHAZADA', 'ANULADA'])->default('PENDIENTE');

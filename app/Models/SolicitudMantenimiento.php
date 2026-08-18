@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'tipo_mantenimiento',
     'descripcion_problema',
     'kilometraje_actual',
+    'horometro_actual',
     'fecha_solicitud',
     'estado',
     'observacion',
@@ -109,6 +110,8 @@ class SolicitudMantenimiento extends Model
         static::creating(function ($solicitudMantenimiento) {
             $solicitudMantenimiento->gestion = $solicitudMantenimiento->calcularGestion();
             $solicitudMantenimiento->nro_solicitud = self::siguienteNroVale($solicitudMantenimiento->gestion);
+
+            $solicitudMantenimiento->fecha_solicitud = now();
         });
     }
 }
