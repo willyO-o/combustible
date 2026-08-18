@@ -206,7 +206,7 @@ const costoTotal = computed(() =>
                         <div class="card-title"><i class="ri-alarm-warning-line me-2 text-warning"></i>Solicitud Origen</div>
                     </div>
                     <div class="card-body">
-                        <p class="mb-1 fw-medium">#{{ orden.solicitud_mantenimiento.id }}</p>
+                        <p class="mb-1 fw-medium">#{{ orden.solicitud_mantenimiento.nro }}</p>
                         <p class="mb-1 text-muted small">{{ orden.solicitud_mantenimiento.descripcion_problema?.substring(0, 100) }}</p>
                         <Link :href="route('mantenimiento.solicitudes.show', orden.solicitud_mantenimiento.id)"
                             class="btn btn-sm btn-outline-info btn-wave">

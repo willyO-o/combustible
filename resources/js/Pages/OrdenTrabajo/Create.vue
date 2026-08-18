@@ -71,7 +71,7 @@ function submit() {
         <div v-if="solicitudPreseleccionada" class="alert alert-info d-flex align-items-start gap-2 mb-4">
             <i class="ri-information-line fs-20 mt-1"></i>
             <div>
-                <strong>Solicitud origen #{{ solicitudPreseleccionada.id }}</strong> —
+                <strong>Solicitud origen #{{ solicitudPreseleccionada.nro }}</strong> —
                 {{ solicitudPreseleccionada.tipo_mantenimiento }} —
                 Vehículo: {{ solicitudPreseleccionada.vehiculo?.nro_placa }}
                 <br />
@@ -96,7 +96,7 @@ function submit() {
                                 @change="onSolicitudChange">
                                 <option value="">— Sin solicitud previa —</option>
                                 <option v-for="s in solicitudesPendientes" :key="s.id" :value="s.id">
-                                    #{{ s.id }} – {{ s.vehiculo?.nro_placa }} – {{ s.tipo_mantenimiento }}
+                                    #{{ s.nro }} – {{ s.vehiculo?.nro_placa }} – {{ s.tipo_mantenimiento }}
                                 </option>
                             </select>
                         </div>

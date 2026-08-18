@@ -2,44 +2,43 @@
 
 namespace App\Libraries;
 
+use App\Models\CargaCombustible;
 use FPDF;
-
 
 class Reportes extends FPDF
 {
-
     public function generarVale($vale)
     {
         // logo======
         // DATOS DE EJEMPLO (reemplazar por variables dinámicas luego)
         // ==========================================================
-        $empresaLocal   = "PLUS METALS LTDA.";
-        $numeroVale     = $vale->nro; // Número de vale (formateado con ceros a la izquierda)
-        $empresa        = $vale->grifo->razon_social;
-        $direccion      = $vale->grifo->direccion;
-        $telefono       = "Tel. " . $vale->grifo->telefono;
-        $ciudad         = $vale->grifo->ciudad;
+        $empresaLocal = 'PLUS METALS LTDA.';
+        $numeroVale = $vale->nro; // Número de vale (formateado con ceros a la izquierda)
+        $empresa = $vale->grifo->razon_social;
+        $direccion = $vale->grifo->direccion;
+        $telefono = 'Tel. '.$vale->grifo->telefono;
+        $ciudad = $vale->grifo->ciudad;
 
-        $cliente        = $vale->conductor->persona->nombre_completo;
-        $licencia       = $vale->conductor->persona->ci;
-        $vehiculo       = $vale->vehiculo->codigo;
-        $marca          = $vale->vehiculo->marca;
-        $placa          = $vale->vehiculo->nro_placa;
+        $cliente = $vale->conductor->persona->nombre_completo;
+        $licencia = $vale->conductor->persona->ci;
+        $vehiculo = $vale->vehiculo->codigo;
+        $marca = $vale->vehiculo->marca;
+        $placa = $vale->vehiculo->nro_placa;
 
-        $litros         = $vale->litros;
-        $bolivianos     = $vale->precio;
+        $litros = $vale->litros;
+        $bolivianos = $vale->precio;
         // $tipoGasolina   = true;   // marca el checkbox "Gasolina"
-        $tipoDiesel     = false;  // marca el checkbox "Diesel"
-        $autorizadoPor  = $vale->user?->name;
+        $tipoDiesel = false;  // marca el checkbox "Diesel"
+        $autorizadoPor = $vale->user?->name;
         // $facturaNro     = '000452';
-        $tipoCombustible = $vale->tipoCombustible->tipo_combustible;;
+        $tipoCombustible = $vale->tipoCombustible->tipo_combustible;
 
         // Colores base (verde institucional / rojo para el correlativo)
         // $verde  = [20, 110, 60];
-        $verde  = [24, 125, 170];
-        $rojo   = [190, 30, 30];
-        $negro  = [30, 30, 30];
-        $gris   = [90, 90, 90];
+        $verde = [24, 125, 170];
+        $rojo = [190, 30, 30];
+        $negro = [30, 30, 30];
+        $gris = [90, 90, 90];
 
         $this->AddPage('L', [219, 140]);
         $this->SetMargins(5, 5, 5);
@@ -67,7 +66,7 @@ class Reportes extends FPDF
         $this->SetXY(23, 19);
         $this->SetFont('Arial', 'B', 14);
         $this->SetTextColor($rojo[0], $rojo[1], $rojo[2]);
-        $this->Cell(27, 4, utf8Decode('N°' . $numeroVale), 0, 2, 'C');
+        $this->Cell(27, 4, utf8Decode('N°'.$numeroVale), 0, 2, 'C');
         // $this->SetFont('Arial', 'B', 12);
         // $this->Cell(27, 6, $numeroVale, 0, 0, 'C');
         // Datos de la empresa (alineados a la derecha, arriba)
@@ -81,8 +80,6 @@ class Reportes extends FPDF
         $this->Cell(74, 3.5, utf8Decode($direccion), 0, 2, 'R');
         $this->Cell(74, 3.5, utf8Decode($telefono), 0, 2, 'R');
         $this->Cell(74, 3.5, utf8Decode($ciudad), 0, 2, 'R');
-
-
 
         // Barra verde separadora con el logotipo "SOCINBOL"
         $this->SetFillColor($verde[0], $verde[1], $verde[2]);
@@ -183,7 +180,7 @@ class Reportes extends FPDF
         $this->SetXY($rx, $y2);
         // $this->Cell(30, 6, utf8Decode('Tipo Combustible: '), 0, 0, 'L');
         $this->SetFont('Arial', '', 9);
-        $this->Cell($rw , 6, utf8Decode(monedaLiteral($bolivianos)), 'B', 0, 'C');
+        $this->Cell($rw, 6, utf8Decode(monedaLiteral($bolivianos)), 'B', 0, 'C');
 
         $y2 += 10;
         $this->SetFont('Arial', 'B', 9);
@@ -208,8 +205,6 @@ class Reportes extends FPDF
         // $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         // $this->SetXY($rx, $chkY - 0.8);
         // $this->Cell(30, 5, utf8Decode('Tipo combustible: ' . $tipoCombustible), 0, 0, 'L');
-
-
 
         // $this->Rect($rx + 40, $chkY, 4, 4);
         // if ($tipoDiesel) {
@@ -254,19 +249,18 @@ class Reportes extends FPDF
         $this->Output('I', 'vale_combustible.pdf');
     }
 
-
     public function generarSolicitudMantenimiento($solicitud)
     {
         // ── Datos de ejemplo (reemplazar por parámetro dinámico) ──────────
-        $empresaLocal   = 'PLUS METALS LTDA.';
-        $nroSolicitud   = $solicitud?->nro_solicitud;
+        $empresaLocal = 'PLUS METALS LTDA.';
+        $nroSolicitud = $solicitud?->nro;
         $fechaSolicitud = $solicitud?->fecha_solicitud;
-        $solicitante    = $solicitud->persona?->nombre_completo;
-        $maquinaria     = "{$solicitud->vehiculo?->codigo} {$solicitud->vehiculo?->marca}";
-        $modelo         = $solicitud->vehiculo?->anio;
-        $tipoMant       = $solicitud->tipo_mantenimiento === 'PREVENTIVO' ? 'A' : 'B'; // 'A' = PREVENTIVO, 'B' = CORRECTIVO
-        $descripcion    = $solicitud->descripcion_problema;
-        $observaciones  = '';
+        $solicitante = $solicitud->persona?->nombre_completo;
+        $maquinaria = "{$solicitud->vehiculo?->codigo} {$solicitud->vehiculo?->marca}";
+        $modelo = $solicitud->vehiculo?->anio;
+        $tipoMant = $solicitud->tipo_mantenimiento === 'PREVENTIVO' ? 'A' : 'B'; // 'A' = PREVENTIVO, 'B' = CORRECTIVO
+        $descripcion = $solicitud->descripcion_problema;
+        $observaciones = '';
 
         $trabajos = [
             ['fecha' => '',          'horometro' => '',         'repuesto' => '',                     'codigo' => '',        'cantidad' => ''],
@@ -280,10 +274,10 @@ class Reportes extends FPDF
         ];
 
         // ── Colores (consistentes con generarVale) ────────────────────────
-        $azul   = [39, 42, 84];
-        $rojo   = [190, 30, 30];
-        $negro  = [30, 30, 30];
-        $gris   = [90, 90, 90];
+        $azul = [39, 42, 84];
+        $rojo = [190, 30, 30];
+        $negro = [30, 30, 30];
+        $gris = [90, 90, 90];
         $blanco = [255, 255, 255];
 
         $this->AddPage('P', 'Letter');
@@ -303,10 +297,10 @@ class Reportes extends FPDF
         // ══════════════════════════════════════════════════════════════════
         // SECCIÓN 1 – ENCABEZADO  (y=8, h=16)
         // ══════════════════════════════════════════════════════════════════
-        $h1    = 16;
+        $h1 = 16;
         $logoW = 45;
-        $nroW  = 44;
-        $titW  = $uw - $logoW - $nroW; // ~110.9
+        $nroW = 44;
+        $titW = $uw - $logoW - $nroW; // ~110.9
 
         $this->SetLineWidth(0.3);
 
@@ -327,15 +321,15 @@ class Reportes extends FPDF
         $this->SetFont('Arial', 'B', 14);
         $this->SetTextColor($rojo[0], $rojo[1], $rojo[2]);
         $this->SetXY($sx + $logoW + $titW, $sy);
-        $this->Cell($nroW, $h1, utf8Decode('N° ' . $nroSolicitud), 0, 0, 'C');
+        $this->Cell($nroW, $h1, utf8Decode('N° '.$nroSolicitud), 0, 0, 'C');
 
         // ══════════════════════════════════════════════════════════════════
         // SECCIÓN 2 – DATOS + TIPO MANTENIMIENTO  (y=24, h=44)
         // ══════════════════════════════════════════════════════════════════
-        $s2Y   = $sy + $h1; // 24
-        $s2H   = 44;
+        $s2Y = $sy + $h1; // 24
+        $s2H = 44;
         $leftW = 130;
-        $rigW  = $uw - $leftW; // ~69.9
+        $rigW = $uw - $leftW; // ~69.9
 
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
         $this->Rect($sx, $s2Y, $leftW, $s2H);
@@ -343,7 +337,7 @@ class Reportes extends FPDF
 
         // -- Campos lado izquierdo --
         $labelW = 54;
-        $rowH   = 10;
+        $rowH = 10;
         $campos = [
             ['FECHA DE SOLICITUD :',      $fechaSolicitud],
             ['NOMBRE DEL SOLICITANTE :',  $solicitante],
@@ -425,7 +419,7 @@ class Reportes extends FPDF
         // ══════════════════════════════════════════════════════════════════
         // SECCIÓN 4 – TRABAJOS REALIZADOS  (y=104)
         // ══════════════════════════════════════════════════════════════════
-        $s4Y     = $s3Y + $s3H; // 104
+        $s4Y = $s3Y + $s3H; // 104
         $tblRowH = 8;
 
         $this->SetFillColor($azul[0], $azul[1], $azul[2]);
@@ -464,7 +458,7 @@ class Reportes extends FPDF
 
         foreach ($trabajos as $t) {
             $vals = [$t['fecha'], $t['horometro'], $t['repuesto'], $t['codigo'], $t['cantidad']];
-            $cx   = $sx;
+            $cx = $sx;
             foreach ($cols as $idx => $col) {
                 $this->Rect($cx, $dataY, $col['w'], $tblRowH);
                 $this->SetXY($cx + 1, $dataY);
@@ -501,9 +495,9 @@ class Reportes extends FPDF
         // ══════════════════════════════════════════════════════════════════
         // SECCIÓN 6 – FIRMAS  (ocupa el resto hasta $sBottom, altura reducida)
         // ══════════════════════════════════════════════════════════════════
-        $s6Y  = $s5Y + $s5H;
-        $s6H  = $sBottom - $s6Y;
-        $cw3  = $uw / 3; // ~66.6 mm por columna
+        $s6Y = $s5Y + $s5H;
+        $s6H = $sBottom - $s6Y;
+        $cw3 = $uw / 3; // ~66.6 mm por columna
 
         $firmas = ['SOLICITANTE:', 'EJECUTOR DE TRABAJO:', 'Vo. Bo.'];
 
@@ -524,8 +518,8 @@ class Reportes extends FPDF
             $this->SetLineWidth(0.2);
             $this->Line($fx + 3, $s6Y + $s6H - 19, $fx + $cw3 - 3, $s6Y + $s6H - 19);
 
-            if($i === 0) {
-                //imprimir sobre la línea de firma el nombre del solicitante
+            if ($i === 0) {
+                // imprimir sobre la línea de firma el nombre del solicitante
                 $this->SetFont('Arial', 'B', 9);
                 $this->SetXY($fx + 2, $s6Y + $s6H - 25);
                 $this->Cell($cw3 - 4, 5, utf8Decode($solicitante), 0, 0, 'C');
@@ -542,14 +536,13 @@ class Reportes extends FPDF
             $this->Cell($cw3 - 4, 5, utf8Decode('FECHA ......../......../........'), 0, 0, 'C');
         }
 
-
         $this->Output('I', 'solicitud_mantenimiento.pdf');
     }
 
     public function generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo = null)
     {
         // Importar modelo
-        $cargasCombustibleQuery = \App\Models\CargaCombustible::whereBetween('fecha_carga', [$fechaInicio, $fechaFin])
+        $cargasCombustibleQuery = CargaCombustible::whereBetween('fecha_carga', [$fechaInicio, $fechaFin])
             ->with(['vehiculo', 'tipoCombustible']);
 
         if ($idVehiculo) {
@@ -561,6 +554,7 @@ class Reportes extends FPDF
         // Agrupar por vehículo
         $vehiculosAgrupados = $cargas->groupBy('id_vehiculo')->map(function ($grupo) {
             $primerCarga = $grupo->first();
+
             return [
                 'vehiculo' => $primerCarga->vehiculo,
                 'cargas' => $grupo->toArray(),
@@ -613,7 +607,7 @@ class Reportes extends FPDF
         $this->SetFont('Arial', '', 9);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
         $this->SetXY($sx + 40, $sy + 8);
-        $this->Cell($uw - 40, 8, utf8Decode("Del " . date('d/m/Y', strtotime($fechaInicio)) . " al " . date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+        $this->Cell($uw - 40, 8, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
 
         $currentY = $sy + 16 + 5;
 
@@ -623,9 +617,9 @@ class Reportes extends FPDF
         $cardW = 49;
         $cardH = 14;
         $cards = [
-            ['TOTAL LITROS', round($totalLitros, 2) . ' L', 'Azul'],
-            ['TOTAL COSTO', 'Bs. ' . number_format($totalCosto, 2, ',', '.'), 'Verde'],
-            ['COSTO/LITRO', 'Bs. ' . number_format($totalLitros > 0 ? $totalCosto / $totalLitros : 0, 2, ',', '.'), 'Rojo'],
+            ['TOTAL LITROS', round($totalLitros, 2).' L', 'Azul'],
+            ['TOTAL COSTO', 'Bs. '.number_format($totalCosto, 2, ',', '.'), 'Verde'],
+            ['COSTO/LITRO', 'Bs. '.number_format($totalLitros > 0 ? $totalCosto / $totalLitros : 0, 2, ',', '.'), 'Rojo'],
             ['CANTIDAD CARGAS', count($cargas), 'Gris'],
         ];
 
@@ -704,7 +698,7 @@ class Reportes extends FPDF
 
         foreach ($vehiculosAgrupados as $vehData) {
             $precioPromedio = count($vehData['cargas']) > 0
-                ? array_sum(array_map(fn($c) => $c['precio'], $vehData['cargas'])) / count($vehData['cargas'])
+                ? array_sum(array_map(fn ($c) => $c['precio'], $vehData['cargas'])) / count($vehData['cargas'])
                 : 0;
 
             $valores = [
@@ -758,8 +752,8 @@ class Reportes extends FPDF
         $this->SetY(-12);
         $this->SetFont('Arial', 'I', 8);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
-        $this->Cell($uw, 4, utf8Decode('Reporte generado el: ' . date('d/m/Y H:i')), 0, 0, 'L');
-        $this->Cell($uw, 4, utf8Decode('Página: ') . $this->PageNo() . '/{nb}', 0, 0, 'R');
+        $this->Cell($uw, 4, utf8Decode('Reporte generado el: '.date('d/m/Y H:i')), 0, 0, 'L');
+        $this->Cell($uw, 4, utf8Decode('Página: ').$this->PageNo().'/{nb}', 0, 0, 'R');
 
         $this->AliasNbPages();
         $this->Output('I', 'reporte_cargas_combustible.pdf');
@@ -774,48 +768,46 @@ class Reportes extends FPDF
         } else {
             $op = 'S';
         }
-        $k  = $this->k;
-        $h  = $this->h;
+        $k = $this->k;
+        $h = $this->h;
         $lx = 4 / 3 * (sqrt(2) - 1) * $r;
         $this->_out(sprintf(
             '%.2F %.2F m '
-            . '%.2F %.2F %.2F %.2F %.2F %.2F c '
-            . '%.2F %.2F %.2F %.2F %.2F %.2F c '
-            . '%.2F %.2F %.2F %.2F %.2F %.2F c '
-            . '%.2F %.2F %.2F %.2F %.2F %.2F c %s',
+            .'%.2F %.2F %.2F %.2F %.2F %.2F c '
+            .'%.2F %.2F %.2F %.2F %.2F %.2F c '
+            .'%.2F %.2F %.2F %.2F %.2F %.2F c '
+            .'%.2F %.2F %.2F %.2F %.2F %.2F c %s',
             ($cx + $r) * $k, ($h - $cy) * $k,
-            ($cx + $r) * $k, ($h - $cy + $lx) * $k,  ($cx + $lx) * $k, ($h - $cy + $r) * $k,  $cx * $k,          ($h - $cy + $r) * $k,
-            ($cx - $lx) * $k, ($h - $cy + $r) * $k,  ($cx - $r) * $k,  ($h - $cy + $lx) * $k, ($cx - $r) * $k,   ($h - $cy) * $k,
-            ($cx - $r) * $k,  ($h - $cy - $lx) * $k, ($cx - $lx) * $k, ($h - $cy - $r) * $k,  $cx * $k,          ($h - $cy - $r) * $k,
-            ($cx + $lx) * $k, ($h - $cy - $r) * $k,  ($cx + $r) * $k,  ($h - $cy - $lx) * $k, ($cx + $r) * $k,   ($h - $cy) * $k,
+            ($cx + $r) * $k, ($h - $cy + $lx) * $k, ($cx + $lx) * $k, ($h - $cy + $r) * $k, $cx * $k, ($h - $cy + $r) * $k,
+            ($cx - $lx) * $k, ($h - $cy + $r) * $k, ($cx - $r) * $k, ($h - $cy + $lx) * $k, ($cx - $r) * $k, ($h - $cy) * $k,
+            ($cx - $r) * $k, ($h - $cy - $lx) * $k, ($cx - $lx) * $k, ($h - $cy - $r) * $k, $cx * $k, ($h - $cy - $r) * $k,
+            ($cx + $lx) * $k, ($h - $cy - $r) * $k, ($cx + $r) * $k, ($h - $cy - $lx) * $k, ($cx + $r) * $k, ($h - $cy) * $k,
             $op
         ));
     }
 
-
-
     public function generarReporteOperacionDiaria($datos = null)
     {
         // ── Datos estáticos de ejemplo ──────────────────────────────────────
-        $nroReporte     = '01576';
-        $operador       = 'JOSÉ GARCÍA MORALES';
+        $nroReporte = '01576';
+        $operador = 'JOSÉ GARCÍA MORALES';
         $horometroInicial = '45000';
         $horometroFinal = '45150';
         $descripcionEquipo = 'EXCAVADORA CAT 320 D';
         $totalHorasTrabajo = '8.5 HRS';
-        $dia            = '15';
-        $mes            = '08';
-        $anio           = '2026';
-        $tipoJornada    = 'DÍA'; // 'DÍA' o 'NOCHE'
+        $dia = '15';
+        $mes = '08';
+        $anio = '2026';
+        $tipoJornada = 'DÍA'; // 'DÍA' o 'NOCHE'
 
         // Datos de mantenimiento realizado
-        $diesel         = 'HO 0KM';
-        $aceitesMotor   = 'HO 0KM';
-        $aceiteTransm   = 'HO 0KM';
-        $aceiteHidraul  = 'HO 0KM';
-        $grasa          = 'HO 0KM';
-        $sopleteFiltro  = 'NO'; // 'SI' o 'NO'
-        $observaciones  = 'Operación normal. Equipo en excelente estado operativo.';
+        $diesel = 'HO 0KM';
+        $aceitesMotor = 'HO 0KM';
+        $aceiteTransm = 'HO 0KM';
+        $aceiteHidraul = 'HO 0KM';
+        $grasa = 'HO 0KM';
+        $sopleteFiltro = 'NO'; // 'SI' o 'NO'
+        $observaciones = 'Operación normal. Equipo en excelente estado operativo.';
 
         // Datos de actividades (tabla de ejemplo)
         $actividades = [
@@ -828,10 +820,10 @@ class Reportes extends FPDF
         ];
 
         // ── Colores consistentes ────────────────────────────────────────────
-        $azul   = [39, 42, 84];
-        $rojo   = [190, 30, 30];
-        $negro  = [30, 30, 30];
-        $gris   = [90, 90, 90];
+        $azul = [39, 42, 84];
+        $rojo = [190, 30, 30];
+        $negro = [30, 30, 30];
+        $gris = [90, 90, 90];
         $blanco = [255, 255, 255];
 
         $this->AddPage('P', 'Letter');
@@ -846,10 +838,10 @@ class Reportes extends FPDF
         // ══════════════════════════════════════════════════════════════════
         // ENCABEZADO: 3 secciones [LOGO | TÍTULO + CHECKBOXES | N° + FECHA]
         // ══════════════════════════════════════════════════════════════════
-        $h1    = 24;    // altura del bloque encabezado
+        $h1 = 24;    // altura del bloque encabezado
         $logoW = 42;    // ancho sección logo
-        $nroW  = 50;    // ancho sección derecha
-        $midW  = $uw - $logoW - $nroW; // ancho sección central
+        $nroW = 50;    // ancho sección derecha
+        $midW = $uw - $logoW - $nroW; // ancho sección central
 
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
         $this->SetLineWidth(0.4);
@@ -880,8 +872,8 @@ class Reportes extends FPDF
         $this->Cell($midW, 8, utf8Decode('REPORTE DE OPERACION DIARIA'), 0, 0, 'C');
 
         // Checkboxes centrados horizontalmente
-        $chkY   = $sy + 13;
-        $chkSz  = 4;
+        $chkY = $sy + 13;
+        $chkSz = 4;
         $chkMid = $midX + $midW / 2;
 
         // Checkbox DIA (izquierda del centro)
@@ -916,11 +908,11 @@ class Reportes extends FPDF
         $this->SetFont('Arial', 'B', 13);
         $this->SetTextColor($rojo[0], $rojo[1], $rojo[2]);
         $this->SetXY($rx, $sy + 1);
-        $this->Cell($nroW, 7, utf8Decode('N° ' . $nroReporte), 0, 0, 'C');
+        $this->Cell($nroW, 7, utf8Decode('N° '.$nroReporte), 0, 0, 'C');
 
         // Tabla de fecha (3 columnas iguales)
         $dtColW = $nroW / 3;
-        $dtY    = $sy + 10;
+        $dtY = $sy + 10;
 
         $dtCols = ['DIA', 'MES', utf8Decode('AÑO')];
         $dtVals = [$dia, $mes, $anio];
@@ -1215,6 +1207,4 @@ class Reportes extends FPDF
         // Salida del PDF
         $this->Output('I', 'reporte_operacion_diaria.pdf');
     }
-
-
 }

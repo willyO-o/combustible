@@ -76,7 +76,7 @@ class SolicitudMantenimiento extends Model
         return now()->month >= 11 ? now()->year + 1 : now()->year;
     }
 
-    public static function siguienteNroVale(int $gestion): int
+    public static function siguienteNroSolicitud(int $gestion): int
     {
         $ultimo = self::where('gestion', $gestion)
             ->lockForUpdate()
@@ -92,7 +92,7 @@ class SolicitudMantenimiento extends Model
 
         static::creating(function ($solicitudMantenimiento) {
             $solicitudMantenimiento->gestion = $solicitudMantenimiento->calcularGestion();
-            $solicitudMantenimiento->nro_solicitud = self::siguienteNroVale($solicitudMantenimiento->gestion);
+            $solicitudMantenimiento->nro_solicitud = self::siguienteNroSolicitud($solicitudMantenimiento->gestion);
 
             $solicitudMantenimiento->fecha_solicitud = now();
 

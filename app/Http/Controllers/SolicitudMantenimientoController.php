@@ -116,7 +116,7 @@ class SolicitudMantenimientoController extends Controller
      */
     public function show(SolicitudMantenimiento $solicitud): Response
     {
-        $solicitud->load(['vehiculo', 'conductor', 'usuarioRegistra', 'ordenTrabajo']);
+        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo']);
 
         return Inertia::render('SolicitudMantenimiento/Show', [
             'solicitud' => $solicitud,

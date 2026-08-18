@@ -35,10 +35,10 @@ const tipoBadge = (tipo) => {
                         <li class="breadcrumb-item">
                             <Link :href="route('mantenimiento.solicitudes.index')">Solicitudes Mantenimiento</Link>
                         </li>
-                        <li class="breadcrumb-item active">Detalle #{{ solicitud.id }}</li>
+                        <li class="breadcrumb-item active">Detalle #{{ solicitud.nro }}</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Solicitud de Mantenimiento #{{ solicitud.id }}</h1>
+                <h1 class="page-title fw-medium fs-18 mb-0">Solicitud de Mantenimiento #{{ solicitud.nro }}</h1>
             </div>
             <div class="d-flex gap-2">
                 <Link :href="route('mantenimiento.solicitudes.index')" class="btn btn-outline-secondary btn-wave">
@@ -108,7 +108,8 @@ const tipoBadge = (tipo) => {
                 <div class="card custom-card mb-3">
                     <div class="card-header"><div class="card-title"><i class="ri-car-line me-2"></i>Vehículo</div></div>
                     <div class="card-body">
-                        <p class="mb-1 fw-bold fs-16">{{ solicitud.vehiculo?.nro_placa ?? '—' }}</p>
+                        <p class="mb-1 fw-bold fs-16">Codigo: {{ solicitud.vehiculo?.codigo ?? '—' }}</p>
+                        <p class="mb-1 fw-bold fs-16">Placa: {{ solicitud.vehiculo?.nro_placa ?? '—' }}</p>
                         <p class="mb-1 text-muted">{{ solicitud.vehiculo?.marca ?? '' }}</p>
                     </div>
                 </div>
@@ -117,7 +118,7 @@ const tipoBadge = (tipo) => {
                     <div class="card-header"><div class="card-title"><i class="ri-user-line me-2"></i>Conductor</div></div>
                     <div class="card-body">
                         <p v-if="solicitud.conductor" class="mb-1 fw-medium">
-                            {{ solicitud.conductor.nombres }} {{ solicitud.conductor.paterno ?? '' }}
+                            {{ solicitud.conductor.persona.nombre_completo  }}
                         </p>
                         <p v-else class="text-muted">No especificado</p>
                     </div>
