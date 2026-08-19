@@ -10,6 +10,7 @@ use App\Http\Controllers\OperacionDiariaController;
 use App\Http\Controllers\OrdenTrabajoController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RepuestoController;
 use App\Http\Controllers\SolicitudMantenimientoController;
 use App\Http\Controllers\TipoCombustibleController;
 use App\Http\Controllers\TipoMantenimientoController;
@@ -67,6 +68,9 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('tipos-vehiculo', TipoVehiculoController::class)
         ->parameters(['tipos-vehiculo' => 'tipoVehiculo']);
+
+    Route::resource('repuestos', RepuestoController::class)
+        ->parameters(['repuestos' => 'repuesto']);
 
     // Usuarios
     Route::get('usuarios/{usuario}/password', [UserController::class, 'editPassword'])->name('usuarios.edit-password');

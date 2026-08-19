@@ -309,7 +309,7 @@ class OrdenTrabajoController extends Controller
             ->orderBy('tipo_mantenimiento')
             ->get();
 
-        $repuestos = Repuesto::select('id', 'nombre_repuesto', 'codigo_repuesto', 'unidad_medida')
+        $repuestos = Repuesto::select('id', 'nombre_repuesto', 'codigo_repuesto', 'unidad_medida', 'stock_actual')
             ->where('estado_repuesto', 'ACTIVO')
             ->orderBy('nombre_repuesto')
             ->get();
@@ -331,7 +331,10 @@ class OrdenTrabajoController extends Controller
     {
         DB::transaction(function () use ($request, $orden) {
             $data = $request->safe()->except('detalles');
-            $data['fecha_ejecucion'] = $orden->fecha_ejecucion ?? $data['fecha_ejecucion'] ?? now();
+            // fecha_ejecucion ya debería estar registrada desde que se marcó EN_EJECUCION
+            // (cambiarEstado); si no lo está, se completa aquí como respaldo.
+            $data['fecha_ejecucion'] = $orden->fecha_ejecucion ?? now();
+            $data['fecha_culminacion'] = now();
             $data['estado_orden'] = 'CULMINADO';
 
             $orden->update($data);

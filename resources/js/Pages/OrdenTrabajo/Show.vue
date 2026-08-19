@@ -201,7 +201,10 @@ const costoTotal = computed(() =>
                                     <tr v-for="(d, idx) in orden.detalles" :key="d.id">
                                         <td>{{ idx + 1 }}</td>
                                         <td>{{ d.tipo_mantenimiento?.tipo_mantenimiento ?? '—' }}</td>
-                                        <td>{{ d.repuesto?.nombre_repuesto ?? d.detalle ?? '—' }}</td>
+                                        <td>
+                                            <span v-if="d.repuesto">{{ d.repuesto.codigo_repuesto }} – {{ d.repuesto.nombre_repuesto }}</span>
+                                            <span v-else>{{ d.detalle ?? '—' }}</span>
+                                        </td>
                                         <td class="text-end">{{ d.cantidad }}</td>
                                         <td class="text-end">Bs {{ Number(d.costo_unitario).toFixed(2) }}</td>
                                         <td class="text-end fw-medium">Bs {{ Number(d.subtotal).toFixed(2) }}</td>

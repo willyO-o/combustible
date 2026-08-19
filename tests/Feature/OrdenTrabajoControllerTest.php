@@ -174,7 +174,7 @@ class OrdenTrabajoControllerTest extends TestCase
 
         $response = $this->actingAs($this->admin)
             ->post(route('mantenimiento.ordenes.ejecucion.store', $orden), [
-                'fecha_culminacion' => now()->toDateString(),
+                'kilometraje_actual' => 90000,
                 'observacion' => 'Trabajo finalizado sin novedad',
                 'detalles' => [
                     [

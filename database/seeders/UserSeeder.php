@@ -148,6 +148,16 @@ class UserSeeder extends Seeder
         ];
     }
 
+    private function permisosRepuestos(): array
+    {
+        return [
+            'repuestos.ver',
+            'repuestos.crear',
+            'repuestos.editar',
+            'repuestos.eliminar',
+        ];
+    }
+
     private function permisosUsuarios(): array
     {
         return [
@@ -192,6 +202,7 @@ class UserSeeder extends Seeder
             ...$this->permisosTiposCombustible(),
             ...$this->permisosTiposMantenimiento(),
             ...$this->permisosTiposVehiculo(),
+            ...$this->permisosRepuestos(),
         ];
     }
 

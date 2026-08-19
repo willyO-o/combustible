@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class EjecucionOrdenTrabajoRequest extends FormRequest
 {
@@ -37,11 +38,25 @@ class EjecucionOrdenTrabajoRequest extends FormRequest
 
     public function rules(): array
     {
+        // fecha_ejecucion se registra al marcar la orden EN_EJECUCION (cambiarEstado) y
+        // fecha_culminacion se fija automáticamente al registrar esta ejecución: ninguna
+        // de las dos es un campo del formulario.
+        // El km/horómetro a pedir depende del tipo de medición del vehículo de la orden.
+        $tipoMedicion = $this->route('orden')?->vehiculo?->tipo_medicion;
+
         return [
-            'fecha_ejecucion' => ['nullable', 'date'],
-            'fecha_culminacion' => ['required', 'date', 'after_or_equal:fecha_ejecucion'],
-            'kilometraje_actual' => ['nullable', 'integer', 'min:0'],
-            'horometro_actual' => ['nullable', 'integer', 'min:0'],
+            'kilometraje_actual' => [
+                Rule::requiredIf($tipoMedicion === 'kilometraje'),
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+            'horometro_actual' => [
+                Rule::requiredIf($tipoMedicion === 'horometro'),
+                'nullable',
+                'integer',
+                'min:0',
+            ],
             'observacion' => ['nullable', 'string', 'max:500'],
 
             // Detalle de repuestos / insumos / mano de obra aplicados
@@ -57,8 +72,8 @@ class EjecucionOrdenTrabajoRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'fecha_culminacion.required' => 'La fecha de culminación es obligatoria.',
-            'fecha_culminacion.after_or_equal' => 'La fecha de culminación debe ser igual o posterior a la de ejecución.',
+            'kilometraje_actual.required' => 'El kilometraje actual es obligatorio.',
+            'horometro_actual.required' => 'El horómetro actual es obligatorio.',
             'detalles.required' => 'Debe registrar al menos un ítem del trabajo realizado.',
             'detalles.*.id_tipo_mantenimiento.required' => 'Cada ítem debe indicar el tipo de mantenimiento.',
             'detalles.*.cantidad.required' => 'La cantidad es obligatoria.',

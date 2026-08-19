@@ -10,10 +10,14 @@ const props = defineProps({
     repuestos: Array,
 })
 
+// fecha_ejecucion se registra al marcar la orden EN_EJECUCION (botón "Iniciar" en el
+// detalle de la orden) y fecha_culminacion se fija automáticamente al enviar este
+// formulario: ninguna de las dos se pide aquí.
+// El km/horómetro a mostrar depende del tipo de medición del vehículo de la orden.
+const tipoMedicion = computed(() => props.orden.vehiculo?.tipo_medicion)
+
 // ── Formulario principal ──────────────────────────────────────────────────────
 const form = useForm({
-    fecha_ejecucion:    props.orden.fecha_ejecucion?.substring(0, 10) ?? '',
-    fecha_culminacion:  '',
     kilometraje_actual: props.orden.kilometraje_actual ?? '',
     horometro_actual:   props.orden.horometro_actual ?? '',
     observacion:        props.orden.observacion ?? '',
@@ -103,50 +107,40 @@ agregarItem()
                 <div class="card-header">
                     <div class="card-title">
                         <i class="ri-tools-line me-2 text-success"></i>
-                        Fechas y Lecturas
+                        Lecturas y Observaciones
                     </div>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <!-- Fecha ejecución -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">Fecha Inicio Ejecución</label>
-                            <input v-model="form.fecha_ejecucion" type="date"
-                                class="form-control" :class="{ 'is-invalid': form.errors.fecha_ejecucion }" />
-                            <div v-if="form.errors.fecha_ejecucion" class="invalid-feedback">
-                                {{ form.errors.fecha_ejecucion }}
-                            </div>
-                        </div>
-
-                        <!-- Fecha culminación -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">
-                                Fecha Culminación <span class="text-danger">*</span>
-                            </label>
-                            <input v-model="form.fecha_culminacion" type="date"
-                                class="form-control" :class="{ 'is-invalid': form.errors.fecha_culminacion }" />
-                            <div v-if="form.errors.fecha_culminacion" class="invalid-feedback">
-                                {{ form.errors.fecha_culminacion }}
-                            </div>
-                        </div>
-
                         <!-- Km al mantenimiento -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">Kilometraje</label>
+                        <div v-if="tipoMedicion === 'kilometraje'" class="col-sm-6 col-xl-4">
+                            <label class="form-label fw-medium">
+                                Kilometraje <span class="text-danger">*</span>
+                            </label>
                             <div class="input-group">
                                 <input v-model="form.kilometraje_actual" type="number" min="0"
-                                    class="form-control" placeholder="Ej: 87500" />
+                                    class="form-control" :class="{ 'is-invalid': form.errors.kilometraje_actual }"
+                                    placeholder="Ej: 87500" />
                                 <span class="input-group-text">km</span>
+                                <div v-if="form.errors.kilometraje_actual" class="invalid-feedback">
+                                    {{ form.errors.kilometraje_actual }}
+                                </div>
                             </div>
                         </div>
 
                         <!-- Horómetro -->
-                        <div class="col-sm-6 col-xl-3">
-                            <label class="form-label fw-medium">Horómetro</label>
+                        <div v-else-if="tipoMedicion === 'horometro'" class="col-sm-6 col-xl-4">
+                            <label class="form-label fw-medium">
+                                Horómetro <span class="text-danger">*</span>
+                            </label>
                             <div class="input-group">
                                 <input v-model="form.horometro_actual" type="number" min="0"
-                                    class="form-control" placeholder="Ej: 1200" />
+                                    class="form-control" :class="{ 'is-invalid': form.errors.horometro_actual }"
+                                    placeholder="Ej: 1200" />
                                 <span class="input-group-text">h</span>
+                                <div v-if="form.errors.horometro_actual" class="invalid-feedback">
+                                    {{ form.errors.horometro_actual }}
+                                </div>
                             </div>
                         </div>
 
@@ -210,7 +204,7 @@ agregarItem()
                                             @change="onRepuestoChange(item)">
                                             <option value="">— Libre —</option>
                                             <option v-for="r in repuestos" :key="r.id" :value="r.id">
-                                                {{ r.nombre_repuesto }} ({{ r.unidad_medida }})
+                                                {{ r.codigo_repuesto }} – {{ r.nombre_repuesto }} ({{ r.unidad_medida }}) — Stock: {{ r.stock_actual }}
                                             </option>
                                         </select>
                                     </td>

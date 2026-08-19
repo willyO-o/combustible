@@ -64,7 +64,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     ],
   },
   {
-    menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver']
+    menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver', 'repuestos.ver']
   },
   {
     title: 'Conductores', icon: Svgicons.Conductoricon, type: 'link', path: '/conductores', active: false, selected: false, dirchange: false, permission: 'conductores.ver'
@@ -84,6 +84,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
   {
     title: 'Tipos de Vehículo', icon: Svgicons.TipoVehiculoIcon, type: 'link', path: '/tipos-vehiculo', active: false, selected: false, dirchange: false, permission: 'tipos-vehiculo.ver'
+  },
+  {
+    title: 'Repuestos', icon: Svgicons.RepuestoIcon, type: 'link', path: '/repuestos', active: false, selected: false, dirchange: false, permission: 'repuestos.ver'
   },
   {
     menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'roles.ver', 'permisos.ver']
