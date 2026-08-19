@@ -215,6 +215,19 @@ class UserSeeder extends Seeder
     }
 
     /**
+     * Parámetros de la Empresa (App\Http\Controllers\ParametrosEmpresaController):
+     * configuración global de la empresa, sólo administrador/super-admin, así
+     * que tampoco forma parte de ningún otro bundle de permisos.
+     */
+    private function permisosParametrosEmpresa(): array
+    {
+        return [
+            'parametros-empresa.ver',
+            'parametros-empresa.editar',
+        ];
+    }
+
+    /**
      * Todos los catálogos (conductores, vehículos, grifos, tipos-*) agrupados,
      * útil porque varios roles (admin, jefe de transporte) los comparten.
      */
@@ -260,6 +273,7 @@ class UserSeeder extends Seeder
             ...$this->permisosAreas(),
             ...$this->permisosPersonas(),
             ...$this->permisosRoles(),
+            ...$this->permisosParametrosEmpresa(),
         ];
     }
 

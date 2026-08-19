@@ -10,6 +10,7 @@ use App\Http\Controllers\GrupoVehiculoController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\OperacionDiariaController;
 use App\Http\Controllers\OrdenTrabajoController;
+use App\Http\Controllers\ParametrosEmpresaController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RepuestoController;
@@ -89,6 +90,10 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('roles', RolController::class)
         ->except(['show', 'destroy']);
+
+    // Parámetros de la Empresa (registro único: se crea o se actualiza)
+    Route::get('parametros-empresa', [ParametrosEmpresaController::class, 'edit'])->name('parametros-empresa.edit');
+    Route::put('parametros-empresa', [ParametrosEmpresaController::class, 'update'])->name('parametros-empresa.update');
 
     // Usuarios
     Route::get('usuarios/{usuario}/password', [UserController::class, 'editPassword'])->name('usuarios.edit-password');

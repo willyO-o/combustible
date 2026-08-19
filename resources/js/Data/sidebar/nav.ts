@@ -92,7 +92,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Repuestos', icon: Svgicons.RepuestoIcon, type: 'link', path: '/repuestos', active: false, selected: false, dirchange: false, permission: 'repuestos.ver'
   },
   {
-    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'areas.ver', 'roles.ver', 'permisos.ver']
+    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'areas.ver', 'roles.ver', 'permisos.ver', 'parametros-empresa.ver']
   },
   {
     title: 'Personas', icon: Svgicons.UsuarioIcon, type: 'link', path: '/personas', active: false, selected: false, dirchange: false, permission: 'personas.ver'
@@ -105,6 +105,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
   {
     title: 'Roles y Permisos', icon: Svgicons.RolIcon, type: 'link', path: '/roles', active: false, selected: false, dirchange: false, permission: 'roles.ver'
+  },
+  {
+    title: 'Parámetros de la Empresa', icon: Svgicons.Generalicon, type: 'link', path: '/parametros-empresa', active: false, selected: false, dirchange: false, permission: 'parametros-empresa.ver'
   },
 //   {
 //     title: "Dashboards", icon: Svgicons.Dashboardicon, type: "sub", active: false, dirchange: false, children: [

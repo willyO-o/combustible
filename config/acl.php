@@ -227,6 +227,14 @@ return [
             ],
         ],
 
+        'parametros-empresa' => [
+            'label' => 'Parámetros de la Empresa',
+            'permisos' => [
+                'parametros-empresa.ver' => 'Ver',
+                'parametros-empresa.editar' => 'Editar',
+            ],
+        ],
+
     ],
 
 ];
