@@ -41,8 +41,8 @@ class Reportes extends FPDF
 
         // Colores base (verde institucional / rojo para el correlativo)
         // $verde  = [20, 110, 60];
-        $verde = [24, 125, 170];
-        $rojo = [190, 30, 30];
+        $verde = [1, 82, 145];
+        $rojo = [203, 39, 45];
         $negro = [30, 30, 30];
         $gris = [90, 90, 90];
 
@@ -56,28 +56,29 @@ class Reportes extends FPDF
         // ENCABEZADO
         // ----------------------------------------------------------
         // Título "VALE"
-        $this->Image(public_path('images/logo/logo-min.png'), 6, 5.5, 18);
+        $this->Image(public_path('images/reportes/vale-fondo.png'), 0, 0, 219, 140);
+        $this->Image(public_path('images/logo/logo-min.png'), 6, 5.5, 25,15);
 
-        $this->SetXY(23, 5);
-        $this->SetFont('Arial', 'BI', 34);
+        $this->SetXY(35, 3);
+        $this->SetFont('Arial', 'BI', 40);
         $this->SetTextColor($verde[0], $verde[1], $verde[2]);
         $this->Cell(40, 16, utf8Decode('VALE'), 0, 0, 'L');
 
-        $this->Image(public_path('images/logo/gas.jpg'), 198.5, 5.5, 15);
+        $this->Image(public_path('images/logo/gas.jpg'), 198.5, 2.5, 15);
 
         // Recuadro rojo con el número de vale (arriba a la derecha)
         // $this->SetDrawColor($rojo[0], $rojo[1], $rojo[2]);
         // $this->SetLineWidth(0.4);
         // $this->Rect(40, 5, 16, 17);
-        $this->SetXY(23, 19);
+        $this->SetXY(35, 17);
         $this->SetFont('Arial', 'B', 14);
         $this->SetTextColor($rojo[0], $rojo[1], $rojo[2]);
-        $this->Cell(27, 4, utf8Decode('N°'.$numeroVale), 0, 2, 'C');
+        $this->Cell(40, 4, utf8Decode('N°'.$numeroVale), 0, 2, 'C');
         // $this->SetFont('Arial', 'B', 12);
         // $this->Cell(27, 6, $numeroVale, 0, 0, 'C');
         // Datos de la empresa (alineados a la derecha, arriba)
 
-        $this->SetXY(123, 6);
+        $this->SetXY(123, 3);
         $this->SetFont('Arial', 'B', 8);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->Cell(74, 4, utf8Decode($empresa), 0, 2, 'R');
@@ -87,9 +88,6 @@ class Reportes extends FPDF
         $this->Cell(74, 3.5, utf8Decode($telefono), 0, 2, 'R');
         $this->Cell(74, 3.5, utf8Decode($ciudad), 0, 2, 'R');
 
-        // Barra verde separadora con el logotipo "SOCINBOL"
-        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
-        $this->Rect(5, 27, $pageW - 10, 6, 'F');
         $this->SetXY(5, 27);
         $this->SetFont('Arial', 'B', 11);
         $this->SetTextColor(255, 255, 255);

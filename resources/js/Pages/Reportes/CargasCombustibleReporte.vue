@@ -98,7 +98,7 @@ const costoPorLitro = computed(() => {
                         <select v-model="filtros.id_vehiculo" class="form-select">
                             <option value="">Todos los vehículos</option>
                             <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                                {{ v.nro_placa }} – {{ v.marca }}
+                             {{ v.codigo }}   {{ v.nro_placa }} – {{ v.marca }}
                             </option>
                         </select>
                     </div>
