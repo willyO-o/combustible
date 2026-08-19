@@ -2,43 +2,41 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ValeRequest;
 use App\Actions\Vale\ListValeAction;
+use App\Http\Requests\ValeRequest;
+use App\Libraries\Reportes;
 use App\Models\Conductor;
 use App\Models\Grifo;
+use App\Models\TipoCombustible;
+use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
-use App\Models\TipoCombustible;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Support\Facades\DB;
-
-use App\Libraries\Reportes;
 
 class ValeController extends Controller
 {
-
-
     /* ------------------------------------------------------------------ */
-    /*  CRUD                                                               */
+    /*  CRUD */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request, ListValeAction $listValeAction): Response
     {
         $filters = $request->only(['nro_vale', 'fecha_desde', 'fecha_hasta', 'estado_vale', 'id_conductor']);
 
-
         $vales = $listValeAction->execute($filters, $request->user());
 
         return Inertia::render('Vales/Index', [
-            'vales'   => $vales,
+            'vales' => $vales,
             'filters' => $filters,
-            'flash'   => [
+            'flash' => [
                 'success' => session('success'),
-                'error'   => session('error'),
+                'error' => session('error'),
             ],
         ]);
     }
@@ -50,14 +48,13 @@ class ValeController extends Controller
         $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
             ->orderBy('tipo_combustible', 'asc')
             ->get(['id', 'tipo_combustible'])
-            ->map(fn($t) => [
-                'id'    => $t->id,
+            ->map(fn ($t) => [
+                'id' => $t->id,
                 'label' => $t->tipo_combustible,
             ]);
 
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
             ->get(['id', 'razon_social', 'ciudad', 'es_principal']);
-
 
         return Inertia::render('Vales/Create', [
             'nextNroVale' => $nextNroVale,
@@ -71,7 +68,7 @@ class ValeController extends Controller
     {
         try {
             DB::beginTransaction();
-            $datos=$request->validated();
+            $datos = $request->validated();
 
             $vehiculo = Vehiculo::find($datos['id_vehiculo']);
             $datos['id_tipo_combustible'] = $vehiculo->id_tipo_combustible;
@@ -79,10 +76,12 @@ class ValeController extends Controller
             $vale = Vale::create($datos);
 
             DB::commit();
+
             return redirect()->route('vales.index')
                 ->with('success', "Vale #{$vale->nro} registrado exitosamente.");
         } catch (\Throwable $th) {
             DB::rollBack();
+
             return redirect()->route('vales.index')
                 ->with('error', "Error al registrar el vale: {$th->getMessage()}");
         }
@@ -92,25 +91,22 @@ class ValeController extends Controller
     {
         $vale->load(['vehiculo', 'conductor', 'grifo']);
 
-
         $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
             ->orderBy('tipo_combustible', 'asc')
             ->get(['id', 'tipo_combustible'])
-            ->map(fn($t) => [
-                'id'    => $t->id,
+            ->map(fn ($t) => [
+                'id' => $t->id,
                 'label' => $t->tipo_combustible,
             ]);
-
 
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
             ->get(['id', 'razon_social', 'ciudad', 'es_principal']);
 
-
         return Inertia::render('Vales/Create', [
             'vale' => $vale,
             // Enviamos el objeto completo para que el select muestre el valor actual
-            'vehiculoActual'   => $vale->vehiculo  ? ['id' => $vale->vehiculo->id,  'label' => "{$vale->vehiculo->codigo} — {$vale->vehiculo->nro_placa}" . ($vale->vehiculo->marca ? " — {$vale->vehiculo->marca}" : '')] : null,
-            'conductorActual'  => $vale->conductor ? ['id' => $vale->conductor->id, 'label' => trim("{$vale->conductor->persona->nombre_completo}") . " (CI: {$vale->conductor->persona->ci})"] : null,
+            'vehiculoActual' => $vale->vehiculo ? ['id' => $vale->vehiculo->id,  'label' => "{$vale->vehiculo->codigo} — {$vale->vehiculo->nro_placa}".($vale->vehiculo->marca ? " — {$vale->vehiculo->marca}" : '')] : null,
+            'conductorActual' => $vale->conductor ? ['id' => $vale->conductor->id, 'label' => trim("{$vale->conductor->persona->nombre_completo}")." (CI: {$vale->conductor->persona->ci})"] : null,
             'tiposCombustible' => $tiposCombustible,
             'grifos' => $grifos,
         ]);
@@ -137,27 +133,29 @@ class ValeController extends Controller
             ->with('success', "Vale #{$vale->nro} eliminado exitosamente.");
     }
 
-
     /* ------------------------------------------------------------------ */
-    /*  Endpoints JSON para selects con búsqueda                           */
+    /*  Endpoints JSON para selects con búsqueda */
     /* ------------------------------------------------------------------ */
 
     public function searchVehiculos(Request $request): JsonResponse
     {
         $q = $request->input('q', '');
 
-        $vehiculos = Vehiculo::with('conductorAsignado')->where('estado_vehiculo', 'ACTIVO')
+        $query = Vehiculo::with('conductorAsignado')->where('estado_vehiculo', 'ACTIVO')
             ->where(function ($query) use ($q) {
                 $query->where('nro_placa', 'like', "%{$q}%")
                     ->orWhere('marca', 'like', "%{$q}%")
                     ->orWhere('codigo', 'like', "%{$q}%");
-            })
-            ->limit(20)
+            });
+
+        $this->restringirVehiculosPorAreaDeJefe($query, $request->user());
+
+        $vehiculos = $query->limit(20)
             ->get()
-            ->map(fn($v) => [
-                'id'    => $v->id,
-                'label' => "{$v->codigo} —  {$v->nro_placa}" . ($v->marca ? " — {$v->marca}" : '') . ($v->anio ? " ({$v->anio})" : ''),
-                'meta'  => [
+            ->map(fn ($v) => [
+                'id' => $v->id,
+                'label' => "{$v->codigo} —  {$v->nro_placa}".($v->marca ? " — {$v->marca}" : '').($v->anio ? " ({$v->anio})" : ''),
+                'meta' => [
                     'id_conductor' => $v->conductorAsignado ? $v->conductorAsignado->id : null,
                     'id_tipo_vehiculo' => $v->id_tipo_vehiculo,
                     'codigo' => $v->codigo,
@@ -171,6 +169,24 @@ class ValeController extends Controller
             ]);
 
         return response()->json($vehiculos);
+    }
+
+    /**
+     * Un jefe de área sólo puede emitir vales para vehículos con una
+     * asignación de área activa/provisional a alguna de sus áreas a cargo.
+     * Administradores y super-admin no tienen esta restricción.
+     */
+    private function restringirVehiculosPorAreaDeJefe(Builder $query, ?User $user): void
+    {
+        if (! $user || ! $user->hasRole('jefe-area') || $user->hasAnyRole(['super-admin', 'administrador'])) {
+            return;
+        }
+
+        $areas = $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? [];
+
+        $query->whereHas('areasAsignadas', function ($q) use ($areas) {
+            $q->whereIn('area.id', $areas);
+        });
     }
 
     public function searchConductores(Request $request): JsonResponse
@@ -193,8 +209,8 @@ class ValeController extends Controller
                         'id' => $c->id,
                         'label' => trim(
                             "{$c->nombres} {$c->paterno} {$c->materno}"
-                        ) . " (CI: {$c->ci})",
-                        'meta' => []
+                        )." (CI: {$c->ci})",
+                        'meta' => [],
                     ];
                 });
         } else {
@@ -212,10 +228,10 @@ class ValeController extends Controller
                 })
                 ->limit(20)
                 ->get(['persona.id', 'persona.ci', 'persona.nombres', 'persona.paterno', 'persona.materno'])
-                ->map(fn($c) => [
-                    'id'    => $c->id,
-                    'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}") . " (CI: {$c->ci})",
-                    'meta'  => []
+                ->map(fn ($c) => [
+                    'id' => $c->id,
+                    'label' => trim("{$c->nombres} {$c->paterno} {$c->materno}")." (CI: {$c->ci})",
+                    'meta' => [],
                 ]);
         }
 
@@ -234,14 +250,13 @@ class ValeController extends Controller
             })
             ->limit(20)
             ->get(['id', 'razon_social', 'nit', 'ciudad'])
-            ->map(fn($g) => [
-                'id'    => $g->id,
-                'label' => $g->razon_social . ($g->ciudad ? " — {$g->ciudad}" : '') . " (NIT: {$g->nit})",
+            ->map(fn ($g) => [
+                'id' => $g->id,
+                'label' => $g->razon_social.($g->ciudad ? " — {$g->ciudad}" : '')." (NIT: {$g->nit})",
             ]);
 
         return response()->json($grifos);
     }
-
 
     public function detalle(Vale $vale): JsonResponse
     {
@@ -261,50 +276,50 @@ class ValeController extends Controller
         if ($vale->estado_vale === 'USADO' && $vale->cargasCombustible->isNotEmpty()) {
             $c = $vale->cargasCombustible->first();
             $carga = [
-                'id'             => $c->id,
-                'fecha_carga'    => $c->fecha_carga?->format('d/m/Y'),
-                'litros'         => $c->litros,
-                'precio'         => $c->precio,
-                'total'          => round($c->litros * $c->precio, 2),
-                'nro_factura'    => $c->nro_factura,
-                'kilometraje'    => $c->kilometraje,
-                'horometro'      => $c->horometro,
-                'tipo_carga'     => $c->tipo_carga,
-                'estado_carga'   => $c->estado_carga,
-                'grifo'          => $c->grifo ? [
+                'id' => $c->id,
+                'fecha_carga' => $c->fecha_carga?->format('d/m/Y'),
+                'litros' => $c->litros,
+                'precio' => $c->precio,
+                'total' => round($c->litros * $c->precio, 2),
+                'nro_factura' => $c->nro_factura,
+                'kilometraje' => $c->kilometraje,
+                'horometro' => $c->horometro,
+                'tipo_carga' => $c->tipo_carga,
+                'estado_carga' => $c->estado_carga,
+                'grifo' => $c->grifo ? [
                     'razon_social' => $c->grifo->razon_social,
-                    'ciudad'       => $c->grifo->ciudad,
+                    'ciudad' => $c->grifo->ciudad,
                 ] : null,
             ];
         }
 
         return response()->json([
-            'id'                => $vale->id,
-            'nro'               => $vale->nro,
-            'fecha_emision'     => $vale->fecha_emision?->format('Y-m-d H:i'),
-            'fecha_vencimiento'     => $vale->fecha_vencimiento->format('Y-m-d H:i'),
-            'litros'            => $vale->litros,
-            'precio'            => $vale->precio,
-            'total'             => $total,
-            'estado_vale'       => $vale->estado_vale,
-            'tipo_combustible'  => $vale->tipoCombustible?->tipo_combustible,
-            'vehiculo'          => $vale->vehiculo ? [
+            'id' => $vale->id,
+            'nro' => $vale->nro,
+            'fecha_emision' => $vale->fecha_emision?->format('Y-m-d H:i'),
+            'fecha_vencimiento' => $vale->fecha_vencimiento->format('Y-m-d H:i'),
+            'litros' => $vale->litros,
+            'precio' => $vale->precio,
+            'total' => $total,
+            'estado_vale' => $vale->estado_vale,
+            'tipo_combustible' => $vale->tipoCombustible?->tipo_combustible,
+            'vehiculo' => $vale->vehiculo ? [
                 'nro_placa' => $vale->vehiculo->nro_placa,
-                'marca'     => $vale->vehiculo->marca,
-                'anio'      => $vale->vehiculo->anio,
-                'modelo'    => $vale->vehiculo->modelo ?? null,
+                'marca' => $vale->vehiculo->marca,
+                'anio' => $vale->vehiculo->anio,
+                'modelo' => $vale->vehiculo->modelo ?? null,
             ] : null,
-            'conductor'         => $vale->conductor ? [
+            'conductor' => $vale->conductor ? [
                 'nombre_completo' => trim("{$vale->conductor->persona->nombres} {$vale->conductor->persona->paterno} {$vale->conductor->persona->materno}"),
-                'ci'              => $vale->conductor->persona->ci,
+                'ci' => $vale->conductor->persona->ci,
             ] : null,
-            'grifo'             => $vale->grifo ? [
+            'grifo' => $vale->grifo ? [
                 'razon_social' => $vale->grifo->razon_social,
-                'ciudad'       => $vale->grifo->ciudad,
-                'nit'          => $vale->grifo->nit,
+                'ciudad' => $vale->grifo->ciudad,
+                'nit' => $vale->grifo->nit,
             ] : null,
-            'registrado_por'    => $vale->user?->name,
-            'carga'             => $carga,
+            'registrado_por' => $vale->user?->name,
+            'carga' => $carga,
         ]);
     }
 
@@ -313,7 +328,7 @@ class ValeController extends Controller
         // dd($vale);
         $vale->load(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible', 'user']);
 
-        $reporte = new Reportes();
+        $reporte = new Reportes;
         $reporte->generarVale($vale);
 
         exit;

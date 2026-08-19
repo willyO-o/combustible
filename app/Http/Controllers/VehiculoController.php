@@ -37,6 +37,11 @@ class VehiculoController extends Controller
         if ($request->filled('id_tipo_vehiculo')) {
             $query->where('id_tipo_vehiculo', $request->id_tipo_vehiculo);
         }
+        if ($request->filled('id_area')) {
+            $query->whereHas('areasAsignadas', function ($areaQuery) use ($request) {
+                $areaQuery->where('area.id', $request->id_area);
+            });
+        }
 
         $vehiculos = $query
             ->orderBy('nro_placa')
@@ -47,7 +52,7 @@ class VehiculoController extends Controller
             'vehiculos' => $vehiculos,
             'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
-            'filters' => $request->only(['nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo']),
+            'filters' => $request->only(['nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo', 'id_area']),
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),

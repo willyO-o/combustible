@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Area;
 use App\Models\TipoCombustible;
 use App\Models\TipoVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -54,6 +56,28 @@ class VehiculoControllerTest extends TestCase
             ->component('Vehiculos/Index')
             ->has('vehiculos.data', 1)
             ->where('vehiculos.data.0.codigo', 'ACT-0001')
+        );
+    }
+
+    public function test_index_filtra_vehiculos_por_area(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculoEnArea = Vehiculo::factory()->create();
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculoEnArea->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        Vehiculo::factory()->create(); // sin área asignada
+
+        $response = $this->actingAs($this->admin)->get(route('vehiculos.index', ['id_area' => $area->id]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Vehiculos/Index')
+            ->has('vehiculos.data', 1)
+            ->where('vehiculos.data.0.id', $vehiculoEnArea->id)
         );
     }
 

@@ -21,6 +21,7 @@ const filters = ref({
     marca: props.filters?.marca ?? '',
     estado_vehiculo: props.filters?.estado_vehiculo ?? '',
     id_tipo_vehiculo: props.filters?.id_tipo_vehiculo ?? '',
+    id_area: props.filters?.id_area ?? '',
 })
 
 let debounceTimer = null
@@ -37,6 +38,7 @@ watch(
                     marca: val.marca || undefined,
                     estado_vehiculo: val.estado_vehiculo || undefined,
                     id_tipo_vehiculo: val.id_tipo_vehiculo || undefined,
+                    id_area: val.id_area || undefined,
                 },
                 { preserveState: true, replace: true },
             )
@@ -46,7 +48,7 @@ watch(
 )
 
 function clearFilters() {
-    filters.value = { nro_placa: '', codigo: '', marca: '', estado_vehiculo: '', id_tipo_vehiculo: '' }
+    filters.value = { nro_placa: '', codigo: '', marca: '', estado_vehiculo: '', id_tipo_vehiculo: '', id_area: '' }
 }
 
 async function confirmDelete(vehiculo) {
@@ -220,6 +222,15 @@ const tipoAsignacionBadge = (tipo) =>
                         <option value="ACTIVO">ACTIVO</option>
                         <option value="RETIRADO">RETIRADO</option>
                         <option value="VENDIDO">VENDIDO</option>
+                    </select>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <label class="form-label">Área</label>
+                    <select v-model="filters.id_area" class="form-select">
+                        <option value="">Todas</option>
+                        <option v-for="a in areas" :key="a.id" :value="a.id">
+                            {{ a.nombre_area }}
+                        </option>
                     </select>
                 </div>
             </div>
