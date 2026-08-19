@@ -106,6 +106,9 @@ const chartSeries = computed(() => [
             <h1 class="page-title fw-medium fs-18 mb-0">
                 Detalle de Rendimiento
                 <span v-if="vehiculoSeleccionado" class="text-primary">— {{ vehiculoSeleccionado.codigo }} ({{ vehiculoSeleccionado.nro_placa }})</span>
+                <span v-if="vehiculoSeleccionado?.tipo_combustible" class="badge bg-info-transparent text-info ms-1">
+                    {{ vehiculoSeleccionado.tipo_combustible.tipo_combustible }}
+                </span>
             </h1>
         </div>
         <div class="d-flex gap-2">
@@ -136,7 +139,7 @@ const chartSeries = computed(() => [
                     <select v-model="filtros.id_vehiculo" class="form-select">
                         <option value="">— Seleccionar un vehículo —</option>
                         <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                            {{ v.codigo }} — {{ v.nro_placa }}{{ v.marca ? ' — ' + v.marca : '' }}
+                            {{ v.codigo }} — {{ v.nro_placa }}{{ v.marca ? ' — ' + v.marca : '' }}{{ v.tipo_combustible ? ' · ' + v.tipo_combustible.tipo_combustible : '' }}
                         </option>
                     </select>
                 </div>

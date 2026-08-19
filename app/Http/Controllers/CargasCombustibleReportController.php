@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Libraries\Reportes;
+use App\Models\Area;
 use App\Models\CargaCombustible;
+use App\Models\TipoCombustible;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,13 +14,16 @@ use Inertia\Response;
 class CargasCombustibleReportController extends Controller
 {
     /**
-     * Mostrar la vista de reportes de cargas de combustible.
+     * Mostrar la vista de reportes de cargas de combustible. Admite los
+     * mismos filtros de tipo de combustible y área que el reporte de
+     * rendimiento (ver vehiculosParaFiltro()).
      */
     public function index(Request $request): Response
     {
-        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo')
-            ->orderBy('nro_placa')
-            ->get();
+        $idTipoCombustible = $request->integer('id_tipo_combustible') ?: null;
+        $idArea = $request->integer('id_area') ?: null;
+
+        $vehiculos = $this->vehiculosParaFiltro($idTipoCombustible, $idArea);
 
         // Obtener filtros del request
         $fechaInicio = $request->input('fecha_inicio', now()->startOfMonth()->format('Y-m-d'));
@@ -26,15 +31,19 @@ class CargasCombustibleReportController extends Controller
         $idVehiculo = $request->input('id_vehiculo', null);
 
         // Obtener datos para mostrar en la vista
-        $datosResumen = $this->obtenerResumen($fechaInicio, $fechaFin, $idVehiculo);
+        $datosResumen = $this->obtenerResumen($fechaInicio, $fechaFin, $idVehiculo, $idTipoCombustible, $idArea);
 
         return inertia('Reportes/CargasCombustibleReporte', [
             'vehiculos' => $vehiculos,
+            'tiposCombustible' => $this->tiposCombustibleActivos(),
+            'areas' => $this->areasActivas(),
             'datosResumen' => $datosResumen,
             'filtros' => [
                 'fecha_inicio' => $fechaInicio,
                 'fecha_fin' => $fechaFin,
                 'id_vehiculo' => $idVehiculo,
+                'id_tipo_combustible' => $idTipoCombustible,
+                'id_area' => $idArea,
             ],
         ]);
     }
@@ -59,7 +68,8 @@ class CargasCombustibleReportController extends Controller
 
     /**
      * Generar el PDF del reporte general de rendimiento (uno o varios
-     * vehículos comparados, sin gráfico).
+     * vehículos comparados, sin gráfico). Admite los mismos filtros de tipo
+     * de combustible y área que la vista (ver generarReporteRendimiento()).
      */
     public function generarPDFRendimiento(Request $request)
     {
@@ -71,11 +81,20 @@ class CargasCombustibleReportController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
         $idsVehiculo = array_filter((array) $request->input('id_vehiculo', []));
+        $idTipoCombustible = $request->integer('id_tipo_combustible') ?: null;
+        $idArea = $request->integer('id_area') ?: null;
 
-        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idsVehiculo, true);
+        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idsVehiculo, true, $idTipoCombustible, $idArea);
+
+        // Se resuelven a texto legible aquí (no en Reportes.php) para que el
+        // PDF deje constancia de qué filtro se aplicó, igual que se ve en pantalla.
+        $filtrosAplicados = [
+            'tipo_combustible' => $idTipoCombustible ? TipoCombustible::find($idTipoCombustible)?->tipo_combustible : null,
+            'area' => $idArea ? Area::find($idArea)?->nombre_area : null,
+        ];
 
         $reporte = new Reportes;
-        $contenido = $reporte->generarReporteRendimiento($resultado, $fechaInicio, $fechaFin, 'S');
+        $contenido = $reporte->generarReporteRendimiento($resultado, $fechaInicio, $fechaFin, 'S', null, $filtrosAplicados);
 
         return response($contenido, 200, [
             'Content-Type' => 'application/pdf',
@@ -100,7 +119,9 @@ class CargasCombustibleReportController extends Controller
         $fechaFin = $request->input('fecha_fin');
         $idVehiculo = $request->integer('id_vehiculo');
 
-        $vehiculo = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion')->findOrFail($idVehiculo);
+        $vehiculo = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
+            ->with('tipoCombustible:id,tipo_combustible')
+            ->findOrFail($idVehiculo);
         $detalle = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, [$idVehiculo], false);
 
         $reporte = new Reportes;
@@ -112,27 +133,45 @@ class CargasCombustibleReportController extends Controller
         ]);
     }
 
-    private function obtenerResumen($fechaInicio, $fechaFin, $idVehiculo = null)
+    /**
+     * @param  int|null  $idTipoCombustible  Campo propio de vehiculo (1 vehículo = 1 tipo de combustible).
+     * @param  int|null  $idArea  Asignación vigente en vehiculo_area (estado ACTIVO y fecha_culminacion nula o futura).
+     */
+    private function obtenerResumen($fechaInicio, $fechaFin, $idVehiculo = null, ?int $idTipoCombustible = null, ?int $idArea = null)
     {
         $query = CargaCombustible::join(
             'vehiculo as v',
             'v.id',
             '=',
             'carga_combustible.id_vehiculo'
-        )->whereBetween('fecha_carga', [$fechaInicio, $fechaFin])
+        )->join('tipo_combustible as tc', 'tc.id', '=', 'v.id_tipo_combustible')
+            ->whereBetween('fecha_carga', [$fechaInicio, $fechaFin])
             ->when($idVehiculo, function ($query) use ($idVehiculo) {
                 return $query->where('carga_combustible.id_vehiculo', $idVehiculo);
             })
+            ->when($idTipoCombustible, fn ($q) => $q->where('v.id_tipo_combustible', $idTipoCombustible))
+            ->when($idArea, fn ($q) => $q->whereExists(function ($sub) use ($idArea) {
+                $sub->select(DB::raw(1))
+                    ->from('vehiculo_area')
+                    ->whereColumn('vehiculo_area.id_vehiculo', 'v.id')
+                    ->where('vehiculo_area.id_area', $idArea)
+                    ->where('vehiculo_area.estado_asignacion', 'ACTIVO')
+                    ->where(function ($q2) {
+                        $q2->whereNull('vehiculo_area.fecha_culminacion')
+                            ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
+                    });
+            }))
             ->select([
                 'carga_combustible.id_vehiculo',
                 'v.nro_placa',
                 'v.marca',
                 'v.codigo',
+                'tc.tipo_combustible',
                 DB::raw('SUM(carga_combustible.litros) as total_litros'),
                 DB::raw('SUM(carga_combustible.litros * carga_combustible.precio) as total_costo'),
                 DB::raw('COUNT(carga_combustible.id) as cantidad_cargas'),
                 DB::raw('ROUND(AVG(carga_combustible.precio), 2) as precio_promedio'),
-            ])->groupBy('carga_combustible.id_vehiculo', 'v.nro_placa', 'v.marca', 'v.codigo');
+            ])->groupBy('carga_combustible.id_vehiculo', 'v.nro_placa', 'v.marca', 'v.codigo', 'tc.tipo_combustible');
 
         $cargas = $query->get();
 
@@ -149,6 +188,7 @@ class CargasCombustibleReportController extends Controller
                 'nro_placa' => $primerCarga->nro_placa,
                 'marca' => $primerCarga->marca,
                 'codigo' => $primerCarga->codigo,
+                'tipo_combustible' => $primerCarga->tipo_combustible,
                 'total_litros' => $grupo->sum('total_litros'),
                 'total_costo' => $grupo->sum('total_costo'),
                 'cantidad_cargas' => $grupo->count(),
@@ -166,24 +206,29 @@ class CargasCombustibleReportController extends Controller
 
     public function generarReporteRendimiento(Request $request)
     {
-        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion')
-            ->orderBy('nro_placa')
-            ->get();
+        $idTipoCombustible = $request->integer('id_tipo_combustible') ?: null;
+        $idArea = $request->integer('id_area') ?: null;
+
+        $vehiculos = $this->vehiculosParaFiltro($idTipoCombustible, $idArea);
 
         $fechaInicio = $request->input('fecha_inicio', now()->startOfMonth()->format('Y-m-d 00:00:00'));
         $fechaFin = $request->input('fecha_fin', now()->endOfMonth()->format('Y-m-d 23:59:59'));
         // Selección múltiple: llega como id_vehiculo[]=1&id_vehiculo[]=2 (o vacío = todos los vehículos).
         $idsVehiculo = array_filter((array) $request->input('id_vehiculo', []));
 
-        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idsVehiculo, true);
+        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idsVehiculo, true, $idTipoCombustible, $idArea);
 
         return inertia('Reportes/CargasCombustibleRendimientoReporte', [
             'vehiculos' => $vehiculos,
+            'tiposCombustible' => $this->tiposCombustibleActivos(),
+            'areas' => $this->areasActivas(),
             'resultado' => $resultado,
             'filtros' => [
                 'fecha_inicio' => $fechaInicio,
                 'fecha_fin' => $fechaFin,
                 'id_vehiculo' => array_values($idsVehiculo),
+                'id_tipo_combustible' => $idTipoCombustible,
+                'id_area' => $idArea,
             ],
         ]);
     }
@@ -193,12 +238,15 @@ class CargasCombustibleReportController extends Controller
      * del resumen de generarReporteRendimiento). Siempre delega en
      * obtenerResumenRendimiento() con $soloResumen = false y un único id,
      * nunca con la lista vacía/todos los vehículos.
+     *
+     * A diferencia del resumen, aquí NO se filtra por tipo de combustible ni
+     * área: al ver el detalle ya se eligió un único vehículo específico, así
+     * que acotar el select no tendría sentido. El tipo de combustible se
+     * muestra igual como etiqueta informativa (ver 'tipoCombustible' abajo).
      */
     public function detalleRendimientoVehiculo(Request $request): Response
     {
-        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion')
-            ->orderBy('nro_placa')
-            ->get();
+        $vehiculos = $this->vehiculosParaFiltro();
 
         $fechaInicio = $request->input('fecha_inicio', now()->startOfMonth()->format('Y-m-d 00:00:00'));
         $fechaFin = $request->input('fecha_fin', now()->endOfMonth()->format('Y-m-d 23:59:59'));
@@ -222,18 +270,66 @@ class CargasCombustibleReportController extends Controller
     }
 
     /**
-     * @param  array<int, int|string>  $idsVehiculo  Vacío = todos los vehículos.
+     * Vehículos disponibles para los selects de filtro. Sólo el resumen
+     * (generarReporteRendimiento) acota por tipo de combustible (campo propio
+     * de vehiculo, 1:1) y/o área (asignación vigente en vehiculo_area: estado
+     * ACTIVO y fecha_culminacion nula o futura); el detalle de un solo
+     * vehículo llama a esto sin filtros. Siempre incluye el tipo de
+     * combustible como relación (para mostrarlo como etiqueta en la UI).
      */
-    public function obtenerResumenRendimiento($fechaInicio, $fechaFin, array $idsVehiculo = [], $soloResumen = true)
+    private function vehiculosParaFiltro(?int $idTipoCombustible = null, ?int $idArea = null)
+    {
+        return Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
+            ->with('tipoCombustible:id,tipo_combustible')
+            ->when($idTipoCombustible, fn ($q) => $q->where('id_tipo_combustible', $idTipoCombustible))
+            ->when($idArea, fn ($q) => $q->whereExists(function ($sub) use ($idArea) {
+                $sub->select(DB::raw(1))
+                    ->from('vehiculo_area')
+                    ->whereColumn('vehiculo_area.id_vehiculo', 'vehiculo.id')
+                    ->where('vehiculo_area.id_area', $idArea)
+                    ->where('vehiculo_area.estado_asignacion', 'ACTIVO')
+                    ->where(function ($q2) {
+                        $q2->whereNull('vehiculo_area.fecha_culminacion')
+                            ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
+                    });
+            }))
+            ->orderBy('nro_placa')
+            ->get();
+    }
+
+    private function tiposCombustibleActivos()
+    {
+        return TipoCombustible::select('id', 'tipo_combustible')
+            ->where('estado_tipo_combustible', 'ACTIVO')
+            ->orderBy('tipo_combustible')
+            ->get();
+    }
+
+    private function areasActivas()
+    {
+        return Area::select('id', 'nombre_area')
+            ->where('estado_area', 'ACTIVO')
+            ->orderBy('nombre_area')
+            ->get();
+    }
+
+    /**
+     * @param  array<int, int|string>  $idsVehiculo  Vacío = todos los vehículos.
+     * @param  int|null  $idTipoCombustible  Campo propio de vehiculo (1 vehículo = 1 tipo de combustible).
+     * @param  int|null  $idArea  Asignación vigente en vehiculo_area (estado ACTIVO y fecha_culminacion nula o futura).
+     */
+    public function obtenerResumenRendimiento($fechaInicio, $fechaFin, array $idsVehiculo = [], $soloResumen = true, ?int $idTipoCombustible = null, ?int $idArea = null)
     {
         // 1. CTE Base: Obtiene mediciones y el valor anterior mediante LAG()
         $cteMediciones = DB::table('carga_combustible as cc')
             ->join('vehiculo as v', 'v.id', '=', 'cc.id_vehiculo')
+            ->join('tipo_combustible as tc', 'tc.id', '=', 'v.id_tipo_combustible')
             ->selectRaw("
             v.id as id_vehiculo,
             v.codigo,
             v.nro_placa,
             v.tipo_medicion,
+            tc.tipo_combustible,
             cc.id as id_carga,
             cc.fecha_carga,
             cc.litros,
@@ -241,12 +337,24 @@ class CargasCombustibleReportController extends Controller
             LAG(CASE WHEN v.tipo_medicion = 'kilometraje' THEN cc.kilometraje ELSE cc.horometro END)
                 OVER (PARTITION BY cc.id_vehiculo ORDER BY cc.fecha_carga, cc.id) as medicion_anterior
         ")
-            ->when(! empty($idsVehiculo), fn ($q) => $q->whereIn('cc.id_vehiculo', $idsVehiculo));
+            ->when(! empty($idsVehiculo), fn ($q) => $q->whereIn('cc.id_vehiculo', $idsVehiculo))
+            ->when($idTipoCombustible, fn ($q) => $q->where('v.id_tipo_combustible', $idTipoCombustible))
+            ->when($idArea, fn ($q) => $q->whereExists(function ($sub) use ($idArea) {
+                $sub->select(DB::raw(1))
+                    ->from('vehiculo_area')
+                    ->whereColumn('vehiculo_area.id_vehiculo', 'v.id')
+                    ->where('vehiculo_area.id_area', $idArea)
+                    ->where('vehiculo_area.estado_asignacion', 'ACTIVO')
+                    ->where(function ($q2) {
+                        $q2->whereNull('vehiculo_area.fecha_culminacion')
+                            ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
+                    });
+            }));
 
         // 2. CTE Detalle: Filtra por fechas y calcula el recorrido/rendimiento por cada carga
         $cteDetalle = DB::table('mediciones_base')
             ->selectRaw("
-            id_vehiculo, codigo, nro_placa, tipo_medicion, id_carga, fecha_carga, litros,
+            id_vehiculo, codigo, nro_placa, tipo_medicion, tipo_combustible, id_carga, fecha_carga, litros,
             medicion_anterior, medicion_actual,
             (medicion_actual - medicion_anterior) as recorrido,
             CASE
@@ -270,6 +378,7 @@ class CargasCombustibleReportController extends Controller
                 codigo,
                 nro_placa,
                 tipo_medicion,
+                tipo_combustible,
                 COUNT(id_carga) as total_cargas,
                 ROUND(SUM(litros), 2) as total_litros,
                 ROUND(SUM(recorrido), 2) as total_recorrido,
@@ -286,7 +395,7 @@ class CargasCombustibleReportController extends Controller
                     ELSE ''
                 END as unidad_medida
             ")
-                ->groupBy('id_vehiculo', 'codigo', 'nro_placa', 'tipo_medicion')
+                ->groupBy('id_vehiculo', 'codigo', 'nro_placa', 'tipo_medicion', 'tipo_combustible')
                 ->get();
 
             return $resultado;

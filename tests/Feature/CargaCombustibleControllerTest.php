@@ -255,6 +255,35 @@ class CargaCombustibleControllerTest extends TestCase
         ], $overrides));
     }
 
+    /**
+     * is_offline sólo tiene efecto viniendo de la API (registro sin conexión
+     * desde la app Flutter): en el formulario web, con un vale ya no
+     * disponible, la validación debe seguir rechazando la petición aunque se
+     * envíe is_offline=true.
+     */
+    public function test_is_offline_no_tiene_efecto_en_el_formulario_web(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible, ['estado_vale' => 'USADO']);
+
+        $response = $this->post(route('cargas.store'), [
+            'fecha_carga' => now()->format('Y-m-d'),
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_vale' => $vale->id,
+            'tipo_carga' => 'VALE',
+            'is_offline' => true,
+        ]);
+
+        $response->assertSessionHasErrors('id_vale');
+    }
+
     public function test_create_precarga_los_datos_del_vale_cuando_se_usa_desde_el_listado(): void
     {
         $vehiculo = Vehiculo::factory()->create();

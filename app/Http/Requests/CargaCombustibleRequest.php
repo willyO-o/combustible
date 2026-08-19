@@ -23,6 +23,12 @@ class CargaCombustibleRequest extends FormRequest
             && $this->filled('id_vale')
             && (int) $this->input('id_vale') === (int) $carga->id_vale;
 
+        // La app Flutter permite registrar cargas sin conexión y las sincroniza
+        // después: para ese momento el vale ya pudo haber sido usado o vencer,
+        // así que is_offline (sólo se respeta viniendo de la API) omite la
+        // exigencia de que el vale siga PENDIENTE y vigente.
+        $esRegistroOffline = $this->is('api/*') && $this->boolean('is_offline');
+
         return [
             'fecha_carga' => ['required', 'date'],
             // litros y precio son requeridos solo cuando id_vale es null, de lo contrario no se requieren y se ignoran
@@ -48,7 +54,7 @@ class CargaCombustibleRequest extends FormRequest
             // 'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
             // 'id_conductor' => [$this->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
             'id_vale' => ['nullable', 'integer', 'exists:vale,id',
-                Rule::when($this->filled('id_vale') && ! $valeSinCambios, [
+                Rule::when($this->filled('id_vale') && ! $valeSinCambios && ! $esRegistroOffline, [
                     Rule::exists('vale', 'id')->where(function ($query) {
                         $query->where('estado_vale', 'PENDIENTE')
                             ->where('id_vehiculo', $this->id_vehiculo)
@@ -59,6 +65,9 @@ class CargaCombustibleRequest extends FormRequest
             'nro_factura' => ['nullable', 'string', 'max:50'],
             'tipo_carga' => ['required', Rule::in(['VALE', 'PREPAGO'])],
             'estado_carga' => ['nullable', 'string', Rule::in(['REGISTRADO', 'VERIFICADO', 'ANULADO'])],
+            // Sólo tiene efecto en la API (ver $esRegistroOffline arriba): marca
+            // que la carga se capturó sin conexión en la app y se sincroniza después.
+            'is_offline' => ['sometimes', 'boolean'],
             // Respaldos (archivos planos para FormData)
         ];
     }
@@ -78,6 +87,7 @@ class CargaCombustibleRequest extends FormRequest
             'nro_factura' => 'número de factura',
             'tipo_carga' => 'tipo de carga',
             'estado_carga' => 'estado',
+            'is_offline' => 'registro sin conexión',
         ];
     }
 

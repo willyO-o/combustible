@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Area;
 use App\Models\CargaCombustible;
 use App\Models\Conductor;
 use App\Models\Grifo;
@@ -9,6 +10,7 @@ use App\Models\Persona;
 use App\Models\TipoCombustible;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -80,6 +82,82 @@ class CargasCombustibleReportControllerTest extends TestCase
         return $vehiculo;
     }
 
+    public function test_index_muestra_el_tipo_de_combustible_de_cada_vehiculo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['id_tipo_combustible' => $this->tipoCombustible->id]);
+        $this->crearCarga($vehiculo);
+
+        // Rango explícito y amplio: el filtro por defecto (fecha_fin sin hora)
+        // puede quedar antes de "ahora mismo" y excluir la carga recién creada.
+        $response = $this->get(route('cargas-combustible.reporte.index', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->addDay()->format('Y-m-d'),
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Reportes/CargasCombustibleReporte')
+            ->has('vehiculos')
+            ->has('tiposCombustible')
+            ->has('areas')
+        );
+
+        $fila = collect($response->viewData('page')['props']['datosResumen']['vehiculos'])->first();
+        $this->assertSame($this->tipoCombustible->tipo_combustible, $fila['tipo_combustible']);
+    }
+
+    public function test_index_filtra_por_tipo_de_combustible(): void
+    {
+        $diesel = TipoCombustible::factory()->create();
+        $vehiculoDiesel = Vehiculo::factory()->create(['id_tipo_combustible' => $diesel->id]);
+        $vehiculoOtroTipo = Vehiculo::factory()->create(['id_tipo_combustible' => $this->tipoCombustible->id]);
+        $this->crearCarga($vehiculoDiesel, ['id_tipo_combustible' => $diesel->id]);
+        $this->crearCarga($vehiculoOtroTipo);
+
+        $response = $this->get(route('cargas-combustible.reporte.index', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->addDay()->format('Y-m-d'),
+            'id_tipo_combustible' => $diesel->id,
+        ]));
+
+        $response->assertOk();
+        $vehiculosResumen = collect($response->viewData('page')['props']['datosResumen']['vehiculos']);
+        $vehiculosProp = collect($response->viewData('page')['props']['vehiculos']);
+
+        $this->assertCount(1, $vehiculosResumen);
+        $this->assertSame($vehiculoDiesel->id, $vehiculosResumen->first()['id_vehiculo']);
+        $this->assertTrue($vehiculosProp->pluck('id')->contains($vehiculoDiesel->id));
+        $this->assertFalse($vehiculosProp->pluck('id')->contains($vehiculoOtroTipo->id));
+    }
+
+    public function test_index_filtra_por_area_solo_con_asignacion_vigente(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculoEnArea = Vehiculo::factory()->create();
+        $vehiculoSinArea = Vehiculo::factory()->create();
+        $this->crearCarga($vehiculoEnArea);
+        $this->crearCarga($vehiculoSinArea);
+
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculoEnArea->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now()->subMonth()->format('Y-m-d'),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response = $this->get(route('cargas-combustible.reporte.index', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->addDay()->format('Y-m-d'),
+            'id_area' => $area->id,
+        ]));
+
+        $response->assertOk();
+        $vehiculosResumen = collect($response->viewData('page')['props']['datosResumen']['vehiculos']);
+
+        $this->assertCount(1, $vehiculosResumen);
+        $this->assertSame($vehiculoEnArea->id, $vehiculosResumen->first()['id_vehiculo']);
+    }
+
     public function test_muestra_el_rendimiento_de_todos_los_vehiculos_por_defecto(): void
     {
         $vehiculo1 = $this->crearVehiculoConDosCargas();
@@ -119,6 +197,93 @@ class CargasCombustibleReportControllerTest extends TestCase
         $this->assertFalse($resultado->pluck('id_vehiculo')->contains($vehiculo3->id));
     }
 
+    public function test_filtra_por_tipo_de_combustible(): void
+    {
+        // $this->tipoCombustible (creado en setUp) es el tipo "base"; se crea uno adicional.
+        $diesel = TipoCombustible::factory()->create();
+        $vehiculoDiesel = $this->crearVehiculoConDosCargas(['id_tipo_combustible' => $diesel->id]);
+        $vehiculoOtroTipo = $this->crearVehiculoConDosCargas(['id_tipo_combustible' => $this->tipoCombustible->id]);
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento', [
+            'id_tipo_combustible' => $diesel->id,
+        ]));
+
+        $response->assertOk();
+        $resultado = collect($response->viewData('page')['props']['resultado']);
+        $vehiculosProp = collect($response->viewData('page')['props']['vehiculos']);
+
+        $this->assertCount(1, $resultado);
+        $this->assertSame($vehiculoDiesel->id, $resultado->first()->id_vehiculo);
+        // El select de vehículos también se acota al tipo de combustible elegido.
+        $this->assertTrue($vehiculosProp->pluck('id')->contains($vehiculoDiesel->id));
+        $this->assertFalse($vehiculosProp->pluck('id')->contains($vehiculoOtroTipo->id));
+    }
+
+    public function test_filtra_por_area_solo_con_asignacion_vigente(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculoEnArea = $this->crearVehiculoConDosCargas();
+        $vehiculoAsignacionCulminada = $this->crearVehiculoConDosCargas();
+        $vehiculoSinArea = $this->crearVehiculoConDosCargas();
+
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculoEnArea->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now()->subMonth()->format('Y-m-d'),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        // Asignación ya culminada: no cuenta como vigente aunque sea del área filtrada.
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculoAsignacionCulminada->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now()->subMonths(2)->format('Y-m-d'),
+            'fecha_culminacion' => now()->subMonth()->format('Y-m-d'),
+            'estado_asignacion' => 'CULMINADO',
+        ]);
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento', [
+            'id_area' => $area->id,
+        ]));
+
+        $response->assertOk();
+        $resultado = collect($response->viewData('page')['props']['resultado']);
+        $vehiculosProp = collect($response->viewData('page')['props']['vehiculos']);
+
+        $this->assertCount(1, $resultado);
+        $this->assertSame($vehiculoEnArea->id, $resultado->first()->id_vehiculo);
+        $this->assertTrue($vehiculosProp->pluck('id')->contains($vehiculoEnArea->id));
+        $this->assertFalse($vehiculosProp->pluck('id')->contains($vehiculoAsignacionCulminada->id));
+        $this->assertFalse($vehiculosProp->pluck('id')->contains($vehiculoSinArea->id));
+    }
+
+    /**
+     * A diferencia del resumen, el detalle de UN vehículo no se acota por tipo
+     * de combustible ni área (no tendría sentido, ya se eligió un vehículo
+     * específico): el select siempre lista todos los vehículos, y el tipo de
+     * combustible viaja como etiqueta informativa (relación tipoCombustible).
+     */
+    public function test_el_detalle_no_filtra_el_select_de_vehiculos_por_tipo_de_combustible_ni_area(): void
+    {
+        $diesel = TipoCombustible::factory()->create();
+        $vehiculoDiesel = $this->crearVehiculoConDosCargas(['id_tipo_combustible' => $diesel->id]);
+        $vehiculoOtroTipo = $this->crearVehiculoConDosCargas(['id_tipo_combustible' => $this->tipoCombustible->id]);
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.detalle', [
+            'id_tipo_combustible' => $diesel->id,
+            'id_area' => 999,
+        ]));
+
+        $response->assertOk();
+        $vehiculosProp = collect($response->viewData('page')['props']['vehiculos']);
+
+        $this->assertTrue($vehiculosProp->pluck('id')->contains($vehiculoDiesel->id));
+        $this->assertTrue($vehiculosProp->pluck('id')->contains($vehiculoOtroTipo->id));
+
+        $vehiculoConEtiqueta = $vehiculosProp->firstWhere('id', $vehiculoDiesel->id);
+        $this->assertSame($diesel->tipo_combustible, $vehiculoConEtiqueta['tipo_combustible']['tipo_combustible']);
+    }
+
     public function test_calcula_el_rendimiento_en_km_por_litro_para_vehiculos_por_kilometraje(): void
     {
         // 1200 - 1000 = 200 km recorridos; se cargaron 20 L en la segunda carga (única con "anterior").
@@ -130,6 +295,7 @@ class CargasCombustibleReportControllerTest extends TestCase
 
         $this->assertSame('kilometraje', $resultado->tipo_medicion);
         $this->assertSame('km/L', $resultado->unidad_medida);
+        $this->assertSame($vehiculo->tipoCombustible->tipo_combustible, $resultado->tipo_combustible);
         $this->assertSame(1, $resultado->total_cargas); // sólo la 2ª carga tiene "medición anterior"
         $this->assertEquals(200, $resultado->total_recorrido);
         $this->assertEquals(10, $resultado->rendimiento_promedio); // 200 km / 20 L
@@ -202,6 +368,38 @@ class CargasCombustibleReportControllerTest extends TestCase
         $response = $this->get(route('cargas-combustible.reporte.rendimiento.pdf'));
 
         $response->assertSessionHasErrors(['fecha_inicio', 'fecha_fin']);
+    }
+
+    /**
+     * Mismos filtros de tipo de combustible/área que la vista (ver
+     * test_filtra_por_tipo_de_combustible y test_filtra_por_area_...):
+     * el PDF debe aceptarlos sin romper el join agregado en obtenerResumenRendimiento().
+     */
+    public function test_genera_el_pdf_del_reporte_general_filtrado_por_tipo_de_combustible_y_area(): void
+    {
+        $diesel = TipoCombustible::factory()->create();
+        $area = Area::factory()->create();
+        $vehiculo = $this->crearVehiculoConDosCargas(['id_tipo_combustible' => $diesel->id]);
+
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now()->subMonth()->format('Y-m-d'),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        // Un segundo vehículo que no cumple ninguno de los dos filtros.
+        $this->crearVehiculoConDosCargas();
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.pdf', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_tipo_combustible' => $diesel->id,
+            'id_area' => $area->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
     }
 
     public function test_genera_el_pdf_del_detalle_de_un_vehiculo(): void

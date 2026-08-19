@@ -3,6 +3,7 @@
 namespace App\Libraries;
 
 use App\Models\CargaCombustible;
+use App\Models\ParametrosEmpresa;
 use FPDF;
 
 class Reportes extends FPDF
@@ -589,6 +590,9 @@ class Reportes extends FPDF
         $negro = [30, 30, 30];
         $gris = [90, 90, 90];
         $blanco = [255, 255, 255];
+        $filaAlterna = [244, 246, 250];
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
 
         $this->AddPage('P', 'Letter');
         $this->SetMargins(8, 8, 8);
@@ -605,8 +609,8 @@ class Reportes extends FPDF
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
         $this->Rect($sx, $sy, $uw, 16);
 
-        // Logo
-        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 4, $sy + 1.5, 35);
+        // Logo (el configurado en Parámetros de la Empresa, o el de respaldo)
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 1.5, 35);
 
         // Título
         $this->SetFont('Arial', 'B', 14);
@@ -620,7 +624,9 @@ class Reportes extends FPDF
         $this->SetXY($sx + 40, $sy + 8);
         $this->Cell($uw - 40, 8, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
 
-        $currentY = $sy + 16 + 5;
+        $currentY = $sy + 16 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
 
         // ════════════════════════════════════════════════════════════════
         // TARJETAS DE RESUMEN
@@ -679,12 +685,13 @@ class Reportes extends FPDF
 
         // Encabezados de columnas
         $cols = [
-            ['label' => 'PLACA', 'w' => 25, 'align' => 'C'],
-            ['label' => 'MARCA', 'w' => 35, 'align' => 'L'],
-            ['label' => 'TOTAL LITROS', 'w' => 28, 'align' => 'R'],
-            ['label' => 'TOTAL COSTO (Bs.)', 'w' => 35, 'align' => 'R'],
-            ['label' => 'NRO. CARGAS', 'w' => 20, 'align' => 'C'],
-            ['label' => 'PRECIO PROM.', 'w' => 27.9, 'align' => 'R'],
+            ['label' => 'CÓD. CONTABLE', 'w' => 26, 'align' => 'L'],
+            ['label' => 'PLACA', 'w' => 25.4, 'align' => 'C'],
+            ['label' => 'MARCA', 'w' => 35.6, 'align' => 'L'],
+            ['label' => 'TOTAL LITROS', 'w' => 28.5, 'align' => 'R'],
+            ['label' => 'TOTAL COSTO (Bs.)', 'w' => 35.6, 'align' => 'R'],
+            ['label' => 'NRO. CARGAS', 'w' => 20.3, 'align' => 'C'],
+            ['label' => 'PRECIO PROM.', 'w' => 28.5, 'align' => 'R'],
         ];
 
         $this->SetFillColor(240, 240, 240);
@@ -707,12 +714,13 @@ class Reportes extends FPDF
         $this->SetFont('Arial', '', 7.5);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
 
-        foreach ($vehiculosAgrupados as $vehData) {
+        foreach ($vehiculosAgrupados as $fila => $vehData) {
             $precioPromedio = count($vehData['cargas']) > 0
                 ? array_sum(array_map(fn ($c) => $c['precio'], $vehData['cargas'])) / count($vehData['cargas'])
                 : 0;
 
             $valores = [
+                $vehData['vehiculo']->codigo,
                 $vehData['vehiculo']->nro_placa,
                 $vehData['vehiculo']->marca,
                 number_format($vehData['total_litros'], 2, ',', '.'),
@@ -721,11 +729,15 @@ class Reportes extends FPDF
                 number_format($precioPromedio, 2, ',', '.'),
             ];
 
+            // Franjas alternadas por fila: mejora la lectura en tablas largas.
+            $this->SetFillColor($filaAlterna[0], $filaAlterna[1], $filaAlterna[2]);
+            $conFondo = $fila % 2 === 1;
+
             $colX = $sx;
             foreach ($cols as $idx => $col) {
                 $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
                 $this->SetLineWidth(0.1);
-                $this->Rect($colX, $currentY, $col['w'], 6);
+                $this->Rect($colX, $currentY, $col['w'], 6, $conFondo ? 'FD' : 'D');
                 $this->SetXY($colX + 1, $currentY + 0.5);
                 $this->Cell($col['w'] - 2, 6, utf8Decode($valores[$idx]), 0, 0, $col['align']);
                 $colX += $col['w'];
@@ -742,6 +754,7 @@ class Reportes extends FPDF
 
         $totales = [
             'TOTALES',
+            '',
             '',
             number_format($totalLitros, 2, ',', '.'),
             number_format($totalCosto, 2, ',', '.'),
@@ -760,13 +773,7 @@ class Reportes extends FPDF
         // ════════════════════════════════════════════════════════════════
         // PIE DE PÁGINA
         // ════════════════════════════════════════════════════════════════
-        $this->SetY(-12);
-        $this->SetFont('Arial', 'I', 8);
-        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
-        $this->Cell($uw, 4, utf8Decode('Reporte generado el: '.date('d/m/Y H:i')), 0, 0, 'L');
-        $this->Cell($uw, 4, utf8Decode('Página: ').$this->PageNo().'/{nb}', 0, 0, 'R');
-
-        $this->AliasNbPages();
+        $this->pintarPieDePagina($uw, $gris);
         $this->Output('I', 'reporte_cargas_combustible.pdf');
     }
 
@@ -775,8 +782,12 @@ class Reportes extends FPDF
      * (resumen agrupado, sin gráfico). $resultado es la colección que
      * devuelve CargasCombustibleReportController::obtenerResumenRendimiento()
      * con $soloResumen = true (una fila por vehículo).
+     *
+     * @param  array{tipo_combustible?: ?string, area?: ?string}  $filtrosAplicados  Etiquetas
+     *                                                                               ya resueltas a texto (no ids) de los filtros de tipo de combustible/área
+     *                                                                               aplicados en la vista, para dejar constancia de ellos en el PDF.
      */
-    public function generarReporteRendimiento($resultado, $fechaInicio, $fechaFin, string $modo = 'I', ?string $nombreArchivo = null)
+    public function generarReporteRendimiento($resultado, $fechaInicio, $fechaFin, string $modo = 'I', ?string $nombreArchivo = null, array $filtrosAplicados = [])
     {
         $resultado = collect($resultado);
 
@@ -787,6 +798,9 @@ class Reportes extends FPDF
         $negro = [30, 30, 30];
         $gris = [90, 90, 90];
         $blanco = [255, 255, 255];
+        $filaAlterna = [244, 246, 250];
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
 
         $this->AddPage('P', 'Letter');
         $this->SetMargins(8, 8, 8);
@@ -799,23 +813,42 @@ class Reportes extends FPDF
         // ════════════════════════════════════════════════════════════════
         // ENCABEZADO
         // ════════════════════════════════════════════════════════════════
+        $etiquetasFiltro = array_filter([
+            $filtrosAplicados['tipo_combustible'] ?? null ? 'Combustible: '.$filtrosAplicados['tipo_combustible'] : null,
+            $filtrosAplicados['area'] ?? null ? 'Área: '.$filtrosAplicados['area'] : null,
+        ]);
+        $h1 = $etiquetasFiltro ? 22 : 16;
+
+        // Barra de acento superior, a modo de detalle visual del encabezado.
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+
         $this->SetLineWidth(0.5);
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $sy, $uw, 16);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
 
-        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 4, $sy + 1.5, 35);
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
 
         $this->SetFont('Arial', 'B', 14);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx + 40, $sy);
+        $this->SetXY($sx + 40, $sy + 1.5);
         $this->Cell($uw - 40, 8, utf8Decode('REPORTE DE RENDIMIENTO DE COMBUSTIBLE'), 0, 2, 'L');
 
         $this->SetFont('Arial', '', 9);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
-        $this->SetXY($sx + 40, $sy + 8);
-        $this->Cell($uw - 40, 8, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+        $this->SetXY($sx + 40, $sy + 9.5);
+        $this->Cell($uw - 40, 6, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
 
-        $currentY = $sy + 16 + 5;
+        if ($etiquetasFiltro) {
+            $this->SetFont('Arial', 'BI', 8);
+            $this->SetTextColor($verde[0], $verde[1], $verde[2]);
+            $this->SetXY($sx + 40, $sy + 16);
+            $this->Cell($uw - 40, 5, utf8Decode('Filtros aplicados: '.implode('   |   ', $etiquetasFiltro)), 0, 2, 'L');
+        }
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
 
         // ════════════════════════════════════════════════════════════════
         // TARJETAS DE RESUMEN
@@ -877,13 +910,14 @@ class Reportes extends FPDF
         $currentY += 8;
 
         $cols = [
-            ['label' => 'CÓDIGO', 'w' => 26, 'align' => 'L'],
-            ['label' => 'PLACA', 'w' => 25, 'align' => 'C'],
-            ['label' => 'TIPO MEDICIÓN', 'w' => 30, 'align' => 'C'],
-            ['label' => 'CARGAS', 'w' => 20, 'align' => 'C'],
-            ['label' => 'LITROS', 'w' => 28, 'align' => 'R'],
-            ['label' => 'RECORRIDO/HORAS', 'w' => 33.9, 'align' => 'R'],
-            ['label' => 'RENDIMIENTO', 'w' => 37, 'align' => 'R'],
+            ['label' => 'CÓDIGO', 'w' => 24, 'align' => 'L'],
+            ['label' => 'PLACA', 'w' => 22, 'align' => 'C'],
+            ['label' => 'COMBUSTIBLE', 'w' => 26, 'align' => 'C'],
+            ['label' => 'TIPO MEDICIÓN', 'w' => 26, 'align' => 'C'],
+            ['label' => 'CARGAS', 'w' => 16, 'align' => 'C'],
+            ['label' => 'LITROS', 'w' => 26, 'align' => 'R'],
+            ['label' => 'RECORRIDO/HORAS', 'w' => 30.9, 'align' => 'R'],
+            ['label' => 'RENDIMIENTO', 'w' => 29, 'align' => 'R'],
         ];
 
         $this->SetFillColor(240, 240, 240);
@@ -914,13 +948,14 @@ class Reportes extends FPDF
             $currentY += 7;
         }
 
-        foreach ($resultado as $r) {
+        foreach ($resultado as $fila => $r) {
             $sinDatos = (float) $r->total_recorrido === 0.0;
             $tipoLabel = $r->tipo_medicion === 'horometro' ? 'Horómetro' : 'Kilometraje';
 
             $valores = [
                 $r->codigo,
                 $r->nro_placa,
+                $r->tipo_combustible,
                 $tipoLabel,
                 (string) $r->total_cargas,
                 number_format((float) $r->total_litros, 2, ',', '.').' L',
@@ -928,12 +963,18 @@ class Reportes extends FPDF
                 $sinDatos ? 'Sin datos suficientes' : number_format((float) $r->rendimiento_promedio, 2, ',', '.').' '.$r->unidad_medida,
             ];
 
+            // Franjas alternadas por fila: mejora la lectura en tablas largas.
+            $this->SetFillColor($filaAlterna[0], $filaAlterna[1], $filaAlterna[2]);
+            $conFondo = $fila % 2 === 1;
+
             $colX = $sx;
             foreach ($cols as $idx => $col) {
                 $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
                 $this->SetLineWidth(0.1);
-                $this->Rect($colX, $currentY, $col['w'], 6);
+                $this->Rect($colX, $currentY, $col['w'], 6, $conFondo ? 'FD' : 'D');
                 $this->SetXY($colX + 1, $currentY + 0.5);
+                $this->SetFont('Arial', $idx === 7 && $sinDatos ? 'I' : '', 7.5);
+                $this->SetTextColor($idx === 7 && $sinDatos ? $gris[0] : $negro[0], $idx === 7 && $sinDatos ? $gris[1] : $negro[1], $idx === 7 && $sinDatos ? $gris[2] : $negro[2]);
                 $this->Cell($col['w'] - 2, 6, utf8Decode($valores[$idx]), 0, 0, $col['align']);
                 $colX += $col['w'];
             }
@@ -948,7 +989,7 @@ class Reportes extends FPDF
         $this->SetFont('Arial', 'B', 8);
         $this->SetTextColor(255, 255, 255);
 
-        $totales = ['TOTALES', '', '', (string) $totalCargas, number_format($totalLitros, 2, ',', '.').' L', number_format($totalRecorrido, 2, ',', '.'), '—'];
+        $totales = ['TOTALES', '', '', '', (string) $totalCargas, number_format($totalLitros, 2, ',', '.').' L', number_format($totalRecorrido, 2, ',', '.'), '—'];
 
         $colX = $sx;
         foreach ($cols as $idx => $col) {
@@ -979,10 +1020,13 @@ class Reportes extends FPDF
         $negro = [30, 30, 30];
         $gris = [90, 90, 90];
         $blanco = [255, 255, 255];
+        $filaAlterna = [244, 246, 250];
 
         $esHorometro = $vehiculo->tipo_medicion === 'horometro';
         $unidad = $esHorometro ? 'L/h' : 'km/L';
         $etiquetaRecorrido = $esHorometro ? 'HORAS' : 'RECORRIDO';
+        $tipoCombustibleLabel = $vehiculo->tipoCombustible?->tipo_combustible;
+        $parametrosEmpresa = $this->parametrosEmpresa();
 
         $this->AddPage('P', 'Letter');
         $this->SetMargins(8, 8, 8);
@@ -995,23 +1039,38 @@ class Reportes extends FPDF
         // ════════════════════════════════════════════════════════════════
         // ENCABEZADO
         // ════════════════════════════════════════════════════════════════
+        $h1 = $tipoCombustibleLabel ? 22 : 16;
+
+        // Barra de acento superior, a modo de detalle visual del encabezado.
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+
         $this->SetLineWidth(0.5);
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $sy, $uw, 16);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
 
-        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 4, $sy + 1.5, 35);
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
 
         $this->SetFont('Arial', 'B', 13);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx + 40, $sy);
+        $this->SetXY($sx + 40, $sy + 1.5);
         $this->Cell($uw - 40, 8, utf8Decode('DETALLE DE RENDIMIENTO — '.$vehiculo->codigo.' ('.$vehiculo->nro_placa.')'), 0, 2, 'L');
 
         $this->SetFont('Arial', '', 9);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
-        $this->SetXY($sx + 40, $sy + 8);
-        $this->Cell($uw - 40, 8, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+        $this->SetXY($sx + 40, $sy + 9.5);
+        $this->Cell($uw - 40, 6, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
 
-        $currentY = $sy + 16 + 5;
+        if ($tipoCombustibleLabel) {
+            $this->SetFont('Arial', 'BI', 8);
+            $this->SetTextColor($verde[0], $verde[1], $verde[2]);
+            $this->SetXY($sx + 40, $sy + 16);
+            $this->Cell($uw - 40, 5, utf8Decode('Combustible: '.$tipoCombustibleLabel), 0, 2, 'L');
+        }
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
 
         // ════════════════════════════════════════════════════════════════
         // TARJETAS DE RESUMEN
@@ -1111,7 +1170,7 @@ class Reportes extends FPDF
             $currentY += 7;
         }
 
-        foreach ($detalle as $d) {
+        foreach ($detalle as $fila => $d) {
             $valores = [
                 date('d/m/Y H:i', strtotime($d->fecha_carga)),
                 number_format((float) $d->litros, 2, ',', '.').' L',
@@ -1121,11 +1180,15 @@ class Reportes extends FPDF
                 number_format((float) $d->rendimiento, 2, ',', '.').' '.$unidad,
             ];
 
+            // Franjas alternadas por fila: mejora la lectura en tablas largas.
+            $this->SetFillColor($filaAlterna[0], $filaAlterna[1], $filaAlterna[2]);
+            $conFondo = $fila % 2 === 1;
+
             $colX = $sx;
             foreach ($cols as $idx => $col) {
                 $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
                 $this->SetLineWidth(0.1);
-                $this->Rect($colX, $currentY, $col['w'], 6);
+                $this->Rect($colX, $currentY, $col['w'], 6, $conFondo ? 'FD' : 'D');
                 $this->SetXY($colX + 1, $currentY + 0.5);
                 $this->Cell($col['w'] - 2, 6, utf8Decode($valores[$idx]), 0, 0, $col['align']);
                 $colX += $col['w'];
@@ -1174,6 +1237,65 @@ class Reportes extends FPDF
         $this->Cell($uw, 4, utf8Decode('Reporte generado el: '.date('d/m/Y H:i')), 0, 0, 'L');
         $this->Cell($uw, 4, utf8Decode('Página: ').$this->PageNo().'/{nb}', 0, 0, 'R');
         $this->AliasNbPages();
+    }
+
+    /**
+     * Registro único de configuración de la empresa (nombre, dirección,
+     * teléfono, NIT, logo), usado para no dejar estos datos hardcodeados en
+     * los reportes. Consulta directa a la base de datos (sin caché: el driver
+     * configurado no deserializaba bien el modelo).
+     */
+    private function parametrosEmpresa(): ?ParametrosEmpresa
+    {
+        return ParametrosEmpresa::first();
+    }
+
+    /**
+     * Ruta absoluta al logo a usar en el encabezado: el que esté configurado
+     * en Parámetros de la Empresa si existe el archivo, o el logo estático
+     * como respaldo (para no romper el reporte si aún no se configuró uno).
+     */
+    private function logoEmpresa(?ParametrosEmpresa $parametrosEmpresa): string
+    {
+        $logoRespaldo = public_path('images/logo/logo-plus-metals-azul.png');
+
+        if (! $parametrosEmpresa?->logo_empresa) {
+            return $logoRespaldo;
+        }
+
+        $logoConfigurado = storage_path('app/public/'.$parametrosEmpresa->logo_empresa);
+
+        return file_exists($logoConfigurado) ? $logoConfigurado : $logoRespaldo;
+    }
+
+    /**
+     * Franja informativa con los datos de la empresa (nombre, dirección,
+     * teléfono, NIT), pintada como una línea centrada justo debajo del
+     * encabezado del reporte. Devuelve el alto ocupado (0 si no hay datos).
+     */
+    private function pintarInfoEmpresa(?ParametrosEmpresa $parametrosEmpresa, float $sx, float $y, float $uw, array $gris): float
+    {
+        if (! $parametrosEmpresa) {
+            return 0;
+        }
+
+        $partes = array_filter([
+            $parametrosEmpresa->nombre_empresa,
+            $parametrosEmpresa->direccion_empresa,
+            $parametrosEmpresa->telefono_empresa ? 'Tel. '.$parametrosEmpresa->telefono_empresa : null,
+            $parametrosEmpresa->nit_empresa ? 'NIT: '.$parametrosEmpresa->nit_empresa : null,
+        ]);
+
+        if (! $partes) {
+            return 0;
+        }
+
+        $this->SetFont('Arial', '', 7.5);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx, $y);
+        $this->Cell($uw, 4, utf8Decode(implode('   |   ', $partes)), 0, 0, 'C');
+
+        return 6;
     }
 
     protected function drawCircle(float $cx, float $cy, float $r, string $style = 'D'): void

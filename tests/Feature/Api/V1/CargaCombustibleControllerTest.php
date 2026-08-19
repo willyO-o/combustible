@@ -143,6 +143,102 @@ class CargaCombustibleControllerTest extends TestCase
         $this->assertSame('USADO', $vale->fresh()->estado_vale);
     }
 
+    /**
+     * La app Flutter puede registrar cargas sin conexión: para cuando se
+     * sincronizan, el vale usado ya pudo cambiar de estado o vencer. Con
+     * is_offline=true (sólo respetado en la API) esa carga igual se acepta.
+     */
+    public function test_registra_una_carga_offline_aunque_el_vale_ya_no_este_pendiente(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Empresa de Prueba',
+            'direccion_empresa' => 'Av. Siempre Viva',
+            'telefono_empresa' => '70000000',
+            'correo_empresa' => 'empresa@example.com',
+            'nit_empresa' => '123456',
+            'parametros_vale' => ['tiempo_expiracion' => 5],
+            'estado' => 'ACTIVO',
+        ]);
+
+        $vale = Vale::create([
+            'litros' => 40,
+            'precio' => 9.5,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'estado_vale' => 'USADO',
+            'id_tipo_combustible' => $tipoCombustible->id,
+        ]);
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->post(route('api.v1.cargas.store'), [
+                'fecha_carga' => now()->format('Y-m-d H:i'),
+                'kilometraje' => 15600,
+                'id_vehiculo' => $vehiculo->id,
+                'id_grifo' => $grifo->id,
+                'id_tipo_combustible' => $tipoCombustible->id,
+                'id_conductor' => $conductor->id,
+                'id_vale' => $vale->id,
+                'tipo_carga' => 'VALE',
+                'is_offline' => true,
+            ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('carga_combustible', ['id_vehiculo' => $vehiculo->id, 'id_vale' => $vale->id]);
+    }
+
+    /**
+     * Contraparte del test anterior: sin is_offline, el mismo vale ya no
+     * disponible sigue rechazando la petición (la excepción no aplica por defecto).
+     */
+    public function test_rechaza_un_vale_no_disponible_sin_is_offline(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Empresa de Prueba',
+            'direccion_empresa' => 'Av. Siempre Viva',
+            'telefono_empresa' => '70000000',
+            'correo_empresa' => 'empresa@example.com',
+            'nit_empresa' => '123456',
+            'parametros_vale' => ['tiempo_expiracion' => 5],
+            'estado' => 'ACTIVO',
+        ]);
+
+        $vale = Vale::create([
+            'litros' => 40,
+            'precio' => 9.5,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'estado_vale' => 'USADO',
+            'id_tipo_combustible' => $tipoCombustible->id,
+        ]);
+
+        $response = $this->actingAs($this->admin, 'api')
+            ->postJson(route('api.v1.cargas.store'), [
+                'fecha_carga' => now()->format('Y-m-d H:i'),
+                'kilometraje' => 15600,
+                'id_vehiculo' => $vehiculo->id,
+                'id_grifo' => $grifo->id,
+                'id_tipo_combustible' => $tipoCombustible->id,
+                'id_conductor' => $conductor->id,
+                'id_vale' => $vale->id,
+                'tipo_carga' => 'VALE',
+            ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('id_vale');
+    }
+
     public function test_lista_las_cargas_de_combustible(): void
     {
         $vehiculo = Vehiculo::factory()->create();

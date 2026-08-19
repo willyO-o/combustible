@@ -7,6 +7,8 @@ defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     vehiculos: Array,
+    tiposCombustible: Array,
+    areas: Array,
     resultado: Array,
     filtros: Object,
 })
@@ -15,6 +17,8 @@ const filtros = ref({
     fecha_inicio: props.filtros?.fecha_inicio?.substring(0, 10) ?? '',
     fecha_fin: props.filtros?.fecha_fin?.substring(0, 10) ?? '',
     id_vehiculo: (props.filtros?.id_vehiculo ?? []).map((id) => Number(id)),
+    id_tipo_combustible: props.filtros?.id_tipo_combustible ?? '',
+    id_area: props.filtros?.id_area ?? '',
 })
 
 const vehiculoOptions = computed(() =>
@@ -32,12 +36,26 @@ watch(filtros, (val) => {
             fecha_inicio: val.fecha_inicio || undefined,
             fecha_fin: val.fecha_fin || undefined,
             id_vehiculo: val.id_vehiculo.length ? val.id_vehiculo : undefined,
+            id_tipo_combustible: val.id_tipo_combustible || undefined,
+            id_area: val.id_area || undefined,
         }, { preserveState: true, replace: true })
     }, 500)
 }, { deep: true })
 
+// El tipo de combustible y el área acotan qué vehículos son elegibles (un
+// vehículo tiene 1 solo tipo de combustible; el área depende de su asignación
+// vigente en vehiculo_area). Si el nuevo listado ya no incluye alguno de los
+// vehículos elegidos para comparar, se descarta para no dejar una selección inválida.
+watch(() => props.vehiculos, (nuevos) => {
+    const idsValidos = new Set(nuevos.map((v) => v.id))
+    const filtrados = filtros.value.id_vehiculo.filter((id) => idsValidos.has(id))
+    if (filtrados.length !== filtros.value.id_vehiculo.length) {
+        filtros.value.id_vehiculo = filtrados
+    }
+})
+
 function clearFilters() {
-    filtros.value = { fecha_inicio: '', fecha_fin: '', id_vehiculo: [] }
+    filtros.value = { fecha_inicio: '', fecha_fin: '', id_vehiculo: [], id_tipo_combustible: '', id_area: '' }
 }
 
 function generarPDF() {
@@ -50,6 +68,8 @@ function generarPDF() {
         fecha_inicio: filtros.value.fecha_inicio,
         fecha_fin: filtros.value.fecha_fin,
         id_vehiculo: filtros.value.id_vehiculo.length ? filtros.value.id_vehiculo : undefined,
+        id_tipo_combustible: filtros.value.id_tipo_combustible || undefined,
+        id_area: filtros.value.id_area || undefined,
     })
 
     window.open(url, '_blank')
@@ -136,7 +156,21 @@ function chartSeries(tipoMedicion) {
                     <label class="form-label">Fecha Fin</label>
                     <input v-model="filtros.fecha_fin" type="date" class="form-control">
                 </div>
-                <div class="col-lg-3">
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label">Tipo de Combustible</label>
+                    <select v-model="filtros.id_tipo_combustible" class="form-select">
+                        <option value="">Todos</option>
+                        <option v-for="t in tiposCombustible" :key="t.id" :value="t.id">{{ t.tipo_combustible }}</option>
+                    </select>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label">Área</label>
+                    <select v-model="filtros.id_area" class="form-select">
+                        <option value="">Todas</option>
+                        <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre_area }}</option>
+                    </select>
+                </div>
+                <div class="col-lg-9">
                     <label class="form-label">Vehículos (para comparar, seleccione 1 o más)</label>
                     <Multiselect
                         v-model="filtros.id_vehiculo"
@@ -255,6 +289,7 @@ function chartSeries(tipoMedicion) {
                             <th>#</th>
                             <th>Código</th>
                             <th>Placa</th>
+                            <th>Combustible</th>
                             <th>Tipo de Medición</th>
                             <th class="text-center">Cargas</th>
                             <th class="text-end">Litros</th>
@@ -265,7 +300,7 @@ function chartSeries(tipoMedicion) {
                     </thead>
                     <tbody>
                         <tr v-if="resultado.length === 0">
-                            <td colspan="9" class="text-center py-4 text-muted">
+                            <td colspan="10" class="text-center py-4 text-muted">
                                 <i class="ri-oil-line fs-3 d-block mb-2"></i>
                                 No se encontraron registros de rendimiento
                             </td>
@@ -274,6 +309,7 @@ function chartSeries(tipoMedicion) {
                             <td>{{ idx + 1 }}</td>
                             <td><span class="badge bg-secondary-transparent text-secondary">{{ r.codigo }}</span></td>
                             <td class="fw-medium">{{ r.nro_placa }}</td>
+                            <td><span class="badge bg-warning-transparent text-warning">{{ r.tipo_combustible }}</span></td>
                             <td>
                                 <span class="badge" :class="r.tipo_medicion === 'horometro' ? 'bg-purple-transparent text-purple' : 'bg-info-transparent text-info'">
                                     {{ tipoMedicionLabel(r.tipo_medicion) }}

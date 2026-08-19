@@ -6,6 +6,8 @@ defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     vehiculos: Array,
+    tiposCombustible: Array,
+    areas: Array,
     datosResumen: Object,
     filtros: Object,
 })
@@ -14,6 +16,8 @@ const filtros = ref({
     fecha_inicio: props.filtros?.fecha_inicio ?? '',
     fecha_fin: props.filtros?.fecha_fin ?? '',
     id_vehiculo: props.filtros?.id_vehiculo ?? '',
+    id_tipo_combustible: props.filtros?.id_tipo_combustible ?? '',
+    id_area: props.filtros?.id_area ?? '',
 })
 
 let debounceTimer = null
@@ -24,15 +28,29 @@ watch(filtros, (val) => {
             fecha_inicio: val.fecha_inicio || undefined,
             fecha_fin: val.fecha_fin || undefined,
             id_vehiculo: val.id_vehiculo || undefined,
+            id_tipo_combustible: val.id_tipo_combustible || undefined,
+            id_area: val.id_area || undefined,
         }, { preserveState: true, replace: true })
     }, 500)
 }, { deep: true })
+
+// El tipo de combustible y el área acotan el select de vehículo (1 vehículo =
+// 1 tipo de combustible; el área depende de su asignación vigente en
+// vehiculo_area). Si el vehículo elegido ya no aparece en el nuevo listado, se
+// limpia la selección en vez de dejar un id "fantasma" filtrando el reporte.
+watch(() => props.vehiculos, (nuevos) => {
+    if (filtros.value.id_vehiculo && ! nuevos.some((v) => v.id === Number(filtros.value.id_vehiculo))) {
+        filtros.value.id_vehiculo = ''
+    }
+})
 
 function clearFilters() {
     filtros.value = {
         fecha_inicio: '',
         fecha_fin: '',
         id_vehiculo: '',
+        id_tipo_combustible: '',
+        id_area: '',
     }
 }
 
@@ -94,6 +112,20 @@ const costoPorLitro = computed(() => {
                         <input v-model="filtros.fecha_fin" type="date" class="form-control">
                     </div>
                     <div class="col-sm-6 col-lg-3">
+                        <label class="form-label">Tipo de Combustible</label>
+                        <select v-model="filtros.id_tipo_combustible" class="form-select">
+                            <option value="">Todos</option>
+                            <option v-for="t in tiposCombustible" :key="t.id" :value="t.id">{{ t.tipo_combustible }}</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <label class="form-label">Área</label>
+                        <select v-model="filtros.id_area" class="form-select">
+                            <option value="">Todas</option>
+                            <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre_area }}</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-9">
                         <label class="form-label">Vehículo (Opcional)</label>
                         <select v-model="filtros.id_vehiculo" class="form-select">
                             <option value="">Todos los vehículos</option>
@@ -102,7 +134,7 @@ const costoPorLitro = computed(() => {
                             </option>
                         </select>
                     </div>
-                    <div class="col-sm-6 col-lg-3 d-flex align-items-end gap-2">
+                    <div class="col-lg-3 d-flex align-items-end gap-2">
                         <button type="button" class="btn btn-outline-secondary btn-wave flex-grow-1" @click="clearFilters">
                             <i class="ri-refresh-line me-1"></i> Limpiar
                         </button>
@@ -195,6 +227,7 @@ const costoPorLitro = computed(() => {
                                 <th>Placa</th>
                                 <th>Marca</th>
                                 <th>Código</th>
+                                <th>Combustible</th>
                                 <th>Total Litros</th>
                                 <th>Total Costo</th>
                                 <th>Cantidad Cargas</th>
@@ -203,7 +236,7 @@ const costoPorLitro = computed(() => {
                         </thead>
                         <tbody>
                             <tr v-if="!datosResumen?.vehiculos || datosResumen.vehiculos.length === 0">
-                                <td colspan="8" class="text-center py-4 text-muted">
+                                <td colspan="9" class="text-center py-4 text-muted">
                                     <i class="ri-oil-line fs-3 d-block mb-2"></i>
                                     No se encontraron registros de combustible
                                 </td>
@@ -213,6 +246,7 @@ const costoPorLitro = computed(() => {
                                 <td class="fw-medium">{{ v.nro_placa }}</td>
                                 <td>{{ v.marca }}</td>
                                 <td><span class="badge bg-secondary-transparent text-secondary">{{ v.codigo }}</span></td>
+                                <td><span class="badge bg-warning-transparent text-warning">{{ v.tipo_combustible }}</span></td>
                                 <td class="text-end fw-medium">{{ v.total_litros.toLocaleString() }} L</td>
                                 <td class="text-end">Bs. {{ v.total_costo.toLocaleString('es-ES', { maximumFractionDigits: 2 }) }}</td>
                                 <td class="text-center"><span class="badge bg-info-transparent text-info">{{ v.cantidad_cargas }}</span></td>
@@ -220,7 +254,7 @@ const costoPorLitro = computed(() => {
                             </tr>
                             <!-- Fila de totales -->
                             <tr class="table-active fw-bold">
-                                <td colspan="4">TOTALES</td>
+                                <td colspan="5">TOTALES</td>
                                 <td class="text-end">{{ datosResumen?.total_litros?.toLocaleString() }} L</td>
                                 <td class="text-end">Bs. {{ datosResumen?.total_costo?.toLocaleString('es-ES', { maximumFractionDigits: 2 }) }}</td>
                                 <td class="text-center">{{ datosResumen?.cantidad_cargas }}</td>
