@@ -5,7 +5,6 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import Multiselect from '@vueform/multiselect'
-import '@vueform/multiselect/themes/default.css'
 
 import { confirm, showToast } from '@/Utils/alertUtil'
 

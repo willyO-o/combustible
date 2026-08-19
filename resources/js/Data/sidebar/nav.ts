@@ -47,6 +47,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   {
     title: 'Reportes Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
   },
+  {
+    title: 'Rendimiento Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible/rendimiento', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
+  },
 
   {
     title: 'Operación Diaria', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['operacion-diaria.ver', 'operacion-diaria.crear', 'operacion-diaria.informe'],

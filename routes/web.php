@@ -162,6 +162,7 @@ Route::middleware('auth')->group(function () {
         Route::get('cargas-combustible', [CargasCombustibleReportController::class, 'index'])->name('index');
         Route::get('cargas-combustible/pdf', [CargasCombustibleReportController::class, 'generarPDF'])->name('pdf');
         Route::get('cargas-combustible/rendimiento', [CargasCombustibleReportController::class, 'generarReporteRendimiento'])->name('rendimiento');
+        Route::get('cargas-combustible/rendimiento/detalle', [CargasCombustibleReportController::class, 'detalleRendimientoVehiculo'])->name('rendimiento.detalle');
 
     });
 

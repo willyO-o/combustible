@@ -3,7 +3,6 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 
 import Multiselect from '@vueform/multiselect'
-import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Modal from '@/Components/Modal.vue'; // Ajusta la ruta según tu proyecto
 import TextareaAutocomplete from '@/Components/TextareaAutocomplete.vue'

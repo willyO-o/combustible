@@ -5,7 +5,6 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import Multiselect from '@vueform/multiselect'
-import '@vueform/multiselect/themes/default.css'
 
 const props = defineProps({
     tipo:               Object, // null en creación

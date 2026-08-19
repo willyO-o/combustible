@@ -3,6 +3,8 @@ import '../css/style.scss';
 import '../css/my-styles.css';
 import './bootstrap';
 
+import '@vueform/multiselect/themes/default.css'
+
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createApp, h } from 'vue';

@@ -4,7 +4,6 @@ import { Head, Link, useForm } from '@inertiajs/vue3'
 import SearchSelect from '@/Components/SearchSelect.vue'
 
 import Multiselect from '@vueform/multiselect'
-// import '@vueform/multiselect/themes/default.css'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 

@@ -6,8 +6,8 @@ use App\Libraries\Reportes;
 use App\Models\CargaCombustible;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
-use Inertia\Response;
 use Illuminate\Support\Facades\DB;
+use Inertia\Response;
 
 class CargasCombustibleReportController extends Controller
 {
@@ -53,10 +53,9 @@ class CargasCombustibleReportController extends Controller
         $fechaFin = $request->input('fecha_fin');
         $idVehiculo = $request->input('id_vehiculo', null);
 
-        $reporte = new Reportes();
+        $reporte = new Reportes;
         $reporte->generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo);
     }
-
 
     private function obtenerResumen($fechaInicio, $fechaFin, $idVehiculo = null)
     {
@@ -80,8 +79,6 @@ class CargasCombustibleReportController extends Controller
                 DB::raw('ROUND(AVG(carga_combustible.precio), 2) as precio_promedio'),
             ])->groupBy('carga_combustible.id_vehiculo', 'v.nro_placa', 'v.marca', 'v.codigo');
 
-
-
         $cargas = $query->get();
 
         // Totales generales
@@ -91,6 +88,7 @@ class CargasCombustibleReportController extends Controller
         // Agrupar por vehículo
         $vehiculosDetalle = $cargas->groupBy('id_vehiculo')->map(function ($grupo) {
             $primerCarga = $grupo->first();
+
             return [
                 'id_vehiculo' => $primerCarga->id_vehiculo,
                 'nro_placa' => $primerCarga->nro_placa,
@@ -111,31 +109,67 @@ class CargasCombustibleReportController extends Controller
         ];
     }
 
-
-
-
     public function generarReporteRendimiento(Request $request)
     {
+        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion')
+            ->orderBy('nro_placa')
+            ->get();
+
         $fechaInicio = $request->input('fecha_inicio', now()->startOfMonth()->format('Y-m-d 00:00:00'));
         $fechaFin = $request->input('fecha_fin', now()->endOfMonth()->format('Y-m-d 23:59:59'));
-        $idVehiculo = $request->input('id_vehiculo', null);
-        $soloResumen = $request->boolean('resumen', true); // Flag para devolver resumen o detalle
+        // Selección múltiple: llega como id_vehiculo[]=1&id_vehiculo[]=2 (o vacío = todos los vehículos).
+        $idsVehiculo = array_filter((array) $request->input('id_vehiculo', []));
 
-        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idVehiculo, $soloResumen);
+        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idsVehiculo, true);
 
         return inertia('Reportes/CargasCombustibleRendimientoReporte', [
+            'vehiculos' => $vehiculos,
             'resultado' => $resultado,
             'filtros' => [
                 'fecha_inicio' => $fechaInicio,
                 'fecha_fin' => $fechaFin,
-                'id_vehiculo' => $idVehiculo,
-                'resumen' => $soloResumen,
+                'id_vehiculo' => array_values($idsVehiculo),
             ],
         ]);
     }
 
+    /**
+     * Detalle carga por carga del rendimiento de UN solo vehículo (drill-down
+     * del resumen de generarReporteRendimiento). Siempre delega en
+     * obtenerResumenRendimiento() con $soloResumen = false y un único id,
+     * nunca con la lista vacía/todos los vehículos.
+     */
+    public function detalleRendimientoVehiculo(Request $request): Response
+    {
+        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion')
+            ->orderBy('nro_placa')
+            ->get();
 
-    public function obtenerResumenRendimiento($fechaInicio, $fechaFin, $idVehiculo = null, $soloResumen = true)
+        $fechaInicio = $request->input('fecha_inicio', now()->startOfMonth()->format('Y-m-d 00:00:00'));
+        $fechaFin = $request->input('fecha_fin', now()->endOfMonth()->format('Y-m-d 23:59:59'));
+        $idVehiculo = $request->integer('id_vehiculo') ?: null;
+
+        // Sin vehículo seleccionado todavía no hay nada que consultar: se
+        // muestra el estado vacío en la vista en vez de forzar un error.
+        $detalle = $idVehiculo
+            ? $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, [$idVehiculo], false)
+            : collect();
+
+        return inertia('Reportes/CargasCombustibleRendimientoDetalle', [
+            'vehiculos' => $vehiculos,
+            'detalle' => $detalle,
+            'filtros' => [
+                'fecha_inicio' => $fechaInicio,
+                'fecha_fin' => $fechaFin,
+                'id_vehiculo' => $idVehiculo,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<int, int|string>  $idsVehiculo  Vacío = todos los vehículos.
+     */
+    public function obtenerResumenRendimiento($fechaInicio, $fechaFin, array $idsVehiculo = [], $soloResumen = true)
     {
         // 1. CTE Base: Obtiene mediciones y el valor anterior mediante LAG()
         $cteMediciones = DB::table('carga_combustible as cc')
@@ -152,7 +186,7 @@ class CargasCombustibleReportController extends Controller
             LAG(CASE WHEN v.tipo_medicion = 'kilometraje' THEN cc.kilometraje ELSE cc.horometro END)
                 OVER (PARTITION BY cc.id_vehiculo ORDER BY cc.fecha_carga, cc.id) as medicion_anterior
         ")
-            ->when($idVehiculo, fn($q) => $q->where('cc.id_vehiculo', $idVehiculo));
+            ->when(! empty($idsVehiculo), fn ($q) => $q->whereIn('cc.id_vehiculo', $idsVehiculo));
 
         // 2. CTE Detalle: Filtra por fechas y calcula el recorrido/rendimiento por cada carga
         $cteDetalle = DB::table('mediciones_base')

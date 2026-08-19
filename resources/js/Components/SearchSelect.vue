@@ -10,7 +10,6 @@
  *  - invalid: booleano para mostrar borde rojo
  */
 import Multiselect from '@vueform/multiselect'
-import '@vueform/multiselect/themes/default.css'
 
 import { ref, computed, watch } from 'vue'
 import axios from 'axios'
