@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { confirm } from '@/Utils/alertUtil.js'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -38,10 +39,18 @@ function clearFilters() {
     filters.value = { tipo_combustible: '', estado_tipo_combustible: '' }
 }
 
-function confirmDelete(tipo) {
-    if (confirm(`¿Eliminar el tipo de combustible "${tipo.tipo_combustible}"?`)) {
-        router.delete(route('tipos-combustible.destroy', tipo.id))
+async function confirmDelete(tipo) {
+    const confirmado = await confirm(
+        `¿Eliminar el tipo de combustible "${tipo.tipo_combustible}"?`,
+        'Eliminar Tipo de Combustible',
+        'Sí, eliminar',
+    )
+
+    if (!confirmado) {
+        return
     }
+
+    router.delete(route('tipos-combustible.destroy', tipo.id))
 }
 
 const estadoBadge = (estado) =>

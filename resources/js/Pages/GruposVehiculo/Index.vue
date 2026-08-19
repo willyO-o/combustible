@@ -5,6 +5,7 @@ import { Modal } from 'bootstrap'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
+import { confirm } from '@/Utils/alertUtil.js'
 
 const props = defineProps({
     grupos: Object,
@@ -62,10 +63,18 @@ function submit() {
     }
 }
 
-function confirmDelete(grupo) {
-    if (confirm(`¿Eliminar el grupo de vehículo "${grupo.grupo_vehiculo}"?`)) {
-        router.delete(route('grupos-vehiculo.destroy', grupo.id))
+async function confirmDelete(grupo) {
+    const confirmado = await confirm(
+        `¿Eliminar el grupo de vehículo "${grupo.grupo_vehiculo}"?`,
+        'Eliminar Grupo de Vehículo',
+        'Sí, eliminar',
+    )
+
+    if (!confirmado) {
+        return
     }
+
+    router.delete(route('grupos-vehiculo.destroy', grupo.id))
 }
 
 const estadoBadge = (estado) =>

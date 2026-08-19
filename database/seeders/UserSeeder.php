@@ -95,6 +95,7 @@ class UserSeeder extends Seeder
             'conductores.crear',
             'conductores.editar',
             'conductores.eliminar',
+            'conductores.asignar-vehiculo',
         ];
     }
 
@@ -105,6 +106,7 @@ class UserSeeder extends Seeder
             'vehiculos.crear',
             'vehiculos.editar',
             'vehiculos.eliminar',
+            'vehiculos.asignar-area',
         ];
     }
 

@@ -113,6 +113,7 @@ return [
                 'conductores.crear' => 'Crear',
                 'conductores.editar' => 'Editar',
                 'conductores.eliminar' => 'Eliminar',
+                'conductores.asignar-vehiculo' => 'Asignar vehículo',
             ],
         ],
 
@@ -123,6 +124,7 @@ return [
                 'vehiculos.crear' => 'Crear',
                 'vehiculos.editar' => 'Editar',
                 'vehiculos.eliminar' => 'Eliminar',
+                'vehiculos.asignar-area' => 'Asignar área',
             ],
         ],
 

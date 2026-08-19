@@ -12,11 +12,15 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
     'fecha_asignacion',
     'fecha_reasignacion',
     'fecha_culminacion',
-    'estado_asignacion'
+    'estado_asignacion',
 ])]
 class VehiculoArea extends Pivot
 {
-    //
+    // La tabla tiene su propia PK autoincremental (id), a diferencia de un
+    // pivot tradicional sin clave propia: Pivot::$incrementing es false por
+    // defecto, así que hay que reactivarlo para que create()/fresh()/refresh()
+    // recuperen correctamente el id insertado.
+    public $incrementing = true;
 
     protected $table = 'vehiculo_area';
 

@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { confirm } from '@/Utils/alertUtil.js'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -38,10 +39,18 @@ function clearFilters() {
     filters.value = { tipo_mantenimiento: '', estado_tipo_mantenimiento: '' }
 }
 
-function confirmDelete(tipo) {
-    if (confirm(`¿Eliminar el tipo de mantenimiento "${tipo.tipo_mantenimiento}"?`)) {
-        router.delete(route('tipos-mantenimiento.destroy', tipo.id))
+async function confirmDelete(tipo) {
+    const confirmado = await confirm(
+        `¿Eliminar el tipo de mantenimiento "${tipo.tipo_mantenimiento}"?`,
+        'Eliminar Tipo de Mantenimiento',
+        'Sí, eliminar',
+    )
+
+    if (!confirmado) {
+        return
     }
+
+    router.delete(route('tipos-mantenimiento.destroy', tipo.id))
 }
 
 const estadoBadge = (estado) =>

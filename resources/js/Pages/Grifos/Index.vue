@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { confirm } from '@/Utils/alertUtil.js'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -42,10 +43,14 @@ function clearFilters() {
     filters.value = { razon_social: '', nit: '', ciudad: '', estado_grifo: '' }
 }
 
-function confirmDelete(grifo) {
-    if (confirm(`¿Eliminar el grifo "${grifo.razon_social}"?`)) {
-        router.delete(route('grifos.destroy', grifo.id))
+async function confirmDelete(grifo) {
+    const confirmado = await confirm(`¿Eliminar el grifo "${grifo.razon_social}"?`, 'Eliminar Grifo', 'Sí, eliminar')
+
+    if (!confirmado) {
+        return
     }
+
+    router.delete(route('grifos.destroy', grifo.id))
 }
 
 const estadoBadge = (estado) =>

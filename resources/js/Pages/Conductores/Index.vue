@@ -1,10 +1,13 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { ref, computed, nextTick, watch } from 'vue'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Modal } from 'bootstrap'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import { showToast, confirm , showError} from '@/Utils/alertUtil.js'
+import InputError from '@/Components/InputError.vue'
+import SearchSelect from '@/Components/SearchSelect.vue'
 
 const props = defineProps({
     conductores: Object,
@@ -101,7 +104,93 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
 
 }
 
+/* ------------------------------------------------------------------ *
+ * Modal: reasignar vehículo
+ * ------------------------------------------------------------------ */
+const asignacionModalEl = ref(null)
+let asignacionModalInstance = null
 
+// Guardamos sólo el id: así el modal siempre refleja los datos frescos
+// que llegan en `conductores` tras cada asignación/finalización.
+const conductorAsignacionId = ref(null)
+const conductorAsignacion = computed(() =>
+    props.conductores.data.find((c) => c.id === conductorAsignacionId.value) ?? null
+)
+const asignacionActual = computed(() => conductorAsignacion.value?.asignaciones_activas?.[0] ?? null)
+
+const asignacionForm = useForm({
+    id_vehiculo:          null,
+    estado_asignacion:    'ACTIVO',
+    fecha_culminacion:    '',
+    detalle:              '',
+    kilometraje_inicial:  '',
+    horometro_inicial:    '',
+})
+
+const tipoMedicionSeleccionado = ref(null)
+
+function abrirAsignacion(conductor) {
+    conductorAsignacionId.value = conductor.id
+    asignacionForm.reset()
+    asignacionForm.clearErrors()
+    tipoMedicionSeleccionado.value = null
+
+    nextTick(() => {
+        if (!asignacionModalInstance) {
+            asignacionModalInstance = new Modal(asignacionModalEl.value)
+        }
+        asignacionModalInstance.show()
+    })
+}
+
+function onVehiculoSeleccionado(vehiculo) {
+    tipoMedicionSeleccionado.value = vehiculo?.meta?.tipo_medicion ?? null
+    asignacionForm.kilometraje_inicial = ''
+    asignacionForm.horometro_inicial = ''
+}
+
+function onVehiculoLimpiado() {
+    tipoMedicionSeleccionado.value = null
+}
+
+function submitAsignacion() {
+    asignacionForm
+        .transform((data) => ({
+            ...data,
+            id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
+            fecha_culminacion: data.estado_asignacion === 'PROVISIONAL' ? (data.fecha_culminacion || null) : null,
+        }))
+        .post(route('conductores.asignaciones.asignar', conductorAsignacionId.value), {
+            preserveScroll: true,
+            onSuccess: () => {
+                asignacionForm.reset()
+                tipoMedicionSeleccionado.value = null
+            },
+        })
+}
+
+async function finalizarAsignacion(asignacion) {
+    const confirmado = await confirm(
+        `¿Finalizar la asignación del vehículo <strong>${asignacion.nro_placa}</strong>?`,
+        'Finalizar Asignación',
+        'Sí, finalizar',
+    )
+
+    if (!confirmado) {
+        return
+    }
+
+    router.patch(
+        route('conductores.asignaciones.finalizar', [conductorAsignacionId.value, asignacion.pivot.id]),
+        {},
+        { preserveScroll: true },
+    )
+}
+
+const tipoAsignacionBadge = (tipo) =>
+    tipo === 'ACTIVO'
+        ? 'bg-primary-transparent text-primary'
+        : 'bg-info-transparent text-info'
 
 </script>
 
@@ -260,6 +349,15 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
                                 </td>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
+                                        <button
+                                            v-can="'conductores.asignar-vehiculo'"
+                                            type="button"
+                                            class="btn btn-sm btn-icon btn-primary-light"
+                                            title="Reasignar Vehículo"
+                                            @click="abrirAsignacion(conductor)"
+                                        >
+                                            <i class="ri-exchange-line"></i>
+                                        </button>
                                         <Link :href="route('conductores.show', conductor.id)"
                                             class="btn btn-sm btn-icon btn-light" title="Ver">
                                             <i class="ri-eye-line"></i>
@@ -296,6 +394,183 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
                         </li>
                     </ul>
                 </nav>
+            </div>
+        </div>
+
+        <!-- Modal: reasignar vehículo -->
+        <div ref="asignacionModalEl" class="modal fade" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-medium">
+                            Vehículo asignado:
+                            <span class="text-primary">
+                                {{ conductorAsignacion?.nombres }} {{ conductorAsignacion?.paterno ?? '' }}
+                            </span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Estado actual -->
+                        <div class="card custom-card border mb-4">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span v-if="asignacionActual" class="badge" :class="tipoAsignacionBadge(asignacionActual.pivot.estado_asignacion)">
+                                        {{ asignacionActual.pivot.estado_asignacion }}
+                                    </span>
+                                    <span v-else class="badge bg-secondary-transparent text-secondary">Sin vehículo</span>
+                                    <button
+                                        v-if="asignacionActual"
+                                        type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        title="Finalizar asignación"
+                                        @click="finalizarAsignacion(asignacionActual)"
+                                    >
+                                        <i class="ri-close-circle-line"></i>
+                                    </button>
+                                </div>
+                                <div v-if="asignacionActual">
+                                    <div class="fw-medium">
+                                        {{ asignacionActual.codigo }} — {{ asignacionActual.nro_placa }}
+                                        <span v-if="asignacionActual.marca" class="text-muted">({{ asignacionActual.marca }})</span>
+                                    </div>
+                                    <small class="text-muted d-block">Desde: {{ asignacionActual.pivot.fecha_asignacion }}</small>
+                                    <small v-if="asignacionActual.pivot.fecha_culminacion" class="text-muted d-block">
+                                        Hasta: {{ asignacionActual.pivot.fecha_culminacion }}
+                                    </small>
+                                    <small v-if="asignacionActual.pivot.detalle" class="text-muted d-block">
+                                        Motivo: {{ asignacionActual.pivot.detalle }}
+                                    </small>
+                                </div>
+                                <div v-else class="text-muted small">Este conductor no tiene un vehículo asignado</div>
+                            </div>
+                        </div>
+
+                        <!-- Formulario de asignación -->
+                        <form @submit.prevent="submitAsignacion">
+                            <h6 class="fw-medium mb-3">Asignar / Reasignar Vehículo</h6>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">
+                                        Vehículo <span class="text-danger">*</span>
+                                    </label>
+                                    <SearchSelect
+                                        v-model="asignacionForm.id_vehiculo"
+                                        :object="true"
+                                        :search-url="route('search.vehiculos')"
+                                        placeholder="Buscar por placa, código o marca (mín. 2 caracteres)..."
+                                        :invalid="!!asignacionForm.errors.id_vehiculo"
+                                        @selected="onVehiculoSeleccionado"
+                                        @cleared="onVehiculoLimpiado"
+                                    />
+                                    <InputError :message="asignacionForm.errors.id_vehiculo" class="mt-1" />
+                                </div>
+
+                                <div class="col-sm-6">
+                                    <label class="form-label fw-medium">
+                                        Tipo de Asignación <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="d-flex gap-4 mt-1">
+                                        <div class="form-check">
+                                            <input
+                                                id="asignacion_activo"
+                                                v-model="asignacionForm.estado_asignacion"
+                                                class="form-check-input"
+                                                type="radio"
+                                                value="ACTIVO"
+                                            />
+                                            <label for="asignacion_activo" class="form-check-label">ACTIVO</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input
+                                                id="asignacion_provisional"
+                                                v-model="asignacionForm.estado_asignacion"
+                                                class="form-check-input"
+                                                type="radio"
+                                                value="PROVISIONAL"
+                                            />
+                                            <label for="asignacion_provisional" class="form-check-label">PROVISIONAL</label>
+                                        </div>
+                                    </div>
+                                    <InputError :message="asignacionForm.errors.estado_asignacion" class="mt-1" />
+                                    <small class="text-muted">
+                                        Provisional: cuando el encargado oficial está de permiso o ausencia justificada.
+                                    </small>
+                                </div>
+
+                                <div v-if="asignacionForm.estado_asignacion === 'PROVISIONAL'" class="col-sm-6">
+                                    <label class="form-label fw-medium">Fecha de Finalización (opcional)</label>
+                                    <input
+                                        v-model="asignacionForm.fecha_culminacion"
+                                        type="date"
+                                        class="form-control"
+                                        :class="{ 'is-invalid': asignacionForm.errors.fecha_culminacion }"
+                                    />
+                                    <InputError :message="asignacionForm.errors.fecha_culminacion" class="mt-1" />
+                                </div>
+
+                                <div v-if="tipoMedicionSeleccionado === 'kilometraje'" class="col-sm-6">
+                                    <label class="form-label fw-medium">
+                                        Kilometraje Inicial <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <input
+                                            v-model="asignacionForm.kilometraje_inicial"
+                                            type="number"
+                                            min="0"
+                                            class="form-control"
+                                            :class="{ 'is-invalid': asignacionForm.errors.kilometraje_inicial }"
+                                        />
+                                        <span class="input-group-text">km</span>
+                                    </div>
+                                    <InputError :message="asignacionForm.errors.kilometraje_inicial" class="mt-1" />
+                                </div>
+
+                                <div v-if="tipoMedicionSeleccionado === 'horometro'" class="col-sm-6">
+                                    <label class="form-label fw-medium">
+                                        Horómetro Inicial <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <input
+                                            v-model="asignacionForm.horometro_inicial"
+                                            type="number"
+                                            min="0"
+                                            class="form-control"
+                                            :class="{ 'is-invalid': asignacionForm.errors.horometro_inicial }"
+                                        />
+                                        <span class="input-group-text">h</span>
+                                    </div>
+                                    <InputError :message="asignacionForm.errors.horometro_inicial" class="mt-1" />
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">Motivo</label>
+                                    <textarea
+                                        v-model="asignacionForm.detalle"
+                                        class="form-control"
+                                        :class="{ 'is-invalid': asignacionForm.errors.detalle }"
+                                        rows="2"
+                                        placeholder="Ej: asignación inicial, reemplazo por mantenimiento..."
+                                    ></textarea>
+                                    <InputError :message="asignacionForm.errors.detalle" class="mt-1" />
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-end mt-3">
+                                <button type="submit" class="btn btn-primary btn-wave" :disabled="asignacionForm.processing">
+                                    <span v-if="asignacionForm.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                    <i v-else class="ri-exchange-line me-1"></i>
+                                    {{ asignacionForm.processing ? 'Asignando...' : 'Asignar' }}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-wave" data-bs-dismiss="modal">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 </template>

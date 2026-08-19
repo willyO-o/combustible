@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { confirm } from '@/Utils/alertUtil.js'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -40,10 +41,14 @@ function clearFilters() {
     filters.value = { nombre_repuesto: '', codigo_repuesto: '', estado_repuesto: '' }
 }
 
-function confirmDelete(repuesto) {
-    if (confirm(`¿Eliminar el repuesto "${repuesto.nombre_repuesto}"?`)) {
-        router.delete(route('repuestos.destroy', repuesto.id))
+async function confirmDelete(repuesto) {
+    const confirmado = await confirm(`¿Eliminar el repuesto "${repuesto.nombre_repuesto}"?`, 'Eliminar Repuesto', 'Sí, eliminar')
+
+    if (!confirmado) {
+        return
     }
+
+    router.delete(route('repuestos.destroy', repuesto.id))
 }
 
 const estadoBadge = (estado) => {

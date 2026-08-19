@@ -152,16 +152,18 @@ class Vehiculo extends Model
             ->withTimestamps();
     }
 
+    // Estado PROVISIONAL o ACTIVO Y fecha_culminacion nula o futura (antes se
+    // evaluaba con "orWhere" entre ambos grupos, lo que hacía que cualquier
+    // fila con fecha_culminacion nula -incluida una ya REASIGNADA/CULMINADA
+    // sin ese campo registrado- contara como "asignada").
     public function areasAsignadas()
     {
         return $this->areas()->where(function ($query) {
             $query->where('vehiculo_area.estado_asignacion', 'PROVISIONAL')
-                ->orWhere('vehiculo_area.estado_asignacion', 'ACTIVO')
-                ->orWhere(function ($query) {
-                    $query->whereNull('vehiculo_area.fecha_culminacion')
-                        ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
-                })
-                ->orderBy('vehiculo_area.fecha_asignacion', 'desc');
-        });
+                ->orWhere('vehiculo_area.estado_asignacion', 'ACTIVO');
+        })->where(function ($query) {
+            $query->whereNull('vehiculo_area.fecha_culminacion')
+                ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
+        })->orderBy('vehiculo_area.fecha_asignacion', 'desc');
     }
 }

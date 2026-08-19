@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import CargaCombustibleDetalleModal from '@/Components/CargaCombustibleDetalleModal.vue'
+import { confirm } from '@/Utils/alertUtil.js'
 
 defineOptions({ layout: Maindashboard })
 
@@ -46,10 +47,18 @@ function clearFilters() {
     filters.value = { nro_placa: '', fecha_desde: '', fecha_hasta: '', tipo_carga: '', estado_carga: '' }
 }
 
-function confirmDelete(carga) {
-    if (confirm(`¿Eliminar la carga del ${formatDate(carga.fecha_carga)} — ${carga.vehiculo?.nro_placa}?`)) {
-        router.delete(route('cargas.destroy', carga.id))
+async function confirmDelete(carga) {
+    const confirmado = await confirm(
+        `¿Eliminar la carga del ${formatDate(carga.fecha_carga)} — ${carga.vehiculo?.nro_placa}?`,
+        'Eliminar Carga',
+        'Sí, eliminar',
+    )
+
+    if (!confirmado) {
+        return
     }
+
+    router.delete(route('cargas.destroy', carga.id))
 }
 
 const estadoBadge = (estado) => {

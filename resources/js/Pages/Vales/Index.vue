@@ -4,6 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import ValeDetalleModal from '@/Components/ValeDetalleModal.vue'
 import { getExpirationStatus, formatDate } from '@/Utils/dateUtil'
+import { confirm } from '@/Utils/alertUtil.js'
 
 
 defineOptions({ layout: Maindashboard })
@@ -46,10 +47,14 @@ function clearFilters() {
     filters.value = { nro_vale: '', fecha_desde: '', fecha_hasta: '', estado_vale: '' }
 }
 
-function confirmDelete(vale) {
-    if (confirm(`¿Eliminar el Vale #${vale.nro_vale}?`)) {
-        router.delete(route('vales.destroy', vale.id))
+async function confirmDelete(vale) {
+    const confirmado = await confirm(`¿Eliminar el Vale #${vale.nro_vale}?`, 'Eliminar Vale', 'Sí, eliminar')
+
+    if (!confirmado) {
+        return
     }
+
+    router.delete(route('vales.destroy', vale.id))
 }
 
 const selectedValeId = ref(null)

@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Support\Facades\DB;
 
 #[Fillable([
@@ -14,21 +15,20 @@ use Illuminate\Support\Facades\DB;
 
 class Conductor extends Model
 {
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'conductor';
 
     // protected $primaryKey = 'id_persona';
 
-
     public $incrementing = false;
-
 
     public function getFNacimientoFormattedAttribute()
     {
         if ($this->fecha_nacimiento) {
             return $this->fecha_nacimiento->format('d/m/Y');
         }
+
         return null;
     }
 
@@ -37,6 +37,7 @@ class Conductor extends Model
         if ($this->fecha_nacimiento) {
             return $this->fecha_nacimiento->age;
         }
+
         return null;
     }
 
@@ -45,6 +46,7 @@ class Conductor extends Model
     {
         return $this->belongsTo(Persona::class, 'id');
     }
+
     public function user()
     {
         return $this->hasOne(User::class, 'id_persona', 'id');
@@ -71,21 +73,21 @@ class Conductor extends Model
 
     public function asignacionesActivasOpt()
     {
-        //devolver en formato id, label y meta para usar en select2
+        // devolver en formato id, label y meta para usar en select2
 
         return $this->asignacionesActivas->map(function ($asignacion) {
             return [
-                'id'    => $asignacion->id,
+                'id' => $asignacion->id,
                 'label' => "{$asignacion->codigo} — {$asignacion->nro_placa} —  {$asignacion->marca} ({$asignacion->anio})",
-                'meta'  => [
+                'meta' => [
                     'id_tipo_vehiculo' => $asignacion->id_tipo_vehiculo,
-                    'id_tipo_combustible'   => $asignacion->id_tipo_combustible,
-                    'tipo_medicion'       => $asignacion->tipo_medicion,
-                    'marca'       => $asignacion->marca,
-                    'nro_placa'       => $asignacion->nro_placa,
-                    'anio'       => $asignacion->anio,
-                    'modelo'       => $asignacion->modelo,
-                    'codigo'       => $asignacion->codigo,
+                    'id_tipo_combustible' => $asignacion->id_tipo_combustible,
+                    'tipo_medicion' => $asignacion->tipo_medicion,
+                    'marca' => $asignacion->marca,
+                    'nro_placa' => $asignacion->nro_placa,
+                    'anio' => $asignacion->anio,
+                    'modelo' => $asignacion->modelo,
+                    'codigo' => $asignacion->codigo,
                 ],
             ];
         });
@@ -99,8 +101,6 @@ class Conductor extends Model
             ->orderByPivot('fecha_asignacion', 'desc');
     }
 
-
-
     public function vales()
     {
         return $this->hasMany(Vale::class, 'id_conductor');
@@ -110,8 +110,6 @@ class Conductor extends Model
     {
         return $this->hasMany(CargaCombustible::class, 'id_conductor');
     }
-
-
 
     public function mantenimientos()
     {
