@@ -64,7 +64,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     ],
   },
   {
-    menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver', 'repuestos.ver']
+    menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver', 'grupos-vehiculo.ver', 'repuestos.ver']
   },
   {
     title: 'Conductores', icon: Svgicons.Conductoricon, type: 'link', path: '/conductores', active: false, selected: false, dirchange: false, permission: 'conductores.ver'
@@ -86,6 +86,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Tipos de Vehículo', icon: Svgicons.TipoVehiculoIcon, type: 'link', path: '/tipos-vehiculo', active: false, selected: false, dirchange: false, permission: 'tipos-vehiculo.ver'
   },
   {
+    title: 'Grupos de Vehículo', icon: Svgicons.GrupoVehiculoIcon, type: 'link', path: '/grupos-vehiculo', active: false, selected: false, dirchange: false, permission: 'grupos-vehiculo.ver'
+  },
+  {
     title: 'Repuestos', icon: Svgicons.RepuestoIcon, type: 'link', path: '/repuestos', active: false, selected: false, dirchange: false, permission: 'repuestos.ver'
   },
   {
@@ -96,6 +99,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
   {
     title: 'Usuarios', icon: Svgicons.UsuarioIcon, type: 'link', path: '/usuarios', active: false, selected: false, dirchange: false, permission: 'usuarios.ver'
+  },
+  {
+    title: 'Roles y Permisos', icon: Svgicons.RolIcon, type: 'link', path: '/roles', active: false, selected: false, dirchange: false, permission: 'roles.ver'
   },
 //   {
 //     title: "Dashboards", icon: Svgicons.Dashboardicon, type: "sub", active: false, dirchange: false, children: [

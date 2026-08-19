@@ -19,6 +19,7 @@ class TipoVehiculoRequest extends FormRequest
         return [
             'tipo_vehiculo' => ['required', 'string', 'max:150', Rule::unique('tipo_vehiculo', 'tipo_vehiculo')->ignore($id)],
             'estado_tipo_vehiculo' => ['required', Rule::in(['ACTIVO', 'INACTIVO'])],
+            'id_grupo_vehiculo' => ['required', 'integer', 'exists:grupo_vehiculo,id'],
 
             // Intervalos de mantenimiento (referencia para futuras alertas): a lo
             // sumo un intervalo por tipo de mantenimiento.
@@ -34,6 +35,7 @@ class TipoVehiculoRequest extends FormRequest
         return [
             'tipo_vehiculo' => 'tipo de vehículo',
             'estado_tipo_vehiculo' => 'estado',
+            'id_grupo_vehiculo' => 'grupo de vehículo',
             'intervalos.*.id_tipo_mantenimiento' => 'tipo de mantenimiento',
             'intervalos.*.tipo_medicion' => 'medición',
             'intervalos.*.frecuencia' => 'frecuencia',

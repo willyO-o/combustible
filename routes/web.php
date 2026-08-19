@@ -5,12 +5,14 @@ use App\Http\Controllers\CargasCombustibleReportController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GrifoController;
+use App\Http\Controllers\GrupoVehiculoController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\OperacionDiariaController;
 use App\Http\Controllers\OrdenTrabajoController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RepuestoController;
+use App\Http\Controllers\RolController;
 use App\Http\Controllers\SolicitudMantenimientoController;
 use App\Http\Controllers\TipoCombustibleController;
 use App\Http\Controllers\TipoMantenimientoController;
@@ -66,11 +68,18 @@ Route::middleware('auth')->group(function () {
     Route::resource('tipos-mantenimiento', TipoMantenimientoController::class)
         ->parameters(['tipos-mantenimiento' => 'tipoMantenimiento']);
 
+    Route::resource('grupos-vehiculo', GrupoVehiculoController::class)
+        ->parameters(['grupos-vehiculo' => 'grupoVehiculo'])
+        ->only(['index', 'store', 'update', 'destroy']);
+
     Route::resource('tipos-vehiculo', TipoVehiculoController::class)
         ->parameters(['tipos-vehiculo' => 'tipoVehiculo']);
 
     Route::resource('repuestos', RepuestoController::class)
         ->parameters(['repuestos' => 'repuesto']);
+
+    Route::resource('roles', RolController::class)
+        ->except(['show', 'destroy']);
 
     // Usuarios
     Route::get('usuarios/{usuario}/password', [UserController::class, 'editPassword'])->name('usuarios.edit-password');

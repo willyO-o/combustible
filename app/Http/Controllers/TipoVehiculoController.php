@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\TipoVehiculoRequest;
+use App\Models\GrupoVehiculo;
 use App\Models\IntervaloMantenimientoTipo;
 use App\Models\TipoMantenimiento;
 use App\Models\TipoVehiculo;
@@ -43,6 +44,7 @@ class TipoVehiculoController extends Controller
         return Inertia::render('TiposVehiculo/Create', [
             'tipo' => null,
             'tiposMantenimiento' => $this->tiposMantenimientoActivos(),
+            'gruposVehiculo' => $this->gruposVehiculoActivos(),
         ]);
     }
 
@@ -66,6 +68,7 @@ class TipoVehiculoController extends Controller
         return Inertia::render('TiposVehiculo/Create', [
             'tipo' => $tipoVehiculo->load('intervalos.tipoMantenimiento'),
             'tiposMantenimiento' => $this->tiposMantenimientoActivos(),
+            'gruposVehiculo' => $this->gruposVehiculoActivos($tipoVehiculo->id_grupo_vehiculo),
         ]);
     }
 
@@ -107,6 +110,20 @@ class TipoVehiculoController extends Controller
         return TipoMantenimiento::where('estado_tipo_mantenimiento', 'ACTIVO')
             ->orderBy('tipo_mantenimiento')
             ->get(['id', 'tipo_mantenimiento']);
+    }
+
+    /**
+     * Catálogo de grupos de vehículo activos para el selector obligatorio
+     * del formulario de tipo de vehículo. Si el tipo que se está editando
+     * tiene asignado un grupo que ya no está activo, igual se incluye para
+     * no perder la selección actual en el formulario.
+     */
+    private function gruposVehiculoActivos(?int $idGrupoActual = null): Collection
+    {
+        return GrupoVehiculo::where('estado_grupo_vehiculo', 'ACTIVO')
+            ->when($idGrupoActual, fn ($query) => $query->orWhere('id', $idGrupoActual))
+            ->orderBy('grupo_vehiculo')
+            ->get(['id', 'grupo_vehiculo']);
     }
 
     /**

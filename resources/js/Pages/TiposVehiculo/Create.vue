@@ -10,6 +10,7 @@ import '@vueform/multiselect/themes/default.css'
 const props = defineProps({
     tipo:               Object, // null en creación
     tiposMantenimiento: Array,
+    gruposVehiculo:     Array,
 })
 
 const isEditing = computed(() => !!props.tipo)
@@ -18,6 +19,7 @@ const form = useForm({
     ...(isEditing.value ? { _method: 'PUT' } : {}),
     tipo_vehiculo:        props.tipo?.tipo_vehiculo ?? '',
     estado_tipo_vehiculo: props.tipo?.estado_tipo_vehiculo ?? 'ACTIVO',
+    id_grupo_vehiculo:    props.tipo?.id_grupo_vehiculo ?? '',
     intervalos: (props.tipo?.intervalos ?? []).map((i) => ({
         id_tipo_mantenimiento: i.id_tipo_mantenimiento,
         tipo_medicion:         i.tipo_medicion,
@@ -109,6 +111,26 @@ function submit() {
                                         autofocus
                                     />
                                     <InputError :message="form.errors.tipo_vehiculo" class="mt-1" />
+                                </div>
+
+                                <!-- Grupo de Vehículo -->
+                                <div class="col-12">
+                                    <label for="id_grupo_vehiculo" class="form-label fw-medium">
+                                        Grupo de Vehículo
+                                        <span class="text-danger">*</span>
+                                    </label>
+                                    <select
+                                        id="id_grupo_vehiculo"
+                                        v-model="form.id_grupo_vehiculo"
+                                        class="form-select"
+                                        :class="{ 'is-invalid': form.errors.id_grupo_vehiculo }"
+                                    >
+                                        <option value="">— Seleccionar —</option>
+                                        <option v-for="g in gruposVehiculo" :key="g.id" :value="g.id">
+                                            {{ g.grupo_vehiculo }}
+                                        </option>
+                                    </select>
+                                    <InputError :message="form.errors.id_grupo_vehiculo" class="mt-1" />
                                 </div>
 
                                 <!-- Estado -->

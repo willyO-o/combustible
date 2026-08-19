@@ -148,6 +148,16 @@ class UserSeeder extends Seeder
         ];
     }
 
+    private function permisosGruposVehiculo(): array
+    {
+        return [
+            'grupos-vehiculo.ver',
+            'grupos-vehiculo.crear',
+            'grupos-vehiculo.editar',
+            'grupos-vehiculo.eliminar',
+        ];
+    }
+
     private function permisosRepuestos(): array
     {
         return [
@@ -190,6 +200,18 @@ class UserSeeder extends Seeder
     }
 
     /**
+     * Módulo de Roles y Permisos (App\Http\Controllers\RolController): sólo
+     * administrador/super-admin lo usan, así que no se agrupa en ningún otro
+     * bundle de permisos (no forma parte de permisosCatalogos()).
+     */
+    private function permisosRoles(): array
+    {
+        return [
+            'roles.ver',
+        ];
+    }
+
+    /**
      * Todos los catálogos (conductores, vehículos, grifos, tipos-*) agrupados,
      * útil porque varios roles (admin, jefe de transporte) los comparten.
      */
@@ -202,6 +224,7 @@ class UserSeeder extends Seeder
             ...$this->permisosTiposCombustible(),
             ...$this->permisosTiposMantenimiento(),
             ...$this->permisosTiposVehiculo(),
+            ...$this->permisosGruposVehiculo(),
             ...$this->permisosRepuestos(),
         ];
     }
@@ -233,6 +256,7 @@ class UserSeeder extends Seeder
             ...$this->permisosUsuarios(),
             ...$this->permisosAreas(),
             ...$this->permisosPersonas(),
+            ...$this->permisosRoles(),
         ];
     }
 
