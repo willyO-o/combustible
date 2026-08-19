@@ -182,4 +182,49 @@ class CargasCombustibleReportControllerTest extends TestCase
         $this->assertEquals(200, $fila->recorrido);
         $this->assertEquals(10, $fila->rendimiento); // 200 km / 20 L
     }
+
+    public function test_genera_el_pdf_del_reporte_general_de_rendimiento(): void
+    {
+        $this->crearVehiculoConDosCargas();
+        $this->crearVehiculoConDosCargas();
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.pdf', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_pdf_del_reporte_general_exige_fechas(): void
+    {
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.pdf'));
+
+        $response->assertSessionHasErrors(['fecha_inicio', 'fecha_fin']);
+    }
+
+    public function test_genera_el_pdf_del_detalle_de_un_vehiculo(): void
+    {
+        $vehiculo = $this->crearVehiculoConDosCargas();
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.detalle.pdf', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => $vehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_pdf_del_detalle_exige_un_vehiculo(): void
+    {
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.detalle.pdf', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertSessionHasErrors('id_vehiculo');
+    }
 }

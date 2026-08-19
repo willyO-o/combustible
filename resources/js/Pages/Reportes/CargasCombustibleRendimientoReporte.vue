@@ -40,6 +40,21 @@ function clearFilters() {
     filtros.value = { fecha_inicio: '', fecha_fin: '', id_vehiculo: [] }
 }
 
+function generarPDF() {
+    if (!filtros.value.fecha_inicio || !filtros.value.fecha_fin) {
+        alert('Por favor, selecciona un rango de fechas')
+        return
+    }
+
+    const url = route('cargas-combustible.reporte.rendimiento.pdf', {
+        fecha_inicio: filtros.value.fecha_inicio,
+        fecha_fin: filtros.value.fecha_fin,
+        id_vehiculo: filtros.value.id_vehiculo.length ? filtros.value.id_vehiculo : undefined,
+    })
+
+    window.open(url, '_blank')
+}
+
 // El backend devuelve los agregados como strings decimales (p.ej. "18.70").
 const num = (v) => Number(v ?? 0)
 
@@ -121,7 +136,7 @@ function chartSeries(tipoMedicion) {
                     <label class="form-label">Fecha Fin</label>
                     <input v-model="filtros.fecha_fin" type="date" class="form-control">
                 </div>
-                <div class="col-lg-4">
+                <div class="col-lg-3">
                     <label class="form-label">Vehículos (para comparar, seleccione 1 o más)</label>
                     <Multiselect
                         v-model="filtros.id_vehiculo"
@@ -134,9 +149,12 @@ function chartSeries(tipoMedicion) {
                         no-results-text="Sin resultados"
                     />
                 </div>
-                <div class="col-lg-2 d-flex align-items-end">
-                    <button type="button" class="btn btn-outline-secondary btn-wave w-100" @click="clearFilters">
+                <div class="col-lg-3 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-wave flex-grow-1" @click="clearFilters">
                         <i class="ri-refresh-line me-1"></i> Limpiar
+                    </button>
+                    <button type="button" class="btn btn-primary btn-wave flex-grow-1" @click="generarPDF">
+                        <i class="ri-file-pdf-line me-1"></i> PDF
                     </button>
                 </div>
             </div>

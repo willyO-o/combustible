@@ -32,6 +32,25 @@ const vehiculoSeleccionado = computed(() =>
     props.vehiculos.find((v) => v.id === Number(filtros.value.id_vehiculo)) ?? null,
 )
 
+function generarPDF() {
+    if (!filtros.value.id_vehiculo) {
+        alert('Por favor, selecciona un vehículo')
+        return
+    }
+    if (!filtros.value.fecha_inicio || !filtros.value.fecha_fin) {
+        alert('Por favor, selecciona un rango de fechas')
+        return
+    }
+
+    const url = route('cargas-combustible.reporte.rendimiento.detalle.pdf', {
+        fecha_inicio: filtros.value.fecha_inicio,
+        fecha_fin: filtros.value.fecha_fin,
+        id_vehiculo: filtros.value.id_vehiculo,
+    })
+
+    window.open(url, '_blank')
+}
+
 // El backend devuelve los valores como strings decimales (p.ej. "18.70").
 const num = (v) => Number(v ?? 0)
 const unidadLabel = (tipoMedicion) => (tipoMedicion === 'horometro' ? 'L/h' : 'km/L')
@@ -89,9 +108,14 @@ const chartSeries = computed(() => [
                 <span v-if="vehiculoSeleccionado" class="text-primary">— {{ vehiculoSeleccionado.codigo }} ({{ vehiculoSeleccionado.nro_placa }})</span>
             </h1>
         </div>
-        <Link :href="route('cargas-combustible.reporte.rendimiento')" class="btn btn-outline-secondary btn-wave">
-            <i class="ri-arrow-left-line me-1"></i> Volver al resumen
-        </Link>
+        <div class="d-flex gap-2">
+            <button v-if="filtros.id_vehiculo" type="button" class="btn btn-primary btn-wave" @click="generarPDF">
+                <i class="ri-file-pdf-line me-1"></i> PDF
+            </button>
+            <Link :href="route('cargas-combustible.reporte.rendimiento')" class="btn btn-outline-secondary btn-wave">
+                <i class="ri-arrow-left-line me-1"></i> Volver al resumen
+            </Link>
+        </div>
     </div>
 
     <!-- Filtros -->

@@ -57,6 +57,61 @@ class CargasCombustibleReportController extends Controller
         $reporte->generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo);
     }
 
+    /**
+     * Generar el PDF del reporte general de rendimiento (uno o varios
+     * vehículos comparados, sin gráfico).
+     */
+    public function generarPDFRendimiento(Request $request)
+    {
+        $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date',
+        ]);
+
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $idsVehiculo = array_filter((array) $request->input('id_vehiculo', []));
+
+        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idsVehiculo, true);
+
+        $reporte = new Reportes;
+        $contenido = $reporte->generarReporteRendimiento($resultado, $fechaInicio, $fechaFin, 'S');
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="reporte_rendimiento_combustible.pdf"',
+        ]);
+    }
+
+    /**
+     * Generar el PDF del detalle de rendimiento de UN solo vehículo.
+     * Igual que detalleRendimientoVehiculo(): siempre delega en
+     * obtenerResumenRendimiento() con $soloResumen = false y un único id.
+     */
+    public function generarPDFDetalleRendimiento(Request $request)
+    {
+        $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date',
+            'id_vehiculo' => 'required|integer|exists:vehiculo,id',
+        ]);
+
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $idVehiculo = $request->integer('id_vehiculo');
+
+        $vehiculo = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion')->findOrFail($idVehiculo);
+        $detalle = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, [$idVehiculo], false);
+
+        $reporte = new Reportes;
+        $contenido = $reporte->generarReporteDetalleRendimiento($vehiculo, $detalle, $fechaInicio, $fechaFin, 'S');
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="detalle_rendimiento_'.$vehiculo->codigo.'.pdf"',
+        ]);
+    }
+
     private function obtenerResumen($fechaInicio, $fechaFin, $idVehiculo = null)
     {
         $query = CargaCombustible::join(

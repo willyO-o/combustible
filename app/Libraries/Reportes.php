@@ -57,7 +57,7 @@ class Reportes extends FPDF
         // ----------------------------------------------------------
         // Título "VALE"
         $this->Image(public_path('images/reportes/vale-fondo.png'), 0, 0, 219, 140);
-        $this->Image(public_path('images/logo/logo-min.png'), 6, 5.5, 25,15);
+        $this->Image(public_path('images/logo/logo-min.png'), 6, 5.5, 25, 15);
 
         $this->SetXY(35, 3);
         $this->SetFont('Arial', 'BI', 40);
@@ -768,6 +768,412 @@ class Reportes extends FPDF
 
         $this->AliasNbPages();
         $this->Output('I', 'reporte_cargas_combustible.pdf');
+    }
+
+    /**
+     * Reporte general de rendimiento: uno o varios vehículos comparados
+     * (resumen agrupado, sin gráfico). $resultado es la colección que
+     * devuelve CargasCombustibleReportController::obtenerResumenRendimiento()
+     * con $soloResumen = true (una fila por vehículo).
+     */
+    public function generarReporteRendimiento($resultado, $fechaInicio, $fechaFin, string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $resultado = collect($resultado);
+
+        // Colores (consistentes con generarReporteCargasCombustible)
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $rojo = [190, 30, 30];
+        $negro = [30, 30, 30];
+        $gris = [90, 90, 90];
+        $blanco = [255, 255, 255];
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 199.9;
+
+        // ════════════════════════════════════════════════════════════════
+        // ENCABEZADO
+        // ════════════════════════════════════════════════════════════════
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy, $uw, 16);
+
+        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 4, $sy + 1.5, 35);
+
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy);
+        $this->Cell($uw - 40, 8, utf8Decode('REPORTE DE RENDIMIENTO DE COMBUSTIBLE'), 0, 2, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 8);
+        $this->Cell($uw - 40, 8, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+
+        $currentY = $sy + 16 + 5;
+
+        // ════════════════════════════════════════════════════════════════
+        // TARJETAS DE RESUMEN
+        // ════════════════════════════════════════════════════════════════
+        $totalLitros = $resultado->sum(fn ($r) => (float) $r->total_litros);
+        $totalRecorrido = $resultado->sum(fn ($r) => (float) $r->total_recorrido);
+        $totalCargas = $resultado->sum(fn ($r) => (int) $r->total_cargas);
+
+        $cardW = 49;
+        $cardH = 14;
+        $cards = [
+            ['VEHÍCULOS COMPARADOS', (string) $resultado->count(), 'Azul'],
+            ['TOTAL LITROS', number_format($totalLitros, 2, ',', '.').' L', 'Verde'],
+            ['TOTAL RECORRIDO/HORAS', number_format($totalRecorrido, 2, ',', '.'), 'Rojo'],
+            ['TOTAL CARGAS', (string) $totalCargas, 'Gris'],
+        ];
+
+        $cardX = $sx;
+        foreach ($cards as $card) {
+            $color = match ($card[2]) {
+                'Azul' => [59, 89, 152],
+                'Verde' => [34, 177, 76],
+                'Rojo' => [192, 0, 0],
+                'Gris' => [155, 155, 155],
+            };
+
+            $this->SetLineWidth(0.3);
+            $this->SetDrawColor($color[0], $color[1], $color[2]);
+            $this->SetFillColor($color[0], $color[1], $color[2]);
+            $this->Rect($cardX, $currentY, $cardW, $cardH, 'FD');
+
+            $this->SetFont('Arial', 'B', 7);
+            $this->SetTextColor(255, 255, 255);
+            $this->SetXY($cardX, $currentY);
+            $this->Cell($cardW, 5, utf8Decode($card[0]), 0, 1, 'C');
+
+            $this->SetFont('Arial', 'B', 10);
+            $this->SetXY($cardX, $currentY + 5);
+            $this->Cell($cardW, 9, utf8Decode($card[1]), 0, 1, 'C');
+
+            $cardX += $cardW + 2;
+        }
+
+        $currentY += $cardH + 8;
+
+        // ════════════════════════════════════════════════════════════════
+        // TABLA DE VEHÍCULOS
+        // ════════════════════════════════════════════════════════════════
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('DETALLE POR VEHÍCULO'), 0, 1, 'C');
+
+        $currentY += 8;
+
+        $cols = [
+            ['label' => 'CÓDIGO', 'w' => 26, 'align' => 'L'],
+            ['label' => 'PLACA', 'w' => 25, 'align' => 'C'],
+            ['label' => 'TIPO MEDICIÓN', 'w' => 30, 'align' => 'C'],
+            ['label' => 'CARGAS', 'w' => 20, 'align' => 'C'],
+            ['label' => 'LITROS', 'w' => 28, 'align' => 'R'],
+            ['label' => 'RECORRIDO/HORAS', 'w' => 33.9, 'align' => 'R'],
+            ['label' => 'RENDIMIENTO', 'w' => 37, 'align' => 'R'],
+        ];
+
+        $this->SetFillColor(240, 240, 240);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.2);
+        $this->SetFont('Arial', 'B', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        $colX = $sx;
+        foreach ($cols as $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX, $currentY);
+            $this->Cell($col['w'], 7, utf8Decode($col['label']), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        $currentY += 7;
+
+        $this->SetFont('Arial', '', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        if ($resultado->isEmpty()) {
+            $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
+            $this->SetLineWidth(0.1);
+            $this->Rect($sx, $currentY, $uw, 7);
+            $this->SetXY($sx, $currentY);
+            $this->Cell($uw, 7, utf8Decode('No hay datos de rendimiento para el rango seleccionado.'), 0, 0, 'C');
+            $currentY += 7;
+        }
+
+        foreach ($resultado as $r) {
+            $sinDatos = (float) $r->total_recorrido === 0.0;
+            $tipoLabel = $r->tipo_medicion === 'horometro' ? 'Horómetro' : 'Kilometraje';
+
+            $valores = [
+                $r->codigo,
+                $r->nro_placa,
+                $tipoLabel,
+                (string) $r->total_cargas,
+                number_format((float) $r->total_litros, 2, ',', '.').' L',
+                number_format((float) $r->total_recorrido, 2, ',', '.'),
+                $sinDatos ? 'Sin datos suficientes' : number_format((float) $r->rendimiento_promedio, 2, ',', '.').' '.$r->unidad_medida,
+            ];
+
+            $colX = $sx;
+            foreach ($cols as $idx => $col) {
+                $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
+                $this->SetLineWidth(0.1);
+                $this->Rect($colX, $currentY, $col['w'], 6);
+                $this->SetXY($colX + 1, $currentY + 0.5);
+                $this->Cell($col['w'] - 2, 6, utf8Decode($valores[$idx]), 0, 0, $col['align']);
+                $colX += $col['w'];
+            }
+
+            $currentY += 6;
+        }
+
+        // Fila de TOTALES (sólo los campos que sí son sumables entre vehículos:
+        // el rendimiento no se totaliza porque km/L y L/h no son comparables)
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFont('Arial', 'B', 8);
+        $this->SetTextColor(255, 255, 255);
+
+        $totales = ['TOTALES', '', '', (string) $totalCargas, number_format($totalLitros, 2, ',', '.').' L', number_format($totalRecorrido, 2, ',', '.'), '—'];
+
+        $colX = $sx;
+        foreach ($cols as $idx => $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX + 1, $currentY);
+            $this->Cell($col['w'] - 2, 7, utf8Decode($totales[$idx]), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        $this->pintarPieDePagina($uw, $gris);
+
+        return $this->Output($modo, $nombreArchivo ?? 'reporte_rendimiento_combustible.pdf');
+    }
+
+    /**
+     * Detalle carga por carga del rendimiento de UN solo vehículo (drill-down
+     * del reporte general). $detalle es la colección que devuelve
+     * obtenerResumenRendimiento() con $soloResumen = false, ya filtrada a un
+     * único id_vehiculo.
+     */
+    public function generarReporteDetalleRendimiento($vehiculo, $detalle, $fechaInicio, $fechaFin, string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $detalle = collect($detalle);
+
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $rojo = [190, 30, 30];
+        $negro = [30, 30, 30];
+        $gris = [90, 90, 90];
+        $blanco = [255, 255, 255];
+
+        $esHorometro = $vehiculo->tipo_medicion === 'horometro';
+        $unidad = $esHorometro ? 'L/h' : 'km/L';
+        $etiquetaRecorrido = $esHorometro ? 'HORAS' : 'RECORRIDO';
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 199.9;
+
+        // ════════════════════════════════════════════════════════════════
+        // ENCABEZADO
+        // ════════════════════════════════════════════════════════════════
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy, $uw, 16);
+
+        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 4, $sy + 1.5, 35);
+
+        $this->SetFont('Arial', 'B', 13);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy);
+        $this->Cell($uw - 40, 8, utf8Decode('DETALLE DE RENDIMIENTO — '.$vehiculo->codigo.' ('.$vehiculo->nro_placa.')'), 0, 2, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 8);
+        $this->Cell($uw - 40, 8, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+
+        $currentY = $sy + 16 + 5;
+
+        // ════════════════════════════════════════════════════════════════
+        // TARJETAS DE RESUMEN
+        // ════════════════════════════════════════════════════════════════
+        $totalLitros = $detalle->sum(fn ($d) => (float) $d->litros);
+        $totalRecorrido = $detalle->sum(fn ($d) => (float) $d->recorrido);
+        $rendimientoPromedio = $esHorometro
+            ? ($totalRecorrido > 0 ? $totalLitros / $totalRecorrido : 0)
+            : ($totalLitros > 0 ? $totalRecorrido / $totalLitros : 0);
+
+        $cardW = 49;
+        $cardH = 14;
+        $cards = [
+            ['CARGAS EN EL RANGO', (string) $detalle->count(), 'Azul'],
+            ['TOTAL LITROS', number_format($totalLitros, 2, ',', '.').' L', 'Verde'],
+            ['TOTAL '.$etiquetaRecorrido, number_format($totalRecorrido, 2, ',', '.'), 'Rojo'],
+            ['RENDIMIENTO PROMEDIO', number_format($rendimientoPromedio, 2, ',', '.').' '.$unidad, 'Gris'],
+        ];
+
+        $cardX = $sx;
+        foreach ($cards as $card) {
+            $color = match ($card[2]) {
+                'Azul' => [59, 89, 152],
+                'Verde' => [34, 177, 76],
+                'Rojo' => [192, 0, 0],
+                'Gris' => [155, 155, 155],
+            };
+
+            $this->SetLineWidth(0.3);
+            $this->SetDrawColor($color[0], $color[1], $color[2]);
+            $this->SetFillColor($color[0], $color[1], $color[2]);
+            $this->Rect($cardX, $currentY, $cardW, $cardH, 'FD');
+
+            $this->SetFont('Arial', 'B', 7);
+            $this->SetTextColor(255, 255, 255);
+            $this->SetXY($cardX, $currentY);
+            $this->Cell($cardW, 5, utf8Decode($card[0]), 0, 1, 'C');
+
+            $this->SetFont('Arial', 'B', 10);
+            $this->SetXY($cardX, $currentY + 5);
+            $this->Cell($cardW, 9, utf8Decode($card[1]), 0, 1, 'C');
+
+            $cardX += $cardW + 2;
+        }
+
+        $currentY += $cardH + 8;
+
+        // ════════════════════════════════════════════════════════════════
+        // TABLA DE CARGAS
+        // ════════════════════════════════════════════════════════════════
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('CARGAS DEL VEHÍCULO'), 0, 1, 'C');
+
+        $currentY += 8;
+
+        $cols = [
+            ['label' => 'FECHA DE CARGA', 'w' => 34, 'align' => 'C'],
+            ['label' => 'LITROS', 'w' => 26, 'align' => 'R'],
+            ['label' => 'MED. ANTERIOR', 'w' => 32, 'align' => 'R'],
+            ['label' => 'MED. ACTUAL', 'w' => 32, 'align' => 'R'],
+            ['label' => strtoupper($etiquetaRecorrido), 'w' => 32.9, 'align' => 'R'],
+            ['label' => 'RENDIMIENTO', 'w' => 43, 'align' => 'R'],
+        ];
+
+        $this->SetFillColor(240, 240, 240);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.2);
+        $this->SetFont('Arial', 'B', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        $colX = $sx;
+        foreach ($cols as $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX, $currentY);
+            $this->Cell($col['w'], 7, utf8Decode($col['label']), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        $currentY += 7;
+
+        $this->SetFont('Arial', '', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        if ($detalle->isEmpty()) {
+            $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
+            $this->SetLineWidth(0.1);
+            $this->Rect($sx, $currentY, $uw, 7);
+            $this->SetXY($sx, $currentY);
+            $this->Cell($uw, 7, utf8Decode('No hay cargas con medición anterior disponible en este rango.'), 0, 0, 'C');
+            $currentY += 7;
+        }
+
+        foreach ($detalle as $d) {
+            $valores = [
+                date('d/m/Y H:i', strtotime($d->fecha_carga)),
+                number_format((float) $d->litros, 2, ',', '.').' L',
+                number_format((float) $d->medicion_anterior, 2, ',', '.'),
+                number_format((float) $d->medicion_actual, 2, ',', '.'),
+                number_format((float) $d->recorrido, 2, ',', '.'),
+                number_format((float) $d->rendimiento, 2, ',', '.').' '.$unidad,
+            ];
+
+            $colX = $sx;
+            foreach ($cols as $idx => $col) {
+                $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
+                $this->SetLineWidth(0.1);
+                $this->Rect($colX, $currentY, $col['w'], 6);
+                $this->SetXY($colX + 1, $currentY + 0.5);
+                $this->Cell($col['w'] - 2, 6, utf8Decode($valores[$idx]), 0, 0, $col['align']);
+                $colX += $col['w'];
+            }
+
+            $currentY += 6;
+        }
+
+        // Fila de TOTALES
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFont('Arial', 'B', 8);
+        $this->SetTextColor(255, 255, 255);
+
+        $totales = ['TOTALES', number_format($totalLitros, 2, ',', '.').' L', '', '', number_format($totalRecorrido, 2, ',', '.'), number_format($rendimientoPromedio, 2, ',', '.').' '.$unidad];
+
+        $colX = $sx;
+        foreach ($cols as $idx => $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX + 1, $currentY);
+            $this->Cell($col['w'] - 2, 7, utf8Decode($totales[$idx]), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        $this->pintarPieDePagina($uw, $gris);
+
+        return $this->Output($modo, $nombreArchivo ?? 'detalle_rendimiento_'.$vehiculo->codigo.'.pdf');
+    }
+
+    /**
+     * Pie de página estándar (fecha de generación + numeración), reutilizado
+     * por los reportes de rendimiento. AliasNbPages()+SetY(-12) sólo puede
+     * pintarse una vez que ya se conoce la altura final del contenido.
+     */
+    private function pintarPieDePagina(float $uw, array $gris): void
+    {
+        // El auto-salto de página (activado para que la tabla pagine si hay
+        // muchas filas) dispara una página nueva en cuanto un Cell() cae
+        // dentro de los últimos 15mm; el pie va a -12mm del borde inferior,
+        // así que hay que apagarlo aquí o el pie termina solo en una página
+        // extra en blanco.
+        $this->SetAutoPageBreak(false);
+        $this->SetY(-12);
+        $this->SetFont('Arial', 'I', 8);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->Cell($uw, 4, utf8Decode('Reporte generado el: '.date('d/m/Y H:i')), 0, 0, 'L');
+        $this->Cell($uw, 4, utf8Decode('Página: ').$this->PageNo().'/{nb}', 0, 0, 'R');
+        $this->AliasNbPages();
     }
 
     protected function drawCircle(float $cx, float $cy, float $r, string $style = 'D'): void
