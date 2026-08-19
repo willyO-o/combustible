@@ -66,7 +66,8 @@ const ordenBadge = (tipo) =>
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Órdenes de Trabajo – Mantenimiento</h1>
             </div>
-            <Link :href="route('mantenimiento.ordenes.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'mantenimiento.ordenes.crear'" :href="route('mantenimiento.ordenes.create')"
+                class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nueva Orden
             </Link>
         </div>
@@ -118,7 +119,7 @@ const ordenBadge = (tipo) =>
                         <select v-model="filters.id_vehiculo" class="form-select">
                             <option value="">Todos</option>
                             <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                                {{ v.nro_placa }} – {{ v.marca }}
+                                {{ v.codigo }} – {{ v.nro_placa }} – {{ v.marca }}
                             </option>
                         </select>
                     </div>
@@ -166,7 +167,7 @@ const ordenBadge = (tipo) =>
                                 <td>{{ idx + 1 }}</td>
                                 <td>{{ o.nro }}</td>
                                 <td>
-                                    <span class="fw-medium">{{ o.vehiculo?.nro_placa ?? '—' }}</span>
+                                    <span class="fw-medium">{{ o.vehiculo?.codigo ?? '—' }} – {{ o.vehiculo?.nro_placa ?? '—' }}</span>
                                     <br /><small class="text-muted">{{ o.vehiculo?.marca ?? '' }}</small>
                                 </td>
                                 <td><span class="badge" :class="tipoBadge(o.tipo_mantenimiento)">{{ o.tipo_mantenimiento }}</span></td>
@@ -180,12 +181,13 @@ const ordenBadge = (tipo) =>
                                             class="btn btn-outline-primary btn-wave" title="Ver detalle">
                                             <i class="ri-eye-line"></i>
                                         </Link>
-                                        <Link v-if="o.estado_orden === 'PENDIENTE'"
+                                        <Link v-can="'mantenimiento.ordenes.editar'" v-if="o.estado_orden === 'PENDIENTE'"
                                             :href="route('mantenimiento.ordenes.edit', o.id)"
                                             class="btn btn-outline-secondary btn-wave" title="Editar">
                                             <i class="ri-pencil-line"></i>
                                         </Link>
-                                        <Link v-if="['PENDIENTE','EN_EJECUCION'].includes(o.estado_orden)"
+                                        <Link v-can="'mantenimiento.ordenes.ejecucion.registrar'"
+                                            v-if="['PENDIENTE','EN_EJECUCION'].includes(o.estado_orden)"
                                             :href="route('mantenimiento.ordenes.ejecucion.create', o.id)"
                                             class="btn btn-outline-success btn-wave" title="Registrar ejecución">
                                             <i class="ri-tools-line"></i>

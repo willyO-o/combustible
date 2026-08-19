@@ -44,7 +44,8 @@ const tipoBadge = (tipo) => {
                 <Link :href="route('mantenimiento.solicitudes.index')" class="btn btn-outline-secondary btn-wave">
                     <i class="ri-arrow-left-line me-1"></i> Volver
                 </Link>
-                <Link v-if="solicitud.estado === 'PENDIENTE' && !solicitud.orden_trabajo"
+                <Link v-can="'mantenimiento.ordenes.crear'"
+                    v-if="solicitud.estado === 'PENDIENTE' && !solicitud.orden_trabajo"
                     :href="route('mantenimiento.ordenes.create', { solicitud: solicitud.id })"
                     class="btn btn-success btn-wave">
                     <i class="ri-file-list-3-line me-1"></i> Generar Orden de Trabajo

@@ -2,13 +2,37 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 class EjecucionOrdenTrabajoRequest extends FormRequest
 {
+    /**
+     * Un jefe de área/administrador puede registrar la ejecución de cualquier
+     * orden; un técnico de mantenimiento sólo la de sus propias órdenes
+     * asignadas (id_usuario_ejecuta).
+     */
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
+            return true;
+        }
+
+        $orden = $this->route('orden');
+
+        return $user->hasRole('tecnico-mantenimiento')
+            && $orden?->id_usuario_ejecuta === $user->id;
+    }
+
+    protected function failedAuthorization(): never
+    {
+        throw new AuthorizationException('Sólo puede registrar la ejecución de las órdenes que tiene asignadas.');
     }
 
     public function rules(): array

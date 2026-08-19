@@ -36,8 +36,25 @@ function onSolicitudChange() {
         form.nota_emisor          = s.descripcion_problema
         form.kilometraje_actual   = s.kilometraje_actual ?? ''
         form.horometro_actual     = s.horometro_actual ?? ''
+    } else {
+        // Se quitó la solicitud de origen: liberar los campos para elegir manualmente.
+        form.id_vehiculo        = ''
+        form.id_conductor       = ''
+        form.kilometraje_actual = ''
+        form.horometro_actual   = ''
     }
 }
+
+// Si la solicitud llegó preseleccionada por la URL, queda fija (no se puede quitar).
+// Si se seleccionó manualmente del combo, sus datos (vehículo, conductor, categoría,
+// kilometraje/horómetro) también quedan bloqueados: reflejan siempre la solicitud de
+// origen. Sin ninguna solicitud seleccionada, el vehículo puede elegirse libremente.
+const modoUrl = computed(() => !!props.solicitudPreseleccionada)
+const solicitudSeleccionada = computed(() => {
+    if (modoUrl.value) return props.solicitudPreseleccionada
+    return props.solicitudesPendientes.find(s => s.id == form.id_solicitud_mantenimiento) ?? null
+})
+const datosLocked = computed(() => !!solicitudSeleccionada.value)
 
 const esExterno = computed(() => !!form.id_taller)
 
@@ -73,7 +90,7 @@ function submit() {
             <div>
                 <strong>Solicitud origen #{{ solicitudPreseleccionada.nro }}</strong> —
                 {{ solicitudPreseleccionada.tipo_mantenimiento }} —
-                Vehículo: {{ solicitudPreseleccionada.vehiculo?.nro_placa }}
+                Vehículo: {{ solicitudPreseleccionada.vehiculo?.codigo }} – {{ solicitudPreseleccionada.vehiculo?.nro_placa }}
                 <br />
                 <span class="text-muted">{{ solicitudPreseleccionada.descripcion_problema }}</span>
             </div>
@@ -93,12 +110,15 @@ function submit() {
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">Solicitud de Origen (opcional)</label>
                             <select v-model="form.id_solicitud_mantenimiento" class="form-select"
-                                @change="onSolicitudChange">
+                                :disabled="modoUrl" @change="onSolicitudChange">
                                 <option value="">— Sin solicitud previa —</option>
                                 <option v-for="s in solicitudesPendientes" :key="s.id" :value="s.id">
-                                    #{{ s.nro }} – {{ s.vehiculo?.nro_placa }} – {{ s.tipo_mantenimiento }}
+                                    #{{ s.nro }} – {{ s.vehiculo?.codigo }} – {{ s.vehiculo?.nro_placa }} – {{ s.tipo_mantenimiento }}
                                 </option>
                             </select>
+                            <small v-if="modoUrl" class="text-muted">
+                                Fijada desde la solicitud de origen, no se puede cambiar.
+                            </small>
                         </div>
 
                         <!-- Vehículo -->
@@ -106,16 +126,19 @@ function submit() {
                             <label class="form-label fw-medium">
                                 Vehículo <span class="text-danger">*</span>
                             </label>
-                            <select v-model="form.id_vehiculo" class="form-select"
+                            <select v-model="form.id_vehiculo" class="form-select" :disabled="datosLocked"
                                 :class="{ 'is-invalid': form.errors.id_vehiculo }">
                                 <option value="">— Seleccione —</option>
                                 <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                                    {{ v.nro_placa }} – {{ v.marca }}
+                                    {{ v.codigo }} – {{ v.nro_placa }} – {{ v.marca }}
                                 </option>
                             </select>
                             <div v-if="form.errors.id_vehiculo" class="invalid-feedback">
                                 {{ form.errors.id_vehiculo }}
                             </div>
+                            <small v-if="datosLocked" class="text-muted">
+                                Viene de la solicitud de origen.
+                            </small>
                         </div>
 
                         <!-- Responsable de ejecución -->
@@ -138,7 +161,7 @@ function submit() {
                             <label class="form-label fw-medium">
                                 Categoría <span class="text-danger">*</span>
                             </label>
-                            <select v-model="form.tipo_mantenimiento" class="form-select"
+                            <select v-model="form.tipo_mantenimiento" class="form-select" :disabled="datosLocked"
                                 :class="{ 'is-invalid': form.errors.tipo_mantenimiento }">
                                 <option value="PREVENTIVO">Preventivo</option>
                                 <option value="CORRECTIVO">Correctivo</option>
@@ -168,7 +191,7 @@ function submit() {
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">Kilometraje Actual</label>
                             <div class="input-group">
-                                <input v-model="form.kilometraje_actual" type="number" min="0"
+                                <input v-model="form.kilometraje_actual" type="number" min="0" :disabled="datosLocked"
                                     class="form-control" :class="{ 'is-invalid': form.errors.kilometraje_actual }"
                                     placeholder="Ej: 85000" />
                                 <span class="input-group-text">km</span>

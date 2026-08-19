@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import { showToast, confirm } from '@/Utils/alertUtil.js'
@@ -9,6 +9,26 @@ const props = defineProps({
     orden: Object,
     flash: Object,
 })
+
+const page = usePage()
+
+// La "Verificación" sólo puede realizarla el usuario que emitió la orden, y
+// "Cancelar" queda reservado a la gestión (jefe de área/administrador) — un
+// técnico de mantenimiento no debe ver ninguno de los dos botones.
+const esGestor = computed(() => {
+    const roles = page.props.auth?.roles ?? []
+    return page.props.auth?.is_super_admin
+        || roles.includes('administrador')
+        || roles.includes('jefe-area')
+})
+const esEmisor = computed(() => page.props.auth?.user?.id === props.orden.usuario_emite?.id)
+
+const puedeIniciar = computed(() => props.orden.estado_orden === 'PENDIENTE')
+const puedeVerificar = computed(() => props.orden.estado_orden === 'CULMINADO' && esEmisor.value)
+const puedeCancelar = computed(() =>
+    ['PENDIENTE', 'EN_EJECUCION'].includes(props.orden.estado_orden) && esGestor.value
+)
+const mostrarPanelEstado = computed(() => puedeIniciar.value || puedeVerificar.value || puedeCancelar.value)
 
 const estadoBadge = (estado) => {
     const map = {
@@ -63,12 +83,13 @@ const costoTotal = computed(() =>
                 <Link :href="route('mantenimiento.ordenes.index')" class="btn btn-outline-secondary btn-wave">
                     <i class="ri-arrow-left-line me-1"></i> Volver
                 </Link>
-                <Link v-if="orden.estado_orden === 'PENDIENTE'"
+                <Link v-can="'mantenimiento.ordenes.editar'" v-if="orden.estado_orden === 'PENDIENTE'"
                     :href="route('mantenimiento.ordenes.edit', orden.id)"
                     class="btn btn-outline-secondary btn-wave">
                     <i class="ri-pencil-line me-1"></i> Editar
                 </Link>
-                <Link v-if="['PENDIENTE','EN_EJECUCION'].includes(orden.estado_orden)"
+                <Link v-can="'mantenimiento.ordenes.ejecucion.registrar'"
+                    v-if="['PENDIENTE','EN_EJECUCION'].includes(orden.estado_orden)"
                     :href="route('mantenimiento.ordenes.ejecucion.create', orden.id)"
                     class="btn btn-success btn-wave">
                     <i class="ri-tools-line me-1"></i> Registrar Ejecución
@@ -97,7 +118,7 @@ const costoTotal = computed(() =>
                         <div class="row g-3">
                             <div class="col-sm-6">
                                 <label class="form-label text-muted mb-0">Vehículo</label>
-                                <p class="fw-bold fs-15">{{ orden.vehiculo?.nro_placa ?? '—' }} — {{ orden.vehiculo?.marca ?? '' }}</p>
+                                <p class="fw-bold fs-15">{{ orden.vehiculo?.codigo ?? '—' }} — {{ orden.vehiculo?.nro_placa ?? '—' }} — {{ orden.vehiculo?.marca ?? '' }}</p>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label text-muted mb-0">Tipo de Mantenimiento</label>
@@ -227,20 +248,20 @@ const costoTotal = computed(() =>
                 </div>
 
                 <!-- Cambiar estado -->
-                <div v-if="!['CANCELADO','VERIFICADO'].includes(orden.estado_orden)" class="card custom-card">
+                <div v-can="'mantenimiento.ordenes.estado.cambiar'" v-if="mostrarPanelEstado" class="card custom-card">
                     <div class="card-header"><div class="card-title">Cambiar Estado</div></div>
                     <div class="card-body d-flex flex-column gap-2">
-                        <button v-if="orden.estado_orden === 'PENDIENTE'"
+                        <button v-if="puedeIniciar"
                             class="btn btn-info btn-wave w-100"
                             @click="cambiarEstado('EN_EJECUCION')">
                             Iniciar → En Ejecución
                         </button>
-                        <button v-if="orden.estado_orden === 'CULMINADO'"
+                        <button v-if="puedeVerificar"
                             class="btn btn-primary btn-wave w-100"
                             @click="cambiarEstado('VERIFICADO')">
                             Verificar Orden
                         </button>
-                        <button v-if="['PENDIENTE','EN_EJECUCION'].includes(orden.estado_orden)"
+                        <button v-if="puedeCancelar"
                             class="btn btn-outline-danger btn-wave w-100"
                             @click="cambiarEstado('CANCELADO')">
                             Cancelar Orden

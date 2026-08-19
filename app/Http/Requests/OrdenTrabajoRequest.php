@@ -2,15 +2,26 @@
 
 namespace App\Http\Requests;
 
+use App\Models\User;
 use App\Models\Vehiculo;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class OrdenTrabajoRequest extends FormRequest
 {
+    /**
+     * Sólo un jefe de área o administrador puede generar o editar una orden
+     * de trabajo.
+     */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->hasAnyRole(['super-admin', 'administrador', 'jefe-area']) ?? false;
+    }
+
+    protected function failedAuthorization(): never
+    {
+        throw new AuthorizationException('Sólo un jefe de área o administrador puede generar o editar una orden de trabajo.');
     }
 
     public function rules(): array
@@ -20,7 +31,17 @@ class OrdenTrabajoRequest extends FormRequest
             'id_conductor' => ['nullable', 'exists:conductor,id'],
             'id_solicitud_mantenimiento' => ['nullable', 'exists:solicitud_mantenimiento,id'],
             'id_taller' => ['nullable', 'exists:taller,id'],
-            'id_usuario_ejecuta' => ['required', 'exists:users,id'],
+            'id_usuario_ejecuta' => [
+                'required',
+                Rule::exists('users', 'id'),
+                function ($attribute, $value, $fail) {
+                    $usuario = User::find($value);
+
+                    if (! $usuario || ! $usuario->hasRole('tecnico-mantenimiento')) {
+                        $fail('El responsable de ejecución debe ser un usuario con el rol de técnico de mantenimiento.');
+                    }
+                },
+            ],
             'tipo_mantenimiento' => ['required', 'in:PREVENTIVO,CORRECTIVO'],
             'nota_emisor' => ['nullable', 'string', 'max:1000'],
             'kilometraje_actual' => [

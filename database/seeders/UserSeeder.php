@@ -260,6 +260,21 @@ class UserSeeder extends Seeder
         ];
     }
 
+    /**
+     * Ejecuta el trabajo de mantenimiento asignado (Paso 3): sólo ve sus
+     * propias órdenes, registra la ejecución/detalle y puede marcarlas
+     * EN_EJECUCION/CULMINADO. No crea ni edita órdenes, ni las verifica
+     * (la verificación queda reservada al usuario que emitió cada orden).
+     */
+    private function permisosParaTecnicoMantenimiento(): array
+    {
+        return [
+            'mantenimiento.ordenes.ver',
+            'mantenimiento.ordenes.estado.cambiar',
+            'mantenimiento.ordenes.ejecucion.registrar',
+        ];
+    }
+
     /* -----------------------------------------------------------------
      |  Helpers de creación (roles, permisos, usuarios)
      | -----------------------------------------------------------------
@@ -324,6 +339,7 @@ class UserSeeder extends Seeder
         $this->crearRolSuperAdmin();
         $this->crearRolConductor();
         $this->crearRolJefeArea();
+        $this->crearRolTecnicoMantenimiento();
     }
 
     /* -----------------------------------------------------------------
@@ -422,6 +438,27 @@ class UserSeeder extends Seeder
             );
 
             $idArea++; // Incrementar el área para el siguiente jefe de área
+        }
+    }
+
+    private function crearRolTecnicoMantenimiento(): void
+    {
+        $rol = $this->crearRolConPermisos('tecnico-mantenimiento', $this->permisosParaTecnicoMantenimiento());
+
+        $tecnicos = [
+            ['email' => 'tecnico1@gmail.com', 'name' => 'Técnico Mantenimiento 1', 'password' => 'tecnico123'],
+            ['email' => 'tecnico2@gmail.com', 'name' => 'Técnico Mantenimiento 2', 'password' => 'tecnico123'],
+        ];
+
+        foreach ($tecnicos as $tecnico) {
+            $this->crearUsuarioConRol(
+                ['email' => $tecnico['email']],
+                [
+                    'name' => $tecnico['name'],
+                    'password' => bcrypt($tecnico['password']),
+                ],
+                $rol
+            );
         }
     }
 }

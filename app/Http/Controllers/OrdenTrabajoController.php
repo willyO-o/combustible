@@ -54,11 +54,15 @@ class OrdenTrabajoController extends Controller
             $query->where('id_vehiculo', $request->id_vehiculo);
         }
 
+        if ($this->esSoloTecnico($request->user())) {
+            $query->where('id_usuario_ejecuta', $request->user()->id);
+        }
+
         $ordenes = $query->orderBy('id', 'desc')
             ->paginate(15)
             ->withQueryString();
 
-        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca')
+        $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
             ->where('estado_vehiculo', 'ACTIVO')
             ->orderBy('nro_placa')
             ->get();
@@ -76,10 +80,16 @@ class OrdenTrabajoController extends Controller
 
     /**
      * Formulario para emitir una orden de trabajo.
+     *
+     * Sólo jefes de área y administradores pueden generar órdenes de trabajo.
      */
     public function create(Request $request): Response
     {
-        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca')
+        if (! $request->user()->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
+            abort(403, 'Sólo un jefe de área o administrador puede generar una orden de trabajo.');
+        }
+
+        $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
             ->where('estado_vehiculo', 'ACTIVO')
             ->orderBy('nro_placa')
             ->get();
@@ -89,7 +99,10 @@ class OrdenTrabajoController extends Controller
             ->orderBy('razon_social')
             ->get();
 
-        $usuarios = User::select('id', 'name')
+        // Sólo técnicos de mantenimiento activos pueden ser asignados como
+        // responsables de ejecución de la orden.
+        $usuarios = User::role('tecnico-mantenimiento')
+            ->select('id', 'name')
             ->where('estado_usuario', 'ACTIVO')
             ->orderBy('name')
             ->get();
@@ -119,10 +132,28 @@ class OrdenTrabajoController extends Controller
 
     /**
      * Guarda la orden de trabajo.
+     *
+     * El acceso ya queda restringido a jefes de área/administradores por
+     * OrdenTrabajoRequest::authorize().
      */
     public function store(OrdenTrabajoRequest $request): RedirectResponse
     {
-        $orden = OrdenTrabajo::create($request->validated());
+        $data = $request->validated();
+
+        // Si la orden nace de una solicitud, el vehículo/conductor y la
+        // clasificación del mantenimiento se toman siempre de la solicitud de
+        // origen: se fuerzan aquí para que no puedan alterarse manipulando el
+        // formulario (que ya los muestra bloqueados como información).
+        if (! empty($data['id_solicitud_mantenimiento'])) {
+            $solicitud = SolicitudMantenimiento::findOrFail($data['id_solicitud_mantenimiento']);
+            $data['id_vehiculo'] = $solicitud->id_vehiculo;
+            $data['id_conductor'] = $solicitud->id_conductor;
+            $data['tipo_mantenimiento'] = $solicitud->tipo_mantenimiento;
+            $data['kilometraje_actual'] = $solicitud->kilometraje_actual;
+            $data['horometro_actual'] = $solicitud->horometro_actual;
+        }
+
+        $orden = OrdenTrabajo::create($data);
 
         // Marcar la solicitud origen como aprobada
         if ($orden->id_solicitud_mantenimiento) {
@@ -136,9 +167,15 @@ class OrdenTrabajoController extends Controller
 
     /**
      * Detalle de una orden de trabajo.
+     *
+     * Un técnico de mantenimiento sólo puede ver las órdenes que tiene asignadas.
      */
-    public function show(OrdenTrabajo $orden): Response
+    public function show(Request $request, OrdenTrabajo $orden): Response
     {
+        if ($this->esSoloTecnico($request->user()) && $orden->id_usuario_ejecuta !== $request->user()->id) {
+            abort(403, 'No tiene acceso a esta orden de trabajo.');
+        }
+
         $orden->load([
             'vehiculo',
             'conductor',
@@ -161,12 +198,18 @@ class OrdenTrabajoController extends Controller
 
     /**
      * Formulario de edición de la orden (sólo mientras está PENDIENTE).
+     *
+     * Sólo jefes de área y administradores pueden editar órdenes de trabajo.
      */
-    public function edit(OrdenTrabajo $orden): Response
+    public function edit(Request $request, OrdenTrabajo $orden): Response
     {
+        if (! $request->user()->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
+            abort(403, 'Sólo un jefe de área o administrador puede editar la orden de trabajo.');
+        }
+
         $orden->load(['vehiculo', 'conductor', 'solicitudMantenimiento', 'taller']);
 
-        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca')
+        $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
             ->where('estado_vehiculo', 'ACTIVO')
             ->orderBy('nro_placa')
             ->get();
@@ -176,7 +219,8 @@ class OrdenTrabajoController extends Controller
             ->orderBy('razon_social')
             ->get();
 
-        $usuarios = User::select('id', 'name')
+        $usuarios = User::role('tecnico-mantenimiento')
+            ->select('id', 'name')
             ->where('estado_usuario', 'ACTIVO')
             ->orderBy('name')
             ->get();
@@ -191,6 +235,9 @@ class OrdenTrabajoController extends Controller
 
     /**
      * Actualiza la orden de trabajo.
+     *
+     * El acceso ya queda restringido a jefes de área/administradores por
+     * OrdenTrabajoRequest::authorize().
      */
     public function update(OrdenTrabajoRequest $request, OrdenTrabajo $orden): RedirectResponse
     {
@@ -202,6 +249,11 @@ class OrdenTrabajoController extends Controller
 
     /**
      * Cambia el estado de una orden de trabajo.
+     *
+     * - VERIFICADO sólo puede ser marcado por el usuario que emitió la orden.
+     * - Un técnico de mantenimiento sólo puede mover sus propias órdenes
+     *   asignadas, y únicamente a EN_EJECUCION o CULMINADO.
+     * - Jefes de área/administradores pueden fijar cualquier otro estado.
      */
     public function cambiarEstado(Request $request, OrdenTrabajo $orden): RedirectResponse
     {
@@ -209,23 +261,48 @@ class OrdenTrabajoController extends Controller
             'estado_orden' => ['required', 'in:PENDIENTE,EN_EJECUCION,CULMINADO,CANCELADO,VERIFICADO'],
         ]);
 
-        $data = ['estado_orden' => $request->estado_orden];
+        $user = $request->user();
+        $nuevoEstado = $request->estado_orden;
 
-        if ($request->estado_orden === 'EN_EJECUCION' && ! $orden->fecha_ejecucion) {
+        if ($nuevoEstado === 'VERIFICADO') {
+            if ($orden->id_usuario_emite !== $user->id) {
+                abort(403, 'Sólo el usuario que emitió la orden puede marcarla como VERIFICADO.');
+            }
+        } elseif ($this->esSoloTecnico($user)) {
+            if ($orden->id_usuario_ejecuta !== $user->id) {
+                abort(403, 'Sólo puede actualizar el estado de las órdenes que tiene asignadas.');
+            }
+            if (! in_array($nuevoEstado, ['EN_EJECUCION', 'CULMINADO'], true)) {
+                abort(403, 'Como técnico de mantenimiento sólo puede marcar la orden como EN_EJECUCION o CULMINADO.');
+            }
+        } elseif (! $user->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
+            abort(403, 'No tiene permiso para cambiar el estado de esta orden.');
+        }
+
+        $data = ['estado_orden' => $nuevoEstado];
+
+        if ($nuevoEstado === 'EN_EJECUCION' && ! $orden->fecha_ejecucion) {
             $data['fecha_ejecucion'] = now();
         }
 
         $orden->update($data);
 
         return redirect()->back()
-            ->with('success', 'Estado de la orden actualizado a "'.$request->estado_orden.'".');
+            ->with('success', 'Estado de la orden actualizado a "'.$nuevoEstado.'".');
     }
 
     /**
      * Formulario para registrar la ejecución/culminación de la orden (Paso 3).
+     *
+     * Un técnico de mantenimiento sólo puede registrar la ejecución de las
+     * órdenes que tiene asignadas.
      */
-    public function createEjecucion(OrdenTrabajo $orden): Response
+    public function createEjecucion(Request $request, OrdenTrabajo $orden): Response
     {
+        if ($this->esSoloTecnico($request->user()) && $orden->id_usuario_ejecuta !== $request->user()->id) {
+            abort(403, 'Sólo puede registrar la ejecución de las órdenes que tiene asignadas.');
+        }
+
         $orden->load(['vehiculo', 'taller']);
 
         $tiposMantenimiento = TipoMantenimiento::select('id', 'tipo_mantenimiento')
@@ -246,6 +323,9 @@ class OrdenTrabajoController extends Controller
 
     /**
      * Guarda el registro de ejecución/culminación (detalle de trabajo + insumos).
+     *
+     * El acceso ya queda restringido a las órdenes asignadas al técnico por
+     * EjecucionOrdenTrabajoRequest::authorize().
      */
     public function storeEjecucion(EjecucionOrdenTrabajoRequest $request, OrdenTrabajo $orden): RedirectResponse
     {
@@ -273,5 +353,16 @@ class OrdenTrabajoController extends Controller
 
         return redirect()->route('mantenimiento.ordenes.show', $orden)
             ->with('success', 'Ejecución de la orden de trabajo registrada exitosamente.');
+    }
+
+    /**
+     * Un técnico de mantenimiento sin ningún rol de gestión (jefe de área,
+     * administrador o super-admin) sólo puede operar sobre sus propias
+     * órdenes asignadas.
+     */
+    private function esSoloTecnico(User $user): bool
+    {
+        return $user->hasRole('tecnico-mantenimiento')
+            && ! $user->hasAnyRole(['super-admin', 'administrador', 'jefe-area']);
     }
 }

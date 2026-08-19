@@ -170,7 +170,7 @@ const tipoBadge = (tipo) => {
                                         <td class="fw-medium">{{ s.nro }}</td>
                                         <td><small>{{ s.fecha }}</small></td>
                                         <td>
-                                            <span class="fw-medium">{{ s.vehiculo?.nro_placa ?? '—' }}</span>
+                                            <span class="fw-medium">{{ s.vehiculo?.codigo ?? '—' }} – {{ s.vehiculo?.nro_placa ?? '—' }}</span>
                                             <br /><small class="text-muted">{{ s.vehiculo?.marca ?? '' }}</small>
                                         </td>
                                         <td>
@@ -229,7 +229,7 @@ const tipoBadge = (tipo) => {
                         <select v-model="filters.id_vehiculo" class="form-select">
                             <option value="">Todos</option>
                             <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                                {{ v.nro_placa }} – {{ v.marca }}
+                                {{ v.codigo }} – {{ v.nro_placa }} – {{ v.marca }}
                             </option>
                         </select>
                     </div>
@@ -279,7 +279,7 @@ const tipoBadge = (tipo) => {
                                 <td>{{ s.nro }}</td>
                                 <td>{{ s.fecha }}</td>
                                 <td>
-                                    <span class="fw-medium">{{ s.vehiculo?.nro_placa ?? '—' }}</span>
+                                    <span class="fw-medium">{{ s.vehiculo?.codigo ?? '—' }} – {{ s.vehiculo?.nro_placa ?? '—' }}</span>
                                     <br /><small class="text-muted">{{ s.vehiculo?.marca ?? '' }}</small>
                                 </td>
                                 <td>{{ s.conductor ? `${s.conductor.persona.nombre_completo}` : '—' }}</td>

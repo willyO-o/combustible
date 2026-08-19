@@ -45,7 +45,7 @@ class SolicitudMantenimientoController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca')
+        $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
             ->where('estado_vehiculo', 'ACTIVO')
             ->orderBy('nro_placa')
             ->get();
@@ -82,7 +82,7 @@ class SolicitudMantenimientoController extends Controller
             $conductor = Conductor::with('persona')->where('id', auth()->user()->id_persona)->first();
             $vehiculos = $conductor->asignacionesActivas;
         } else {
-            $vehiculos = Vehiculo::select('id', 'nro_placa', 'marca')
+            $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
                 ->where('estado_vehiculo', 'ACTIVO')
                 ->orderBy('nro_placa')->get();
         }

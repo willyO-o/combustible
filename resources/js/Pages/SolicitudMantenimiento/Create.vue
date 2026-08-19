@@ -64,7 +64,7 @@ function submit() {
                                 :class="{ 'is-invalid': form.errors.id_vehiculo }">
                                 <option value="">— Seleccione —</option>
                                 <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                                    {{ v.nro_placa }} – {{ v.marca }}
+                                    {{ v.codigo }} – {{ v.nro_placa }} – {{ v.marca }}
                                 </option>
                             </select>
                             <div v-if="form.errors.id_vehiculo" class="invalid-feedback">
