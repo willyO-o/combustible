@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AreaController;
 use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\CargasCombustibleReportController;
 use App\Http\Controllers\ConductorController;
@@ -61,6 +62,12 @@ Route::middleware('auth')->group(function () {
     Route::resource('personas', PersonaController::class)
         ->parameters(['personas' => 'persona'])
         ->except(['show']);
+
+    Route::resource('areas', AreaController::class)
+        ->only(['index', 'store', 'update', 'destroy']);
+    Route::post('areas/{area}/encargados', [AreaController::class, 'asignarEncargado'])->name('areas.encargados.asignar');
+    Route::patch('areas/{area}/encargados/{encargado}/finalizar', [AreaController::class, 'finalizarEncargado'])->name('areas.encargados.finalizar');
+    Route::get('/search/personas-para-encargado', [AreaController::class, 'searchPersonasParaEncargado'])->name('search.personas-para-encargado');
 
     Route::resource('tipos-combustible', TipoCombustibleController::class)
         ->parameters(['tipos-combustible' => 'tipoCombustible']);

@@ -114,7 +114,7 @@ class Persona extends Model
     {
         return $this->areas()->where(function ($query) {
             $query->where('encargado_area.estado_encargo', 'ACTIVO')
-                ->orWhere(function ($query) {
+                ->where(function ($query) {
                     $query->whereNull('encargado_area.fecha_fin')
                         ->orWhere('encargado_area.fecha_fin', '>', now());
                 });

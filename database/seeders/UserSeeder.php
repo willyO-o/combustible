@@ -186,6 +186,7 @@ class UserSeeder extends Seeder
             'areas.crear',
             'areas.editar',
             'areas.eliminar',
+            'areas.encargados.asignar',
         ];
     }
 

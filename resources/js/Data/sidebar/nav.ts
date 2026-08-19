@@ -92,10 +92,13 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Repuestos', icon: Svgicons.RepuestoIcon, type: 'link', path: '/repuestos', active: false, selected: false, dirchange: false, permission: 'repuestos.ver'
   },
   {
-    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'roles.ver', 'permisos.ver']
+    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'areas.ver', 'roles.ver', 'permisos.ver']
   },
   {
     title: 'Personas', icon: Svgicons.UsuarioIcon, type: 'link', path: '/personas', active: false, selected: false, dirchange: false, permission: 'personas.ver'
+  },
+  {
+    title: 'Áreas', icon: Svgicons.AreaIcon, type: 'link', path: '/areas', active: false, selected: false, dirchange: false, permission: 'areas.ver'
   },
   {
     title: 'Usuarios', icon: Svgicons.UsuarioIcon, type: 'link', path: '/usuarios', active: false, selected: false, dirchange: false, permission: 'usuarios.ver'

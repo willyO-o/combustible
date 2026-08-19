@@ -204,6 +204,7 @@ return [
                 'areas.crear' => 'Crear',
                 'areas.editar' => 'Editar',
                 'areas.eliminar' => 'Eliminar',
+                'areas.encargados.asignar' => 'Asignar encargados',
             ],
         ],
 
