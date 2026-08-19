@@ -1053,6 +1053,65 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /vales/{vale}/pdf:
+    get:
+      tags: [Vales]
+      summary: Descargar el PDF del vale
+      description: |
+        Genera y descarga el PDF del vale de combustible (el mismo formato que se imprime
+        desde el sistema web), pensado para que la app móvil (Flutter) lo descargue y lo
+        muestre en el dispositivo del usuario.
+
+        La respuesta es el archivo binario directo (no JSON): `Content-Type: application/pdf`
+        y `Content-Disposition: attachment; filename="vale_NNNNNN-GESTION.pdf"` — el número de
+        vale (formato `NNNNNN/GESTION`, p.ej. `000002/2026`) con el `/` cambiado por `-` para
+        que sea un nombre de archivo válido (p.ej. `vale_000002-2026.pdf`).
+
+        **Cómo consumirlo desde Flutter:**
+        1. Hacer un `GET` a esta URL enviando el header `Authorization: Bearer {access_token}`
+           (igual que cualquier otro endpoint autenticado de esta API).
+        2. Leer la respuesta como bytes crudos (p.ej. `response.bodyBytes` con `http`, o
+           `ResponseType.bytes` con `dio`) — **no** parsear como JSON.
+        3. Guardar los bytes en un archivo local (p.ej. con `path_provider`), usando como
+           nombre sugerido el que viene en el header `Content-Disposition`.
+        4. Abrir el archivo guardado con un visor de PDF nativo del dispositivo (p.ej. el
+           paquete `open_filex` / `open_file`), o mostrarlo embebido con un visor de PDF en
+           Flutter (p.ej. `flutter_pdfview` / `syncfusion_flutter_pdfviewer`) pasándole los
+           bytes o la ruta del archivo guardado.
+
+        **Restricción de acceso:**
+        - **conductor**: sólo puede descargar el PDF de sus propios vales
+          (`id_conductor` = persona del usuario autenticado); intentar descargar el de otro
+          conductor responde `403`.
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: vale
+          in: path
+          required: true
+          description: ID del vale.
+          schema: { type: integer }
+          example: 1
+      responses:
+        '200':
+          description: PDF del vale generado exitosamente.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+          headers:
+            Content-Disposition:
+              description: 'Ej: `attachment; filename="vale_000001-2026.pdf"`'
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El conductor autenticado intenta descargar el vale de otro conductor.
+          content:
+            application/json:
+              example:
+                message: No tienes permiso para descargar este vale.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ──────────────────────────────────────────────────────────────────────
   # CARGA DE COMBUSTIBLE
   # ──────────────────────────────────────────────────────────────────────
@@ -1353,6 +1412,58 @@ paths:
               example:
                 message: Error al registrar la solicitud de mantenimiento.
                 error: "SQLSTATE[23000]: Integrity constraint violation..."
+
+  /solicitudes-mantenimiento/{solicitud}/pdf:
+    get:
+      tags: [Solicitudes de Mantenimiento]
+      summary: Descargar el PDF de la solicitud de mantenimiento
+      description: |
+        Genera y descarga el PDF de la solicitud de mantenimiento (el mismo formato que se
+        imprime desde el sistema web), pensado para que la app móvil (Flutter) lo descargue y
+        lo muestre en el dispositivo del usuario.
+
+        La respuesta es el archivo binario directo (no JSON): `Content-Type: application/pdf`
+        y `Content-Disposition: attachment; filename="solicitud_mantenimiento_NNNNNN-GESTION.pdf"`
+        — el número de solicitud (formato `NNNNNN/GESTION`, p.ej. `000012/2026`) con el `/`
+        cambiado por `-` para que sea un nombre de archivo válido.
+
+        **Cómo consumirlo desde Flutter:** igual que `GET /vales/{vale}/pdf` (ver esa
+        descripción): `GET` autenticado con `Authorization: Bearer {access_token}`, leer la
+        respuesta como bytes crudos (no JSON), guardarla en un archivo local y abrirla con un
+        visor de PDF nativo o embebido.
+
+        **Restricción de acceso:**
+        - **conductor**: sólo puede descargar el PDF de sus propias solicitudes
+          (`id_conductor` = persona del usuario autenticado); intentar descargar la de otro
+          conductor responde `403`.
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: solicitud
+          in: path
+          required: true
+          description: ID de la solicitud de mantenimiento.
+          schema: { type: integer }
+          example: 1
+      responses:
+        '200':
+          description: PDF de la solicitud de mantenimiento generado exitosamente.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+          headers:
+            Content-Disposition:
+              description: 'Ej: `attachment; filename="solicitud_mantenimiento_000012-2026.pdf"`'
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El conductor autenticado intenta descargar la solicitud de otro conductor.
+          content:
+            application/json:
+              example:
+                message: No tienes permiso para descargar esta solicitud.
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ──────────────────────────────────────────────────────────────────────
   # NOTIFICACIONES

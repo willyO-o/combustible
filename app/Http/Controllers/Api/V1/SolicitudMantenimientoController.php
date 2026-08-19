@@ -7,9 +7,11 @@ use App\Actions\SolicitudMantenimiento\ListSolicitudesMantenimientoAction;
 use App\Actions\SolicitudMantenimiento\UpdateSolicitudMantenimientoAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SolicitudMantenimientoRequest;
+use App\Libraries\Reportes;
 use App\Models\SolicitudMantenimiento;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class SolicitudMantenimientoController extends Controller
 {
@@ -87,5 +89,29 @@ class SolicitudMantenimientoController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Descarga el PDF de la solicitud para verla/guardarla desde la app móvil.
+     * Un conductor sólo puede descargar sus propias solicitudes.
+     */
+    public function pdf(Request $request, SolicitudMantenimiento $solicitud): Response
+    {
+        if ($request->user()->hasRole('conductor') && $solicitud->id_conductor !== $request->user()->id_persona) {
+            abort(403, 'No tienes permiso para descargar esta solicitud.');
+        }
+
+        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo']);
+
+        $contenido = (new Reportes)->generarSolicitudMantenimiento($solicitud, 'S');
+
+        // $solicitud->nro tiene formato "NNNNNN/GESTION"; el '/' no es válido dentro
+        // de un nombre de archivo, así que se reemplaza por '-' sólo para el header.
+        $nombreArchivo = 'solicitud_mantenimiento_'.str_replace('/', '-', $solicitud->nro).'.pdf';
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$nombreArchivo.'"',
+        ]);
     }
 }

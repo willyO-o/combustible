@@ -7,7 +7,13 @@ use FPDF;
 
 class Reportes extends FPDF
 {
-    public function generarVale($vale)
+    /**
+     * @param  string  $modo  Destino de salida de FPDF: 'I' (mostrar inline en el navegador,
+     *                        usado por la vista web), 'D' (forzar descarga en el navegador) o
+     *                        'S' (devolver el PDF como string, usado por la API para que el
+     *                        controlador arme la respuesta HTTP con sus propios encabezados).
+     */
+    public function generarVale($vale, string $modo = 'I', ?string $nombreArchivo = null)
     {
         // logo======
         // DATOS DE EJEMPLO (reemplazar por variables dinámicas luego)
@@ -246,10 +252,15 @@ class Reportes extends FPDF
         $this->Cell(26, 3, 'SOCINBOL', 0, 0, 'C');
 
         // Salida del PDF
-        $this->Output('I', 'vale_combustible.pdf');
+        // El '/' de $numeroVale ("NNNNNN/GESTION") no es válido dentro de un nombre
+        // de archivo, así que se reemplaza por '-' sólo para el nombre sugerido.
+        return $this->Output($modo, $nombreArchivo ?? 'vale_'.str_replace('/', '-', (string) $numeroVale).'.pdf');
     }
 
-    public function generarSolicitudMantenimiento($solicitud)
+    /**
+     * @param  string  $modo  Ver docblock de generarVale().
+     */
+    public function generarSolicitudMantenimiento($solicitud, string $modo = 'I', ?string $nombreArchivo = null)
     {
         // ── Datos de ejemplo (reemplazar por parámetro dinámico) ──────────
         $empresaLocal = 'PLUS METALS LTDA.';
@@ -536,7 +547,9 @@ class Reportes extends FPDF
             $this->Cell($cw3 - 4, 5, utf8Decode('FECHA ......../......../........'), 0, 0, 'C');
         }
 
-        $this->Output('I', 'solicitud_mantenimiento.pdf');
+        // El '/' de $nroSolicitud ("NNNNNN/GESTION") no es válido dentro de un nombre
+        // de archivo, así que se reemplaza por '-' sólo para el nombre sugerido.
+        return $this->Output($modo, $nombreArchivo ?? 'solicitud_mantenimiento_'.str_replace('/', '-', (string) $nroSolicitud).'.pdf');
     }
 
     public function generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo = null)

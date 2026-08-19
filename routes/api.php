@@ -45,12 +45,15 @@ Route::middleware('auth:api')->group(function () {
     Route::post('notificaciones/{notificacion}/marcar-leida', [NotificacionController::class, 'marcarLeida'])->name('api.v1.notificaciones.marcar-leida');
 
     Route::get('vales/pendientes', [ValeController::class, 'valesPendientes'])->name('api.v1.vales.pendientes');
+    Route::get('vales/{vale}/pdf', [ValeController::class, 'pdf'])->name('api.v1.vales.pdf');
 
     Route::resource('vales', ValeController::class)
         ->parameters(['vales' => 'vale'])->except(['create', 'edit'])->names('api.v1.vales');
 
     Route::resource('cargas', CargaCombustibleController::class)
         ->parameters(['cargas' => 'carga'])->except(['create', 'edit'])->names('api.v1.cargas');
+
+    Route::get('solicitudes-mantenimiento/{solicitud}/pdf', [SolicitudMantenimientoController::class, 'pdf'])->name('api.v1.solicitudes-mantenimiento.pdf');
 
     Route::resource('solicitudes-mantenimiento', SolicitudMantenimientoController::class)
         ->parameters(['solicitudes-mantenimiento' => 'solicitud'])
