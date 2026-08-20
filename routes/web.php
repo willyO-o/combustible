@@ -21,6 +21,7 @@ use App\Http\Controllers\TipoMantenimientoController;
 use App\Http\Controllers\TipoVehiculoController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValeController;
+use App\Http\Controllers\ValePublicoController;
 use App\Http\Controllers\VehiculoController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -44,6 +45,12 @@ Route::get('/', function () {
 Route::get('/api/documentation', function () {
     return view('docs.swagger');
 })->name('api.documentation');
+
+// ── Verificación pública de vales (QR) ──────────────────────────────────────
+// Sin autenticación: la URL sólo expone md5(id), nunca el id real. Pensada
+// para que el código QR impreso en el vale apunte aquí y cualquiera pueda
+// verificar su estado (pendiente, usado o anulado) sin acceder al sistema.
+Route::get('/vale/verificar/{hash}', [ValePublicoController::class, 'show'])->name('vales.publico');
 
 // Route::get('/dashboard', function () {
 //     return Inertia::render('Dashboard');

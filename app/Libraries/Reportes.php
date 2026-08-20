@@ -5,6 +5,7 @@ namespace App\Libraries;
 use App\Models\CargaCombustible;
 use App\Models\ParametrosEmpresa;
 use FPDF;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class Reportes extends FPDF
 {
@@ -30,7 +31,7 @@ class Reportes extends FPDF
         $ciudad = $vale->grifo->ciudad;
 
         $cliente = $vale->conductor->persona->nombre_completo;
-        $licencia = $vale->conductor->persona->ci;
+        $licencia = $vale->conductor->licenciaConducir()?->numero_documento ?? 'N/A';
         $vehiculo = $vale->vehiculo->codigo;
         $marca = $vale->vehiculo->marca;
         $placa = $vale->vehiculo->nro_placa;
@@ -99,8 +100,8 @@ class Reportes extends FPDF
 
         $this->SetXY(5, 20);
         $this->SetFont('Arial', 'B', 12);
-        $this->SetTextColor(255,255,255);
-        $this->Cell($pageW - 12, 5,  utf8Decode(mb_strtoupper($empresaLocal)), 0, 0, 'R');
+        $this->SetTextColor(255, 255, 255);
+        $this->Cell($pageW - 12, 5, utf8Decode(mb_strtoupper($empresaLocal)), 0, 0, 'R');
 
         // ----------------------------------------------------------
         // CUERPO: 2 cuadros (Cliente / Combustible)
@@ -112,16 +113,12 @@ class Reportes extends FPDF
         $rightX = 116;
         $rightW = 98;
 
-        $this->SetDrawColor($verde[0], $verde[1], $verde[2]);
-        $this->SetLineWidth(0.3);
-        $this->Rect($leftX, $bodyY, $leftW, $bodyH);   // cuadro izquierdo
-        $this->Rect($rightX, $bodyY, $rightW, $bodyH); // cuadro derecho
+        // $this->SetDrawColor($verde[0], $verde[1], $verde[2]);
+        // $this->SetLineWidth(0.3);
+        // $this->Rect($leftX, $bodyY, $leftW, $bodyH);   // cuadro izquierdo
+        // $this->Rect($rightX, $bodyY, $rightW, $bodyH); // cuadro derecho
 
         // --- Cuadro izquierdo: datos del cliente ---
-        $this->SetXY($leftX + 4, $bodyY + 3);
-        $this->SetFont('Arial', 'B', 10);
-        $this->SetTextColor($verde[0], $verde[1], $verde[2]);
-        $this->Cell($leftW - 8, 6, utf8Decode('CLIENTE'), 'B', 1, 'L');
 
         $filas = [
             ['Nombre:', $cliente],
@@ -131,23 +128,23 @@ class Reportes extends FPDF
             ['Placa:', $placa],
         ];
 
-        $y = $bodyY + 14;
+        $y = $bodyY + 12;
         foreach ($filas as $fila) {
             [$etiqueta, $valor] = $fila;
 
-            $this->SetXY($leftX + 4, $y);
+            $this->SetXY($leftX + 30, $y);
             $this->SetFont('Arial', 'B', 9);
             $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->Cell(24, 6, utf8Decode($etiqueta), 0, 0, 'L');
+            // $this->Cell(24, 6, utf8Decode($etiqueta), 0, 0, 'L');
 
             $this->SetFont('Arial', '', 9);
-            $this->Cell($leftW - 4 - 24 - 4, 6, utf8Decode($valor), 'B', 0, 'L');
+            $this->Cell($leftW - 4 - 24 - 4, 6, utf8Decode($valor), 0, 0, 'L');
 
             $y += 14.5;
         }
 
         // --- Cuadro derecho: litros / importe ---
-        $rx = $rightX + 4;
+        $rx = $rightX;
         $rw = $rightW - 8;
 
         // Tabla Lt. / Bs.
@@ -155,90 +152,59 @@ class Reportes extends FPDF
         $tblH = 22;
         $colW = $rw / 2;
 
-        $this->SetDrawColor($verde[0], $verde[1], $verde[2]);
-        $this->Rect($rx, $tblY, $rw, $tblH);
-        $this->Line($rx + $colW, $tblY, $rx + $colW, $tblY + $tblH);
-        $this->Line($rx, $tblY + 6, $rx + $rw, $tblY + 6);
-
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($verde[0], $verde[1], $verde[2]);
-        $this->SetXY($rx, $tblY);
-        $this->Cell($colW, 6, 'Lt.', 0, 0, 'C');
-        $this->SetXY($rx + $colW, $tblY);
-        $this->Cell($colW, 6, 'Bs.', 0, 0, 'C');
-
-        $this->SetFont('Arial', 'B', 16);
+        $this->SetFont('Arial', 'B', 20);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($rx, $tblY + 6);
+        $this->SetXY($rx, $tblY);
         $this->Cell($colW, 16, $litros, 0, 0, 'C');
-        $this->SetXY($rx + $colW, $tblY + 6);
+        $this->SetXY($rx + $colW, $tblY);
         $this->Cell($colW, 16, $bolivianos, 0, 0, 'C');
 
-        $this->SetFont('Arial', 'I', 7);
-        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
-        $this->SetXY($rx, $tblY + $tblH + 1);
-        $this->Cell($colW, 3, 'Litros', 0, 0, 'C');
-        $this->SetXY($rx + $colW, $tblY + $tblH + 1);
-        $this->Cell($colW, 3, 'Bolivianos', 0, 0, 'C');
-
-        $y2 = $tblY + $tblH + 10;
+        $y2 = $tblY + $tblH;
         $this->SetFont('Arial', 'B', 9);
         $this->SetXY($rx, $y2);
         // $this->Cell(30, 6, utf8Decode('Tipo Combustible: '), 0, 0, 'L');
         $this->SetFont('Arial', '', 9);
-        $this->Cell($rw, 6, utf8Decode(numeroLiteral($litros, 'LITROS')), 'B', 0, 'C');
+        $this->Cell($rw, 6, utf8Decode(numeroLiteral($litros, 'LITROS')), 0, 0, 'C');
 
-        $y2 += 10;
+        $y2 += 7;
         $this->SetFont('Arial', 'B', 9);
         $this->SetXY($rx, $y2);
         // $this->Cell(30, 6, utf8Decode('Tipo Combustible: '), 0, 0, 'L');
         $this->SetFont('Arial', '', 9);
-        $this->Cell($rw, 6, utf8Decode(monedaLiteral($bolivianos)), 'B', 0, 'C');
+        $this->Cell($rw, 6, utf8Decode(monedaLiteral($bolivianos)), 0, 0, 'C');
 
         $y2 += 10;
         $this->SetFont('Arial', 'B', 9);
-        $this->SetXY($rx, $y2);
-        $this->Cell(30, 6, utf8Decode('Tipo Combustible: '), 0, 0, 'L');
+        $this->SetXY($rx + 33, $y2);
         $this->SetFont('Arial', '', 9);
-        $this->Cell($rw - 28, 6, utf8Decode($tipoCombustible), 'B', 0, 'L');
+        $this->Cell($rw, 6, utf8Decode($tipoCombustible), 0, 0, 'L');
 
-        // Checkboxes Gasolina / Diesel
-        // $chkY = $tblY + $tblH + 8;
-        // $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
-        // $this->SetLineWidth(0.25);
-
-        // $this->Rect($rx, $chkY, 4, 4);
-        // if ($tipoGasolina) {
-        //     $this->SetFont('Arial', 'B', 9);
-        //     $this->SetXY($rx, $chkY - 0.5);
-        //     $this->Cell(4, 5, 'X', 0, 0, 'C');
-        // }
-
-        // $this->SetFont('Arial', '', 9);
-        // $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        // $this->SetXY($rx, $chkY - 0.8);
-        // $this->Cell(30, 5, utf8Decode('Tipo combustible: ' . $tipoCombustible), 0, 0, 'L');
-
-        // $this->Rect($rx + 40, $chkY, 4, 4);
-        // if ($tipoDiesel) {
-        //     $this->SetFont('Arial', 'B', 9);
-        //     $this->SetXY($rx + 40, $chkY - 0.5);
-        //     $this->Cell(4, 5, 'X', 0, 0, 'C');
-        // }
-        // $this->SetFont('Arial', '', 9);
-        // $this->SetXY($rx + 46, $chkY - 0.8);
-        // $this->Cell(30, 5, 'Diesel', 0, 0, 'L');
-
-        // Autorizado por / Factura N°
-        // $y2 = $chkY + 10;
-        $y2 += 10;
+        $y2 += 9;
         $this->SetFont('Arial', 'B', 9);
-        $this->SetXY($rx, $y2);
-        $this->Cell(28, 6, utf8Decode('Autorizado por:'), 0, 0, 'L');
+        $this->SetXY($rx + 30, $y2);
         $this->SetFont('Arial', '', 9);
-        $this->Cell($rw - 28, 6, utf8Decode($autorizadoPor), 'B', 0, 'L');
+        $this->Cell($rw - 28, 6, utf8Decode($autorizadoPor), 0, 0, 'L');
 
         $y2 += 14;
+
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetXY(17, 127);
+        $this->SetTextColor(255, 255, 255);
+        $this->Cell($rw - 28, 6, utf8Decode('Este vale es de uso unico'), 0, 0, 'L');
+
+        $this->SetXY(89, 128);
+        $this->SetTextColor(255, 255, 255);
+        $this->Cell($rw - 28, 5, utf8Decode('Emitido el: '.$vale->fecha_emision?->format('d/m/Y H:i')), 0, 0, 'L');
+
+        $this->SetXY(151, 128);
+        $this->SetTextColor(255, 255, 255);
+        $this->Cell($rw - 28, 5, utf8Decode('Expira el: '.$vale->fecha_vencimiento?->format('d/m/Y H:i')), 0, 0, 'L');
+
+        $urlQr = route('vales.publico', ['hash' => md5($vale->id)]);
+        $base64Qr = 'data:image/png;base64,'.$this->getBase64Qr($urlQr);
+
+        $this->Image($base64Qr, 177.5, 95, 23, 23, 'PNG');
+
         // $this->SetFont('Arial', 'B', 9);
         // $this->SetXY($rx, $y2);
         // $this->Cell(24, 6, utf8Decode('Factura N°:'), 0, 0, 'L');
@@ -246,22 +212,29 @@ class Reportes extends FPDF
         // $this->Cell($rw - 24, 6, $facturaNro, 'B', 0, 'L');
 
         // Mini "código de barras" decorativo + marca, esquina inferior derecha
-        $barX = $rightX + $rightW - 26;
-        $barY = $bodyY + $bodyH - 16;
-        $this->SetFillColor(0, 0, 0);
-        for ($i = 0; $i < 22; $i++) {
-            $w = ($i % 3 === 0) ? 1.1 : 0.5;
-            $this->Rect($barX + ($i * 1.1), $barY, $w, 10, 'F');
-        }
-        $this->SetFont('Arial', 'B', 7);
-        $this->SetTextColor($verde[0], $verde[1], $verde[2]);
-        $this->SetXY($barX, $barY + 11);
-        $this->Cell(26, 3, 'SOCINBOL', 0, 0, 'C');
 
         // Salida del PDF
         // El '/' de $numeroVale ("NNNNNN/GESTION") no es válido dentro de un nombre
         // de archivo, así que se reemplaza por '-' sólo para el nombre sugerido.
         return $this->Output($modo, $nombreArchivo ?? 'vale_'.str_replace('/', '-', (string) $numeroVale).'.pdf');
+    }
+
+    public function getBase64Qr($text, $size = 400, $format = 'png', $qualy = 'Q', $logoPath = '', $margin = 2)
+    {
+
+        if (empty($text)) {
+            throw new \Exception('No se Especificó el Texto para generar el Qr', 1);
+        }
+
+        if (empty($logoPath)) {
+            return base64_encode(QrCode::encoding('UTF-8')->format($format)->size($size)->errorCorrection($qualy)->margin($margin)->generate($text));
+        }
+
+        return base64_encode(QrCode::encoding('UTF-8')->format($format)->merge($logoPath, 0.3)->size($size)->errorCorrection($qualy)->margin($margin)->generate($text));
+
+        // >eyeColor(0, 180, 255, 255, 0, 0, 0)
+        //  return base64_encode(QrCode::encoding('UTF-8')->format('png')->merge('/public/assets/logo/logo-circular.png', 0.3)->size(500)->errorCorrection('H')->generate($qrText));
+
     }
 
     /**

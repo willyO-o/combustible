@@ -39,6 +39,27 @@ const estadoAsignacionBadge = (estado) => {
     }
     return map[estado] ?? 'bg-secondary-transparent text-secondary'
 }
+
+const documentos = computed(() => props.conductor.documentos ?? [])
+
+const estadoDocumentoBadge = (estado) => {
+    const map = {
+        VIGENTE: 'bg-success-transparent text-success',
+        VENCIDO: 'bg-danger-transparent text-danger',
+        OBSERVADO: 'bg-warning-transparent text-warning',
+    }
+    return map[estado] ?? 'bg-secondary-transparent text-secondary'
+}
+
+const tipoDocumentoLabel = (tipo) => {
+    const map = {
+        LICENCIA_DE_CONDUCIR: 'Licencia de Conducir',
+        CI: 'Carnet de Identidad',
+        CERTIFICADO_MEDICO: 'Certificado Médico',
+        OTRO: 'Otro',
+    }
+    return map[tipo] ?? tipo
+}
 </script>
 
 <template>
@@ -201,6 +222,60 @@ const estadoAsignacionBadge = (estado) => {
                     Este conductor no tiene vehículos asignados actualmente.
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Documentos del Conductor -->
+    <div class="card custom-card overflow-hidden mb-4">
+        <div class="card-header justify-content-between">
+            <div class="card-title">
+                <h6 class="mb-0">Documentos del Conductor</h6>
+            </div>
+            <span class="badge bg-primary-transparent text-primary">{{ documentos.length }} registros</span>
+        </div>
+        <div v-if="documentos.length > 0" class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover text-nowrap mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Número</th>
+                            <th>Categoría</th>
+                            <th>Emisión</th>
+                            <th>Vencimiento</th>
+                            <th>Estado</th>
+                            <th>Observación</th>
+                            <th>Archivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="documento in documentos" :key="documento.id">
+                            <td>{{ tipoDocumentoLabel(documento.tipo_documento) }}</td>
+                            <td>{{ documento.numero_documento ?? 'N/A' }}</td>
+                            <td>{{ documento.categoria ?? 'N/A' }}</td>
+                            <td>{{ documento.fecha_emision ?? 'N/A' }}</td>
+                            <td>{{ documento.fecha_vencimiento ?? 'N/A' }}</td>
+                            <td>
+                                <span class="badge" :class="estadoDocumentoBadge(documento.estado_documento)">
+                                    {{ documento.estado_documento }}
+                                </span>
+                            </td>
+                            <td class="text-wrap" style="max-width: 220px;">{{ documento.observacion ?? '—' }}</td>
+                            <td>
+                                <a v-if="documento.archivo_url" :href="documento.archivo_url" target="_blank"
+                                    class="btn btn-sm btn-icon btn-primary-light" title="Ver archivo">
+                                    <i class="ri-file-line"></i>
+                                </a>
+                                <span v-else class="text-muted">—</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div v-else class="card-body text-center text-muted py-5">
+            <i class="ri-file-list-3-line fs-3 d-block mb-2"></i>
+            Este conductor no tiene documentos registrados.
         </div>
     </div>
 

@@ -16,6 +16,7 @@ const form = useForm({
     direccion:        '',
     fecha_nacimiento: '',
     estado_conductor: 'ACTIVO',
+    documentos:       [],
 })
 
 const fotoPreview = ref(null)
@@ -27,6 +28,29 @@ function onFotoChange(e) {
     const reader = new FileReader()
     reader.onload = (ev) => (fotoPreview.value = ev.target.result)
     reader.readAsDataURL(file)
+}
+
+const documentoVacio = () => ({
+    tipo_documento:    'LICENCIA_DE_CONDUCIR',
+    numero_documento:  '',
+    categoria:         '',
+    fecha_emision:     '',
+    fecha_vencimiento: '',
+    archivo:           null,
+    estado_documento:  'VIGENTE',
+    observacion:       '',
+})
+
+function agregarDocumento() {
+    form.documentos.push(documentoVacio())
+}
+
+function eliminarDocumento(idx) {
+    form.documentos.splice(idx, 1)
+}
+
+function onDocumentoArchivoChange(e, documento) {
+    documento.archivo = e.target.files[0] ?? null
 }
 
 function submit() {
@@ -217,6 +241,153 @@ function submit() {
                                         maxlength="250"
                                     ></textarea>
                                     <div v-if="form.errors.direccion" class="invalid-feedback">{{ form.errors.direccion }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documentos del Conductor -->
+            <div class="card custom-card mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-title">Documentos del Conductor (opcional)</div>
+                    <button type="button" class="btn btn-sm btn-outline-primary btn-wave" @click="agregarDocumento">
+                        <i class="ri-add-line me-1"></i> Agregar Documento
+                    </button>
+                </div>
+                <div v-if="form.documentos.length === 0" class="card-body text-center text-muted py-4">
+                    No se registraron documentos adicionales. Son opcionales.
+                </div>
+                <div v-else class="card-body d-flex flex-column gap-3">
+                    <div v-for="(documento, idx) in form.documentos" :key="idx" class="border rounded-3 p-3 position-relative">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-icon btn-danger-light position-absolute top-0 end-0 m-2"
+                            title="Quitar documento"
+                            @click="eliminarDocumento(idx)"
+                        >
+                            <i class="ri-delete-bin-line"></i>
+                        </button>
+                        <div class="row g-3">
+                            <div class="col-sm-6 col-xl-3">
+                                <label class="form-label fw-medium">
+                                    Tipo de Documento <span class="text-danger">*</span>
+                                </label>
+                                <select
+                                    v-model="documento.tipo_documento"
+                                    class="form-select"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.tipo_documento`] }"
+                                >
+                                    <option value="LICENCIA_DE_CONDUCIR">Licencia de Conducir</option>
+                                    <option value="CI">Carnet de Identidad</option>
+                                    <option value="CERTIFICADO_MEDICO">Certificado Médico</option>
+                                    <option value="OTRO">Otro</option>
+                                </select>
+                                <div v-if="form.errors[`documentos.${idx}.tipo_documento`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.tipo_documento`] }}
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-3">
+                                <label class="form-label fw-medium">Número de Documento</label>
+                                <input
+                                    v-model="documento.numero_documento"
+                                    type="text"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.numero_documento`] }"
+                                    maxlength="100"
+                                    placeholder="Ej: LIC-12345"
+                                />
+                                <div v-if="form.errors[`documentos.${idx}.numero_documento`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.numero_documento`] }}
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-2">
+                                <label class="form-label fw-medium">Categoría</label>
+                                <input
+                                    v-model="documento.categoria"
+                                    type="text"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.categoria`] }"
+                                    maxlength="10"
+                                    placeholder="Ej: B-2"
+                                />
+                                <div v-if="form.errors[`documentos.${idx}.categoria`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.categoria`] }}
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-2">
+                                <label class="form-label fw-medium">Estado</label>
+                                <select
+                                    v-model="documento.estado_documento"
+                                    class="form-select"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.estado_documento`] }"
+                                >
+                                    <option value="VIGENTE">VIGENTE</option>
+                                    <option value="VENCIDO">VENCIDO</option>
+                                    <option value="OBSERVADO">OBSERVADO</option>
+                                </select>
+                                <div v-if="form.errors[`documentos.${idx}.estado_documento`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.estado_documento`] }}
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-2">
+                                <label class="form-label fw-medium">Fecha de Emisión</label>
+                                <input
+                                    v-model="documento.fecha_emision"
+                                    type="date"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.fecha_emision`] }"
+                                />
+                                <div v-if="form.errors[`documentos.${idx}.fecha_emision`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.fecha_emision`] }}
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-3">
+                                <label class="form-label fw-medium">Fecha de Vencimiento</label>
+                                <input
+                                    v-model="documento.fecha_vencimiento"
+                                    type="date"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.fecha_vencimiento`] }"
+                                />
+                                <div v-if="form.errors[`documentos.${idx}.fecha_vencimiento`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.fecha_vencimiento`] }}
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-4">
+                                <label class="form-label fw-medium">Archivo</label>
+                                <input
+                                    type="file"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.archivo`] }"
+                                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                                    @change="onDocumentoArchivoChange($event, documento)"
+                                />
+                                <div v-if="form.errors[`documentos.${idx}.archivo`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.archivo`] }}
+                                </div>
+                                <small class="text-muted">JPG, PNG, WEBP o PDF. Máx 4MB.</small>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label fw-medium">Observación</label>
+                                <textarea
+                                    v-model="documento.observacion"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors[`documentos.${idx}.observacion`] }"
+                                    rows="2"
+                                    maxlength="1000"
+                                    placeholder="Observaciones sobre el documento..."
+                                ></textarea>
+                                <div v-if="form.errors[`documentos.${idx}.observacion`]" class="invalid-feedback">
+                                    {{ form.errors[`documentos.${idx}.observacion`] }}
                                 </div>
                             </div>
                         </div>

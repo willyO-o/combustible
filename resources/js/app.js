@@ -20,6 +20,7 @@ import can from '@/Directives/can';
 import Decimal from '@/Directives/Decimal';
 import Entero from '@/Directives/Entero';
 import MaxLength from '@/Directives/MaxLength';
+import PageLoader from '@/Components/PageLoader.vue';
 import { registerSW } from 'virtual:pwa-register';
 
 
@@ -37,7 +38,11 @@ createInertiaApp({
             import.meta.glob('./Pages/**/*.vue'),
         ),
     setup({ el, App, props, plugin }) {
-        return createApp({ render: () => h(App, props) })
+        // PageLoader se monta como hermano de <App>, fuera de cualquier
+        // layout de página: así reacciona a las transiciones de Inertia
+        // (router.on('start'/'finish')) sin importar si la navegación
+        // entra o sale de un layout distinto (p.ej. Login -> Dashboard).
+        return createApp({ render: () => [h(App, props), h(PageLoader)] })
             .use(plugin)
             .use(ZiggyVue)
             .use(createPinia())
@@ -50,7 +55,6 @@ createInertiaApp({
             .directive('max-length', MaxLength)
             .mount(el);
     },
-    progress: {
-        color: '#4B5563',
-    },
+    // El PageLoader reemplaza a la barra de progreso por defecto de Inertia.
+    progress: false,
 });

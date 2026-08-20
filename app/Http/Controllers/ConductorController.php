@@ -6,8 +6,11 @@ use App\Http\Requests\AsignacionRequest;
 use App\Http\Requests\ConductorRequest;
 use App\Models\Asignacion;
 use App\Models\Conductor;
+use App\Models\DocumentoConductor;
+use App\Models\Persona;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -55,13 +58,25 @@ class ConductorController extends Controller
 
     public function store(ConductorRequest $request): RedirectResponse
     {
-        $data = $request->validated();
+        DB::transaction(function () use ($request) {
+            // Los datos personales (ci, nombres, foto, etc.) viven en la
+            // tabla persona; el conductor sólo agrega estado_conductor
+            // sobre esa misma persona (comparten "id" como llave primaria).
+            $datosPersona = $request->safe()->except(['estado_conductor', 'foto', 'documentos']);
 
-        if ($request->hasFile('foto')) {
-            $data['foto'] = $request->file('foto')->store('conductores', 'public');
-        }
+            if ($request->hasFile('foto')) {
+                $datosPersona['foto'] = $request->file('foto')->store('conductores', 'public');
+            }
 
-        Conductor::create($data);
+            $persona = Persona::create($datosPersona);
+
+            $conductor = Conductor::create([
+                'id' => $persona->id,
+                'estado_conductor' => $request->validated('estado_conductor'),
+            ]);
+
+            $this->guardarDocumentos($conductor, $request);
+        });
 
         return redirect()->route('conductores.index')
             ->with('success', 'Conductor registrado exitosamente.');
@@ -73,6 +88,7 @@ class ConductorController extends Controller
             'persona',
             'asignacionesActivas.tipoVehiculo',
             'asignacionesActivas.tipoCombustible',
+            'documentos',
         ]);
 
         $historialAsignaciones = $conductor->asignaciones()
@@ -109,6 +125,8 @@ class ConductorController extends Controller
 
     public function edit(Conductor $conductor): Response
     {
+        $conductor->load(['persona', 'documentos']);
+
         return Inertia::render('Conductores/Edit', [
             'conductor' => $conductor,
         ]);
@@ -116,29 +134,87 @@ class ConductorController extends Controller
 
     public function update(ConductorRequest $request, Conductor $conductor): RedirectResponse
     {
-        $data = $request->validated();
+        DB::transaction(function () use ($request, $conductor) {
+            $persona = $conductor->persona;
 
-        if ($request->hasFile('foto')) {
-            if ($conductor->foto) {
-                Storage::disk('public')->delete($conductor->foto);
+            $datosPersona = $request->safe()->except(['estado_conductor', 'foto', 'documentos']);
+
+            if ($request->hasFile('foto')) {
+                if ($persona->foto) {
+                    Storage::disk('public')->delete($persona->foto);
+                }
+                $datosPersona['foto'] = $request->file('foto')->store('conductores', 'public');
             }
-            $data['foto'] = $request->file('foto')->store('conductores', 'public');
-        } else {
-            unset($data['foto']);
-        }
 
-        $conductor->update($data);
+            $persona->update($datosPersona);
+
+            $conductor->update([
+                'estado_conductor' => $request->validated('estado_conductor'),
+            ]);
+
+            $this->guardarDocumentos($conductor, $request);
+        });
 
         return redirect()->route('conductores.index')
             ->with('success', 'Conductor actualizado exitosamente.');
     }
 
-    public function destroy(Conductor $conductor): RedirectResponse
+    /**
+     * Crea, actualiza y elimina los documentos opcionales del conductor a
+     * partir del arreglo "documentos" del formulario. Los documentos con
+     * "id" se actualizan (reemplazando el archivo sólo si se sube uno
+     * nuevo); los que no tienen "id" se crean; los que ya no vienen en el
+     * arreglo (removidos por el usuario) se eliminan junto a su archivo.
+     */
+    private function guardarDocumentos(Conductor $conductor, ConductorRequest $request): void
     {
-        if ($conductor->foto) {
-            Storage::disk('public')->delete($conductor->foto);
+        $documentos = $request->validated('documentos') ?? [];
+        $idsConservados = [];
+
+        foreach ($documentos as $item) {
+            $datos = [
+                'tipo_documento' => $item['tipo_documento'],
+                'numero_documento' => $item['numero_documento'] ?? null,
+                'categoria' => $item['categoria'] ?? null,
+                'fecha_emision' => $item['fecha_emision'] ?? null,
+                'fecha_vencimiento' => $item['fecha_vencimiento'] ?? null,
+                'estado_documento' => $item['estado_documento'] ?? 'VIGENTE',
+                'observacion' => $item['observacion'] ?? null,
+            ];
+
+            $documento = ! empty($item['id'])
+                ? $conductor->documentos()->find($item['id'])
+                : null;
+
+            if (($item['archivo'] ?? null) instanceof UploadedFile) {
+                if ($documento?->archivo) {
+                    Storage::disk('public')->delete($documento->archivo);
+                }
+                $datos['archivo'] = $item['archivo']->store('documentos-conductores', 'public');
+            }
+
+            $documento = $documento
+                ? tap($documento)->update($datos)
+                : $conductor->documentos()->create($datos);
+
+            $idsConservados[] = $documento->id;
         }
 
+        $conductor->documentos()
+            ->whereNotIn('id', $idsConservados)
+            ->get()
+            ->each(function (DocumentoConductor $documento) {
+                if ($documento->archivo) {
+                    Storage::disk('public')->delete($documento->archivo);
+                }
+                $documento->delete();
+            });
+    }
+
+    public function destroy(Conductor $conductor): RedirectResponse
+    {
+        // La foto pertenece a la persona (no al conductor) y la persona no
+        // se elimina aquí: sólo se revoca el rol de conductor.
         $conductor->delete();
 
         return redirect()->route('conductores.index')
@@ -149,18 +225,33 @@ class ConductorController extends Controller
      * Asigna (o reasigna) un vehículo a un conductor. La asignación activa
      * anterior de este conductor (si la tiene) queda REASIGNADO con
      * fecha_culminacion=ahora; nunca conviven dos asignaciones activas para
-     * el mismo conductor. El usuario que realiza la asignación se registra
-     * automáticamente desde el servidor.
+     * el mismo conductor. Si el vehículo seleccionado ya estaba asignado
+     * activamente a otro conductor, esa asignación también queda REASIGNADO
+     * con fecha_culminacion=ahora, liberando al conductor anterior. El
+     * usuario que realiza la asignación se registra automáticamente desde
+     * el servidor.
      */
     public function asignarVehiculo(AsignacionRequest $request, Conductor $conductor): RedirectResponse
     {
         DB::transaction(function () use ($request, $conductor) {
+            $condicionVigente = function ($query) {
+                $query->whereNull('fecha_culminacion')
+                    ->orWhere('fecha_culminacion', '>', now());
+            };
+
+            // Libera al conductor que tuviera este vehículo asignado actualmente.
+            Asignacion::where('id_vehiculo', $request->validated('id_vehiculo'))
+                ->where('id_conductor', '!=', $conductor->id)
+                ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
+                ->where($condicionVigente)
+                ->update([
+                    'estado_asignacion' => 'REASIGNADO',
+                    'fecha_culminacion' => now(),
+                ]);
+
             Asignacion::where('id_conductor', $conductor->id)
                 ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
-                ->where(function ($query) {
-                    $query->whereNull('fecha_culminacion')
-                        ->orWhere('fecha_culminacion', '>', now());
-                })
+                ->where($condicionVigente)
                 ->update([
                     'estado_asignacion' => 'REASIGNADO',
                     'fecha_culminacion' => now(),

@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Asignacion;
 use App\Models\Vehiculo;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
@@ -26,27 +25,8 @@ class AsignacionRequest extends FormRequest
 
     public function rules(): array
     {
-        $conductor = $this->route('conductor');
-
         return [
-            'id_vehiculo' => [
-                'required',
-                'exists:vehiculo,id',
-                function ($attribute, $value, $fail) use ($conductor) {
-                    $yaAsignadoAOtro = Asignacion::where('id_vehiculo', $value)
-                        ->where('id_conductor', '!=', $conductor->id)
-                        ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
-                        ->where(function ($query) {
-                            $query->whereNull('fecha_culminacion')
-                                ->orWhere('fecha_culminacion', '>', now());
-                        })
-                        ->exists();
-
-                    if ($yaAsignadoAOtro) {
-                        $fail('Este vehículo ya está asignado activamente a otro conductor.');
-                    }
-                },
-            ],
+            'id_vehiculo' => ['required', 'exists:vehiculo,id'],
             'estado_asignacion' => ['required', Rule::in(['ACTIVO', 'PROVISIONAL'])],
             'fecha_culminacion' => ['nullable', 'date', 'after_or_equal:today', 'prohibited_unless:estado_asignacion,PROVISIONAL'],
             'detalle' => ['nullable', 'string', 'max:1000'],

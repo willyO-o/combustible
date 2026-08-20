@@ -83,11 +83,11 @@ class ConductorAsignacionControllerTest extends TestCase
         ]);
     }
 
-    public function test_asignar_rechaza_un_vehiculo_ya_asignado_activamente_a_otro_conductor(): void
+    public function test_asignar_un_vehiculo_ya_asignado_a_otro_conductor_lo_reasigna_y_libera_al_anterior(): void
     {
         $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
         $otroConductor = Conductor::factory()->create();
-        Asignacion::create([
+        $asignacionAnterior = Asignacion::create([
             'id_vehiculo' => $vehiculo->id,
             'id_conductor' => $otroConductor->id,
             'fecha_asignacion' => now(),
@@ -103,8 +103,18 @@ class ConductorAsignacionControllerTest extends TestCase
             'kilometraje_inicial' => 500,
         ]);
 
-        $response->assertSessionHasErrors('id_vehiculo');
-        $this->assertDatabaseMissing('asignacion', ['id_conductor' => $conductor->id]);
+        $response->assertRedirect(route('conductores.index'));
+        $response->assertSessionDoesntHaveErrors();
+
+        $asignacionAnterior->refresh();
+        $this->assertSame('REASIGNADO', $asignacionAnterior->estado_asignacion);
+        $this->assertNotNull($asignacionAnterior->fecha_culminacion);
+
+        $this->assertDatabaseHas('asignacion', [
+            'id_conductor' => $conductor->id,
+            'id_vehiculo' => $vehiculo->id,
+            'estado_asignacion' => 'ACTIVO',
+        ]);
     }
 
     public function test_asignar_exige_el_kilometraje_inicial_para_un_vehiculo_medido_en_kilometraje(): void

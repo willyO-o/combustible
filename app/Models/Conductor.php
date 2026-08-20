@@ -57,6 +57,17 @@ class Conductor extends Model
         return $this->hasMany(Asignacion::class, 'id_conductor');
     }
 
+    public function documentos()
+    {
+        return $this->hasMany(DocumentoConductor::class, 'id_conductor');
+    }
+
+    //extraer los datos de la licencia de conducir del conductor
+    public function licenciaConducir()
+    {
+        return $this->documentos()->where('tipo_documento', 'LICENCIA_DE_CONDUCIR')->first();
+    }
+
     public function asignacionesActivas()
     {
         return $this->belongsToMany(Vehiculo::class, 'asignacion', 'id_conductor', 'id_vehiculo')
