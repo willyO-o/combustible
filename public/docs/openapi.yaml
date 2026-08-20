@@ -1200,6 +1200,10 @@ paths:
         - Si se envía `id_vale`, debe referenciar un vale con `estado_vale = PENDIENTE`, del
           mismo `id_vehiculo`, y aún no vencido (`fecha_vencimiento > ahora`). Al registrarse la
           carga, ese vale queda marcado como `USADO`.
+        - `is_offline` (uso exclusivo de la app Android, que permite registrar cargas sin
+          conexión y sincronizarlas después) omite, solo para esta petición, la exigencia
+          anterior de que `id_vale` siga `PENDIENTE` y vigente, ya que para el momento de la
+          sincronización el vale pudo haber sido usado o vencido.
 
         ## Envío de los respaldos digitales (`respaldos`)
 
@@ -2408,6 +2412,18 @@ components:
           enum: [REGISTRADO, VERIFICADO, ANULADO]
           description: Opcional; si se omite, la carga queda registrada sin estado (`null`).
           example: REGISTRADO
+        is_offline:
+          type: boolean
+          nullable: true
+          default: false
+          description: |
+            Uso exclusivo de la app Android (Flutter), que permite registrar cargas de
+            combustible sin conexión y sincronizarlas después. Si se envía `true`, se omite la
+            exigencia de que `id_vale` siga con `estado_vale = PENDIENTE` y `fecha_vencimiento`
+            vigente, ya que para el momento en que se sincroniza el vale pudo haber sido usado
+            o vencido. No tiene efecto en peticiones fuera de la API (p. ej. el panel web) ni al
+            editar una carga sin cambiar su `id_vale`.
+          example: false
         respaldos[0][archivo]:
           type: string
           format: binary
