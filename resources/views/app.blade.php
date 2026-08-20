@@ -10,11 +10,24 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-    <link rel="favicon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
 
-    <link rel="manifest" href="/build/manifest.webmanifest">
-    <meta name="theme-color" content="#ffffff">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('favicon-16x16.png') }}">
+
+    <!-- PWA: manifest + tema (Android/Chrome/Desktop) -->
+    <link rel="manifest" href="{{ asset('build/manifest.webmanifest') }}">
+    <meta name="theme-color" content="#162450">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Combustible">
+    <meta name="msapplication-TileColor" content="#162450">
+
+    <!-- PWA: iOS/Safari no lee el manifest para instalar, usa estas meta/link -->
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Combustible">
     <!-- Scripts -->
     @routes
     @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])

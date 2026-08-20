@@ -26,13 +26,20 @@ export default defineConfig({
         }),
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+            includeAssets: [
+                'favicon.ico',
+                'favicon-16x16.png',
+                'favicon-32x32.png',
+                'apple-touch-icon.png',
+            ],
             manifest: {
-                name: 'Mi App',
-                short_name: 'MiApp',
-                description: 'Descripción de mi app',
-                theme_color: '#ffffff',
-                background_color: '#ffffff',
+                id: '/',
+                name: 'Sistema de Control de Combustible',
+                short_name: 'Combustible',
+                description: 'Gestión de combustible, vehículos, conductores y mantenimiento.',
+                lang: 'es',
+                theme_color: '#162450',
+                background_color: '#162450',
                 display: 'standalone',
                 start_url: '/',
                 scope: '/',
@@ -41,14 +48,16 @@ export default defineConfig({
                         src: '/pwa-192x192.png',
                         sizes: '192x192',
                         type: 'image/png',
+                        purpose: 'any',
                     },
                     {
                         src: '/pwa-512x512.png',
                         sizes: '512x512',
                         type: 'image/png',
+                        purpose: 'any',
                     },
                     {
-                        src: '/pwa-512x512.png',
+                        src: '/pwa-512x512-maskable.png',
                         sizes: '512x512',
                         type: 'image/png',
                         purpose: 'maskable',
@@ -57,6 +66,25 @@ export default defineConfig({
             },
             workbox: {
                 navigateFallbackDenylist: [/^\/api/],
+                cleanupOutdatedCaches: true,
+                // Los íconos PWA/favicons y las fotos (vehículos, conductores, logo)
+                // viven en public/ o storage/ y no pasan por el pipeline de Vite, así
+                // que no quedan precacheados: se cachean en tiempo de ejecución la
+                // primera vez que se piden, para que también estén disponibles offline.
+                runtimeCaching: [
+                    {
+                        urlPattern: ({ request, url }) => request.destination === 'image' && url.origin === self.location.origin,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'imagenes',
+                            expiration: {
+                                maxEntries: 200,
+                                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 días
+                            },
+                            cacheableResponse: { statuses: [0, 200] },
+                        },
+                    },
+                ],
             },
         }),
     ],
