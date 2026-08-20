@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
@@ -9,161 +9,270 @@ const props = defineProps({
     historialAsignaciones: Array,
 })
 
+const conductorActual = computed(() => props.vehiculo.conductor_asignado ?? null)
+const areaActual = computed(() => props.vehiculo.areas_asignadas?.[0] ?? null)
 
+const estadoVehiculoBadge = (estado) => {
+    const map = {
+        ACTIVO: 'bg-success-transparent text-success',
+        RETIRADO: 'bg-warning-transparent text-warning',
+        VENDIDO: 'bg-secondary-transparent text-secondary',
+    }
+    return map[estado] ?? 'bg-secondary-transparent text-secondary'
+}
 
-const fotoPreview = ref(
-    props.vehiculo.fotografia ? `/storage/${props.vehiculo.fotografia}` : null,
-)
+const estadoAsignacionBadge = (estado) => {
+    const map = {
+        ACTIVO: 'bg-success-transparent text-success',
+        PROVISIONAL: 'bg-info-transparent text-info',
+        REASIGNADO: 'bg-warning-transparent text-warning',
+        INACTIVO: 'bg-secondary-transparent text-secondary',
+    }
+    return map[estado] ?? 'bg-secondary-transparent text-secondary'
+}
 
+const estadoAreaBadge = (estado) => {
+    const map = {
+        ACTIVO: 'bg-success-transparent text-success',
+        PROVISIONAL: 'bg-info-transparent text-info',
+        REASIGNADO: 'bg-warning-transparent text-warning',
+        CULMINADO: 'bg-secondary-transparent text-secondary',
+    }
+    return map[estado] ?? 'bg-secondary-transparent text-secondary'
+}
 
-
+const tipoMedicionLabel = (tipo) => (tipo === 'horometro' ? 'Horómetro' : 'Kilometraje')
 </script>
 
 <template>
 
     <Head title="Ver detalles del Vehículo" />
 
-        <!-- Breadcrumb -->
-        <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
-            <div>
-                <nav>
-                    <ol class="breadcrumb mb-1">
-                        <li class="breadcrumb-item">
-                            <Link :href="route('dashboard')">Inicio</Link>
-                        </li>
-                        <li class="breadcrumb-item">
-                            <Link :href="route('vehiculos.index')">Vehículos</Link>
-                        </li>
-                        <li class="breadcrumb-item active">Ver detalles</li>
-                    </ol>
-                </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">
-                    Ver detalles del Vehículo:
-                    <span class="text-primary">
-                        {{ vehiculo.marca }} {{ vehiculo.modelo ?? '' }} {{ vehiculo.nro_placa ?? '' }}
-                    </span>
-                </h1>
-            </div>
-            <Link :href="route('vehiculos.index')" class="btn btn-outline-secondary btn-wave">
-                <i class="ri-arrow-left-line me-1"></i> Volver
-            </Link>
+    <!-- Breadcrumb -->
+    <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
+        <div>
+            <nav>
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item">
+                        <Link :href="route('dashboard')">Inicio</Link>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <Link :href="route('vehiculos.index')">Vehículos</Link>
+                    </li>
+                    <li class="breadcrumb-item active">Ver detalles</li>
+                </ol>
+            </nav>
+            <h1 class="page-title fw-medium fs-18 mb-0">
+                Ver detalles del Vehículo:
+                <span class="text-primary">
+                    {{ vehiculo.marca }} {{ vehiculo.modelo ?? '' }} {{ vehiculo.nro_placa ?? '' }}
+                </span>
+            </h1>
         </div>
+        <Link :href="route('vehiculos.index')" class="btn btn-outline-secondary btn-wave">
+            <i class="ri-arrow-left-line me-1"></i> Volver
+        </Link>
+    </div>
 
-        <div class="row g-4">
-            <!-- Foto -->
-            <div class="col-xl-3">
-                <div class="card custom-card h-100">
-                    <div class="card-header">
-                        <div class="card-title">Foto del Vehículo</div>
+    <div class="row g-4 mb-4">
+        <!-- Datos del Vehículo -->
+        <div class="col-xl-4">
+            <div class="card custom-card h-100">
+                <div class="card-header justify-content-between">
+                    <div class="card-title">Datos del Vehículo</div>
+                    <span class="badge" :class="estadoVehiculoBadge(vehiculo.estado_vehiculo)">
+                        {{ vehiculo.estado_vehiculo }}
+                    </span>
+                </div>
+                <div class="card-body d-flex flex-column align-items-center gap-3">
+                    <div class="border rounded-3 overflow-hidden"
+                        style="width:150px;height:150px;background:#f8f9fa;">
+                        <img v-if="vehiculo.url_fotografia" :src="vehiculo.url_fotografia"
+                            :alt="vehiculo.nro_placa" class="w-100 h-100" style="object-fit:cover;" />
+                        <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                            <i class="ri-car-line" style="font-size:4rem;"></i>
+                        </div>
                     </div>
-                    <div class="card-body d-flex flex-column align-items-center justify-content-center gap-3">
-                        <div class="border rounded-3 overflow-hidden"
-                            style="width:150px;height:150px;background:#f8f9fa;">
-                            <img v-if="fotoPreview" :src="fotoPreview" alt="Foto del vehículo" class="w-100 h-100"
-                                style="object-fit:cover;" />
-                            <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
-                                <i class="ri-user-3-line" style="font-size:4rem;"></i>
-                            </div>
-                        </div>
-                        <div class="w-100 text-center">
-                            <p class="fs-14 fw-medium mb-2"> {{ vehiculo.marca }} {{ vehiculo.modelo ?? '' }}
-                                {{ vehiculo.nro_placa ?? '' }} </p>
-                            <label class="form-label fw-medium">Cambiar </label>
 
-                            <p class="fs-14 fw-medium mb-2">
-                                C.I.: <b> {{ vehiculo.ci }} </b> </p>
+                    <div class="w-100">
+                        <p class="fs-14 fw-medium mb-3 text-center">
+                            {{ vehiculo.marca }} {{ vehiculo.modelo ?? '' }} ({{ vehiculo.anio ?? 'S/A' }})
+                        </p>
 
-                            <small class="text-muted d-none">Dejar vacío para conservar la foto actual.</small>
-                        </div>
-                        <div class="text-muted">
-
-                            <div class="mb-2 d-flex align-items-center gap-1 flex-wrap"> <span
-                                    class="avatar avatar-sm avatar-rounded text-default">
-                                    <i class="ri-calendar-line align-middle fs-15"></i>
+                        <ul class="list-unstyled mb-0 w-100">
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                                <span class="text-muted fs-13">Código</span>
+                                <span class="fw-medium">{{ vehiculo.codigo ?? 'N/A' }}</span>
+                            </li>
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                                <span class="text-muted fs-13">Placa</span>
+                                <span class="fw-medium">{{ vehiculo.nro_placa ?? 'N/A' }}</span>
+                            </li>
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                                <span class="text-muted fs-13">Tipo de Vehículo</span>
+                                <span class="fw-medium">{{ vehiculo.tipo_vehiculo?.tipo_vehiculo ?? 'N/A' }}</span>
+                            </li>
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                                <span class="text-muted fs-13">Tipo de Combustible</span>
+                                <span class="badge bg-info-transparent text-info">
+                                    {{ vehiculo.tipo_combustible?.tipo_combustible ?? 'N/A' }}
                                 </span>
-                                <span class="fw-medium text-default">F. Nacimiento: </span>
-                                {{ vehiculo.f_nacimiento_formatted }} /
-                                {{ vehiculo.edad }} años
-                            </div>
-                            <div class="mb-2 d-flex align-items-center gap-1 flex-wrap"> <span
-                                    class="avatar avatar-sm avatar-rounded text-default">
-                                    <i class="ri-phone-line align-middle fs-15"></i>
-                                </span>
-                                <span class="fw-medium text-default">Celular: </span>
-                                <a :href="`tel:${vehiculo.celular}`" class="text-decoration-none">
-                                    {{ vehiculo.celular ?? 'N/A' }}
-                                </a>
-                            </div>
+                            </li>
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1">
+                                <span class="text-muted fs-13">Medición</span>
+                                <span class="fw-medium">{{ tipoMedicionLabel(vehiculo.tipo_medicion) }}</span>
+                            </li>
+                        </ul>
 
+                        <div v-if="vehiculo.detalles" class="mt-3">
+                            <span class="text-muted fs-13 d-block mb-1">Detalles</span>
+                            <p class="fs-13 mb-0">{{ vehiculo.detalles }}</p>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="col-xl-9">
-                <div class="card custom-card overflow-hidden">
-                    <div class="card-header justify-content-between">
-                        <div class="card-title">
-                            <h6 class="mb-0">Historial de Asignaciones</h6>
+        <!-- Conductor / Operario Actual -->
+        <div class="col-xl-4">
+            <div class="card custom-card h-100">
+                <div class="card-header justify-content-between">
+                    <div class="card-title">Conductor / Operario Actual</div>
+                    <span v-if="conductorActual" class="badge bg-success-transparent text-success">Asignado</span>
+                    <span v-else class="badge bg-secondary-transparent text-secondary">Sin asignar</span>
+                </div>
+                <div v-if="conductorActual" class="card-body d-flex flex-column align-items-center gap-3">
+                    <div class="border rounded-3 overflow-hidden"
+                        style="width:150px;height:150px;background:#f8f9fa;">
+                        <img v-if="conductorActual.persona?.foto_url" :src="conductorActual.persona.foto_url"
+                            :alt="conductorActual.persona?.nombre_completo" class="w-100 h-100"
+                            style="object-fit:cover;" />
+                        <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                            <i class="ri-user-3-line" style="font-size:4rem;"></i>
                         </div>
-                        <a href="javascript:void(0);" class="text-muted fs-12 text-decoration-underline d-none">View
-                            All<i class="ti ti-arrow-narrow-right"></i></a>
                     </div>
-                    <div class="card-body p-0">
-                        <ul class="list-group list-group-flush">
-                            <li v-for="(vehiculo, index) in historialAsignaciones" :key="index" class="list-group-item">
-                                <div class="d-flex align-items-center gap-3">
-                                    <div class="lh-1">
-                                        <span class="avatar avatar-lg bg-light border border-dashed p-1">
-                                            <img :src="vehiculo.fotografia" :alt="vehiculo.nro_placa">
-                                        </span>
-                                    </div>
-                                    <div class="flex-fill">
-                                        <span class="fw-semibold mb-1 d-block">
-                                            {{ vehiculo.nro_placa }}
-                                        </span>
-                                        <div class="d-flex align-items-center gap-2 fw-medium">
-                                            <div class="fs-12 text-muted">{{ vehiculo.marca }}</div>
-                                            <div class="vr"></div>
-                                            <span :class="vehiculo.stockClass + ' fs-12'">
-                                                {{ vehiculo.anio }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="flex-fill">
-                                        <span class="mb-1 d-block">
-                                            {{ vehiculo.pivot.detalle }}
-                                        </span>
 
-                                    </div>
-                                    <div class="flex-fill">
-                                        <span class="d-block fw-semibold">{{
-                                            vehiculo.pivot.fecha_asignacion }}</span>
-                                        <span class="fs-12 d-block text-muted">Fecha de
-                                            asignación</span>
+                    <div class="w-100">
+                        <p class="fs-14 fw-medium mb-3 text-center">
+                            {{ conductorActual.persona?.nombre_completo }}
+                        </p>
 
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="d-block fw-semibold">{{
-                                            vehiculo.pivot.fecha_culminacion }}</span>
-                                        <span class="fs-12 d-block text-muted">Fecha de
-                                            culminación</span>
-                                    </div>
-                                </div>
+                        <ul class="list-unstyled mb-0 w-100">
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                                <span class="text-muted fs-13">C.I.</span>
+                                <span class="fw-medium">{{ conductorActual.persona?.ci ?? 'N/A' }}</span>
                             </li>
-
-                            <li v-if="historialAsignaciones.length === 0"
-                                class="list-group-item p-5 text-center text-muted">
-                                No hay historial de asignaciones para este vehiculo.
-
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1">
+                                <span class="text-muted fs-13">Celular</span>
+                                <a :href="`tel:${conductorActual.persona?.celular}`" class="text-decoration-none fw-medium">
+                                    {{ conductorActual.persona?.celular ?? 'N/A' }}
+                                </a>
                             </li>
                         </ul>
                     </div>
                 </div>
+                <div v-else class="card-body text-center text-muted py-5">
+                    <i class="ri-user-unfollow-line fs-3 d-block mb-2"></i>
+                    Este vehículo no tiene un conductor asignado actualmente.
+                </div>
             </div>
-
         </div>
 
-        <!-- Botones -->
+        <!-- Área Actual -->
+        <div class="col-xl-4">
+            <div class="card custom-card h-100">
+                <div class="card-header justify-content-between">
+                    <div class="card-title">Área Actual</div>
+                    <span v-if="areaActual" class="badge" :class="estadoAreaBadge(areaActual.pivot.estado_asignacion)">
+                        {{ areaActual.pivot.estado_asignacion }}
+                    </span>
+                    <span v-else class="badge bg-secondary-transparent text-secondary">Sin área</span>
+                </div>
+                <div v-if="areaActual" class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="avatar avatar-md bg-primary-transparent text-primary">
+                            <i class="ri-building-line fs-18"></i>
+                        </span>
+                        <span class="fs-15 fw-semibold">{{ areaActual.nombre_area }}</span>
+                    </div>
+
+                    <ul class="list-unstyled mb-0 w-100">
+                        <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                            <span class="text-muted fs-13">Fecha de Asignación</span>
+                            <span class="fw-medium">{{ areaActual.pivot.fecha_asignacion ?? 'N/A' }}</span>
+                        </li>
+                        <li class="d-flex align-items-center justify-content-between gap-2 py-1">
+                            <span class="text-muted fs-13">Fecha de Culminación</span>
+                            <span class="fw-medium">{{ areaActual.pivot.fecha_culminacion ?? 'Indefinida' }}</span>
+                        </li>
+                    </ul>
+
+                    <div v-if="areaActual.pivot.motivo_asignacion" class="mt-3">
+                        <span class="text-muted fs-13 d-block mb-1">Motivo</span>
+                        <p class="fs-13 mb-0">{{ areaActual.pivot.motivo_asignacion }}</p>
+                    </div>
+                </div>
+                <div v-else class="card-body text-center text-muted py-5">
+                    <i class="ri-building-line fs-3 d-block mb-2"></i>
+                    Este vehículo no tiene un área asignada actualmente.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial de Asignaciones de Conductor -->
+    <div class="card custom-card overflow-hidden">
+        <div class="card-header justify-content-between">
+            <div class="card-title">
+                <h6 class="mb-0">Historial de Asignaciones de Conductor</h6>
+            </div>
+            <span class="badge bg-primary-transparent text-primary">{{ historialAsignaciones.length }} registros</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover text-nowrap mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Conductor</th>
+                            <th>C.I.</th>
+                            <th>Celular</th>
+                            <th>Tipo de Asignación</th>
+                            <th>Fecha de Asignación</th>
+                            <th>Fecha de Culminación</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(asignacion, index) in historialAsignaciones" :key="asignacion.id">
+                            <td>{{ index + 1 }}</td>
+                            <td>
+                                <span class="fw-semibold">
+                                    <i class="ri-user-line me-1"></i>
+                                    {{ asignacion.conductor?.nombre_completo ?? 'N/A' }}
+                                </span>
+                            </td>
+                            <td>{{ asignacion.conductor?.ci ?? 'N/A' }}</td>
+                            <td>{{ asignacion.conductor?.celular ?? 'N/A' }}</td>
+                            <td>
+                                <span class="badge" :class="estadoAsignacionBadge(asignacion.estado_asignacion)">
+                                    {{ asignacion.estado_asignacion }}
+                                </span>
+                            </td>
+                            <td>{{ asignacion.fecha_asignacion ?? 'N/A' }}</td>
+                            <td>{{ asignacion.fecha_culminacion ?? 'Indefinida' }}</td>
+                            <td class="text-wrap" style="max-width: 220px;">{{ asignacion.detalle ?? '—' }}</td>
+                        </tr>
+
+                        <tr v-if="historialAsignaciones.length === 0">
+                            <td colspan="8" class="p-5 text-center text-muted">
+                                No hay historial de asignaciones para este vehículo.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
 </template>

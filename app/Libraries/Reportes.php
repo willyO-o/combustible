@@ -19,7 +19,10 @@ class Reportes extends FPDF
         // logo======
         // DATOS DE EJEMPLO (reemplazar por variables dinámicas luego)
         // ==========================================================
-        $empresaLocal = 'PLUS METALS LTDA.';
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
+
+        $empresaLocal = $parametrosEmpresa->nombre_empresa;
         $numeroVale = $vale->nro; // Número de vale (formateado con ceros a la izquierda)
         $empresa = $vale->grifo->razon_social;
         $direccion = $vale->grifo->direccion;
@@ -83,16 +86,21 @@ class Reportes extends FPDF
         $this->SetFont('Arial', 'B', 8);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->Cell(74, 4, utf8Decode($empresa), 0, 2, 'R');
+
+        $this->SetXY(123, 3);
+        $this->SetFont('Arial', 'B', 8);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->Cell(74, 4, utf8Decode($empresa), 0, 2, 'R');
         $this->SetFont('Arial', '', 7);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
         $this->Cell(74, 3.5, utf8Decode($direccion), 0, 2, 'R');
         $this->Cell(74, 3.5, utf8Decode($telefono), 0, 2, 'R');
         $this->Cell(74, 3.5, utf8Decode($ciudad), 0, 2, 'R');
 
-        $this->SetXY(5, 27);
-        $this->SetFont('Arial', 'B', 11);
-        $this->SetTextColor(255, 255, 255);
-        $this->Cell($pageW - 12, 6, utf8Decode($empresaLocal), 0, 0, 'R');
+        $this->SetXY(5, 20);
+        $this->SetFont('Arial', 'B', 12);
+        $this->SetTextColor(255,255,255);
+        $this->Cell($pageW - 12, 5,  utf8Decode(mb_strtoupper($empresaLocal)), 0, 0, 'R');
 
         // ----------------------------------------------------------
         // CUERPO: 2 cuadros (Cliente / Combustible)
@@ -1312,15 +1320,36 @@ class Reportes extends FPDF
         $lx = 4 / 3 * (sqrt(2) - 1) * $r;
         $this->_out(sprintf(
             '%.2F %.2F m '
-            .'%.2F %.2F %.2F %.2F %.2F %.2F c '
-            .'%.2F %.2F %.2F %.2F %.2F %.2F c '
-            .'%.2F %.2F %.2F %.2F %.2F %.2F c '
-            .'%.2F %.2F %.2F %.2F %.2F %.2F c %s',
-            ($cx + $r) * $k, ($h - $cy) * $k,
-            ($cx + $r) * $k, ($h - $cy + $lx) * $k, ($cx + $lx) * $k, ($h - $cy + $r) * $k, $cx * $k, ($h - $cy + $r) * $k,
-            ($cx - $lx) * $k, ($h - $cy + $r) * $k, ($cx - $r) * $k, ($h - $cy + $lx) * $k, ($cx - $r) * $k, ($h - $cy) * $k,
-            ($cx - $r) * $k, ($h - $cy - $lx) * $k, ($cx - $lx) * $k, ($h - $cy - $r) * $k, $cx * $k, ($h - $cy - $r) * $k,
-            ($cx + $lx) * $k, ($h - $cy - $r) * $k, ($cx + $r) * $k, ($h - $cy - $lx) * $k, ($cx + $r) * $k, ($h - $cy) * $k,
+                .'%.2F %.2F %.2F %.2F %.2F %.2F c '
+                .'%.2F %.2F %.2F %.2F %.2F %.2F c '
+                .'%.2F %.2F %.2F %.2F %.2F %.2F c '
+                .'%.2F %.2F %.2F %.2F %.2F %.2F c %s',
+            ($cx + $r) * $k,
+            ($h - $cy) * $k,
+            ($cx + $r) * $k,
+            ($h - $cy + $lx) * $k,
+            ($cx + $lx) * $k,
+            ($h - $cy + $r) * $k,
+            $cx * $k,
+            ($h - $cy + $r) * $k,
+            ($cx - $lx) * $k,
+            ($h - $cy + $r) * $k,
+            ($cx - $r) * $k,
+            ($h - $cy + $lx) * $k,
+            ($cx - $r) * $k,
+            ($h - $cy) * $k,
+            ($cx - $r) * $k,
+            ($h - $cy - $lx) * $k,
+            ($cx - $lx) * $k,
+            ($h - $cy - $r) * $k,
+            $cx * $k,
+            ($h - $cy - $r) * $k,
+            ($cx + $lx) * $k,
+            ($h - $cy - $r) * $k,
+            ($cx + $r) * $k,
+            ($h - $cy - $lx) * $k,
+            ($cx + $r) * $k,
+            ($h - $cy) * $k,
             $op
         ));
     }

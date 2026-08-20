@@ -69,8 +69,37 @@ class ConductorController extends Controller
 
     public function show(Conductor $conductor): Response
     {
-        $historialAsignaciones = $conductor->historialAsignacionesVehiculos()->get();
-        $conductor->load('asignacionesActivas'); // Cargar las asignaciones activas para el conductor
+        $conductor->load([
+            'persona',
+            'asignacionesActivas.tipoVehiculo',
+            'asignacionesActivas.tipoCombustible',
+        ]);
+
+        $historialAsignaciones = $conductor->asignaciones()
+            ->with(['vehiculo.tipoVehiculo', 'vehiculo.tipoCombustible'])
+            ->orderByDesc('fecha_asignacion')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($asignacion) => [
+                'id' => $asignacion->id,
+                'estado_asignacion' => $asignacion->estado_asignacion,
+                'fecha_asignacion' => $asignacion->fecha_asignacion?->format('d/m/Y'),
+                'fecha_culminacion' => $asignacion->fecha_culminacion?->format('d/m/Y'),
+                'detalle' => $asignacion->detalle,
+                'kilometraje_inicial' => $asignacion->kilometraje_inicial,
+                'horometro_inicial' => $asignacion->horometro_inicial,
+                'vehiculo' => $asignacion->vehiculo ? [
+                    'id' => $asignacion->vehiculo->id,
+                    'codigo' => $asignacion->vehiculo->codigo,
+                    'nro_placa' => $asignacion->vehiculo->nro_placa,
+                    'marca' => $asignacion->vehiculo->marca,
+                    'modelo' => $asignacion->vehiculo->modelo,
+                    'anio' => $asignacion->vehiculo->anio,
+                    'url_fotografia' => $asignacion->vehiculo->url_fotografia,
+                    'tipo_vehiculo' => $asignacion->vehiculo->tipoVehiculo?->tipo_vehiculo,
+                    'tipo_combustible' => $asignacion->vehiculo->tipoCombustible?->tipo_combustible,
+                ] : null,
+            ]);
 
         return Inertia::render('Conductores/Show', [
             'conductor' => $conductor,

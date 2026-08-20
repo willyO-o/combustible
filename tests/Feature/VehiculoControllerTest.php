@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Area;
+use App\Models\Asignacion;
+use App\Models\Conductor;
 use App\Models\TipoCombustible;
 use App\Models\TipoVehiculo;
 use App\Models\User;
@@ -106,6 +108,52 @@ class VehiculoControllerTest extends TestCase
             'modelo' => 'Hilux',
             'tipo_medicion' => 'horometro',
         ]);
+    }
+
+    public function test_show_incluye_el_historial_de_asignaciones_y_el_conductor_actual(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $area = Area::factory()->create(['nombre_area' => 'Transporte']);
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $conductorAnterior = Conductor::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorAnterior->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'fecha_culminacion' => now()->subDay(),
+            'estado_asignacion' => 'INACTIVO',
+            'detalle' => 'Asignación anterior',
+        ]);
+
+        $conductorActual = Conductor::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorActual->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+            'detalle' => 'Asignación vigente',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('vehiculos.show', $vehiculo->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Vehiculos/Show')
+            ->where('vehiculo.id', $vehiculo->id)
+            ->where('vehiculo.conductor_asignado.id', $conductorActual->id)
+            ->where('vehiculo.areas_asignadas.0.nombre_area', 'Transporte')
+            ->has('historialAsignaciones', 2)
+            ->where('historialAsignaciones.0.conductor.id', $conductorActual->id)
+            ->where('historialAsignaciones.0.estado_asignacion', 'ACTIVO')
+            ->where('historialAsignaciones.1.conductor.id', $conductorAnterior->id)
+            ->where('historialAsignaciones.1.estado_asignacion', 'INACTIVO')
+        );
     }
 
     public function test_edit_reutiliza_la_pagina_create_con_los_datos_del_vehiculo(): void

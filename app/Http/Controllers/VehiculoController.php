@@ -85,10 +85,38 @@ class VehiculoController extends Controller
 
     public function show(Vehiculo $vehiculo): Response
     {
-        // $historialAsignaciones = $vehiculo->historialAsignacionesConductores()->get();
+        $vehiculo->load([
+            'tipoCombustible',
+            'tipoVehiculo',
+            'conductorAsignado.persona',
+            'areasAsignadas',
+        ]);
+
+        $historialAsignaciones = $vehiculo->asignaciones()
+            ->with('conductor.persona')
+            ->orderByDesc('fecha_asignacion')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($asignacion) => [
+                'id' => $asignacion->id,
+                'estado_asignacion' => $asignacion->estado_asignacion,
+                'fecha_asignacion' => $asignacion->fecha_asignacion?->format('d/m/Y'),
+                'fecha_culminacion' => $asignacion->fecha_culminacion?->format('d/m/Y'),
+                'detalle' => $asignacion->detalle,
+                'kilometraje_inicial' => $asignacion->kilometraje_inicial,
+                'horometro_inicial' => $asignacion->horometro_inicial,
+                'conductor' => $asignacion->conductor ? [
+                    'id' => $asignacion->conductor->id,
+                    'nombre_completo' => $asignacion->conductor->persona?->nombre_completo,
+                    'ci' => $asignacion->conductor->persona?->ci,
+                    'celular' => $asignacion->conductor->persona?->celular,
+                    'foto_url' => $asignacion->conductor->persona?->foto_url,
+                ] : null,
+            ]);
+
         return Inertia::render('Vehiculos/Show', [
-            'vehiculo' => $vehiculo->load(['tipoCombustible', 'tipoVehiculo']),
-            'historialAsignaciones' => [],
+            'vehiculo' => $vehiculo,
+            'historialAsignaciones' => $historialAsignaciones,
         ]);
     }
 
