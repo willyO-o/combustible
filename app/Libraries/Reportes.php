@@ -253,16 +253,27 @@ class Reportes extends FPDF
         $descripcion = $solicitud->descripcion_problema;
         $observaciones = '';
 
-        $trabajos = [
-            ['fecha' => '',          'horometro' => '',         'repuesto' => '',                     'codigo' => '',        'cantidad' => ''],
-            ['fecha' => '',           'horometro' => '',        'repuesto' => '',                     'codigo' => '',        'cantidad' => ''],
-            ['fecha' => '',           'horometro' => '',         'repuesto' => '',                    'codigo' => '',        'cantidad' => ''],
-            ['fecha' => '',           'horometro' => '',         'repuesto' => '',                    'codigo' => '',        'cantidad' => ''],
-            ['fecha' => '',           'horometro' => '',         'repuesto' => '',                    'codigo' => '',        'cantidad' => ''],
-            ['fecha' => '',           'horometro' => '',         'repuesto' => '',                    'codigo' => '',        'cantidad' => ''],
-            ['fecha' => '',           'horometro' => '',         'repuesto' => '',                    'codigo' => '',        'cantidad' => ''],
-            ['fecha' => '',           'horometro' => '',         'repuesto' => '',                    'codigo' => '',        'cantidad' => ''],
-        ];
+        // Los trabajos realizados sólo existen si la solicitud ya derivó en
+        // una orden de trabajo (Paso 2/3 del flujo) con su detalle de
+        // repuestos/insumos cargado. Si no hay orden_trabajo relacionada, o
+        // aún no tiene detalle, la sección se muestra vacía.
+        $ordenTrabajo = $solicitud->ordenTrabajo;
+        $fechaTrabajo = $ordenTrabajo?->fecha_culminacion ?? $ordenTrabajo?->fecha_ejecucion;
+        $lecturaTrabajo = $ordenTrabajo?->horometro_actual ?? $ordenTrabajo?->kilometraje_actual;
+
+        $trabajos = $ordenTrabajo
+            ? $ordenTrabajo->detalles
+                // la sección tiene alto fijo (formulario de una sola página): máximo 8 filas
+                ->take(8)
+                ->map(fn ($detalle) => [
+                    'fecha' => $fechaTrabajo?->format('d/m/Y') ?? '',
+                    'horometro' => (string) ($lecturaTrabajo ?? ''),
+                    'repuesto' => $detalle->repuesto?->nombre_repuesto ?? $detalle->detalle ?? '',
+                    'codigo' => $detalle->repuesto?->codigo_repuesto ?? '',
+                    'cantidad' => (string) $detalle->cantidad,
+                ])
+                ->all()
+            : [];
 
         // ── Colores (consistentes con generarVale) ────────────────────────
         $azul = [39, 42, 84];

@@ -3,8 +3,12 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Models\Conductor;
+use App\Models\DetalleMantenimiento;
+use App\Models\OrdenTrabajo;
 use App\Models\Persona;
+use App\Models\Repuesto;
 use App\Models\SolicitudMantenimiento;
+use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -95,6 +99,64 @@ class SolicitudMantenimientoPdfControllerTest extends TestCase
             ->get(route('api.v1.solicitudes-mantenimiento.pdf', $solicitud->id));
 
         $response->assertStatus(403);
+    }
+
+    public function test_el_pdf_lista_los_trabajos_realizados_cuando_la_orden_de_trabajo_tiene_detalle(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+        $this->actingAs($admin, 'api');
+
+        $solicitud = $this->crearSolicitud();
+
+        $tipoMantenimiento = TipoMantenimiento::create(['tipo_mantenimiento' => 'Cambio de aceite']);
+        $repuesto = Repuesto::create([
+            'nombre_repuesto' => 'Filtro de aceite',
+            'codigo_repuesto' => 'FA-001',
+            'unidad_medida' => 'UNIDAD',
+        ]);
+
+        $orden = OrdenTrabajo::create([
+            'id_solicitud_mantenimiento' => $solicitud->id,
+            'id_vehiculo' => $solicitud->id_vehiculo,
+            'id_usuario_ejecuta' => $admin->id,
+            'fecha_ejecucion' => now(),
+            'horometro_actual' => 1500,
+        ]);
+
+        DetalleMantenimiento::create([
+            'id_orden_trabajo' => $orden->id,
+            'id_repuesto' => $repuesto->id,
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'cantidad' => 2,
+            'costo_unitario' => 50,
+        ]);
+
+        $response = $this->get(route('api.v1.solicitudes-mantenimiento.pdf', $solicitud->id));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_el_pdf_no_falla_cuando_la_orden_de_trabajo_aun_no_tiene_detalle(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+        $this->actingAs($admin, 'api');
+
+        $solicitud = $this->crearSolicitud();
+
+        OrdenTrabajo::create([
+            'id_solicitud_mantenimiento' => $solicitud->id,
+            'id_vehiculo' => $solicitud->id_vehiculo,
+            'id_usuario_ejecuta' => $admin->id,
+        ]);
+
+        $response = $this->get(route('api.v1.solicitudes-mantenimiento.pdf', $solicitud->id));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
     }
 
     public function test_requiere_autenticacion(): void

@@ -125,7 +125,7 @@ class SolicitudMantenimientoController extends Controller
 
     public function imprimir(SolicitudMantenimiento $solicitud)
     {
-        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo']);
+        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo.detalles.repuesto']);
         $reporte = new Reportes;
         $reporte->generarSolicitudMantenimiento($solicitud);
         exit;
