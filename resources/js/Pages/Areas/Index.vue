@@ -204,7 +204,7 @@ const encargoBadge = (tipo) =>
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Áreas</h1>
             </div>
-            <button type="button" class="btn btn-primary btn-wave" @click="abrirCrear">
+            <button v-can="'areas.crear'" type="button" class="btn btn-primary btn-wave" @click="abrirCrear">
                 <i class="ri-add-line me-1"></i> Nueva Área
             </button>
         </div>
@@ -291,6 +291,7 @@ const encargoBadge = (tipo) =>
                                             <i class="ri-user-star-line"></i>
                                         </button>
                                         <button
+                                            v-can="'areas.editar'"
                                             type="button"
                                             class="btn btn-sm btn-icon btn-info-light"
                                             title="Editar"
@@ -299,6 +300,7 @@ const encargoBadge = (tipo) =>
                                             <i class="ri-edit-line"></i>
                                         </button>
                                         <button
+                                            v-can="'areas.eliminar'"
                                             type="button"
                                             class="btn btn-sm btn-icon btn-danger-light"
                                             title="Eliminar"

@@ -38,6 +38,7 @@ class UserSeeder extends Seeder
             'vales.crear',
             'vales.editar',
             'vales.eliminar',
+            'vales.imprimir',
         ];
     }
 
@@ -71,7 +72,14 @@ class UserSeeder extends Seeder
             'cargas-combustible.registrar',
             'cargas-combustible.editar',
             'cargas-combustible.eliminar',
+            // El reporte de cargas (costos) y el de rendimiento son permisos
+            // independientes entre sí (y de su respectivo PDF, mismo patrón
+            // que operacion-diaria.reporte.pdf): un rol puede tener acceso a
+            // uno sin el otro.
             'cargas-combustible.reporte',
+            'cargas-combustible.reporte.pdf',
+            'cargas-combustible.reporte.rendimiento',
+            'cargas-combustible.reporte.rendimiento.pdf',
         ];
     }
 
@@ -80,6 +88,7 @@ class UserSeeder extends Seeder
         return [
             'mantenimiento.solicitudes.ver',
             'mantenimiento.solicitudes.crear',
+            'mantenimiento.solicitudes.imprimir',
             'mantenimiento.ordenes.ver',
             'mantenimiento.ordenes.crear',
             'mantenimiento.ordenes.editar',
@@ -287,10 +296,12 @@ class UserSeeder extends Seeder
     {
         return [
             'vales.ver',
+            'vales.imprimir',
             'cargas-combustible.ver',
             'cargas-combustible.registrar',
             'mantenimiento.solicitudes.crear',
             'mantenimiento.solicitudes.ver',
+            'mantenimiento.solicitudes.imprimir',
             'mantenimiento.ordenes.ver',
             'operacion-diaria.ver',
             'operacion-diaria.crear',

@@ -74,7 +74,7 @@ const estadoBadge = (estado) =>
                 <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Surtidores</h1>
             </div>
             <div>
-                <Link :href="route('grifos.create')" class="btn btn-primary btn-wave">
+                <Link v-can="'grifos.crear'" :href="route('grifos.create')" class="btn btn-primary btn-wave">
                     <i class="ri-add-line me-1"></i> Nuevo Surtidor
                 </Link>
             </div>
@@ -196,6 +196,7 @@ const estadoBadge = (estado) =>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
                                         <Link
+                                            v-can="'grifos.editar'"
                                             :href="route('grifos.edit', grifo.id)"
                                             class="btn btn-sm btn-icon btn-info-light"
                                             title="Editar"
@@ -203,6 +204,7 @@ const estadoBadge = (estado) =>
                                             <i class="ri-edit-line"></i>
                                         </Link>
                                         <button
+                                            v-can="'grifos.eliminar'"
                                             type="button"
                                             class="btn btn-sm btn-icon btn-danger-light"
                                             title="Eliminar"

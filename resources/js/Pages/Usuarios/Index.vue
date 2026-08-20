@@ -93,7 +93,7 @@ const tipoBadge = (tipo) => ({
             </nav>
             <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Usuarios</h1>
         </div>
-        <Link :href="route('usuarios.create')" class="btn btn-primary btn-wave">
+        <Link v-can="'usuarios.crear'" :href="route('usuarios.create')" class="btn btn-primary btn-wave">
             <i class="ri-user-add-line me-1"></i> Nuevo Usuario
         </Link>
     </div>
@@ -195,17 +195,17 @@ const tipoBadge = (tipo) => ({
                             </td>
                             <td class="text-center">
                                 <div class="d-flex gap-1 justify-content-center">
-                                    <Link :href="route('usuarios.edit', usuario.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
+                                    <Link v-can="'usuarios.editar'" :href="route('usuarios.edit', usuario.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                         <i class="ri-edit-line"></i>
                                     </Link>
-                                    <Link :href="route('usuarios.edit-password', usuario.id)" class="btn btn-sm btn-icon btn-warning-light" title="Cambiar contraseña">
+                                    <Link v-can="'usuarios.contrasena.cambiar'" :href="route('usuarios.edit-password', usuario.id)" class="btn btn-sm btn-icon btn-warning-light" title="Cambiar contraseña">
                                         <i class="ri-lock-password-line"></i>
                                     </Link>
-                                    <button v-if="usuario.estado_usuario === 'ACTIVO'" type="button" class="btn btn-sm btn-icon btn-danger-light"
+                                    <button v-if="usuario.estado_usuario === 'ACTIVO'" v-can="'usuarios.eliminar'" type="button" class="btn btn-sm btn-icon btn-danger-light"
                                         title="Inactivar" @click="cambiarEstado(usuario, 'INACTIVO')">
                                         <i class="ri-user-unfollow-line"></i>
                                     </button>
-                                    <button v-else type="button" class="btn btn-sm btn-icon btn-success-light"
+                                    <button v-else v-can="'usuarios.eliminar'" type="button" class="btn btn-sm btn-icon btn-success-light"
                                         title="Activar" @click="cambiarEstado(usuario, 'ACTIVO')">
                                         <i class="ri-user-follow-line"></i>
                                     </button>

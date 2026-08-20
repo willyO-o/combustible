@@ -130,7 +130,7 @@ const costoPorLitro = computed(() => {
                         <select v-model="filtros.id_vehiculo" class="form-select">
                             <option value="">Todos los vehículos</option>
                             <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                             {{ v.codigo }}   {{ v.nro_placa }} – {{ v.marca }}
+                             {{ v.codigo }}   {{ v.nro_placa ?? "" }} – {{ v.marca }}
                             </option>
                         </select>
                     </div>
@@ -138,7 +138,7 @@ const costoPorLitro = computed(() => {
                         <button type="button" class="btn btn-outline-secondary btn-wave flex-grow-1" @click="clearFilters">
                             <i class="ri-refresh-line me-1"></i> Limpiar
                         </button>
-                        <button type="button" class="btn btn-primary btn-wave flex-grow-1" @click="generarReporte">
+                        <button v-can="'cargas-combustible.reporte.pdf'" type="button" class="btn btn-primary btn-wave flex-grow-1" @click="generarReporte">
                             <i class="ri-file-pdf-line me-1"></i> PDF
                         </button>
                     </div>
@@ -243,7 +243,7 @@ const costoPorLitro = computed(() => {
                             </tr>
                             <tr v-for="(v, idx) in datosResumen?.vehiculos" :key="v.id_vehiculo">
                                 <td>{{ idx + 1 }}</td>
-                                <td class="fw-medium">{{ v.nro_placa }}</td>
+                                <td class="fw-medium">{{ v.nro_placa ?? "" }}</td>
                                 <td>{{ v.marca }}</td>
                                 <td><span class="badge bg-secondary-transparent text-secondary">{{ v.codigo }}</span></td>
                                 <td><span class="badge bg-warning-transparent text-warning">{{ v.tipo_combustible }}</span></td>

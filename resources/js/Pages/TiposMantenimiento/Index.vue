@@ -75,7 +75,7 @@ const estadoBadge = (estado) =>
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Tipos de Mantenimiento</h1>
             </div>
-            <Link :href="route('tipos-mantenimiento.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'tipos-mantenimiento.crear'" :href="route('tipos-mantenimiento.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nuevo Tipo
             </Link>
         </div>
@@ -179,6 +179,7 @@ const estadoBadge = (estado) =>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
                                         <Link
+                                            v-can="'tipos-mantenimiento.editar'"
                                             :href="route('tipos-mantenimiento.edit', tipo.id)"
                                             class="btn btn-sm btn-icon btn-info-light"
                                             title="Editar"
@@ -186,6 +187,7 @@ const estadoBadge = (estado) =>
                                             <i class="ri-edit-line"></i>
                                         </Link>
                                         <button
+                                            v-can="'tipos-mantenimiento.eliminar'"
                                             type="button"
                                             class="btn btn-sm btn-icon btn-danger-light"
                                             title="Eliminar"

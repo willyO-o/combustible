@@ -28,7 +28,7 @@ const esProtegido = (role) => props.rolesProtegidos.includes(role.name)
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Roles y Permisos</h1>
             </div>
-            <Link :href="route('roles.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'roles.ver'" :href="route('roles.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nuevo Rol
             </Link>
         </div>
@@ -100,6 +100,7 @@ const esProtegido = (role) => props.rolesProtegidos.includes(role.name)
                                 </td>
                                 <td class="text-center">
                                     <Link
+                                        v-can="'roles.ver'"
                                         :href="route('roles.edit', role.id)"
                                         class="btn btn-sm btn-icon btn-info-light"
                                         title="Editar permisos"

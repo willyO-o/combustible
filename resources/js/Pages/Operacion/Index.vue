@@ -84,7 +84,7 @@ const estadoBadge = (estado) => {
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Operaciones Diarias</h1>
             </div>
-            <Link :href="route('operacion-diaria.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'operacion-diaria.crear'" :href="route('operacion-diaria.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Registrar Operación Diaria
             </Link>
         </div>

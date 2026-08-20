@@ -123,7 +123,7 @@ const tipoBadge = (tipo) => {
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Solicitudes de Mantenimiento</h1>
             </div>
-            <Link v-if="esUsuarioConductor" :href="route('mantenimiento.solicitudes.create')"
+            <Link v-if="esUsuarioConductor" v-can="'mantenimiento.solicitudes.crear'" :href="route('mantenimiento.solicitudes.create')"
                 class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nueva Solicitud
             </Link>
@@ -295,7 +295,7 @@ const tipoBadge = (tipo) => {
                                             class="btn btn-outline-primary btn-wave" title="Ver detalle">
                                             <i class="ri-eye-line"></i>
                                         </Link>
-                                        <Link :href="route('mantenimiento.solicitudes.imprimir', s.id)" target="_blank"
+                                        <Link v-can="'mantenimiento.solicitudes.imprimir'" :href="route('mantenimiento.solicitudes.imprimir', s.id)" target="_blank"
                                             class="btn btn-outline-primary btn-wave" title="Ver detalle">
                                             <i class="ri-file-list-3-line"></i>
                                         </Link>

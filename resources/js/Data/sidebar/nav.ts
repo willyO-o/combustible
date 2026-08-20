@@ -35,7 +35,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Dashboard', icon: Svgicons.Dashboardicon, type: 'link', path: '/dashboard', active: true, selected: true, dirchange: false, permission: 'dashboard.ver',
   },
   {
-    menutitle: 'GESTIÓN', permission: ['dashboard.ver', 'vales.ver', 'cargas-combustible.ver', 'cargas-combustible.reporte', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
+    menutitle: 'GESTIÓN', permission: ['dashboard.ver', 'vales.ver', 'cargas-combustible.ver', 'cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
   },
 
   {
@@ -44,12 +44,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   {
     title: 'Cargas Combustible', icon: Svgicons.CargaIcon, type: 'link', path: '/cargas', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.ver',
   },
-  {
-    title: 'Reportes Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
-  },
-  {
-    title: 'Rendimiento Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible/rendimiento', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
-  },
+
 
   {
     title: 'Operación Diaria', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['operacion-diaria.ver', 'operacion-diaria.crear', 'operacion-diaria.informe'],
@@ -65,6 +60,15 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
       { path: '/mantenimiento/solicitudes/crear', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Crear Solicitud', permission: 'mantenimiento.solicitudes.crear' },
       { path: '/mantenimiento/ordenes',    icon: Svgicons.OrdenMantenimientoIcon,      type: 'link', active: false, selected: false, dirchange: false, title: 'Órdenes de Trabajo', permission: 'mantenimiento.ordenes.ver' },
     ],
+  },
+  {
+    menutitle: 'REPORTES', permission: ['dashboard.ver', 'vales.ver', 'cargas-combustible.ver', 'cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
+  },
+  {
+    title: 'Reportes Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
+  },
+  {
+    title: 'Rendimiento Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible/rendimiento', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte.rendimiento',
   },
   {
     menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver', 'grupos-vehiculo.ver', 'repuestos.ver']

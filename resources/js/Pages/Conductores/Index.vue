@@ -212,7 +212,7 @@ const tipoAsignacionBadge = (tipo) =>
                 <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Conductores</h1>
             </div>
             <div>
-                <Link :href="route('conductores.create')" class="btn btn-primary btn-wave">
+                <Link v-can="'conductores.crear'" :href="route('conductores.create')" class="btn btn-primary btn-wave">
                     <i class="ri-add-line me-1"></i> Nuevo Conductor
                 </Link>
             </div>
@@ -362,11 +362,11 @@ const tipoAsignacionBadge = (tipo) =>
                                             class="btn btn-sm btn-icon btn-light" title="Ver">
                                             <i class="ri-eye-line"></i>
                                         </Link>
-                                        <Link :href="route('conductores.edit', conductor.id)"
+                                        <Link v-can="'conductores.editar'" :href="route('conductores.edit', conductor.id)"
                                             class="btn btn-sm btn-icon btn-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
-                                        <button type="button" class="btn btn-sm btn-icon btn-light" title="Eliminar"
+                                        <button v-can="'conductores.eliminar'" type="button" class="btn btn-sm btn-icon btn-light" title="Eliminar"
                                             @click="confirmDelete(conductor)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>

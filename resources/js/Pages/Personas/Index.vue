@@ -99,7 +99,7 @@ const fotoUrl = (foto) => (foto ? `/storage/${foto}` : '/images/faces/1.jpg')
             <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Personas</h1>
         </div>
         <div>
-            <Link :href="route('personas.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'personas.crear'" :href="route('personas.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nueva Persona
             </Link>
         </div>
@@ -209,10 +209,10 @@ const fotoUrl = (foto) => (foto ? `/storage/${foto}` : '/images/faces/1.jpg')
                             </td>
                             <td class="text-center">
                                 <div class="d-flex gap-1 justify-content-center">
-                                    <Link :href="route('personas.edit', persona.id)" class="btn btn-sm btn-icon btn-light" title="Editar">
+                                    <Link v-can="'personas.editar'" :href="route('personas.edit', persona.id)" class="btn btn-sm btn-icon btn-light" title="Editar">
                                         <i class="ri-edit-line"></i>
                                     </Link>
-                                    <button type="button" class="btn btn-sm btn-icon btn-light" title="Eliminar"
+                                    <button v-can="'personas.eliminar'" type="button" class="btn btn-sm btn-icon btn-light" title="Eliminar"
                                         @click="confirmDelete(persona)">
                                         <i class="ri-delete-bin-line"></i>
                                     </button>

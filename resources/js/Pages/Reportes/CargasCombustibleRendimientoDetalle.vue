@@ -112,7 +112,7 @@ const chartSeries = computed(() => [
             </h1>
         </div>
         <div class="d-flex gap-2">
-            <button v-if="filtros.id_vehiculo" type="button" class="btn btn-primary btn-wave" @click="generarPDF">
+            <button v-if="filtros.id_vehiculo" v-can="'cargas-combustible.reporte.rendimiento.pdf'" type="button" class="btn btn-primary btn-wave" @click="generarPDF">
                 <i class="ri-file-pdf-line me-1"></i> PDF
             </button>
             <Link :href="route('cargas-combustible.reporte.rendimiento')" class="btn btn-outline-secondary btn-wave">

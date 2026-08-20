@@ -80,7 +80,7 @@ const tipoBadge = (tipo) =>
                 </ol></nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Cargas de Combustible</h1>
             </div>
-            <Link :href="route('cargas.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'cargas-combustible.registrar'" :href="route('cargas.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nueva Carga
             </Link>
         </div>
@@ -203,10 +203,10 @@ const tipoBadge = (tipo) =>
                                         <button type="button" class="btn btn-sm btn-icon btn-primary-light" title="Ver detalle" @click="verDetalle(carga)">
                                             <i class="ri-eye-line"></i>
                                         </button>
-                                        <Link  v-if="carga.estado != 'REGISTRADO'" :href="route('cargas.edit', carga.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
+                                        <Link  v-if="carga.estado != 'REGISTRADO'" v-can="'cargas-combustible.editar'" :href="route('cargas.edit', carga.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
-                                        <button v-if="carga.estado != 'REGISTRADO'" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar" @click="confirmDelete(carga)">
+                                        <button v-if="carga.estado != 'REGISTRADO'" v-can="'cargas-combustible.eliminar'" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar" @click="confirmDelete(carga)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>
                                     </div>

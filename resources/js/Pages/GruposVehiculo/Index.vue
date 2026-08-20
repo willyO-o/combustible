@@ -99,7 +99,7 @@ const estadoBadge = (estado) =>
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Grupos de Vehículo</h1>
             </div>
-            <button type="button" class="btn btn-primary btn-wave" @click="abrirCrear">
+            <button v-can="'grupos-vehiculo.crear'" type="button" class="btn btn-primary btn-wave" @click="abrirCrear">
                 <i class="ri-add-line me-1"></i> Nuevo Grupo
             </button>
         </div>
@@ -161,6 +161,7 @@ const estadoBadge = (estado) =>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
                                         <button
+                                            v-can="'grupos-vehiculo.editar'"
                                             type="button"
                                             class="btn btn-sm btn-icon btn-info-light"
                                             title="Editar"
@@ -169,6 +170,7 @@ const estadoBadge = (estado) =>
                                             <i class="ri-edit-line"></i>
                                         </button>
                                         <button
+                                            v-can="'grupos-vehiculo.eliminar'"
                                             type="button"
                                             class="btn btn-sm btn-icon btn-danger-light"
                                             title="Eliminar"

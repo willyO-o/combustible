@@ -170,7 +170,7 @@ const tipoAsignacionBadge = (tipo) =>
             </nav>
             <h1 class="page-title fw-medium fs-18 mb-0">Gestión de Vehículos</h1>
         </div>
-        <Link :href="route('vehiculos.create')" class="btn btn-primary btn-wave">
+        <Link v-can="'vehiculos.crear'" :href="route('vehiculos.create')" class="btn btn-primary btn-wave">
             <i class="ri-add-line me-1"></i> Nuevo Vehículo
         </Link>
     </div>
@@ -348,11 +348,11 @@ const tipoAsignacionBadge = (tipo) =>
                                         class="btn btn-sm btn-icon btn-primary-light" title="Editar">
                                         <i class="ri-eye-line"></i>
                                     </Link>
-                                    <Link :href="route('vehiculos.edit', vehiculo.id)"
+                                    <Link v-can="'vehiculos.editar'" :href="route('vehiculos.edit', vehiculo.id)"
                                         class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                         <i class="ri-edit-line"></i>
                                     </Link>
-                                    <button type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar"
+                                    <button v-can="'vehiculos.eliminar'" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar"
                                         @click="confirmDelete(vehiculo)">
                                         <i class="ri-delete-bin-line"></i>
                                     </button>

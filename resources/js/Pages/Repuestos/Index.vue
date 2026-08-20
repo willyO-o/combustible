@@ -77,7 +77,7 @@ const estadoBadge = (estado) => {
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Catálogo de Repuestos</h1>
             </div>
-            <Link :href="route('repuestos.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'repuestos.crear'" :href="route('repuestos.create')" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nuevo Repuesto
             </Link>
         </div>
@@ -191,6 +191,7 @@ const estadoBadge = (estado) => {
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
                                         <Link
+                                            v-can="'repuestos.editar'"
                                             :href="route('repuestos.edit', repuesto.id)"
                                             class="btn btn-sm btn-icon btn-info-light"
                                             title="Editar"
@@ -198,6 +199,7 @@ const estadoBadge = (estado) => {
                                             <i class="ri-edit-line"></i>
                                         </Link>
                                         <button
+                                            v-can="'repuestos.eliminar'"
                                             type="button"
                                             class="btn btn-sm btn-icon btn-danger-light"
                                             title="Eliminar"

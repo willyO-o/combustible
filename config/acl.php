@@ -66,6 +66,7 @@ return [
                 'vales.crear' => 'Crear',
                 'vales.editar' => 'Editar',
                 'vales.eliminar' => 'Eliminar',
+                'vales.imprimir' => 'Imprimir',
             ],
         ],
 
@@ -76,7 +77,10 @@ return [
                 'cargas-combustible.registrar' => 'Registrar',
                 'cargas-combustible.editar' => 'Editar',
                 'cargas-combustible.eliminar' => 'Eliminar',
-                'cargas-combustible.reporte' => 'Ver reporte',
+                'cargas-combustible.reporte' => 'Ver reporte de cargas',
+                'cargas-combustible.reporte.pdf' => 'Generar PDF del reporte de cargas',
+                'cargas-combustible.reporte.rendimiento' => 'Ver reporte de rendimiento',
+                'cargas-combustible.reporte.rendimiento.pdf' => 'Generar PDF del reporte de rendimiento',
             ],
         ],
 
@@ -98,6 +102,7 @@ return [
             'permisos' => [
                 'mantenimiento.solicitudes.ver' => 'Ver solicitudes',
                 'mantenimiento.solicitudes.crear' => 'Crear solicitudes',
+                'mantenimiento.solicitudes.imprimir' => 'Imprimir solicitudes',
                 'mantenimiento.ordenes.ver' => 'Ver órdenes de trabajo',
                 'mantenimiento.ordenes.crear' => 'Emitir órdenes de trabajo',
                 'mantenimiento.ordenes.editar' => 'Editar órdenes de trabajo',

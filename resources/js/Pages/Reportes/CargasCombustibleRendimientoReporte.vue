@@ -24,7 +24,7 @@ const filtros = ref({
 const vehiculoOptions = computed(() =>
     props.vehiculos.map((v) => ({
         value: v.id,
-        label: `${v.codigo} — ${v.nro_placa}${v.marca ? ' — ' + v.marca : ''}`,
+        label: `${v.codigo} — ${v.nro_placa ?? ""}${v.marca ? ' — ' + v.marca : ''}`,
     })),
 )
 
@@ -113,7 +113,7 @@ function chartOptions(tipoMedicion) {
             formatter: (val) => `${val} ${unidadLabel(tipoMedicion)}`,
             style: { fontSize: '11px' },
         },
-        xaxis: { categories: gruposPorMedicion.value[tipoMedicion]?.filter((r) => !sinDatosSuficientes(r)).map((r) => `${r.codigo}\n${r.nro_placa}`) ?? [] },
+        xaxis: { categories: gruposPorMedicion.value[tipoMedicion]?.filter((r) => !sinDatosSuficientes(r)).map((r) => `${r.codigo}\n${r.nro_placa ?? ""}`) ?? [] },
         yaxis: { title: { text: `Rendimiento (${unidadLabel(tipoMedicion)})` } },
         colors: ['#187daa'],
         tooltip: { y: { formatter: (val) => `${val} ${unidadLabel(tipoMedicion)}` } },
@@ -187,7 +187,7 @@ function chartSeries(tipoMedicion) {
                     <button type="button" class="btn btn-outline-secondary btn-wave flex-grow-1" @click="clearFilters">
                         <i class="ri-refresh-line me-1"></i> Limpiar
                     </button>
-                    <button type="button" class="btn btn-primary btn-wave flex-grow-1" @click="generarPDF">
+                    <button v-can="'cargas-combustible.reporte.rendimiento.pdf'" type="button" class="btn btn-primary btn-wave flex-grow-1" @click="generarPDF">
                         <i class="ri-file-pdf-line me-1"></i> PDF
                     </button>
                 </div>
@@ -308,7 +308,7 @@ function chartSeries(tipoMedicion) {
                         <tr v-for="(r, idx) in resultado" :key="r.id_vehiculo">
                             <td>{{ idx + 1 }}</td>
                             <td><span class="badge bg-secondary-transparent text-secondary">{{ r.codigo }}</span></td>
-                            <td class="fw-medium">{{ r.nro_placa }}</td>
+                            <td class="fw-medium">{{ r.nro_placa ?? "" }}</td>
                             <td><span class="badge bg-warning-transparent text-warning">{{ r.tipo_combustible }}</span></td>
                             <td>
                                 <span class="badge" :class="r.tipo_medicion === 'horometro' ? 'bg-purple-transparent text-purple' : 'bg-info-transparent text-info'">
@@ -326,6 +326,7 @@ function chartSeries(tipoMedicion) {
                             </td>
                             <td class="text-center">
                                 <Link
+                                    v-can="'cargas-combustible.reporte.rendimiento'"
                                     :href="route('cargas-combustible.reporte.rendimiento.detalle', {
                                         id_vehiculo: r.id_vehiculo,
                                         fecha_inicio: filtros.fecha_inicio,
