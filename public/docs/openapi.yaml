@@ -379,9 +379,10 @@ paths:
         Crea una nueva operación diaria para el vehículo indicado, junto con las actividades
         realizadas durante la jornada.
 
-        El `id_conductor` se asigna automáticamente a partir del usuario autenticado
-        (`auth()->user()->id_persona`) y el `nro_operacion` se autogenera de forma correlativa;
-        **no deben enviarse en el cuerpo de la petición**.
+        El `id_conductor` se asigna automáticamente a partir del usuario autenticado, el
+        `nro_operacion` se autogenera de forma correlativa, y `horas_trabajadas` se calcula
+        automáticamente a partir de `fecha_inicio` y `fecha_fin`; **ninguno de estos tres debe
+        enviarse en el cuerpo de la petición**.
 
         El `id_area` se determina automáticamente a partir del área actualmente asignada al
         vehículo. Si el vehículo no tiene un área asignada, la petición falla con `422`.
@@ -393,7 +394,9 @@ paths:
         - `horometro_fin` es obligatorio si se envió `horometro_inicio`, y debe ser mayor a este.
         - `kilometraje_inicio` / `horometro_inicio` no pueden ser inferiores a la última lectura
           registrada para el vehículo (según el último registro de carga de combustible).
-        - Cada actividad realizada debe indicar `lugar`, o alternativamente `origen` **y** `destino`.
+        - Si el vehículo tiene `tipo_medicion = horometro`, cada actividad realizada debe indicar
+          `lugar`. Si tiene `tipo_medicion = kilometraje`, cada actividad debe indicar `origen`
+          **y** `destino` (p. ej. actividades de transporte).
         - Si se envían `observaciones` y `notificar_observaciones: true`, se envía una notificación.
       requestBody:
         required: true
@@ -403,7 +406,7 @@ paths:
               $ref: '#/components/schemas/OperacionDiariaStoreRequest'
             examples:
               con_kilometraje:
-                summary: Vehículo medido por kilometraje, con lugar único
+                summary: Vehículo medido por kilometraje, con origen/destino
                 value:
                   id_vehiculo: 8
                   turno: DIA
@@ -411,12 +414,12 @@ paths:
                   fecha_fin: "2026-08-13 17:00"
                   kilometraje_inicio: 15420.50
                   kilometraje_fin: 15510.00
-                  horas_trabajadas: 9.5
                   observaciones: "Se detectó ruido leve en el motor al arrancar."
                   notificar_observaciones: true
                   actividades_realizadas:
                     - actividad: Acarreo de material
-                      lugar: Cancha de acopio
+                      origen: Cancha de acopio
+                      destino: Botadero norte
                       cantidad: 6
                       unidad_medida: viajes
                       hora_inicio: "07:15"
@@ -429,7 +432,7 @@ paths:
                       hora_inicio: "11:30"
                       hora_fin: "16:45"
               con_horometro:
-                summary: Vehículo medido por horómetro (p.ej. maquinaria pesada)
+                summary: Vehículo medido por horómetro (p.ej. maquinaria pesada), con lugar
                 value:
                   id_vehiculo: 15
                   turno: NOCHE
@@ -437,7 +440,6 @@ paths:
                   fecha_fin: "2026-08-14 06:00"
                   horometro_inicio: 3210.00
                   horometro_fin: 3221.50
-                  horas_trabajadas: 11
                   notificar_observaciones: false
                   actividades_realizadas:
                     - actividad: Nivelación de terreno
@@ -496,17 +498,15 @@ paths:
                     - id: 1
                       nombre_actividad: Acarreo de material
                       pivot:
-                        origen: null
-                        destino: null
-                        lugar: Cancha de acopio
+                        origen: Cancha de acopio
+                        destino: Botadero norte
+                        lugar: null
                         cantidad: "6.00"
                         unidad_medida: viajes
                         hora_inicio: "07:15"
                         hora_fin: "11:00"
         '422':
-          description: |
-            Error de validación, o el vehículo no tiene un área asignada
-            (`AreaNoAsignadaException`).
+          description: Error de validación, o el vehículo no tiene un área asignada.
           content:
             application/json:
               examples:
@@ -563,7 +563,7 @@ paths:
                   actividadesRealizadas:
                     - id: 1
                       nombre_actividad: Acarreo de material
-                      pivot: { lugar: Cancha de acopio, cantidad: "6.00", unidad_medida: viajes, hora_inicio: "07:15", hora_fin: "11:00" }
+                      pivot: { origen: Cancha de acopio, destino: Botadero norte, cantidad: "6.00", unidad_medida: viajes, hora_inicio: "07:15", hora_fin: "11:00" }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -579,8 +579,9 @@ paths:
 
         - **No es un parche parcial real**: solo `id_vehiculo`, `kilometraje_inicio`,
           `kilometraje_fin`, `horometro_inicio` y `horometro_fin` son opcionales aquí. `turno`,
-          `fecha_inicio`, `fecha_fin`, `horas_trabajadas`, `notificar_observaciones` y
-          `actividades_realizadas` **siguen siendo obligatorios**, igual que en el registro.
+          `fecha_inicio`, `fecha_fin`, `notificar_observaciones` y `actividades_realizadas`
+          **siguen siendo obligatorios**, igual que en el registro. `horas_trabajadas` se
+          recalcula automáticamente a partir de `fecha_inicio`/`fecha_fin` y no debe enviarse.
         - `actividades_realizadas` **reemplaza por completo** el conjunto de actividades
           previamente registradas para esta operación (se resincroniza, no se agrega de forma
           incremental) — y al ser obligatorio, debe reenviarse siempre completo, incluidas las
@@ -599,7 +600,6 @@ paths:
               $ref: '#/components/schemas/OperacionDiariaUpdateRequest'
             example:
               kilometraje_fin: 15525.00
-              horas_trabajadas: 10
               estado: FINALIZADO
       responses:
         '200':
@@ -661,8 +661,8 @@ paths:
       description: |
         Alias de `PUT` sobre el mismo recurso: misma validación y mismo formato de respuesta.
         **No se comporta como un PATCH parcial** — ver las notas en `PUT` sobre qué campos
-        siguen siendo obligatorios (`turno`, `fecha_inicio`, `fecha_fin`, `horas_trabajadas`,
-        `notificar_observaciones` y `actividades_realizadas`).
+        siguen siendo obligatorios (`turno`, `fecha_inicio`, `fecha_fin`, `notificar_observaciones`
+        y `actividades_realizadas`).
       requestBody:
         required: true
         content:
@@ -1709,8 +1709,10 @@ components:
     ActividadRealizadaInput:
       type: object
       description: |
-        Una actividad realizada durante la operación diaria. Debe indicarse `lugar`,
-        o alternativamente `origen` **y** `destino` (por ejemplo, para actividades de transporte).
+        Una actividad realizada durante la operación diaria. El campo obligatorio para
+        describir el lugar depende del `tipo_medicion` del vehículo (`id_vehiculo`) de la
+        operación: `lugar` si es `horometro`, o `origen` **y** `destino` si es `kilometraje`
+        (por ejemplo, para actividades de transporte).
       required: [actividad, cantidad, unidad_medida, hora_inicio, hora_fin]
       properties:
         actividad:
@@ -1721,17 +1723,17 @@ components:
         lugar:
           type: string
           nullable: true
-          description: Lugar donde se realizó la actividad. Obligatorio si no se envían `origen`/`destino`.
+          description: Lugar donde se realizó la actividad. Obligatorio si el vehículo de la operación tiene `tipo_medicion = horometro`.
           example: Cancha de acopio
         origen:
           type: string
           nullable: true
-          description: Punto de origen (usado junto con `destino` en actividades de transporte).
+          description: Punto de origen (usado junto con `destino` en actividades de transporte). Obligatorio si el vehículo de la operación tiene `tipo_medicion = kilometraje`.
           example: Cancha de acopio
         destino:
           type: string
           nullable: true
-          description: Punto de destino (usado junto con `origen` en actividades de transporte).
+          description: Punto de destino (usado junto con `origen` en actividades de transporte). Obligatorio si el vehículo de la operación tiene `tipo_medicion = kilometraje`.
           example: Chancado primario
         cantidad:
           type: number
@@ -1755,8 +1757,11 @@ components:
 
     OperacionDiariaStoreRequest:
       type: object
-      description: Cuerpo esperado por `POST /operacion-diaria`. `id_conductor`, `id_area` y `nro_operacion` se calculan en el servidor y no deben enviarse.
-      required: [id_vehiculo, turno, fecha_inicio, fecha_fin, horas_trabajadas, notificar_observaciones, actividades_realizadas]
+      description: |
+        Cuerpo esperado por `POST /operacion-diaria`. `id_conductor`, `id_area`, `nro_operacion`
+        y `horas_trabajadas` (calculada a partir de `fecha_inicio`/`fecha_fin`) se calculan en
+        el servidor y no deben enviarse.
+      required: [id_vehiculo, turno, fecha_inicio, fecha_fin, notificar_observaciones, actividades_realizadas]
       properties:
         id_vehiculo:
           type: integer
@@ -1803,11 +1808,6 @@ components:
           minimum: 0
           description: Obligatorio si se envía `horometro_inicio`. Debe ser mayor a `horometro_inicio`.
           example: null
-        horas_trabajadas:
-          type: number
-          format: float
-          minimum: 0
-          example: 9.5
         observaciones:
           type: string
           nullable: true
@@ -1826,13 +1826,14 @@ components:
       type: object
       description: |
         Cuerpo esperado por `PUT`/`PATCH /operacion-diaria/{id}`. **No es un parche parcial
-        real**: `OperacionStoreRequest::rules()` solo relaja a `sometimes` (opcional) los campos
-        `id_vehiculo`, `kilometraje_inicio`, `kilometraje_fin`, `horometro_inicio` y
-        `horometro_fin`. El resto — `turno`, `fecha_inicio`, `fecha_fin`, `horas_trabajadas`,
-        `notificar_observaciones` y `actividades_realizadas` — sigue siendo **obligatorio**, sin
-        excepción por tratarse de una actualización, y debe reenviarse completo en cada petición
-        (incluyendo las actividades que no cambiaron, ya que se resincronizan por completo).
-      required: [turno, fecha_inicio, fecha_fin, horas_trabajadas, notificar_observaciones, actividades_realizadas]
+        real**: solo se relajan a opcionales los campos `id_vehiculo`, `kilometraje_inicio`,
+        `kilometraje_fin`, `horometro_inicio` y `horometro_fin`. El resto — `turno`,
+        `fecha_inicio`, `fecha_fin`, `notificar_observaciones` y `actividades_realizadas` —
+        sigue siendo **obligatorio**, sin excepción por tratarse de una actualización, y debe
+        reenviarse completo en cada petición (incluyendo las actividades que no cambiaron, ya
+        que se resincronizan por completo). `horas_trabajadas` se recalcula automáticamente a
+        partir de `fecha_inicio`/`fecha_fin` y no debe enviarse.
+      required: [turno, fecha_inicio, fecha_fin, notificar_observaciones, actividades_realizadas]
       properties:
         id_vehiculo:
           type: integer
@@ -1879,11 +1880,6 @@ components:
           minimum: 0
           description: Opcional en la actualización. Si se envía, debe ser mayor a `horometro_inicio`.
           example: null
-        horas_trabajadas:
-          type: number
-          format: float
-          minimum: 0
-          example: 10
         observaciones:
           type: string
           nullable: true
