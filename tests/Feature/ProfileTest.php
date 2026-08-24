@@ -2,8 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Persona;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -23,13 +27,15 @@ class ProfileTest extends TestCase
 
     public function test_profile_information_can_be_updated(): void
     {
-        $user = User::factory()->create();
+        $persona = Persona::factory()->create();
+        $user = User::factory()->create(['id_persona' => $persona->id]);
 
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
                 'name' => 'Test User',
-                'email' => 'test@example.com',
+                'celular' => '77712345',
+                'direccion' => 'Av. Siempre Viva 123',
             ]);
 
         $response
@@ -39,61 +45,74 @@ class ProfileTest extends TestCase
         $user->refresh();
 
         $this->assertSame('Test User', $user->name);
-        $this->assertSame('test@example.com', $user->email);
-        $this->assertNull($user->email_verified_at);
+        $this->assertSame('77712345', $persona->fresh()->celular);
+        $this->assertSame('Av. Siempre Viva 123', $persona->fresh()->direccion);
     }
 
-    public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged(): void
+    public function test_el_correo_no_se_puede_cambiar_desde_el_perfil(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['email' => 'original@example.com']);
 
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
-                'email' => $user->email,
+                'name' => $user->name,
+                'email' => 'nuevo@example.com',
             ]);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/profile');
-
-        $this->assertNotNull($user->refresh()->email_verified_at);
+        $response->assertSessionHasNoErrors();
+        $this->assertSame('original@example.com', $user->fresh()->email);
     }
 
-    public function test_user_can_delete_their_account(): void
+    public function test_el_celular_y_la_direccion_no_se_actualizan_si_el_usuario_no_tiene_persona_vinculada(): void
     {
+        $user = User::factory()->create(['id_persona' => null]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'celular' => '77712345',
+                'direccion' => 'Av. Siempre Viva 123',
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertNull($user->fresh()->persona);
+    }
+
+    public function test_profile_photo_can_be_uploaded_and_replaces_the_previous_one(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create(['foto' => 'usuarios/anterior.jpg']);
+        Storage::disk('public')->put('usuarios/anterior.jpg', 'contenido');
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => $user->name,
+                'foto' => UploadedFile::fake()->image('foto.jpg'),
+            ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $user->refresh();
+        Storage::disk('public')->assertMissing('usuarios/anterior.jpg');
+        Storage::disk('public')->assertExists($user->foto);
+    }
+
+    public function test_no_existe_ruta_de_eliminar_cuenta_desde_el_perfil(): void
+    {
+        $this->assertFalse(Route::has('profile.destroy'));
+
         $user = User::factory()->create();
 
         $response = $this
             ->actingAs($user)
-            ->delete('/profile', [
-                'password' => 'password',
-            ]);
+            ->delete('/profile', ['password' => 'password']);
 
-        $response
-            ->assertSessionHasNoErrors()
-            ->assertRedirect('/');
-
-        $this->assertGuest();
-        $this->assertNull($user->fresh());
-    }
-
-    public function test_correct_password_must_be_provided_to_delete_account(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this
-            ->actingAs($user)
-            ->from('/profile')
-            ->delete('/profile', [
-                'password' => 'wrong-password',
-            ]);
-
-        $response
-            ->assertSessionHasErrors('password')
-            ->assertRedirect('/profile');
-
+        // /profile existe (GET, PATCH), pero ya no acepta DELETE: 405, no 404.
+        $response->assertMethodNotAllowed();
         $this->assertNotNull($user->fresh());
     }
 }

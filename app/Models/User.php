@@ -12,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
-#[Fillable(['name', 'email', 'password', 'id_persona', 'estado_usuario'])]
+#[Fillable(['name', 'email', 'password', 'id_persona', 'estado_usuario', 'foto'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements JWTSubject
 {
@@ -20,6 +20,13 @@ class User extends Authenticatable implements JWTSubject
     use HasFactory, Notifiable;
 
     use HasRoles;
+
+    protected $appends = ['foto_url'];
+
+    public function getFotoUrlAttribute(): ?string
+    {
+        return $this->foto ? asset('storage/'.$this->foto) : null;
+    }
 
     public function getJWTIdentifier(): mixed
     {

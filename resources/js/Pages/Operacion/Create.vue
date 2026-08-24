@@ -416,7 +416,7 @@ onMounted(() => {
                             </div>
 
                         </div>
-                        <div class="card-body pt-2">
+                        <div class="card-body pt-2 text-center">
 
                             <div v-for="(r, idx) in form.actividades_realizadas" :key="idx"
                                 class="border rounded-3 p-3 mb-3 bg-white rounded-3 shadow-sm ">
@@ -478,7 +478,7 @@ onMounted(() => {
                                 </div>
                             </div>
 
-                            <div class="text-center px-5 py-2 border w-100 border-info mt-4 mb-4  rounded-pill btn-wave btn btn-info-light"
+                            <div class="text-center px-5 py-2 border  border-info mt-4 mb-4  rounded-pill btn-wave btn btn-info-light"
                                 @click="estaAbiertoModal = true">
                                 <i class="ri-add-line  "></i>
                                 <small>Añadir actividad</small>

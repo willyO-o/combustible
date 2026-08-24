@@ -26,6 +26,7 @@ Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
         Route::post('refresh', [AuthController::class, 'refresh'])->name('api.v1.auth.refresh');
         Route::get('me', [AuthController::class, 'me'])->name('api.v1.auth.me');
+        Route::match(['put', 'patch'], 'me', [AuthController::class, 'updateMe'])->name('api.v1.auth.me.update');
     });
 });
 

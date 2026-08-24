@@ -123,9 +123,11 @@ paths:
                   materno: Quispe
                   ci: "7451236"
                   f_nacimiento_formatted: 12/05/1990
-                  foto_url: http://localhost/storage/personas/juan.jpg
+                  foto_url: http://localhost/storage/usuarios/juan.jpg
                   celular: "70012345"
+                  direccion: null
                   roles: [conductor]
+                  permisos: [operacion-diaria.ver, operacion-diaria.crear, cargas-combustible.registrar]
         '401':
           description: Credenciales incorrectas.
           content:
@@ -203,27 +205,155 @@ paths:
     get:
       tags: [Autenticación]
       summary: Usuario autenticado
-      description: Devuelve los datos del usuario actualmente autenticado, incluyendo su relación `persona`.
+      description: Devuelve los datos combinados de la cuenta autenticada y su persona vinculada (si tiene).
       responses:
         '200':
           description: Datos del usuario.
           content:
             application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { $ref: '#/components/schemas/UsuarioAutenticado' }
               example:
                 success: true
                 data:
-                  id: 12
                   name: Conductor User
                   email: conductor@gmail.com
-                  id_persona: 45
-                  persona:
-                    id: 45
-                    ci: "7451236"
-                    nombres: Juan
-                    paterno: Pérez
-                    materno: Quispe
-                    celular: "70012345"
-                    estado_persona: ACTIVO
+                  nombre_completo: Juan Pérez Quispe
+                  nombres: Juan
+                  paterno: Pérez
+                  materno: Quispe
+                  ci: "7451236"
+                  f_nacimiento_formatted: 12/05/1990
+                  foto_url: http://localhost/storage/usuarios/juan.jpg
+                  celular: "70012345"
+                  direccion: "Av. Siempre Viva 123"
+                  roles: [conductor]
+                  permisos: [operacion-diaria.ver, operacion-diaria.crear, cargas-combustible.registrar]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Autenticación]
+      summary: Actualizar mi perfil
+      description: |
+        Actualiza los datos editables del perfil de la cuenta autenticada. Es una
+        **actualización parcial**: solo se modifican los campos enviados en el
+        cuerpo de la petición; los que se omiten conservan su valor actual.
+
+        Solo se pueden actualizar **`name`** (puede usarse como apodo), **`celular`**,
+        **`direccion`** y **`foto`** — el correo y la contraseña no se gestionan desde
+        este endpoint. `celular`/`direccion` se guardan en la persona vinculada a la
+        cuenta (`users.id_persona` -> `persona`): si la cuenta no tiene una persona
+        vinculada, esos dos campos simplemente no se actualizan (no se produce
+        ningún error). Al reemplazar `foto`, la foto anterior se elimina.
+
+        Acepta tanto `PUT` como `PATCH`.
+
+        ## Envío con foto (`multipart/form-data`)
+
+        Si la petición no incluye `foto`, puede enviarse como `application/json`
+        normalmente. Si incluye `foto`, debe enviarse como `multipart/form-data` —
+        pero como PHP no procesa el cuerpo de una petición `PUT`/`PATCH` en ese
+        formato, la petición debe hacerse como **`POST`** agregando un campo
+        `_method=PUT` (o `PATCH`) para que el servidor la trate como tal (la misma
+        técnica usada por cualquier formulario que sube archivos a un endpoint que
+        no es `POST`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarPerfilRequest'
+            example:
+              name: Juanito
+              celular: "77712345"
+              direccion: "Av. Siempre Viva 123"
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ActualizarPerfilRequest'
+            example:
+              _method: PUT
+              name: Juanito
+              celular: "77712345"
+              direccion: "Av. Siempre Viva 123"
+      responses:
+        '200':
+          description: Perfil actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: Perfil actualizado exitosamente. }
+                  data: { $ref: '#/components/schemas/UsuarioAutenticado' }
+              example:
+                success: true
+                message: Perfil actualizado exitosamente.
+                data:
+                  name: Juanito
+                  email: conductor@gmail.com
+                  nombre_completo: Juan Pérez Quispe
+                  nombres: Juan
+                  paterno: Pérez
+                  materno: Quispe
+                  ci: "7451236"
+                  f_nacimiento_formatted: 12/05/1990
+                  foto_url: http://localhost/storage/usuarios/juan.jpg
+                  celular: "77712345"
+                  direccion: "Av. Siempre Viva 123"
+                  roles: [conductor]
+                  permisos: [operacion-diaria.ver, operacion-diaria.crear, cargas-combustible.registrar]
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                success: false
+                message: Datos de entrada inválidos.
+                errors:
+                  celular: ["El campo celular no debe ser mayor que 20 caracteres."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [Autenticación]
+      summary: Actualizar mi perfil (alias de PUT)
+      description: |
+        Alias de `PUT /auth/me` sobre el mismo recurso, mismo cuerpo y misma
+        respuesta — incluyendo el envío con foto (`multipart/form-data` vía
+        `POST` con `_method=PATCH`, ver la descripción de `PUT` para el detalle).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarPerfilRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ActualizarPerfilRequest'
+      responses:
+        '200':
+          description: Perfil actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: Perfil actualizado exitosamente. }
+                  data: { $ref: '#/components/schemas/UsuarioAutenticado' }
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -264,8 +394,8 @@ paths:
         tipos de combustible activos, y los valores enumerados usados por otros módulos
         (cargas de combustible, solicitudes de mantenimiento).
 
-        Requiere que el usuario autenticado tenga una `persona` con un registro de `conductor`
-        asociado (`$request->user()->persona->conductor`).
+        Requiere que el usuario autenticado tenga una persona vinculada con un registro de
+        conductor asociado.
       responses:
         '200':
           description: Colecciones disponibles para el usuario autenticado.
@@ -306,12 +436,12 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
-          description: El usuario autenticado no tiene una `persona`/`conductor` asociado.
+          description: El usuario autenticado no tiene una persona/conductor asociado.
           content:
             application/json:
               example:
                 message: "Error al obtener colecciones."
-                error: "Attempt to read property \"conductor\" on null"
+                error: "Detalle técnico interno del error (varía según la causa)."
 
   # ──────────────────────────────────────────────────────────────────────
   # OPERACIÓN DIARIA
@@ -1613,23 +1743,84 @@ components:
         access_token: { type: string, example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9... }
         token_type: { type: string, example: bearer }
         expires_in: { type: integer, description: Segundos hasta la expiración del token., example: 3600 }
-        user:
-          type: object
-          properties:
-            name: { type: string, example: Conductor User }
-            email: { type: string, format: email, example: conductor@gmail.com }
-            nombre_completo: { type: string, nullable: true, example: Juan Pérez Quispe }
-            nombres: { type: string, nullable: true, example: Juan }
-            paterno: { type: string, nullable: true, example: Pérez }
-            materno: { type: string, nullable: true, example: Quispe }
-            ci: { type: string, nullable: true, example: "7451236" }
-            f_nacimiento_formatted: { type: string, nullable: true, example: 12/05/1990 }
-            foto_url: { type: string, nullable: true, example: http://localhost/storage/personas/juan.jpg }
-            celular: { type: string, nullable: true, example: "70012345" }
-            roles:
-              type: array
-              items: { type: string }
-              example: [conductor]
+        user: { $ref: '#/components/schemas/UsuarioAutenticado' }
+
+    UsuarioAutenticado:
+      type: object
+      description: |
+        Datos combinados de la cuenta y su persona vinculada, tal como los devuelve
+        `POST /auth/login`, `POST /auth/refresh`, `GET /auth/me` y `PUT /auth/me`. Los
+        campos que vienen de la persona (de `nombre_completo` en adelante) son `null`
+        si la cuenta no tiene una persona vinculada.
+      properties:
+        name:
+          type: string
+          description: Nombre de la cuenta. Editable desde `PUT /auth/me` (puede usarse como apodo).
+          example: Conductor User
+        email: { type: string, format: email, example: conductor@gmail.com }
+        nombre_completo: { type: string, nullable: true, example: Juan Pérez Quispe }
+        nombres: { type: string, nullable: true, example: Juan }
+        paterno: { type: string, nullable: true, example: Pérez }
+        materno: { type: string, nullable: true, example: Quispe }
+        ci: { type: string, nullable: true, example: "7451236" }
+        f_nacimiento_formatted: { type: string, nullable: true, example: 12/05/1990 }
+        foto_url: { type: string, nullable: true, example: http://localhost/storage/usuarios/juan.jpg }
+        celular:
+          type: string
+          nullable: true
+          description: Editable desde `PUT /auth/me` (se guarda en la persona vinculada).
+          example: "70012345"
+        direccion:
+          type: string
+          nullable: true
+          description: Editable desde `PUT /auth/me` (se guarda en la persona vinculada).
+          example: "Av. Siempre Viva 123"
+        roles:
+          type: array
+          items: { type: string }
+          example: [conductor]
+        permisos:
+          type: array
+          items: { type: string }
+          example: [operacion-diaria.ver, operacion-diaria.crear]
+
+    ActualizarPerfilRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `PUT`/`PATCH /auth/me`. Es una actualización parcial:
+        todos los campos son opcionales y solo se actualizan los que se envían; los
+        que se omiten conservan su valor actual.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Nombre de la cuenta (puede usarse como apodo).
+          example: Juanito
+        celular:
+          type: string
+          nullable: true
+          maxLength: 20
+          description: |
+            Se guarda en la persona vinculada a la cuenta (`users.id_persona` ->
+            `persona`). Si la cuenta no tiene una persona vinculada, se envía sin
+            efecto (no se produce ningún error).
+          example: "77712345"
+        direccion:
+          type: string
+          nullable: true
+          maxLength: 250
+          description: |
+            Se guarda en la persona vinculada a la cuenta (`users.id_persona` ->
+            `persona`). Si la cuenta no tiene una persona vinculada, se envía sin
+            efecto (no se produce ningún error).
+          example: "Av. Siempre Viva 123"
+        foto:
+          type: string
+          format: binary
+          description: |
+            Reemplaza la foto de perfil (la anterior se elimina). Solo válido si la
+            petición se envía como `multipart/form-data` (ver la descripción de
+            `PUT /auth/me` para el detalle de cómo enviarla).
 
     # ── Parámetros ────────────────────────────────────────────────────
     ParametrosGenerales:

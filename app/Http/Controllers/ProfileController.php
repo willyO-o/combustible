@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,45 +17,54 @@ class ProfileController extends Controller
     public function edit(Request $request): Response
     {
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status' => session('status'),
+            'usuario' => $request->user()->load('persona'),
         ]);
     }
 
     /**
-     * Update the user's profile information.
+     * Update the user's profile information (foto, nombre, celular, dirección).
+     * No gestiona el correo ni el nombre de la persona, ni permite eliminar la
+     * cuenta: eso se hace desde el módulo de Personas/Usuarios (administradores).
+     *
+     * `email` no es editable desde el perfil (ProfileUpdateRequest ya no lo
+     * valida, así que nunca llega en $data), pero igual se omite
+     * explícitamente aquí por seguridad ante cualquier cambio futuro en las
+     * reglas de validación.
+     *
+     * `celular`/`direccion` se guardan en persona a través de la relación
+     * users.id_persona -> persona (no existen columnas propias en users): si
+     * el usuario no tiene una persona vinculada (ej. cuentas de sistema),
+     * esos campos simplemente no se actualizan.
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $usuario = $request->user();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $data = $request->validated();
+        unset($data['email']);
+
+        $datosPersona = [
+            'celular' => $data['celular'] ?? null,
+            'direccion' => $data['direccion'] ?? null,
+        ];
+        unset($data['celular'], $data['direccion']);
+
+        if ($request->hasFile('foto')) {
+            if ($usuario->foto) {
+                Storage::disk('public')->delete($usuario->foto);
+            }
+            $data['foto'] = $request->file('foto')->store('usuarios', 'public');
+        } else {
+            unset($data['foto']);
         }
 
-        $request->user()->save();
+        $usuario->fill($data)->save();
 
-        return Redirect::route('profile.edit');
-    }
+        if ($usuario->persona) {
+            $usuario->persona->update($datosPersona);
+        }
 
-    /**
-     * Delete the user's account.
-     */
-    public function destroy(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'password' => ['required', 'current_password'],
-        ]);
-
-        $user = $request->user();
-
-        Auth::logout();
-
-        $user->delete();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return Redirect::to('/');
+        return redirect()->route('profile.edit')
+            ->with('success', 'Perfil actualizado exitosamente.');
     }
 }

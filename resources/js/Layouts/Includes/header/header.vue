@@ -371,7 +371,7 @@
             <a href="javascript:void(0);" class="header-link dropdown-toggle" id="mainHeaderProfile"
                 data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                 <div>
-                    <img src="/images/faces/12.jpg" alt="img" class="header-link-icon">
+                    <img :src="$page.props.auth.user.foto_url || '/images/faces/12.jpg'" alt="img" class="header-link-icon">
                 </div>
             </a>
             <!-- End::header-link|dropdown-toggle -->
@@ -388,7 +388,7 @@
                     <div class="d-flex align-items-start gap-2">
                         <div class="lh-1">
                             <span class="avatar avatar-sm bg-primary-transparent avatar-rounded">
-                                <img src="/images/faces/12.jpg" alt="">
+                                <img :src="$page.props.auth.user.foto_url || '/images/faces/12.jpg'" alt="">
                             </span>
                         </div>
                         <div>
@@ -404,7 +404,7 @@
                     <li>
                         <ul class="list-unstyled mb-0 sub-list">
                             <li>
-                                <Link class="dropdown-item d-flex align-items-center" href="#!"><i
+                                <Link class="dropdown-item d-flex align-items-center" :href="route('profile.edit')"><i
                                         class="ti ti-user-circle me-2 fs-18"></i>Ver Perfil</Link>
                             </li>
 

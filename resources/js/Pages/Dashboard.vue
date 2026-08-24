@@ -1,5 +1,4 @@
 <script setup>
-// import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Maindashboard from '@/Layouts/Maindashboard.vue';
 defineOptions({ layout: Maindashboard })
 import CardAnalitic from '@/Components/CardAnalitic.vue';
