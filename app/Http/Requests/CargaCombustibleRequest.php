@@ -5,6 +5,8 @@ namespace App\Http\Requests;
 use App\Models\Vehiculo;
 use App\Rules\GreaterThanPreviousReading;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 class CargaCombustibleRequest extends FormRequest
@@ -12,6 +14,19 @@ class CargaCombustibleRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => 'Los datos enviados no son válidos.',
+                'errors'  => $validator->errors(),
+            ], 422));
+        }
+
+        parent::failedValidation($validator);
     }
 
     public function rules(): array
@@ -30,7 +45,7 @@ class CargaCombustibleRequest extends FormRequest
         $esRegistroOffline = $this->is('api/*') && $this->boolean('is_offline');
 
         return [
-            'fecha_carga' => ['required', 'date'],
+            'fecha_carga' => [$esRegistroOffline ? 'required' : 'nullable', 'date'],
             // litros y precio son requeridos solo cuando id_vale es null, de lo contrario no se requieren y se ignoran
             'litros' => [Rule::requiredIf(function () {
                 return ! $this->filled('id_vale');
@@ -53,7 +68,10 @@ class CargaCombustibleRequest extends FormRequest
             // 'id_grifo' => ['required', 'integer', 'exists:grifo,id'],
             // 'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
             // 'id_conductor' => [$this->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
-            'id_vale' => ['nullable', 'integer', 'exists:vale,id',
+            'id_vale' => [
+                'nullable',
+                'integer',
+                'exists:vale,id',
                 Rule::when($this->filled('id_vale') && ! $valeSinCambios && ! $esRegistroOffline, [
                     Rule::exists('vale', 'id')->where(function ($query) {
                         $query->where('estado_vale', 'PENDIENTE')

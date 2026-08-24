@@ -13,6 +13,10 @@ class CreateSolicitudMantenimientoAction
             $datos['id_conductor'] = $user->id_persona;
         }
 
+        if(empty($datos['is_offline'])) {
+            $datos['fecha_solicitud'] = now();
+        }
+
         $datos['id_usuario_registra'] = $user->id;
         $datos['estado'] = 'PENDIENTE';
 

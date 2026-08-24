@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Support\Facades\Auth;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 
@@ -65,7 +67,18 @@ class OperacionDiaria extends Model
             $ultimoNroOperacion = self::max('nro_operacion');
             $operacion->nro_operacion = $ultimoNroOperacion ? $ultimoNroOperacion + 1 : 1;
 
-            $operacion->id_conductor = auth()->user()->id_persona;
+            $operacion->id_conductor = Auth::user()->id_persona;
+
+            //horas trabajadas se calcula como la diferencia en horas entre fecha_fin y fecha_inicio
+            //en formato con 1 decimal 4.5, 7.8, 8.0
+            $operacion->horas_trabajadas = round(($operacion->fecha_fin->diffInMinutes($operacion->fecha_inicio, true) / 60), 1);
+        });
+
+        //para crea y actualizar
+        static::updating(function ($operacion) {
+            //horas trabajadas se calcula como la diferencia en horas entre fecha_fin y fecha_inicio
+            //en formato con 1 decimal 4.5, 7.8, 8.0
+            $operacion->horas_trabajadas = round(($operacion->fecha_fin->diffInMinutes($operacion->fecha_inicio, true) / 60), 1);
         });
     }
 

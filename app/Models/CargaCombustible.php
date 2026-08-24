@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 #[Fillable([
     'fecha_carga',
@@ -86,7 +87,8 @@ class CargaCombustible extends Model
         parent::boot();
 
         static::creating(function ($model) {
-            $model->id_usuario = auth()->id();
+            $model->id_usuario = Auth::id();
+
         });
     }
 

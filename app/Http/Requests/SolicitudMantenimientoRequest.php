@@ -26,8 +26,12 @@ class SolicitudMantenimientoRequest extends FormRequest
 
     public function rules(): array
     {
+
+        $esRegistroOffline = $this->is('api/*') && $this->boolean('is_offline');
+
         return [
             // verificar si el vehiculo esta asignado al conductor mediante el id del usuario que registra
+            'is_offline' => ['nullable', 'boolean'],
             'id_vehiculo' => [
                 'required',
                 Rule::exists('asignacion', 'id_vehiculo')
@@ -40,6 +44,8 @@ class SolicitudMantenimientoRequest extends FormRequest
             ],
             'tipo_mantenimiento' => ['required', 'in:PREVENTIVO,CORRECTIVO'],
             'descripcion_problema' => ['required', 'string', 'max:3000'],
+            // requerir fecha_ si existe campo is_offline y es true
+            'fecha_solicitud' => [$esRegistroOffline ? 'required' : 'nullable', 'date'],
             'kilometraje_actual' => [
                 Rule::requiredIf(function () {
                     $vehiculo = Vehiculo::find($this->id_vehiculo);
@@ -60,7 +66,7 @@ class SolicitudMantenimientoRequest extends FormRequest
                 'integer',
                 'min:0',
             ],
-            'observacion' => ['nullable', 'string', 'max:500'],
+            'observacion' => ['nullable', 'string', 'max:1500'],
         ];
     }
 

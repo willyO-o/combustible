@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 #[Fillable([
     'id_vehiculo',
@@ -94,11 +95,9 @@ class SolicitudMantenimiento extends Model
             $solicitudMantenimiento->gestion = $solicitudMantenimiento->calcularGestion();
             $solicitudMantenimiento->nro_solicitud = self::siguienteNroSolicitud($solicitudMantenimiento->gestion);
 
-            $solicitudMantenimiento->fecha_solicitud = now();
-
             $solicitudMantenimiento->estado = 'PENDIENTE';
-            $solicitudMantenimiento->id_conductor = auth()->user()->id_persona;
-            $solicitudMantenimiento->id_usuario_registra = auth()->id();
+            $solicitudMantenimiento->id_conductor = Auth::user()->id_persona;
+            $solicitudMantenimiento->id_usuario_registra = Auth::id();
         });
     }
 }

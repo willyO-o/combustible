@@ -19,6 +19,11 @@ class CreateCargaCombustibleAction
 
             $datos = $request->all();
 
+            if (!$request->input('is_offline', false)) {
+                $datos['fecha_carga'] = now();
+            }
+
+
             if ($request->filled('id_vale')) {
                 $vale = Vale::findOrFail($datos['id_vale']);
 

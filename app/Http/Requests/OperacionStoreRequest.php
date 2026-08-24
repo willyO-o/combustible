@@ -8,6 +8,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 use App\Rules\GreaterThanPreviousReading;
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Vehiculo;
 
 class OperacionStoreRequest extends FormRequest
 {
@@ -45,23 +46,32 @@ class OperacionStoreRequest extends FormRequest
             "fecha_inicio" => "required|date",
             "fecha_fin" => "required|date|after:fecha_inicio",
             "kilometraje_inicio" => [$this->method() === 'POST' ? Rule::requiredIf(function () {
-                $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
+                $vehiculo = Vehiculo::find($this->id_vehiculo);
                 return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
             }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
             "kilometraje_fin" => [$this->method() === 'POST' ? Rule::requiredIf(fn() => $this->kilometraje_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:kilometraje_inicio'],
             "horometro_inicio" => [$this->method() === 'POST' ? Rule::requiredIf(function () {
-                $vehiculo = \App\Models\Vehiculo::find($this->id_vehiculo);
+                $vehiculo = Vehiculo::find($this->id_vehiculo);
                 return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
             }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
             "horometro_fin" => [$this->method() === 'POST' ? Rule::requiredIf(fn() => $this->horometro_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:horometro_inicio'],
-            "horas_trabajadas" => 'required|numeric|min:0',
+            // "horas_trabajadas" => 'required|numeric|min:0', se calcula automáticamente a partir de fecha_inicio y fecha_fin
             "observaciones" => 'nullable|string|min:10',
             "notificar_observaciones" => 'required|boolean',
             'actividades_realizadas' => 'required|array|min:1',
             'actividades_realizadas.*.actividad' => 'required|string|min:3',
-            'actividades_realizadas.*.lugar' => 'required_without:actividades_realizadas.*.origen|nullable|string',
-            'actividades_realizadas.*.origen' => 'required_without:actividades_realizadas.*.actividad|nullable|string',
-            'actividades_realizadas.*.destino' => 'required_without:actividades_realizadas.*.actividad|nullable|string',
+            'actividades_realizadas.*.lugar' => [Rule::requiredIf(function () {
+                $vehiculo = Vehiculo::find($this->id_vehiculo);
+                return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
+            }), 'nullable', 'string'],
+            'actividades_realizadas.*.origen' => [Rule::requiredIf(function () {
+                $vehiculo = Vehiculo::find($this->id_vehiculo);
+                return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
+            }), 'nullable', 'string'],
+            'actividades_realizadas.*.destino' => [Rule::requiredIf(function () {
+                $vehiculo = Vehiculo::find($this->id_vehiculo);
+                return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
+            }), 'nullable', 'string'],
             'actividades_realizadas.*.cantidad' => 'required|numeric|min:1',
             'actividades_realizadas.*.unidad_medida' => 'required|string|min:1',
             'actividades_realizadas.*.hora_inicio' => 'required|date_format:H:i',

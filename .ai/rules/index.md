@@ -7,6 +7,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/**/*.php | .ai/rules/actions.md |
 | app/**/*.php | .ai/rules/app.md |
 | app/Http/Controllers/**/*.php, app/Http/Controllers/*.php | .ai/rules/controllers.md |
+| public/docs/openapi.yaml | .ai/rules/docs.md |
 | tests/Feature/**/*.php | .ai/rules/feature.md |
 | app/Models/OrdenTrabajo.php,app/Models/DetalleMantenimiento.php,app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/http-controllers.md |
 | app/Http/Controllers/ConductorController.php,app/Models/Conductor.php,app/Http/Requests/ConductorRequest.php | .ai/rules/http-requests.md |
