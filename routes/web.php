@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\CargaCombustibleController;
+use App\Http\Controllers\CargaMaterialController;
 use App\Http\Controllers\CargasCombustibleReportController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GrifoController;
 use App\Http\Controllers\GrupoVehiculoController;
+use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\OperacionDiariaController;
 use App\Http\Controllers\OrdenTrabajoController;
@@ -23,6 +25,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValeController;
 use App\Http\Controllers\ValePublicoController;
 use App\Http\Controllers\VehiculoController;
+use App\Http\Controllers\VehiculoExternoController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -96,6 +99,20 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('repuestos', RepuestoController::class)
         ->parameters(['repuestos' => 'repuesto']);
+
+    Route::resource('materiales', MaterialController::class)
+        ->parameters(['materiales' => 'material'])
+        ->only(['index', 'store', 'update', 'destroy']);
+
+    Route::resource('vehiculos-externos', VehiculoExternoController::class)
+        ->parameters(['vehiculos-externos' => 'vehiculoExterno'])
+        ->only(['index', 'store', 'update', 'destroy']);
+
+    Route::resource('control-cargas', CargaMaterialController::class)
+        ->parameters(['control-cargas' => 'cargaMaterial'])
+        ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+    Route::post('control-cargas/{cargaMaterial}/viajes', [CargaMaterialController::class, 'registrarViaje'])
+        ->name('control-cargas.viajes.registrar');
 
     Route::resource('roles', RolController::class)
         ->except(['show', 'destroy']);

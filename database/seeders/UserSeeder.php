@@ -212,6 +212,50 @@ class UserSeeder extends Seeder
     }
 
     /**
+     * Control de Cargas (App\Http\Controllers\MaterialController): catálogo
+     * de materiales usado por el módulo de control de cargas.
+     */
+    private function permisosMateriales(): array
+    {
+        return [
+            'materiales.ver',
+            'materiales.crear',
+            'materiales.editar',
+            'materiales.eliminar',
+        ];
+    }
+
+    /**
+     * Control de Cargas (App\Http\Controllers\VehiculoExternoController):
+     * catálogo de vehículos de terceros usado por el módulo de control de
+     * cargas.
+     */
+    private function permisosVehiculosExternos(): array
+    {
+        return [
+            'vehiculos-externos.ver',
+            'vehiculos-externos.crear',
+            'vehiculos-externos.editar',
+            'vehiculos-externos.eliminar',
+        ];
+    }
+
+    /**
+     * Control de Cargas (App\Http\Controllers\CargaMaterialController): el
+     * flujo operativo de registro de cargas y viajes en sí, compartido por
+     * conductor y jefe-area (ver permisosParaConductor()/permisosParaJefeArea()).
+     */
+    private function permisosControlCargas(): array
+    {
+        return [
+            'control-cargas.ver',
+            'control-cargas.crear',
+            'control-cargas.editar',
+            'control-cargas.viajes.registrar',
+        ];
+    }
+
+    /**
      * Módulo de Roles y Permisos (App\Http\Controllers\RolController): sólo
      * administrador/super-admin lo usan, así que no se agrupa en ningún otro
      * bundle de permisos (no forma parte de permisosCatalogos()).
@@ -281,6 +325,9 @@ class UserSeeder extends Seeder
             ...$this->permisosUsuarios(),
             ...$this->permisosAreas(),
             ...$this->permisosPersonas(),
+            ...$this->permisosMateriales(),
+            ...$this->permisosVehiculosExternos(),
+            ...$this->permisosControlCargas(),
             ...$this->permisosRoles(),
             ...$this->permisosParametrosEmpresa(),
         ];
@@ -308,6 +355,7 @@ class UserSeeder extends Seeder
             'operacion-diaria.editar',
             'operacion-diaria.eliminar',
             'operacion-diaria.informe',
+            ...$this->permisosControlCargas(),
         ];
     }
 
@@ -319,6 +367,7 @@ class UserSeeder extends Seeder
             ...$this->permisosMantenimiento(),
             ...$this->permisosOperacionDiariaJefe(),
             ...$this->permisosCatalogos(),
+            ...$this->permisosControlCargas(),
             'operacion-diaria.verificar',
         ];
     }

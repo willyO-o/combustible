@@ -193,6 +193,36 @@ return [
             ],
         ],
 
+        'materiales' => [
+            'label' => 'Materiales',
+            'permisos' => [
+                'materiales.ver' => 'Ver',
+                'materiales.crear' => 'Crear',
+                'materiales.editar' => 'Editar',
+                'materiales.eliminar' => 'Eliminar',
+            ],
+        ],
+
+        'vehiculos-externos' => [
+            'label' => 'Vehículos Externos',
+            'permisos' => [
+                'vehiculos-externos.ver' => 'Ver',
+                'vehiculos-externos.crear' => 'Crear',
+                'vehiculos-externos.editar' => 'Editar',
+                'vehiculos-externos.eliminar' => 'Eliminar',
+            ],
+        ],
+
+        'control-cargas' => [
+            'label' => 'Control de Cargas',
+            'permisos' => [
+                'control-cargas.ver' => 'Ver',
+                'control-cargas.crear' => 'Abrir carga',
+                'control-cargas.editar' => 'Editar carga',
+                'control-cargas.viajes.registrar' => 'Registrar viaje',
+            ],
+        ],
+
         'usuarios' => [
             'label' => 'Usuarios',
             'permisos' => [

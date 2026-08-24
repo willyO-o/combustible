@@ -4,7 +4,7 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import { showToast, confirm } from '@/Utils/alertUtil.js'
-import { Modal } from 'bootstrap'
+import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 
 const page = usePage()
 
@@ -23,7 +23,7 @@ const filters = ref({
 
 // Modal de solicitudes pendientes
 const showPendingModal = ref(false)
-const modalInstance = ref(null)
+const modal = useBootstrapModal()
 const modalKey = 'pendingModalShown'
 
 // Verificar si el usuario es conductor
@@ -51,9 +51,8 @@ const verificarYMostrarModal = () => {
         // Mostrar modal cuando el DOM esté listo
         setTimeout(() => {
             const modalEl = document.getElementById('pendingRequestsModal')
-            if (modalEl && !modalInstance.value) {
-                modalInstance.value = new Modal(modalEl)
-                modalInstance.value.show()
+            if (modalEl) {
+                modal.mostrar(modalEl)
             }
         }, 300)
     }
@@ -71,9 +70,7 @@ onMounted(() => {
 
 // Cerrar modal
 const cerrarModalPendiente = () => {
-    if (modalInstance.value) {
-        modalInstance.value.hide()
-    }
+    modal.ocultar()
     showPendingModal.value = false
 }
 

@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { Modal } from 'bootstrap'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import { confirm as confirmSwal } from '@/Utils/alertUtil.js'
+import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 
 const props = defineProps({
     areas: Object,
@@ -17,7 +17,7 @@ const props = defineProps({
  * Modal: crear / editar área
  * ------------------------------------------------------------------ */
 const modalEl = ref(null)
-let modalInstance = null
+const modal = useBootstrapModal()
 
 // null = creando un área nueva; objeto = editando esa área.
 const editando = ref(null)
@@ -30,10 +30,7 @@ const form = useForm({
 
 function abrirModal() {
     nextTick(() => {
-        if (!modalInstance) {
-            modalInstance = new Modal(modalEl.value)
-        }
-        modalInstance.show()
+        modal.mostrar(modalEl.value)
     })
 }
 
@@ -57,7 +54,7 @@ function submit() {
     const opciones = {
         preserveScroll: true,
         onSuccess: () => {
-            modalInstance?.hide()
+            modal.ocultar()
             form.reset()
         },
     }
@@ -92,7 +89,7 @@ const estadoBadge = (estado) =>
  * Modal: encargados del área (titular / suplente)
  * ------------------------------------------------------------------ */
 const encargadosModalEl = ref(null)
-let encargadosModalInstance = null
+const encargadosModal = useBootstrapModal()
 
 // Guardamos sólo el id: así el modal siempre refleja los datos frescos
 // que llegan en `areas` tras cada asignación/finalización.
@@ -127,10 +124,7 @@ function abrirEncargados(area) {
     personaEmailActual.value = null
 
     nextTick(() => {
-        if (!encargadosModalInstance) {
-            encargadosModalInstance = new Modal(encargadosModalEl.value)
-        }
-        encargadosModalInstance.show()
+        encargadosModal.mostrar(encargadosModalEl.value)
     })
 }
 

@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { Modal } from 'bootstrap'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import { showToast, confirm , showError} from '@/Utils/alertUtil.js'
 import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
+import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 
 const props = defineProps({
     conductores: Object,
@@ -108,7 +108,7 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
  * Modal: reasignar vehículo
  * ------------------------------------------------------------------ */
 const asignacionModalEl = ref(null)
-let asignacionModalInstance = null
+const asignacionModal = useBootstrapModal()
 
 // Guardamos sólo el id: así el modal siempre refleja los datos frescos
 // que llegan en `conductores` tras cada asignación/finalización.
@@ -136,10 +136,7 @@ function abrirAsignacion(conductor) {
     tipoMedicionSeleccionado.value = null
 
     nextTick(() => {
-        if (!asignacionModalInstance) {
-            asignacionModalInstance = new Modal(asignacionModalEl.value)
-        }
-        asignacionModalInstance.show()
+        asignacionModal.mostrar(asignacionModalEl.value)
     })
 }
 

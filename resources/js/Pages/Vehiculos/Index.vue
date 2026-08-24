@@ -1,10 +1,10 @@
 <script setup>
 import { onMounted, ref, computed, nextTick, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { Modal } from 'bootstrap'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import { confirm } from '@/Utils/alertUtil.js'
 import InputError from '@/Components/InputError.vue'
+import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -85,7 +85,7 @@ onMounted(() => {
  * Modal: reasignar área
  * ------------------------------------------------------------------ */
 const areaModalEl = ref(null)
-let areaModalInstance = null
+const areaModal = useBootstrapModal()
 
 // Guardamos sólo el id: así el modal siempre refleja los datos frescos
 // que llegan en `vehiculos` tras cada asignación/finalización.
@@ -108,10 +108,7 @@ function abrirAsignarArea(vehiculo) {
     areaForm.clearErrors()
 
     nextTick(() => {
-        if (!areaModalInstance) {
-            areaModalInstance = new Modal(areaModalEl.value)
-        }
-        areaModalInstance.show()
+        areaModal.mostrar(areaModalEl.value)
     })
 }
 

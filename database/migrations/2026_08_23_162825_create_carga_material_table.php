@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique();
             $table->integer('nro_carga')->nullable();
-            $table->foreignId('id_material')->constrained('material')->onDelete('restrict')->onUpdate('cascade');
+            $table->string('gestion', 4)->nullable();
             $table->foreignId('id_vehiculo_externo')->constrained('vehiculo_externo')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('id_usuario_apertura')->constrained('users')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('id_usuario_cierre')->nullable()->constrained('users')->onDelete('restrict')->onUpdate('cascade');

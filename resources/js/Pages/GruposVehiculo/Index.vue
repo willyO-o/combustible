@@ -1,11 +1,11 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { Modal } from 'bootstrap'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import { confirm } from '@/Utils/alertUtil.js'
+import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 
 const props = defineProps({
     grupos: Object,
@@ -13,7 +13,7 @@ const props = defineProps({
 })
 
 const modalEl = ref(null)
-let modalInstance = null
+const modal = useBootstrapModal()
 
 // null = creando un grupo nuevo; objeto = editando ese grupo.
 const editando = ref(null)
@@ -25,10 +25,7 @@ const form = useForm({
 
 function abrirModal() {
     nextTick(() => {
-        if (!modalInstance) {
-            modalInstance = new Modal(modalEl.value)
-        }
-        modalInstance.show()
+        modal.mostrar(modalEl.value)
     })
 }
 
@@ -51,7 +48,7 @@ function submit() {
     const opciones = {
         preserveScroll: true,
         onSuccess: () => {
-            modalInstance?.hide()
+            modal.ocultar()
             form.reset()
         },
     }
