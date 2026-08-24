@@ -43,7 +43,7 @@ class UserControllerTest extends TestCase
             'id_persona' => $persona->id,
             'email' => 'nuevo.conductor@example.com',
             'estado_usuario' => 'ACTIVO',
-            'tipo' => 'conductor',
+            'roles' => ['conductor'],
             'estado_conductor' => 'ACTIVO',
             'id_vehiculo' => $vehiculo->id,
         ]);
@@ -70,7 +70,7 @@ class UserControllerTest extends TestCase
             'id_persona' => $persona->id,
             'email' => 'duplicado@example.com',
             'estado_usuario' => 'ACTIVO',
-            'tipo' => 'personal',
+            'roles' => [],
         ]);
 
         $response->assertSessionHasErrors('id_persona');
@@ -86,7 +86,7 @@ class UserControllerTest extends TestCase
             'id_persona' => $persona->id,
             'email' => 'transicion@example.com',
             'estado_usuario' => 'ACTIVO',
-            'tipo' => 'conductor',
+            'roles' => ['conductor'],
             'estado_conductor' => 'ACTIVO',
             'id_vehiculo' => $vehiculo->id,
         ]);
@@ -97,7 +97,7 @@ class UserControllerTest extends TestCase
             '_method' => 'PUT',
             'email' => 'transicion@example.com',
             'estado_usuario' => 'ACTIVO',
-            'tipo' => 'jefe-area',
+            'roles' => ['jefe-area'],
             'id_area' => $area->id,
             'tipo_encargo' => 'TITULAR',
         ]);
@@ -115,6 +115,46 @@ class UserControllerTest extends TestCase
             'id_persona' => $persona->id,
             'id_area' => $area->id,
             'estado_encargo' => 'ACTIVO',
+        ]);
+    }
+
+    public function test_usuario_puede_tener_varios_roles_a_la_vez(): void
+    {
+        $persona = Persona::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'multirol@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => ['conductor', 'administrador'],
+            'estado_conductor' => 'ACTIVO',
+            'id_vehiculo' => $vehiculo->id,
+        ]);
+
+        $response->assertRedirect(route('usuarios.index'));
+
+        $usuario = User::where('email', 'multirol@example.com')->firstOrFail();
+        $this->assertTrue($usuario->hasRole('conductor'));
+        $this->assertTrue($usuario->hasRole('administrador'));
+        $this->assertDatabaseHas('conductor', ['id' => $persona->id]);
+
+        $response = $this->actingAs($this->admin)->post(route('usuarios.update', $usuario->id), [
+            '_method' => 'PUT',
+            'email' => 'multirol@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => ['administrador'],
+        ]);
+
+        $response->assertRedirect(route('usuarios.index'));
+
+        $usuario->refresh();
+        $this->assertFalse($usuario->hasRole('conductor'));
+        $this->assertTrue($usuario->hasRole('administrador'));
+        $this->assertDatabaseHas('asignacion', [
+            'id_conductor' => $persona->id,
+            'id_vehiculo' => $vehiculo->id,
+            'estado_asignacion' => 'INACTIVO',
         ]);
     }
 

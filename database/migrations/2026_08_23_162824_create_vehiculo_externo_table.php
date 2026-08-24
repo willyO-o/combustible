@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('vehiculo_externo', function (Blueprint $table) {
             $table->id();
             $table->string('nro_placa', 20)->nullable();
-            $table->string('codigo', 50)->nullable();
             $table->string('propietario', 250)->nullable();
 
         });

@@ -8,6 +8,7 @@ use App\Http\Requests\UserRequest;
 use App\Models\Area;
 use App\Models\Persona;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -46,20 +48,27 @@ class UserController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('Usuarios/Create', [
+        return Inertia::render('Usuarios/Form', [
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
+            'roles' => $this->rolesAsignables(),
         ]);
     }
 
     public function store(UserRequest $request, UpdatePersonaAction $action): RedirectResponse
     {
-        if (! auth()->user()->hasRole('administrador')) {
+        //validar por permiso no por rol
+        if( !$request->user()->can('crear-usuario') ){
             abort(403);
         }
 
         $persona = Persona::findOrFail($request->id_persona);
 
-        $action->execute($persona, $this->datosPersonaParaAction($persona, $request));
+        $persona = $action->execute($persona, $this->datosPersonaParaAction($persona, $request));
+
+        // UpdatePersonaAction solo asigna, como máximo, el rol de conductor o
+        // jefe de área (ver tipoDesdeRoles). Aquí se sincroniza el conjunto
+        // completo de roles seleccionado, que puede incluir varios a la vez.
+        $persona->user->syncRoles($request->validated('roles', []));
 
         return redirect()->route('usuarios.index')
             ->with('success', "Usuario para {$persona->nombres} creado exitosamente.");
@@ -71,9 +80,11 @@ class UserController extends Controller
 
         $persona = $usuario->persona;
 
-        return Inertia::render('Usuarios/Edit', [
+        return Inertia::render('Usuarios/Form', [
             'usuario' => $usuario,
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
+            'roles' => $this->rolesAsignables(),
+            'rolesAsignados' => $usuario->getRoleNames(),
             'vehiculoActual' => $persona?->conductor?->asignacionesActivas->first(),
             'areaActual' => $persona?->encargadoAreas->first(),
         ]);
@@ -81,7 +92,7 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $usuario, UpdatePersonaAction $action): RedirectResponse
     {
-        if (! auth()->user()->hasRole('administrador')) {
+        if (! $request->user()->can('editar-usuario')) {
             abort(403);
         }
 
@@ -89,6 +100,8 @@ class UserController extends Controller
 
         if ($persona) {
             $action->execute($persona, $this->datosPersonaParaAction($persona, $request));
+
+            $usuario->syncRoles($request->validated('roles', []));
         } else {
             // Cuentas de sistema sin persona vinculada (ej. administradores sembrados
             // directamente): solo se gestionan sus datos propios de usuario.
@@ -104,7 +117,7 @@ class UserController extends Controller
 
     public function cambiarEstado(Request $request, User $usuario): RedirectResponse
     {
-        if (! auth()->user()->hasRole('administrador')) {
+        if (! $request->user()->can('cambiar-estado-usuario')) {
             abort(403);
         }
 
@@ -180,6 +193,38 @@ class UserController extends Controller
             'estado_persona' => $persona->estado_persona,
         ], $request->validated(), [
             'crear_usuario' => true,
+            'tipo' => $this->tipoDesdeRoles($request->validated('roles', [])),
         ]);
+    }
+
+    /**
+     * UpdatePersonaAction (compartida con PersonaController) sigue decidiendo
+     * qué registros de dominio gestionar (conductor + asignación, o jefe de
+     * área + encargo) a partir de un único "tipo". Con múltiples roles, se
+     * deriva ese tipo dando prioridad a conductor y luego a jefe-area —
+     * igual que Persona::tipo_actual — sin que eso limite los demás roles,
+     * que se sincronizan aparte con el conjunto completo seleccionado.
+     *
+     * @param  array<int, string>  $roles
+     */
+    private function tipoDesdeRoles(array $roles): string
+    {
+        return match (true) {
+            in_array('conductor', $roles, true) => 'conductor',
+            in_array('jefe-area', $roles, true) => 'jefe-area',
+            default => 'personal',
+        };
+    }
+
+    /**
+     * Roles que pueden asignarse a un usuario desde este módulo: todos los
+     * existentes (y los que se creen a futuro desde el módulo de Roles),
+     * salvo los ocultos (super-admin, ver config/acl.php).
+     */
+    private function rolesAsignables(): Collection
+    {
+        return Role::whereNotIn('name', config('acl.roles_ocultos'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 }

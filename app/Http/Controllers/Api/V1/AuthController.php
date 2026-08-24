@@ -61,9 +61,24 @@ class AuthController extends Controller
         $user = auth('api')->user();
         $user->load('persona');
 
+
+
         return response()->json([
             'success' => true,
-            'data'    => $user,
+            'data'    => [
+                'name'     => $user->name,
+                'email'    => $user->email,
+                'nombre_completo'  => $user->persona->nombre_completo ?? null,
+                'nombres'  => $user->persona->nombres ?? null,
+                'paterno'  => $user->persona->paterno ?? null,
+                'materno'  => $user->persona->materno ?? null,
+                'ci'       => $user->persona->ci ?? null,
+                'f_nacimiento_formatted' => $user->persona->f_nacimiento_formatted ?? null,
+                'foto_url' => $user->persona->foto_url ?? null,
+                'celular' => $user->persona->celular ?? null,
+                'roles'    => $user->roles->pluck('name'), // Retorna solo los nombres de los roles
+                'permisos' => $user->getAllPermissions()->pluck('name'), // Retorna solo los nombres de los permisos
+            ],
         ]);
     }
 
@@ -136,6 +151,7 @@ class AuthController extends Controller
                 'foto_url' => $userData->persona->foto_url ?? null,
                 'celular' => $userData->persona->celular ?? null,
                 'roles'    => $userData->roles->pluck('name'), // Retorna solo los nombres de los roles
+                'permisos' => $userData->getAllPermissions()->pluck('name'), // Retorna solo los nombres de los permisos
             ],
         ]);
     }

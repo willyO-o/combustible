@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            $table->string('foto', 255)->nullable();
             $table->enum('estado_usuario', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
         });
     }
@@ -22,6 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn('foto');
             $table->dropColumn('estado_usuario');
         });
     }

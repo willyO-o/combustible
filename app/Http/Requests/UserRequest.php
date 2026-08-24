@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class UserRequest extends FormRequest
 {
@@ -16,9 +17,9 @@ class UserRequest extends FormRequest
     {
         $usuario = $this->route('usuario');
         $isEdit = $this->isMethod('PUT') || $this->isMethod('PATCH');
-        // En edición, una cuenta de sistema sin persona vinculada (ej. administradores
-        // sembrados directamente) no tiene tipo/rol operativo que gestionar aquí.
-        $requiereTipo = ! $isEdit || $usuario?->persona !== null;
+
+        $rolesAsignables = Role::whereNotIn('name', config('acl.roles_ocultos'))->pluck('name')->all();
+        $tieneRol = fn (string $rol) => in_array($rol, $this->input('roles', []), true);
 
         return [
             'id_persona' => [
@@ -29,14 +30,17 @@ class UserRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'estado_usuario' => ['required', Rule::in(['ACTIVO', 'INACTIVO'])],
 
-            'tipo' => ['nullable', Rule::requiredIf($requiereTipo), Rule::in(['conductor', 'jefe-area', 'personal'])],
+            // Un usuario puede tener varios roles a la vez. Sin roles seleccionados,
+            // queda como "personal" (cuenta con acceso, sin rol operativo).
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['string', Rule::in($rolesAsignables)],
 
-            'estado_conductor' => ['required_if:tipo,conductor', Rule::in(['ACTIVO', 'INACTIVO', 'RETIRADO'])],
+            'estado_conductor' => [Rule::requiredIf(fn () => $tieneRol('conductor')), Rule::in(['ACTIVO', 'INACTIVO', 'RETIRADO'])],
             'id_vehiculo' => ['nullable', 'exists:vehiculo,id'],
             'fecha_asignacion' => ['nullable', 'date'],
 
-            'id_area' => ['required_if:tipo,jefe-area', 'exists:area,id'],
-            'tipo_encargo' => ['required_if:tipo,jefe-area', Rule::in(['TITULAR', 'SUPLENTE'])],
+            'id_area' => [Rule::requiredIf(fn () => $tieneRol('jefe-area')), 'exists:area,id'],
+            'tipo_encargo' => [Rule::requiredIf(fn () => $tieneRol('jefe-area')), Rule::in(['TITULAR', 'SUPLENTE'])],
             'fecha_inicio_encargo' => ['nullable', 'date'],
             'motivo_encargo' => ['nullable', 'string', 'max:255'],
         ];
@@ -48,7 +52,8 @@ class UserRequest extends FormRequest
             'id_persona' => 'persona',
             'email' => 'correo electrónico',
             'estado_usuario' => 'estado del usuario',
-            'tipo' => 'tipo de registro',
+            'roles' => 'roles',
+            'roles.*' => 'rol',
             'estado_conductor' => 'estado del conductor',
             'id_vehiculo' => 'vehículo',
             'fecha_asignacion' => 'fecha de asignación',
