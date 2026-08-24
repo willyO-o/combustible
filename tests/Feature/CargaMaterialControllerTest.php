@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CargaMaterial;
 use App\Models\Material;
+use App\Models\ParametrosEmpresa;
 use App\Models\User;
 use App\Models\VehiculoExterno;
 use App\Models\Viaje;
@@ -36,6 +37,17 @@ class CargaMaterialControllerTest extends TestCase
 
         $this->jefeArea = User::factory()->create();
         $this->jefeArea->assignRole('jefe-area');
+
+        // CargaMaterial::calcularGestion()/getNroAttribute() leen este parámetro.
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Plus Metals Ltda.',
+            'direccion_empresa' => 'Calle Principal 123',
+            'telefono_empresa' => '123456789',
+            'correo_empresa' => 'info@miempresa.com',
+            'nit_empresa' => '123456789',
+            'parametros_vale' => ['tiempo_expiracion' => 1],
+            'estado' => 'ACTIVO',
+        ]);
     }
 
     /** Crea una carga abierta por el usuario indicado, sin afectar la sesión actual. */
@@ -134,6 +146,20 @@ class CargaMaterialControllerTest extends TestCase
         $this->actingAs($this->conductor)->post(route('control-cargas.store'), $datos);
 
         $this->assertSame([1, 2], CargaMaterial::orderBy('id')->pluck('nro_carga')->toArray());
+    }
+
+    public function test_store_asigna_la_gestion_configurada_y_formatea_el_nro(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $this->actingAs($this->conductor)->post(route('control-cargas.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+        ]);
+
+        $carga = CargaMaterial::first();
+
+        $this->assertSame((string) now()->year, $carga->gestion);
+        $this->assertSame('000001/'.now()->year, $carga->nro);
     }
 
     public function test_store_requiere_vehiculo(): void
@@ -336,6 +362,20 @@ class CargaMaterialControllerTest extends TestCase
         $this->assertSame(0, Viaje::count());
     }
 
+    public function test_registrar_viaje_requiere_origen_y_destino(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $material = Material::factory()->create();
+
+        $response = $this->actingAs($this->conductor)->post(
+            route('control-cargas.viajes.registrar', $carga->id),
+            ['id_material' => $material->id, 'foto' => UploadedFile::fake()->image('viaje.jpg')]
+        );
+
+        $response->assertSessionHasErrors(['origen', 'destino']);
+        $this->assertSame(0, Viaje::count());
+    }
+
     public function test_registrar_viaje_falla_si_la_carga_esta_cerrada(): void
     {
         Storage::fake('public');
@@ -348,7 +388,12 @@ class CargaMaterialControllerTest extends TestCase
             ->from(route('control-cargas.show', $carga->id))
             ->post(
                 route('control-cargas.viajes.registrar', $carga->id),
-                ['id_material' => $material->id, 'foto' => UploadedFile::fake()->image('viaje.jpg')]
+                [
+                    'id_material' => $material->id,
+                    'foto' => UploadedFile::fake()->image('viaje.jpg'),
+                    'origen' => 'Cantera Norte',
+                    'destino' => 'Planta',
+                ]
             );
 
         $response->assertRedirect(route('control-cargas.show', $carga->id));

@@ -47,7 +47,9 @@ class OrdenTrabajo extends Model
 
     public function getNroAttribute()
     {
-        return $this->nro_orden ? str_pad($this->nro_orden, 6, '0', STR_PAD_LEFT).'/'.$this->gestion : null;
+        $digitos = ParametrosEmpresa::first()->parametros_vale->digitos_serie;
+
+        return $this->nro_orden ? str_pad($this->nro_orden, $digitos, '0', STR_PAD_LEFT).'/'.$this->gestion : null;
     }
 
     /**
@@ -96,9 +98,11 @@ class OrdenTrabajo extends Model
 
     protected function calcularGestion(): string
     {
-        // Si el mes actual es noviembre (11) o diciembre (12),
-        // la gestión ya pertenece al año siguiente
-        return (string) (now()->month >= 11 ? now()->year + 1 : now()->year);
+        $mesCicloContable = ParametrosEmpresa::first()->parametros_vale->mes_ciclo_contable;
+
+        // Si el mes actual alcanzó el mes de inicio del ciclo contable
+        // configurado, la gestión ya pertenece al año siguiente.
+        return (string) (now()->month >= $mesCicloContable ? now()->year + 1 : now()->year);
     }
 
     public static function siguienteNroOrden(string $gestion): int

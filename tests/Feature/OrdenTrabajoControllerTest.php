@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\DetalleMantenimiento;
 use App\Models\OrdenTrabajo;
+use App\Models\ParametrosEmpresa;
 use App\Models\SolicitudMantenimiento;
 use App\Models\Taller;
 use App\Models\TipoMantenimiento;
@@ -35,6 +36,17 @@ class OrdenTrabajoControllerTest extends TestCase
         // Los modelos SolicitudMantenimiento/OrdenTrabajo asignan el usuario
         // autenticado (id_usuario_registra/id_usuario_emite) al crearse.
         $this->actingAs($this->admin);
+
+        // OrdenTrabajo::calcularGestion()/getNroAttribute() leen este parámetro.
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Plus Metals Ltda.',
+            'direccion_empresa' => 'Calle Principal 123',
+            'telefono_empresa' => '123456789',
+            'correo_empresa' => 'info@miempresa.com',
+            'nit_empresa' => '123456789',
+            'parametros_vale' => ['tiempo_expiracion' => 1],
+            'estado' => 'ACTIVO',
+        ]);
     }
 
     private function crearSolicitud(array $overrides = []): SolicitudMantenimiento

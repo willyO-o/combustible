@@ -42,7 +42,7 @@ function submit() {
 </script>
 
 <template>
-    <Head :title="isEditing ? `Editar Carga #${carga.nro_carga}` : 'Nueva Carga'" />
+    <Head :title="isEditing ? `Editar Carga #${carga.nro}` : 'Nueva Carga'" />
 
     <!-- Breadcrumb -->
     <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -59,7 +59,7 @@ function submit() {
                 </ol>
             </nav>
             <h1 class="page-title fw-medium fs-18 mb-0">
-                <template v-if="isEditing">Editar Carga #{{ carga.nro_carga }}</template>
+                <template v-if="isEditing">Editar Carga #{{ carga.nro }}</template>
                 <template v-else>Nueva Carga</template>
             </h1>
         </div>

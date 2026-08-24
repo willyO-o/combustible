@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-//soft delete
+use Illuminate\Database\Eloquent\Model;
+// soft delete
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
@@ -24,8 +24,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Vale extends Model
 {
     use SoftDeletes;
-    protected $table = 'vale';
 
+    protected $table = 'vale';
 
     protected $appends = ['nro', 'fecha_emision_f', 'fecha_vencimiento_f'];
 
@@ -39,8 +39,11 @@ class Vale extends Model
 
     public function getNroAttribute()
     {
-        return str_pad($this->nro_vale, 6, '0', STR_PAD_LEFT) . '/' . $this->gestion;
+        $digitos = ParametrosEmpresa::first()->parametros_vale->digitos_serie;
+
+        return str_pad($this->nro_vale, $digitos, '0', STR_PAD_LEFT).'/'.$this->gestion;
     }
+
     public function getFechaEmisionFAttribute()
     {
         return $this->fecha_emision ? $this->fecha_emision->format('d/m/Y H:i') : null;
@@ -71,10 +74,12 @@ class Vale extends Model
     {
         return $this->hasMany(CargaCombustible::class, 'id_vale');
     }
+
     public function tipoCombustible()
     {
         return $this->belongsTo(TipoCombustible::class, 'id_tipo_combustible');
     }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'id_user');
@@ -91,9 +96,11 @@ class Vale extends Model
 
     protected function calcularGestion(): int
     {
-        // Si el mes actual es noviembre (11) o diciembre (12),
-        // la gestión ya pertenece al año siguiente
-        return now()->month >= 11 ? now()->year + 1 : now()->year;
+        $mesCicloContable = ParametrosEmpresa::first()->parametros_vale->mes_ciclo_contable;
+
+        // Si el mes actual alcanzó el mes de inicio del ciclo contable
+        // configurado, la gestión ya pertenece al año siguiente.
+        return now()->month >= $mesCicloContable ? now()->year + 1 : now()->year;
     }
 
     public static function siguienteNroVale(int $gestion): int
@@ -108,7 +115,9 @@ class Vale extends Model
 
     public static function siguienteNroValeProvisional(): string
     {
-        $gestion = now()->month >= 11 ? now()->year + 1 : now()->year;
+        $parametrosVale = ParametrosEmpresa::first()->parametros_vale;
+
+        $gestion = now()->month >= $parametrosVale->mes_ciclo_contable ? now()->year + 1 : now()->year;
 
         $ultimo = Vale::where('gestion', $gestion)
             ->orderBy('nro_vale', 'desc')
@@ -116,7 +125,7 @@ class Vale extends Model
 
         $siguienteNro = $ultimo ? $ultimo->nro_vale + 1 : 1;
 
-        return str_pad($siguienteNro, 6, '0', STR_PAD_LEFT) . '/' . $gestion;
+        return str_pad($siguienteNro, $parametrosVale->digitos_serie, '0', STR_PAD_LEFT).'/'.$gestion;
     }
 
     protected static function boot()

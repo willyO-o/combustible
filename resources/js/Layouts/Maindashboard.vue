@@ -27,13 +27,22 @@ const customClass = computed(() =>
 )
 
 const page = usePage();
-watch(() => page.props.flash, (flash) => {
 
-
-    if (flash.success) {
-        showToast(flash.success);
+// header.vue hace usePoll(30000, { only: ['notificaciones'] }) para refrescar
+// las notificaciones del header en segundo plano. Cada uno de esos polls
+// reasigna page.props (aunque flash no venga en la respuesta parcial). Un
+// watch({ deep: true }) sobre el objeto flash completo se dispara en CADA
+// reasignación de page.props sin importar si su contenido cambió (con
+// deep:true Vue se salta la comparación de valor y siempre invoca el
+// callback cuando se reevalúa el getter) — por eso el mismo toast volvía a
+// mostrarse cada ~30s sin ninguna acción del usuario. Al observar el string
+// primitivo en vez del objeto, Vue solo dispara el callback cuando el
+// mensaje realmente cambia.
+watch(() => page.props.flash?.success, (mensaje) => {
+    if (mensaje) {
+        showToast(mensaje);
     }
-}, { deep: true });
+});
 
 
 // Scroll progress logic

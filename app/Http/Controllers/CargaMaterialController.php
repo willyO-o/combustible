@@ -50,7 +50,7 @@ class CargaMaterialController extends Controller
 
         $cargas->through(fn (CargaMaterial $carga) => [
             'id' => $carga->id,
-            'nro_carga' => $carga->nro_carga,
+            'nro' => $carga->nro,
             'estado_carga' => $carga->estado_carga,
             'fecha_apertura' => $carga->fecha_apertura?->format('d/m/Y H:i'),
             'nombre_conductor' => $carga->nombre_conductor,
@@ -88,7 +88,7 @@ class CargaMaterialController extends Controller
         $carga = CargaMaterial::create($request->validated());
 
         return redirect()->route('control-cargas.show', $carga->id)
-            ->with('success', "Carga #{$carga->nro_carga} registrada exitosamente. Ya puedes registrar viajes.");
+            ->with('success', "Carga #{$carga->nro} registrada exitosamente. Ya puedes registrar viajes.");
     }
 
     public function edit(CargaMaterial $cargaMaterial): Response
@@ -100,7 +100,7 @@ class CargaMaterialController extends Controller
         return Inertia::render('ControlCargas/Form', [
             'carga' => [
                 'id' => $cargaMaterial->id,
-                'nro_carga' => $cargaMaterial->nro_carga,
+                'nro' => $cargaMaterial->nro,
                 'estado_carga' => $cargaMaterial->estado_carga,
                 'nombre_conductor' => $cargaMaterial->nombre_conductor,
                 'telefono' => $cargaMaterial->telefono,
@@ -123,7 +123,7 @@ class CargaMaterialController extends Controller
         $cargaMaterial->update($request->safe()->only(['nombre_conductor', 'telefono', 'observaciones']));
 
         return redirect()->route('control-cargas.index')
-            ->with('success', "Carga #{$cargaMaterial->nro_carga} actualizada exitosamente.");
+            ->with('success', "Carga #{$cargaMaterial->nro} actualizada exitosamente.");
     }
 
     public function show(CargaMaterial $cargaMaterial): Response
@@ -148,7 +148,7 @@ class CargaMaterialController extends Controller
         return Inertia::render('ControlCargas/Show', [
             'carga' => [
                 'id' => $cargaMaterial->id,
-                'nro_carga' => $cargaMaterial->nro_carga,
+                'nro' => $cargaMaterial->nro,
                 'estado_carga' => $cargaMaterial->estado_carga,
                 'fecha_apertura' => $cargaMaterial->fecha_apertura?->format('d/m/Y H:i'),
                 'nombre_conductor' => $cargaMaterial->nombre_conductor,

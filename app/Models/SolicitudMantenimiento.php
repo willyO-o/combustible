@@ -35,8 +35,9 @@ class SolicitudMantenimiento extends Model
 
     public function getNroAttribute()
     {
-        // rellenar con ceros a la izquierda hasta 6 dígitos
-        return $this->nro_solicitud ? str_pad($this->nro_solicitud, 6, '0', STR_PAD_LEFT).'/'.$this->gestion : null;
+        $digitos = ParametrosEmpresa::first()->parametros_vale->digitos_serie;
+
+        return $this->nro_solicitud ? str_pad($this->nro_solicitud, $digitos, '0', STR_PAD_LEFT).'/'.$this->gestion : null;
     }
 
     public function getFechaAttribute()
@@ -72,9 +73,11 @@ class SolicitudMantenimiento extends Model
 
     protected function calcularGestion(): int
     {
-        // Si el mes actual es noviembre (11) o diciembre (12),
-        // la gestión ya pertenece al año siguiente
-        return now()->month >= 11 ? now()->year + 1 : now()->year;
+        $mesCicloContable = ParametrosEmpresa::first()->parametros_vale->mes_ciclo_contable;
+
+        // Si el mes actual alcanzó el mes de inicio del ciclo contable
+        // configurado, la gestión ya pertenece al año siguiente.
+        return now()->month >= $mesCicloContable ? now()->year + 1 : now()->year;
     }
 
     public static function siguienteNroSolicitud(int $gestion): int

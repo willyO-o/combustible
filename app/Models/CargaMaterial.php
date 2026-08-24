@@ -28,6 +28,8 @@ class CargaMaterial extends Model
 
     protected $table = 'carga_material';
 
+    protected $appends = ['nro'];
+
     public function uniqueIds(): array
     {
         return ['uuid'];
@@ -42,13 +44,39 @@ class CargaMaterial extends Model
         ];
     }
 
+    public function getNroAttribute()
+    {
+        $digitos = ParametrosEmpresa::first()->parametros_vale->digitos_serie;
+
+        return $this->nro_carga ? str_pad($this->nro_carga, $digitos, '0', STR_PAD_LEFT).'/'.$this->gestion : null;
+    }
+
+    protected function calcularGestion(): string
+    {
+        $mesCicloContable = ParametrosEmpresa::first()->parametros_vale->mes_ciclo_contable;
+
+        // Si el mes actual alcanzó el mes de inicio del ciclo contable
+        // configurado, la gestión ya pertenece al año siguiente.
+        return (string) (now()->month >= $mesCicloContable ? now()->year + 1 : now()->year);
+    }
+
+    public static function siguienteNroCarga(string $gestion): int
+    {
+        $ultimo = self::where('gestion', $gestion)
+            ->lockForUpdate()
+            ->orderBy('nro_carga', 'desc')
+            ->first();
+
+        return $ultimo ? $ultimo->nro_carga + 1 : 1;
+    }
+
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function (self $carga) {
-            $ultimoNroCarga = self::max('nro_carga');
-            $carga->nro_carga = $ultimoNroCarga ? $ultimoNroCarga + 1 : 1;
+            $carga->gestion = $carga->calcularGestion();
+            $carga->nro_carga = self::siguienteNroCarga($carga->gestion);
 
             $carga->id_usuario_apertura = Auth::id();
             $carga->fecha_apertura = now();

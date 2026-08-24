@@ -3,8 +3,9 @@ import { ref, nextTick } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
+import axios from 'axios'
+import Swal from 'sweetalert2'
 import InputError from '@/Components/InputError.vue'
-import MaterialFormModal from '@/Components/MaterialFormModal.vue'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 
 const props = defineProps({
@@ -17,11 +18,58 @@ const props = defineProps({
 // Copia local editable: al dar de alta un material nuevo desde el "+", se
 // agrega aquí mismo y queda seleccionado de inmediato.
 const materialesList = ref([...props.materiales])
-const materialModal = ref(null)
 
 function onMaterialCreado(material) {
     materialesList.value.push(material)
     form.id_material = material.id
+}
+
+/**
+ * Alta rápida de material desde dentro del modal "Registrar Viaje". Se usa
+ * SweetAlert2 (en vez de MaterialFormModal, otro modal de Bootstrap) porque
+ * dos modales de Bootstrap superpuestos generan un doble backdrop y se ven
+ * mal; SweetAlert2 se dibuja por encima sin ese problema.
+ */
+async function crearMaterialRapido() {
+    const { value: material } = await Swal.fire({
+        // El "focus trap" del modal de Bootstrap detecta el foco en el
+        // popup de SweetAlert2 (montado por defecto en <body>, fuera del
+        // .modal) y lo devuelve a la fuerza al modal en cada tecla,
+        // haciendo que el input se vea como deshabilitado. Montar el popup
+        // dentro del propio elemento del modal evita eso.
+        target: modalEl.value,
+        title: 'Nuevo Material',
+        input: 'text',
+        inputLabel: 'Nombre del material',
+        inputPlaceholder: 'Ej: Arena, Grava, Cemento...',
+        inputAttributes: { maxlength: '150', autocapitalize: 'off' },
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        showLoaderOnConfirm: true,
+        allowOutsideClick: () => !Swal.isLoading(),
+        preConfirm: async (nombre) => {
+            if (!nombre?.trim()) {
+                Swal.showValidationMessage('El nombre del material es obligatorio.')
+                return false
+            }
+
+            try {
+                const { data } = await axios.post(route('materiales.store'), { material: nombre.trim() })
+
+                return data.data
+            } catch (error) {
+                const mensaje = error.response?.data?.errors?.material?.[0] ?? 'No se pudo guardar el material.'
+                Swal.showValidationMessage(mensaje)
+
+                return false
+            }
+        },
+    })
+
+    if (material) {
+        onMaterialCreado(material)
+    }
 }
 
 const estadoBadge = (estado) => ({
@@ -90,7 +138,7 @@ function submit() {
 </script>
 
 <template>
-    <Head :title="`Carga #${carga.nro_carga}`" />
+    <Head :title="`Carga #${carga.nro}`" />
 
     <!-- Page header -->
     <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -103,10 +151,10 @@ function submit() {
                     <li class="breadcrumb-item">
                         <Link :href="route('control-cargas.index')">Control de Cargas</Link>
                     </li>
-                    <li class="breadcrumb-item active">Carga #{{ carga.nro_carga }}</li>
+                    <li class="breadcrumb-item active">Carga #{{ carga.nro }}</li>
                 </ol>
             </nav>
-            <h1 class="page-title fw-medium fs-18 mb-0">Carga #{{ carga.nro_carga }}</h1>
+            <h1 class="page-title fw-medium fs-18 mb-0">Carga #{{ carga.nro }}</h1>
         </div>
         <Link :href="route('control-cargas.index')" class="btn btn-outline-secondary btn-wave">
             <i class="ri-arrow-left-line me-1"></i> Volver
@@ -223,7 +271,7 @@ function submit() {
                                     type="button"
                                     class="btn btn-outline-primary flex-shrink-0"
                                     title="Registrar nuevo material"
-                                    @click="materialModal?.open()"
+                                    @click="crearMaterialRapido"
                                 >
                                     <i class="ri-add-line"></i>
                                 </button>
@@ -261,25 +309,25 @@ function submit() {
 
                         <div class="row g-3">
                             <div class="col-sm-6">
-                                <label class="form-label fw-medium">Origen</label>
+                                <label class="form-label fw-medium">Origen <span class="text-danger">*</span></label>
                                 <input
                                     v-model="form.origen"
                                     type="text"
                                     class="form-control"
                                     :class="{ 'is-invalid': form.errors.origen }"
-                                    placeholder="Ej: Cantera Norte (opcional)"
+                                    placeholder="Ej: Cantera Norte"
                                     maxlength="255"
                                 />
                                 <InputError :message="form.errors.origen" class="mt-1" />
                             </div>
                             <div class="col-sm-6">
-                                <label class="form-label fw-medium">Destino</label>
+                                <label class="form-label fw-medium">Destino <span class="text-danger">*</span></label>
                                 <input
                                     v-model="form.destino"
                                     type="text"
                                     class="form-control"
                                     :class="{ 'is-invalid': form.errors.destino }"
-                                    placeholder="Ej: Planta (opcional)"
+                                    placeholder="Ej: Planta"
                                     maxlength="255"
                                 />
                                 <InputError :message="form.errors.destino" class="mt-1" />
@@ -302,7 +350,7 @@ function submit() {
                         <button type="button" class="btn btn-outline-secondary btn-wave" data-bs-dismiss="modal">
                             Cancelar
                         </button>
-                        <button type="submit" class="btn btn-primary btn-wave" :disabled="form.processing || !form.foto || !form.id_material">
+                        <button type="submit" class="btn btn-primary btn-wave" :disabled="form.processing || !form.foto || !form.id_material || !form.origen || !form.destino">
                             <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
                             <i v-else class="ri-save-line me-1"></i>
                             {{ form.processing ? 'Guardando...' : 'Registrar Viaje' }}
@@ -312,7 +360,4 @@ function submit() {
             </div>
         </div>
     </div>
-
-    <!-- Modal reutilizable para dar de alta un material al vuelo -->
-    <MaterialFormModal ref="materialModal" @created="onMaterialCreado" />
 </template>

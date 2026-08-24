@@ -16,8 +16,8 @@ class ViajeRequest extends FormRequest
         return [
             'id_material' => ['required', 'integer', 'exists:material,id'],
             'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:8192'],
-            'origen' => ['nullable', 'string', 'max:255'],
-            'destino' => ['nullable', 'string', 'max:255'],
+            'origen' => ['required', 'string', 'max:255'],
+            'destino' => ['required', 'string', 'max:255'],
             'detalle' => ['nullable', 'string', 'max:255'],
         ];
     }

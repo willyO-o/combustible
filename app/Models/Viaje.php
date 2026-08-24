@@ -38,7 +38,7 @@ class Viaje extends Model
 
     public function getFotoUrlAttribute()
     {
-        return $this->foto ? Storage::disk('public')->url($this->foto) : null;
+        return $this->foto ? asset("storage/{$this->foto}") : null;
     }
 
     // Relaciones

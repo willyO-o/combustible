@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Conductor;
 use App\Models\OrdenTrabajo;
+use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\SolicitudMantenimiento;
 use App\Models\User;
@@ -28,6 +29,17 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $this->admin = User::factory()->create();
         $this->admin->assignRole('administrador');
         $this->actingAs($this->admin);
+
+        // SolicitudMantenimiento::calcularGestion()/getNroAttribute() leen este parámetro.
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Plus Metals Ltda.',
+            'direccion_empresa' => 'Calle Principal 123',
+            'telefono_empresa' => '123456789',
+            'correo_empresa' => 'info@miempresa.com',
+            'nit_empresa' => '123456789',
+            'parametros_vale' => ['tiempo_expiracion' => 1],
+            'estado' => 'ACTIVO',
+        ]);
     }
 
     private function crearSolicitud(array $overrides = []): SolicitudMantenimiento

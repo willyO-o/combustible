@@ -107,7 +107,7 @@ const estadoBadge = (estado) => ({
                             <div class="fw-semibold fs-16">{{ carga.vehiculo_externo?.nro_placa ?? '—' }}</div>
                             <small class="text-muted">{{ carga.vehiculo_externo?.propietario || 'Sin propietario registrado' }}</small>
                         </div>
-                        <span class="badge" :class="estadoBadge(carga.estado_carga)">#{{ carga.nro_carga }}</span>
+                        <span class="badge" :class="estadoBadge(carga.estado_carga)">#{{ carga.nro }}</span>
                     </div>
 
                     <div class="d-flex flex-wrap gap-1 mb-2">

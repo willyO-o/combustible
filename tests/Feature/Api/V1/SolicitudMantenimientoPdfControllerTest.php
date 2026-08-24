@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1;
 use App\Models\Conductor;
 use App\Models\DetalleMantenimiento;
 use App\Models\OrdenTrabajo;
+use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\Repuesto;
 use App\Models\SolicitudMantenimiento;
@@ -25,6 +26,17 @@ class SolicitudMantenimientoPdfControllerTest extends TestCase
 
         Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+
+        // SolicitudMantenimiento/OrdenTrabajo::calcularGestion()/getNroAttribute() leen este parámetro.
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Plus Metals Ltda.',
+            'direccion_empresa' => 'Calle Principal 123',
+            'telefono_empresa' => '123456789',
+            'correo_empresa' => 'info@miempresa.com',
+            'nit_empresa' => '123456789',
+            'parametros_vale' => ['tiempo_expiracion' => 1],
+            'estado' => 'ACTIVO',
+        ]);
     }
 
     private function crearConductor(): Conductor
