@@ -8,6 +8,22 @@ const props = defineProps({
     parametrosEmpresa: Object,
 })
 
+// Numeración estándar de PHP: 1 = enero ... 12 = diciembre.
+const meses = [
+    { value: 1, label: 'Enero' },
+    { value: 2, label: 'Febrero' },
+    { value: 3, label: 'Marzo' },
+    { value: 4, label: 'Abril' },
+    { value: 5, label: 'Mayo' },
+    { value: 6, label: 'Junio' },
+    { value: 7, label: 'Julio' },
+    { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Septiembre' },
+    { value: 10, label: 'Octubre' },
+    { value: 11, label: 'Noviembre' },
+    { value: 12, label: 'Diciembre' },
+]
+
 const form = useForm({
     _method: 'PUT',
     nombre_empresa: props.parametrosEmpresa?.nombre_empresa ?? '',
@@ -18,6 +34,12 @@ const form = useForm({
     logo_empresa: null,
     parametros_vale: {
         tiempo_expiracion: props.parametrosEmpresa?.parametros_vale?.tiempo_expiracion ?? 1,
+        // Por defecto diciembre (12): el ciclo contable coincide con el año
+        // calendario, sin adelanto de gestión.
+        mes_ciclo_contable: props.parametrosEmpresa?.parametros_vale?.mes_ciclo_contable ?? 12,
+        // Cantidad de dígitos para el relleno con ceros de las series
+        // (nro_vale, nro_orden, nro_solicitud...), ej. 6 = 000003.
+        digitos_serie: props.parametrosEmpresa?.parametros_vale?.digitos_serie ?? 6,
     },
     estado: props.parametrosEmpresa?.estado ?? 'ACTIVO',
 })
@@ -134,12 +156,41 @@ function submit() {
                         <div class="row g-3">
                             <div class="col-sm-4 col-xl-3">
                                 <label class="form-label fw-medium">Tiempo de Expiración del Vale (días) <span class="text-danger">*</span></label>
-                                <input v-model.number="form.parametros_vale.tiempo_expiracion" type="number" min="1" step="1"
+                                <input v-model.number="form.parametros_vale.tiempo_expiracion" type="text" v-entero="1"
                                     class="form-control" :class="{ 'is-invalid': form.errors['parametros_vale.tiempo_expiracion'] }" />
                                 <div v-if="form.errors['parametros_vale.tiempo_expiracion']" class="invalid-feedback">
                                     {{ form.errors['parametros_vale.tiempo_expiracion'] }}
                                 </div>
                                 <small class="text-muted">Días que un vale permanece válido antes de expirar.</small>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-4">
+                                <label class="form-label fw-medium">Mes de Inicio del Ciclo Contable <span class="text-danger">*</span></label>
+                                <select v-model.number="form.parametros_vale.mes_ciclo_contable" class="form-select"
+                                    :class="{ 'is-invalid': form.errors['parametros_vale.mes_ciclo_contable'] }">
+                                    <option v-for="mes in meses" :key="mes.value" :value="mes.value">{{ mes.label }}</option>
+                                </select>
+                                <div v-if="form.errors['parametros_vale.mes_ciclo_contable']" class="invalid-feedback">
+                                    {{ form.errors['parametros_vale.mes_ciclo_contable'] }}
+                                </div>
+                                <small class="text-muted">
+                                    A partir de este mes, las series numeradas (vales, órdenes, solicitudes...)
+                                    comienzan a corresponder a la siguiente gestión. Ej: si es Noviembre, la
+                                    numeración vuelve a 1 desde noviembre en vez de esperar a enero.
+                                </small>
+                            </div>
+
+                            <div class="col-sm-4 col-xl-3">
+                                <label class="form-label fw-medium">Dígitos de la Serie <span class="text-danger">*</span></label>
+                                <input v-model.number="form.parametros_vale.digitos_serie" type="text" v-entero="3"
+                                    class="form-control" :class="{ 'is-invalid': form.errors['parametros_vale.digitos_serie'] }" />
+                                <div v-if="form.errors['parametros_vale.digitos_serie']" class="invalid-feedback">
+                                    {{ form.errors['parametros_vale.digitos_serie'] }}
+                                </div>
+                                <small class="text-muted">
+                                    Cantidad de dígitos con la que se rellenan con ceros los números de serie.
+                                    Ej: 6 dígitos = 000003.
+                                </small>
                             </div>
                         </div>
                     </div>

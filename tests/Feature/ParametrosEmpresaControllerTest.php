@@ -36,7 +36,7 @@ class ParametrosEmpresaControllerTest extends TestCase
             'telefono_empresa' => '123456789',
             'correo_empresa' => 'info@miempresa.com',
             'nit_empresa' => '123456789',
-            'parametros_vale' => ['tiempo_expiracion' => 3],
+            'parametros_vale' => ['tiempo_expiracion' => 3, 'mes_ciclo_contable' => 12, 'digitos_serie' => 6],
             'estado' => 'ACTIVO',
         ], $overrides);
     }
@@ -80,13 +80,77 @@ class ParametrosEmpresaControllerTest extends TestCase
         $this->assertSame(3, $parametrosEmpresa->parametros_vale->tiempo_expiracion);
     }
 
+    public function test_update_guarda_el_mes_de_ciclo_contable(): void
+    {
+        $response = $this->actingAs($this->admin)->put(route('parametros-empresa.update'), $this->datosValidos([
+            'parametros_vale' => ['tiempo_expiracion' => 3, 'mes_ciclo_contable' => 11, 'digitos_serie' => 6],
+        ]));
+
+        $response->assertRedirect(route('parametros-empresa.edit'));
+
+        $parametrosEmpresa = ParametrosEmpresa::first();
+        $this->assertSame(11, $parametrosEmpresa->parametros_vale->mes_ciclo_contable);
+    }
+
+    public function test_update_rechaza_un_mes_de_ciclo_contable_fuera_de_rango(): void
+    {
+        $response = $this->actingAs($this->admin)->put(route('parametros-empresa.update'), $this->datosValidos([
+            'parametros_vale' => ['tiempo_expiracion' => 3, 'mes_ciclo_contable' => 13, 'digitos_serie' => 6],
+        ]));
+
+        $response->assertSessionHasErrors(['parametros_vale.mes_ciclo_contable']);
+        $this->assertDatabaseCount('parametros_empresa', 0);
+    }
+
+    public function test_update_guarda_los_digitos_de_la_serie(): void
+    {
+        $response = $this->actingAs($this->admin)->put(route('parametros-empresa.update'), $this->datosValidos([
+            'parametros_vale' => ['tiempo_expiracion' => 3, 'mes_ciclo_contable' => 12, 'digitos_serie' => 8],
+        ]));
+
+        $response->assertRedirect(route('parametros-empresa.edit'));
+
+        $parametrosEmpresa = ParametrosEmpresa::first();
+        $this->assertSame(8, $parametrosEmpresa->parametros_vale->digitos_serie);
+    }
+
+    public function test_update_rechaza_una_cantidad_de_digitos_de_serie_fuera_de_rango(): void
+    {
+        $response = $this->actingAs($this->admin)->put(route('parametros-empresa.update'), $this->datosValidos([
+            'parametros_vale' => ['tiempo_expiracion' => 3, 'mes_ciclo_contable' => 12, 'digitos_serie' => 2],
+        ]));
+
+        $response->assertSessionHasErrors(['parametros_vale.digitos_serie']);
+        $this->assertDatabaseCount('parametros_empresa', 0);
+    }
+
+    public function test_update_rechaza_un_tiempo_de_expiracion_menor_a_un_dia(): void
+    {
+        $response = $this->actingAs($this->admin)->put(route('parametros-empresa.update'), $this->datosValidos([
+            'parametros_vale' => ['tiempo_expiracion' => 0, 'mes_ciclo_contable' => 12, 'digitos_serie' => 6],
+        ]));
+
+        $response->assertSessionHasErrors(['parametros_vale.tiempo_expiracion']);
+        $this->assertDatabaseCount('parametros_empresa', 0);
+    }
+
+    public function test_update_rechaza_un_tiempo_de_expiracion_mayor_a_365_dias(): void
+    {
+        $response = $this->actingAs($this->admin)->put(route('parametros-empresa.update'), $this->datosValidos([
+            'parametros_vale' => ['tiempo_expiracion' => 366, 'mes_ciclo_contable' => 12, 'digitos_serie' => 6],
+        ]));
+
+        $response->assertSessionHasErrors(['parametros_vale.tiempo_expiracion']);
+        $this->assertDatabaseCount('parametros_empresa', 0);
+    }
+
     public function test_update_actualiza_el_registro_existente_sin_duplicarlo(): void
     {
         ParametrosEmpresa::create($this->datosValidos());
 
         $response = $this->actingAs($this->admin)->put(route('parametros-empresa.update'), $this->datosValidos([
             'nombre_empresa' => 'Plus Metals S.A.',
-            'parametros_vale' => ['tiempo_expiracion' => 7],
+            'parametros_vale' => ['tiempo_expiracion' => 7, 'mes_ciclo_contable' => 12, 'digitos_serie' => 6],
         ]));
 
         $response->assertRedirect(route('parametros-empresa.edit'));

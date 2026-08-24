@@ -22,7 +22,13 @@ class ParametrosEmpresaRequest extends FormRequest
             'nit_empresa' => ['required', 'string', 'max:30'],
             'logo_empresa' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'parametros_vale' => ['required', 'array'],
-            'parametros_vale.tiempo_expiracion' => ['required', 'integer', 'min:1'],
+            'parametros_vale.tiempo_expiracion' => ['required', 'integer', 'min:1', 'max:365'],
+            // Mes 1-12 (numeración estándar: 1 = enero, 12 = diciembre) desde
+            // el cual las series numeradas por gestión pasan a la siguiente.
+            'parametros_vale.mes_ciclo_contable' => ['required', 'integer', 'between:1,12'],
+            // Cantidad de dígitos para el relleno con ceros de las series
+            // (nro_vale, nro_orden, nro_solicitud...), ej. 6 = 000003.
+            'parametros_vale.digitos_serie' => ['required', 'integer', 'between:3,10'],
             'estado' => ['required', Rule::in(['ACTIVO', 'INACTIVO'])],
         ];
     }
@@ -37,6 +43,8 @@ class ParametrosEmpresaRequest extends FormRequest
             'nit_empresa' => 'NIT',
             'logo_empresa' => 'logo',
             'parametros_vale.tiempo_expiracion' => 'tiempo de expiración del vale',
+            'parametros_vale.mes_ciclo_contable' => 'mes de inicio del ciclo contable',
+            'parametros_vale.digitos_serie' => 'cantidad de dígitos de la serie',
             'estado' => 'estado',
         ];
     }
