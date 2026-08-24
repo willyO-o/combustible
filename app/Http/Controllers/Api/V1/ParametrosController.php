@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Models\Area;
-use App\Models\Vehiculo;
+use App\Models\Actividad;
 use App\Models\Grifo;
 use App\Models\TipoCombustible;
 
@@ -52,6 +52,12 @@ class ParametrosController extends Controller
             ];
         });
 
+
+        $areas = $conductor->areas()->pluck('id')->toArray();
+
+        $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
+
+
         $asignaciones = [
             'vehiculos' => $vehiculos,
             'estaciones_servicio' => Grifo::where('estado_grifo', 'ACTIVO')->get(),
@@ -64,6 +70,9 @@ class ParametrosController extends Controller
             'solicitudes_mantenimiento' =>[
                 'tipos_mantenimiento' => ["PREVENTIVO", "CORRECTIVO"],
                 'estado' => ['PENDIENTE', 'APROBADA', 'RECHAZADA', 'ANULADA']
+            ],
+            'operaciones_diarias' => [
+                'actividades_sugeridas' => $actividadesSugeridas
             ]
         ];
 
