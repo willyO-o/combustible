@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('origen', 255)->nullable();
             $table->string('destino', 255)->nullable();
             $table->string('detalle', 255)->nullable();
+            $table->dateTime('fecha_hora_carga');
             $table->timestamps();
         });
     }

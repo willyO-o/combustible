@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Actions\SolicitudMantenimiento\CreateSolicitudMantenimientoAction;
 
 /**
  * Paso 1 del flujo de mantenimiento: el CHOFER registra una solicitud
@@ -99,13 +100,11 @@ class SolicitudMantenimientoController extends Controller
      *
      * El acceso ya queda restringido a conductores por SolicitudMantenimientoRequest::authorize().
      */
-    public function store(SolicitudMantenimientoRequest $request): RedirectResponse
+    public function store(SolicitudMantenimientoRequest $request, CreateSolicitudMantenimientoAction $createSolicitudMantenimientoAction): RedirectResponse
     {
         $data = $request->validated();
-        $data['id_usuario_registra'] = Auth::id();
-        $data['estado'] = 'PENDIENTE';
 
-        SolicitudMantenimiento::create($data);
+        $createSolicitudMantenimientoAction->execute($data, $request->user());
 
         return redirect()->route('mantenimiento.solicitudes.index')
             ->with('success', 'Solicitud de mantenimiento registrada exitosamente.');
