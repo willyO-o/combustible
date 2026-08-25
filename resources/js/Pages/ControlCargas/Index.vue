@@ -35,7 +35,7 @@ const estadoBadge = (estado) => ({
 </script>
 
 <template>
-    <Head title="Control de Cargas" />
+    <Head title="Fletes y Viajes" />
 
     <!-- Page header -->
     <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -45,13 +45,13 @@ const estadoBadge = (estado) => ({
                     <li class="breadcrumb-item">
                         <Link :href="route('dashboard')">Inicio</Link>
                     </li>
-                    <li class="breadcrumb-item active">Control de Cargas</li>
+                    <li class="breadcrumb-item active">Fletes y Viajes</li>
                 </ol>
             </nav>
-            <h1 class="page-title fw-medium fs-18 mb-0">Control de Cargas</h1>
+            <h1 class="page-title fw-medium fs-18 mb-0">Fletes y Viajes</h1>
         </div>
         <Link v-can="'control-cargas.crear'" :href="route('control-cargas.create')" class="btn btn-primary btn-wave">
-            <i class="ri-add-line me-1"></i> Nueva Carga
+            <i class="ri-add-line me-1"></i> Nuevo Flete
         </Link>
     </div>
 
@@ -74,7 +74,7 @@ const estadoBadge = (estado) => ({
                         v-model="filtros.q"
                         type="text"
                         class="form-control"
-                        placeholder="Buscar por N° de carga o placa..."
+                        placeholder="Buscar por N° de flete o placa..."
                     />
                 </div>
                 <div class="col-sm-5 col-lg-4">
@@ -89,15 +89,15 @@ const estadoBadge = (estado) => ({
         </div>
     </div>
 
-    <!-- Sin cargas -->
+    <!-- Sin fletes -->
     <div v-if="cargas.data.length === 0" class="card custom-card">
         <div class="card-body text-center py-5 text-muted">
             <i class="ri-truck-line fs-1 d-block mb-2"></i>
-            No se encontraron cargas.
+            No se encontraron fletes.
         </div>
     </div>
 
-    <!-- Listado de cargas (cards, mobile-first) -->
+    <!-- Listado de fletes (cards, mobile-first) -->
     <div v-else class="row row-cols-1 row-cols-sm-2 row-cols-xl-3 g-3">
         <div v-for="carga in cargas.data" :key="carga.id" class="col">
             <div class="card custom-card h-100 mb-0">

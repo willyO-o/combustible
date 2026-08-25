@@ -99,10 +99,10 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     title: 'Repuestos', icon: Svgicons.RepuestoIcon, type: 'link', path: '/repuestos', active: false, selected: false, dirchange: false, permission: 'repuestos.ver'
   },
   {
-    menutitle: 'CONTROL CARGAS', permission: ['control-cargas.ver', 'materiales.ver', 'vehiculos-externos.ver']
+    menutitle: 'FLETES Y VIAJES', permission: ['control-cargas.ver', 'materiales.ver', 'vehiculos-externos.ver']
   },
   {
-    title: 'Control de Cargas', icon: Svgicons.ControlCargasIcon, type: 'link', path: '/control-cargas', active: false, selected: false, dirchange: false, permission: 'control-cargas.ver'
+    title: 'Fletes y Viajes', icon: Svgicons.ControlCargasIcon, type: 'link', path: '/control-cargas', active: false, selected: false, dirchange: false, permission: 'control-cargas.ver'
   },
   {
     title: 'Materiales', icon: Svgicons.MaterialIcon, type: 'link', path: '/materiales', active: false, selected: false, dirchange: false, permission: 'materiales.ver'

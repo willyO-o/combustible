@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6be302e26fa8734c41f9b6dab29030ed",
+    "content-hash": "2f6911b675e88b8c18bcf6ca1924816b",
     "packages": [
         {
             "name": "archtechx/enums",
@@ -1182,6 +1182,22 @@
                 }
             ],
             "time": "2025-03-06T22:45:56+00:00"
+        },
+        {
+            "name": "fpdf-easytable/fpdf-easytable",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/fpdf-easytable/fpdf-easytable.git",
+                "reference": "master"
+            },
+            "type": "library",
+            "autoload": {
+                "classmap": [
+                    "easyTable.php",
+                    "exfpdf.php"
+                ]
+            }
         },
         {
             "name": "fruitcake/php-cors",
@@ -11568,7 +11584,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "fpdf-easytable/fpdf-easytable": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

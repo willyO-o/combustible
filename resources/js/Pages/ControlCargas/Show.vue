@@ -142,7 +142,7 @@ function submit() {
  * ------------------------------------------------------------------ */
 async function cerrarCarga() {
     const confirmado = await confirmar(
-        `¿Finalizar el registro de viajes de la carga #${props.carga.nro}? Ya no se podrán registrar más viajes.`,
+        `¿Finalizar el registro de viajes del flete #${props.carga.nro}? Ya no se podrán registrar más viajes.`,
         'Confirmación',
         'Sí, finalizar',
     )
@@ -180,14 +180,14 @@ function submitPago() {
         onSuccess: () => {
             modalPago.ocultar()
             formPago.reset()
-            showToast('Carga marcada como pagada')
+            showToast('Flete marcado como pagado')
         },
     })
 }
 </script>
 
 <template>
-    <Head :title="`Carga #${carga.nro}`" />
+    <Head :title="`Flete #${carga.nro}`" />
 
     <!-- Page header -->
     <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -198,12 +198,12 @@ function submitPago() {
                         <Link :href="route('dashboard')">Inicio</Link>
                     </li>
                     <li class="breadcrumb-item">
-                        <Link :href="route('control-cargas.index')">Control de Cargas</Link>
+                        <Link :href="route('control-cargas.index')">Fletes y Viajes</Link>
                     </li>
-                    <li class="breadcrumb-item active">Carga #{{ carga.nro }}</li>
+                    <li class="breadcrumb-item active">Flete #{{ carga.nro }}</li>
                 </ol>
             </nav>
-            <h1 class="page-title fw-medium fs-18 mb-0">Carga #{{ carga.nro }}</h1>
+            <h1 class="page-title fw-medium fs-18 mb-0">Flete #{{ carga.nro }}</h1>
         </div>
         <Link :href="route('control-cargas.index')" class="btn btn-outline-secondary btn-wave">
             <i class="ri-arrow-left-line me-1"></i> Volver
@@ -220,7 +220,7 @@ function submitPago() {
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 
-    <!-- Datos de la carga -->
+    <!-- Datos del flete -->
     <div class="card custom-card mb-3">
         <div class="card-body">
             <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
@@ -305,7 +305,7 @@ function submitPago() {
     <div v-if="viajes.length === 0" class="card custom-card">
         <div class="card-body text-center py-5 text-muted">
             <i class="ri-route-line fs-1 d-block mb-2"></i>
-            Aún no se registraron viajes en esta carga.
+            Aún no se registraron viajes en este flete.
         </div>
     </div>
 
@@ -463,7 +463,7 @@ function submitPago() {
                     </div>
                     <div class="modal-body">
                         <p class="text-muted small">
-                            Ambos datos son opcionales y pueden completarse después editando la carga.
+                            Ambos datos son opcionales y pueden completarse después editando el flete.
                         </p>
                         <div class="mb-3">
                             <label class="form-label fw-medium">Monto de Pago</label>

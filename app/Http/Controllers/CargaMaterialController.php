@@ -100,7 +100,7 @@ class CargaMaterialController extends Controller
         $carga = CargaMaterial::create($datos);
 
         return redirect()->route('control-cargas.show', $carga->id)
-            ->with('success', "Carga #{$carga->nro} registrada exitosamente. Ya puedes registrar viajes.");
+            ->with('success', "Flete #{$carga->nro} registrado exitosamente. Ya puedes registrar viajes.");
     }
 
     public function edit(CargaMaterial $cargaMaterial): Response
@@ -146,7 +146,7 @@ class CargaMaterialController extends Controller
         $cargaMaterial->update($request->safe()->only($campos));
 
         return redirect()->route('control-cargas.index')
-            ->with('success', "Carga #{$cargaMaterial->nro} actualizada exitosamente.");
+            ->with('success', "Flete #{$cargaMaterial->nro} actualizado exitosamente.");
     }
 
     public function show(CargaMaterial $cargaMaterial): Response
@@ -207,7 +207,7 @@ class CargaMaterialController extends Controller
     public function registrarViaje(ViajeRequest $request, CargaMaterial $cargaMaterial): RedirectResponse|JsonResponse
     {
         if ($cargaMaterial->estado_carga !== 'ABIERTA') {
-            $mensaje = 'No se pueden registrar viajes: esta carga ya está cerrada.';
+            $mensaje = 'No se pueden registrar viajes: este flete ya está cerrado.';
 
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => $mensaje], 422);
@@ -247,7 +247,7 @@ class CargaMaterialController extends Controller
         ]);
 
         return redirect()->back()
-            ->with('success', "Carga #{$cargaMaterial->nro} cerrada exitosamente.");
+            ->with('success', "Flete #{$cargaMaterial->nro} cerrado exitosamente.");
     }
 
     /**
@@ -265,7 +265,7 @@ class CargaMaterialController extends Controller
 
         if ($cargaMaterial->estado_carga !== 'CERRADA') {
             return redirect()->back()
-                ->with('error', 'Sólo se puede marcar como pagada una carga que ya esté cerrada.');
+                ->with('error', 'Sólo se puede marcar como pagado un flete que ya esté cerrado.');
         }
 
         $datos = $request->validate([
@@ -289,7 +289,7 @@ class CargaMaterialController extends Controller
         $cargaMaterial->update($datosActualizar);
 
         return redirect()->back()
-            ->with('success', "Carga #{$cargaMaterial->nro} marcada como pagada.");
+            ->with('success', "Flete #{$cargaMaterial->nro} marcado como pagado.");
     }
 
     /**
@@ -307,7 +307,7 @@ class CargaMaterialController extends Controller
         }
 
         if ($cargaMaterial->estado_carga !== 'ABIERTA') {
-            abort(403, 'No se puede editar una carga que ya está cerrada.');
+            abort(403, 'No se puede editar un flete que ya está cerrado.');
         }
     }
 

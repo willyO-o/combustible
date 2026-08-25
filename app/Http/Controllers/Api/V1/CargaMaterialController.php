@@ -86,12 +86,12 @@ class CargaMaterialController extends Controller
             $carga->load(['vehiculoExterno', 'viajes.material']);
 
             return response()->json([
-                'message' => "Carga #{$carga->nro} registrada exitosamente.",
+                'message' => "Flete #{$carga->nro} registrado exitosamente.",
                 'data' => $carga,
             ], 201);
         } catch (Exception $e) {
             return response()->json([
-                'message' => 'Error al registrar la carga.',
+                'message' => 'Error al registrar el flete.',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -123,7 +123,7 @@ class CargaMaterialController extends Controller
     {
         if ($cargaMaterial->estado_carga !== 'ABIERTA') {
             return response()->json([
-                'message' => 'No se pueden registrar viajes: esta carga ya está cerrada.',
+                'message' => 'No se pueden registrar viajes: este flete ya está cerrado.',
             ], 422);
         }
 

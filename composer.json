@@ -5,8 +5,30 @@
     "description": "The skeleton application for the Laravel framework.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "fpdf-easytable/fpdf-easytable",
+                "version": "dev-master",
+                "type": "library",
+                "source": {
+                    "url": "https://github.com/fpdf-easytable/fpdf-easytable.git",
+                    "type": "git",
+                    "reference": "master"
+                },
+                "autoload": {
+                    "classmap": [
+                        "easyTable.php",
+                        "exfpdf.php"
+                    ]
+                }
+            }
+        }
+    ],
     "require": {
         "php": "^8.3",
+        "fpdf-easytable/fpdf-easytable": "dev-master",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel-lang/common": "^6.8",
         "laravel/framework": "^13.8",

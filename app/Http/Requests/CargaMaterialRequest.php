@@ -97,7 +97,7 @@ class CargaMaterialRequest extends FormRequest
         return [
             'id_vehiculo_externo.integer' => 'Seleccione un vehículo válido.',
             'id_vehiculo_externo.exists' => 'Seleccione un vehículo válido.',
-            'pais.required' => 'El país es obligatorio cuando la carga es al exterior.',
+            'pais.required' => 'El país es obligatorio cuando el flete es al exterior.',
         ];
     }
 }

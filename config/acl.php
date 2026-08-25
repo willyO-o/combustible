@@ -214,12 +214,13 @@ return [
         ],
 
         'control-cargas' => [
-            'label' => 'Control de Cargas',
+            'label' => 'Fletes y Viajes',
             'permisos' => [
                 'control-cargas.ver' => 'Ver',
-                'control-cargas.crear' => 'Abrir carga',
-                'control-cargas.editar' => 'Editar carga',
+                'control-cargas.crear' => 'Abrir flete',
+                'control-cargas.editar' => 'Editar flete',
                 'control-cargas.viajes.registrar' => 'Registrar viaje',
+                'control-cargas.marcar-pagado' => 'Marcar flete como pagado',
             ],
         ],
 
