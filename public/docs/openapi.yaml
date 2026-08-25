@@ -69,6 +69,14 @@ tags:
     description: Consulta, registro, actualización y eliminación de vales de combustible.
   - name: Carga de Combustible
     description: Registro y consulta de cargas de combustible efectuadas por los conductores, junto con sus respaldos digitales (facturas, notas, comprobantes).
+  - name: Control de Cargas
+    description: |
+      Registro y consulta de cargas de material (viajes de un vehículo externo transportando
+      un material) y de los viajes individuales dentro de cada carga. Una carga se abre una
+      sola vez y permanece `ABIERTA` mientras se le van agregando viajes; opcionalmente, el
+      primer viaje puede registrarse en la misma petición que abre la carga. Incluye también el
+      catálogo de materiales transportados (cola, broza, concentrado, etc.), que puede
+      consultarse y ampliarse bajo demanda.
   - name: Solicitudes de Mantenimiento
     description: |
       Paso 1 del flujo de mantenimiento: el conductor (o quien registre en su nombre) reporta
@@ -391,8 +399,9 @@ paths:
       description: |
         Devuelve los catálogos y colecciones necesarios para alimentar formularios del cliente:
         vehículos actualmente asignados al conductor autenticado, estaciones de servicio activas,
-        tipos de combustible activos, y los valores enumerados usados por otros módulos
-        (cargas de combustible, solicitudes de mantenimiento).
+        tipos de combustible activos, el catálogo de materiales de control de cargas, y los
+        valores enumerados usados por otros módulos (cargas de combustible, solicitudes de
+        mantenimiento, control de cargas).
 
         Requiere que el usuario autenticado tenga una persona vinculada con un registro de
         conductor asociado.
@@ -433,6 +442,15 @@ paths:
                   solicitudes_mantenimiento:
                     tipos_mantenimiento: [PREVENTIVO, CORRECTIVO]
                     estado: [PENDIENTE, APROBADA, RECHAZADA, ANULADA]
+                  control_cargas:
+                    materiales:
+                      - id: 1
+                        material: Cola
+                      - id: 2
+                        material: Broza
+                      - id: 3
+                        material: Concentrado
+                    estados_carga: [ABIERTA, CERRADA, PAGADA]
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -1384,6 +1402,327 @@ paths:
                 error: "Detalle técnico interno del error (varía según la causa)."
 
   # ──────────────────────────────────────────────────────────────────────
+  # CONTROL DE CARGAS
+  # ──────────────────────────────────────────────────────────────────────
+  /cargas-material:
+    get:
+      tags: [Control de Cargas]
+      summary: Listar cargas de material
+      description: |
+        Lista paginada de cargas de material, ordenadas por `fecha_apertura` descendente.
+
+        Las restricciones de visibilidad dependen del rol del usuario autenticado:
+        - **conductor**: solo ve las cargas que él mismo abrió (`id_usuario_apertura` = usuario
+          autenticado), en cualquier estado.
+        - Otros roles: ve todas las cargas del sistema, sin restricción adicional.
+      parameters:
+        - name: estado_carga
+          in: query
+          description: Filtra por estado exacto de la carga.
+          schema: { type: string, enum: [ABIERTA, CERRADA, PAGADA] }
+          example: ABIERTA
+        - name: per_page
+          in: query
+          description: Cantidad de resultados por página.
+          schema: { type: integer, default: 10 }
+          example: 10
+        - name: page
+          in: query
+          description: |
+            Número de página a obtener (paginación estándar del listado, se resuelve
+            automáticamente a partir de este parámetro). Si se omite, se asume `1`.
+          schema: { type: integer, default: 1, minimum: 1 }
+          example: 1
+      responses:
+        '200':
+          description: Listado paginado de cargas de material.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargaMaterialPaginada'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Control de Cargas]
+      summary: Abrir una nueva carga de material (opcionalmente con su primer viaje)
+      description: |
+        Abre una carga de material para un vehículo externo. La mayoría de los datos se
+        asignan automáticamente en el servidor a partir del usuario autenticado y **no deben
+        enviarse**:
+        - `nro_carga` y `gestion`: correlativo autogenerado dentro de la gestión actual
+          (configurable en los parámetros de la empresa; por defecto la gestión avanza en
+          diciembre).
+        - `estado_carga`: siempre queda en `ABIERTA` al registrar.
+        - `id_usuario_apertura` y `fecha_apertura`: el usuario autenticado y la fecha/hora
+          actual.
+
+        **Debe enviarse como `multipart/form-data`** cuando se registra el primer viaje junto
+        con la carga (ver más abajo), ya que ese viaje exige una foto. Si no se registra ningún
+        viaje, también puede enviarse como `application/json`.
+
+        ## Registrar el primer viaje junto con la carga (opcional)
+
+        Si se envía el bloque `viaje` (aunque sea vacío), sus campos internos
+        (`viaje[id_material]`, `viaje[foto]`, `viaje[origen]`, `viaje[destino]`) pasan a ser
+        **obligatorios** — es decir, el bloque es opcional como un todo, pero si se envía debe
+        venir completo. `viaje[detalle]` sigue siendo opcional. Si se omite el bloque `viaje`
+        por completo, la carga se abre sin ningún viaje y estos se registran después por
+        separado con `POST /cargas-material/{cargaMaterial}/viajes`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CargaMaterialStoreRequest'
+      responses:
+        '201':
+          description: Carga de material registrada exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargaMaterialStoreResponse'
+              example:
+                message: "Carga #000001/2026 registrada exitosamente."
+                data:
+                  id: 1
+                  uuid: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90"
+                  nro_carga: 1
+                  gestion: "2026"
+                  id_vehiculo_externo: 3
+                  id_usuario_apertura: 2
+                  id_usuario_cierre: null
+                  fecha_apertura: "2026-08-24T14:30:00.000000Z"
+                  fecha_cierre: null
+                  nombre_conductor: "Juan Externo"
+                  telefono: "77712345"
+                  fecha_pago: null
+                  monto_pago: null
+                  observaciones: null
+                  estado_carga: ABIERTA
+                  nro: "000001/2026"
+                  created_at: "2026-08-24T14:30:00.000000Z"
+                  updated_at: "2026-08-24T14:30:00.000000Z"
+                  vehiculo_externo:
+                    id: 3
+                    nro_placa: "148-JLK"
+                    propietario: "Transportes Andina"
+                  viajes:
+                    - id: 5
+                      id_carga_material: 1
+                      id_material: 2
+                      id_usuario_registro: 2
+                      foto: "control-cargas/viajes/abc123.jpg"
+                      foto_url: "http://localhost/storage/control-cargas/viajes/abc123.jpg"
+                      origen: "Cantera Norte"
+                      destino: "Planta"
+                      detalle: null
+                      material:
+                        id: 2
+                        material: Arena
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              example:
+                message: The given data was invalid.
+                errors:
+                  id_vehiculo_externo: ["Debe seleccionar un vehículo."]
+                  viaje.foto: ["La foto de evidencia del viaje es obligatoria."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Error inesperado al registrar la carga.
+          content:
+            application/json:
+              example:
+                message: Error al registrar la carga.
+                error: "Detalle técnico interno del error (varía según la causa)."
+
+  /cargas-material/{cargaMaterial}:
+    get:
+      tags: [Control de Cargas]
+      summary: Ver el detalle de una carga de material
+      description: Incluye el listado completo de viajes registrados en la carga, cada uno con su material.
+      parameters:
+        - name: cargaMaterial
+          in: path
+          required: true
+          schema: { type: integer }
+          example: 1
+      responses:
+        '200':
+          description: Detalle de la carga.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/CargaMaterial' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: La carga indicada no existe.
+
+  /cargas-material/{cargaMaterial}/viajes:
+    post:
+      tags: [Control de Cargas]
+      summary: Registrar un viaje (separado) dentro de una carga abierta
+      description: |
+        Registra un viaje adicional dentro de una carga ya abierta. Se usa tanto para el
+        segundo viaje en adelante como para el primero, si no se registró al abrir la carga
+        (ver `POST /cargas-material`).
+
+        **Debe enviarse como `multipart/form-data`** (la foto de evidencia es obligatoria).
+
+        `id_usuario_registro` se asigna automáticamente al usuario autenticado y no debe
+        enviarse.
+      parameters:
+        - name: cargaMaterial
+          in: path
+          required: true
+          schema: { type: integer }
+          example: 1
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ViajeStoreRequest'
+      responses:
+        '201':
+          description: Viaje registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViajeStoreResponse'
+              example:
+                message: Viaje registrado exitosamente.
+                data:
+                  id: 6
+                  id_carga_material: 1
+                  id_material: 2
+                  id_usuario_registro: 2
+                  foto: "control-cargas/viajes/def456.jpg"
+                  foto_url: "http://localhost/storage/control-cargas/viajes/def456.jpg"
+                  origen: "Cantera Norte"
+                  destino: "Planta"
+                  detalle: null
+                  material:
+                    id: 2
+                    material: Arena
+        '422':
+          description: |
+            Error de validación (formato estándar, ver `DefaultValidationErrorResponse`), **o**
+            la carga indicada ya no está `ABIERTA` (en ese caso la respuesta trae únicamente
+            `message`, sin `errors`).
+          content:
+            application/json:
+              examples:
+                validacion:
+                  summary: Error de validación
+                  value:
+                    message: The given data was invalid.
+                    errors:
+                      foto: ["La foto de evidencia es obligatoria."]
+                      origen: ["El origen es obligatorio."]
+                      destino: ["El destino es obligatorio."]
+                carga_cerrada:
+                  summary: La carga ya no está ABIERTA
+                  value:
+                    message: "No se pueden registrar viajes: esta carga ya está cerrada."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: La carga indicada no existe.
+        '500':
+          description: Error inesperado al registrar el viaje.
+          content:
+            application/json:
+              example:
+                message: Error al registrar el viaje.
+                error: "Detalle técnico interno del error (varía según la causa)."
+
+  /materiales:
+    get:
+      tags: [Control de Cargas]
+      summary: Listar el catálogo de materiales
+      description: |
+        Lista completa (sin paginar) del catálogo de materiales transportados en los viajes de
+        control de cargas — cola, broza, concentrado, etc., según lo que maneje cada operación
+        minera. Este mismo catálogo también se envía en `GET /parametros/colecciones`
+        (`control_cargas.materiales`); este endpoint permite además buscar por nombre.
+      parameters:
+        - name: material
+          in: query
+          description: Filtra por nombre del material (coincidencia parcial).
+          schema: { type: string }
+          example: Con
+      responses:
+        '200':
+          description: Catálogo de materiales.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/MaterialResumen' }
+              example:
+                data:
+                  - id: 1
+                    material: Cola
+                  - id: 2
+                    material: Broza
+                  - id: 3
+                    material: Concentrado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Control de Cargas]
+      summary: Registrar un material bajo demanda
+      description: |
+        Registra un nuevo material en el catálogo — pensado para cuando, al registrar un viaje,
+        el material buscado no existe todavía en `GET /materiales` (misma idea que el alta
+        rápida del panel web). El nombre no puede repetirse (sin distinguir mayúsculas/minúsculas).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialStoreRequest'
+            example:
+              material: Broza
+      responses:
+        '201':
+          description: Material registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialStoreResponse'
+              example:
+                message: Material registrado exitosamente.
+                data:
+                  id: 4
+                  material: Broza
+        '422':
+          description: Error de validación (nombre repetido u omitido).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              example:
+                message: The given data was invalid.
+                errors:
+                  material: ["El campo material ya ha sido registrado."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ──────────────────────────────────────────────────────────────────────
   # SOLICITUDES DE MANTENIMIENTO
   # ──────────────────────────────────────────────────────────────────────
   /solicitudes-mantenimiento:
@@ -1895,6 +2234,23 @@ components:
               properties:
                 tipos_mantenimiento: { type: array, items: { type: string }, example: [PREVENTIVO, CORRECTIVO] }
                 estado: { type: array, items: { type: string }, example: [PENDIENTE, APROBADA, RECHAZADA, ANULADA] }
+            control_cargas:
+              type: object
+              description: |
+                Catálogos de apoyo para el módulo de control de cargas de material (ver
+                `POST /cargas-material` y `POST /cargas-material/{cargaMaterial}/viajes`).
+              properties:
+                materiales:
+                  type: array
+                  description: |
+                    Catálogo completo de materiales transportados en cada viaje (cola, broza,
+                    concentrado, etc., según lo que maneje cada operación minera). También se
+                    puede consultar/registrar uno nuevo directamente en `GET`/`POST /materiales`.
+                  items: { $ref: '#/components/schemas/MaterialResumen' }
+                estados_carga:
+                  type: array
+                  items: { type: string }
+                  example: [ABIERTA, CERRADA, PAGADA]
 
     # ── Operación Diaria ──────────────────────────────────────────────
     ActividadRealizadaInput:
@@ -2645,6 +3001,209 @@ components:
       description: A diferencia de otros endpoints de registro de esta API, aquí la respuesta **no** incluye la carga creada (`data`).
       properties:
         message: { type: string, example: "Carga de combustible creada exitosamente" }
+
+    # ── Control de Cargas ────────────────────────────────────────────────
+    VehiculoExternoResumen:
+      type: object
+      description: Vehículo externo (no pertenece a la flota propia) que transporta un material.
+      properties:
+        id: { type: integer, example: 3 }
+        nro_placa: { type: string, example: "148-JLK" }
+        propietario: { type: string, nullable: true, example: "Transportes Andina" }
+
+    MaterialResumen:
+      type: object
+      properties:
+        id: { type: integer, example: 2 }
+        material: { type: string, example: Arena }
+
+    Viaje:
+      type: object
+      description: Una vuelta de carga del material transportado por el vehículo externo, con su foto de evidencia.
+      properties:
+        id: { type: integer, example: 5 }
+        id_carga_material: { type: integer, example: 1 }
+        id_material: { type: integer, example: 2 }
+        id_usuario_registro: { type: integer, nullable: true, example: 2 }
+        foto: { type: string, description: "Ruta interna del archivo (usar `foto_url` para mostrarlo).", example: "control-cargas/viajes/abc123.jpg" }
+        foto_url: { type: string, format: uri, example: "http://localhost/storage/control-cargas/viajes/abc123.jpg" }
+        origen: { type: string, nullable: true, example: "Cantera Norte" }
+        destino: { type: string, nullable: true, example: Planta }
+        detalle: { type: string, nullable: true, example: null }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        material:
+          allOf: [{ $ref: '#/components/schemas/MaterialResumen' }]
+          nullable: true
+        usuarioRegistro:
+          allOf: [{ $ref: '#/components/schemas/Usuario' }]
+          nullable: true
+          description: Sólo presente en `GET /cargas-material/{cargaMaterial}`.
+
+    CargaMaterial:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        uuid: { type: string, format: uuid, example: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90" }
+        nro_carga: { type: integer, description: Correlativo autogenerado dentro de la gestión., example: 1 }
+        gestion: { type: string, description: "Año de gestión. El mes en que la gestión avanza al año siguiente es configurable en los parámetros de la empresa (por defecto diciembre).", example: "2026" }
+        id_vehiculo_externo: { type: integer, example: 3 }
+        id_usuario_apertura: { type: integer, nullable: true, example: 2 }
+        id_usuario_cierre: { type: integer, nullable: true, example: null }
+        fecha_apertura: { type: string, format: date-time }
+        fecha_cierre: { type: string, format: date-time, nullable: true, example: null }
+        nombre_conductor: { type: string, nullable: true, example: "Juan Externo" }
+        telefono: { type: string, nullable: true, example: "77712345" }
+        fecha_pago: { type: string, format: date-time, nullable: true, example: null }
+        monto_pago: { type: number, format: float, nullable: true, example: null }
+        observaciones: { type: string, nullable: true, example: null }
+        estado_carga: { type: string, enum: [ABIERTA, CERRADA, PAGADA], example: ABIERTA }
+        nro: { type: string, description: "`nro_carga` formateado con ceros a la izquierda (cantidad de dígitos configurable en los parámetros de la empresa) seguido de `/gestion`.", example: "000001/2026" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        vehiculo_externo: { $ref: '#/components/schemas/VehiculoExternoResumen' }
+        usuarioApertura:
+          allOf: [{ $ref: '#/components/schemas/Usuario' }]
+          nullable: true
+          description: Sólo presente en `GET /cargas-material/{cargaMaterial}`.
+        viajes:
+          type: array
+          description: Viajes registrados en la carga (vacío justo después de abrirla, salvo que se haya registrado el primero en la misma petición).
+          items: { $ref: '#/components/schemas/Viaje' }
+
+    CargaMaterialPaginada:
+      type: object
+      description: Estructura estándar de paginación.
+      properties:
+        current_page: { type: integer, example: 1 }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CargaMaterial' }
+        first_page_url: { type: string, example: "http://localhost/api/v1/cargas-material?page=1" }
+        from: { type: integer, nullable: true, example: 1 }
+        last_page: { type: integer, example: 1 }
+        last_page_url: { type: string, example: "http://localhost/api/v1/cargas-material?page=1" }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              url: { type: string, nullable: true }
+              label: { type: string, example: "1" }
+              active: { type: boolean, example: true }
+        next_page_url: { type: string, nullable: true, example: null }
+        path: { type: string, example: "http://localhost/api/v1/cargas-material" }
+        per_page: { type: integer, example: 10 }
+        prev_page_url: { type: string, nullable: true, example: null }
+        to: { type: integer, nullable: true, example: 1 }
+        total: { type: integer, example: 1 }
+
+    CargaMaterialStoreRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `POST /cargas-material`. `nro_carga`, `gestion`, `estado_carga`,
+        `id_usuario_apertura` y `fecha_apertura` se calculan/asignan en el servidor y no deben
+        enviarse.
+      required: [id_vehiculo_externo]
+      properties:
+        id_vehiculo_externo:
+          type: integer
+          description: Debe existir en la tabla de vehículos externos.
+          example: 3
+        nombre_conductor:
+          type: string
+          nullable: true
+          maxLength: 250
+          example: "Juan Externo"
+        telefono:
+          type: string
+          nullable: true
+          maxLength: 30
+          example: "77712345"
+        observaciones:
+          type: string
+          nullable: true
+          example: null
+        viaje[id_material]:
+          type: integer
+          description: Obligatorio sólo si se envía el bloque `viaje` (ver descripción del endpoint). Debe existir en la tabla de materiales.
+          example: 2
+        viaje[foto]:
+          type: string
+          format: binary
+          description: Obligatorio sólo si se envía el bloque `viaje`. Foto de evidencia del viaje. Tamaño máximo 8 MB.
+        viaje[origen]:
+          type: string
+          maxLength: 255
+          description: Obligatorio sólo si se envía el bloque `viaje`.
+          example: "Cantera Norte"
+        viaje[destino]:
+          type: string
+          maxLength: 255
+          description: Obligatorio sólo si se envía el bloque `viaje`.
+          example: Planta
+        viaje[detalle]:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Siempre opcional, incluso si se envía el bloque `viaje`.
+          example: null
+
+    CargaMaterialStoreResponse:
+      type: object
+      properties:
+        message: { type: string, example: "Carga #000001/2026 registrada exitosamente." }
+        data: { $ref: '#/components/schemas/CargaMaterial' }
+
+    ViajeStoreRequest:
+      type: object
+      description: Cuerpo esperado por `POST /cargas-material/{cargaMaterial}/viajes`. `id_usuario_registro` se asigna automáticamente al usuario autenticado y no debe enviarse.
+      required: [id_material, foto, origen, destino]
+      properties:
+        id_material:
+          type: integer
+          description: Debe existir en la tabla de materiales.
+          example: 2
+        foto:
+          type: string
+          format: binary
+          description: Foto de evidencia del viaje. Tamaño máximo 8 MB.
+        origen:
+          type: string
+          maxLength: 255
+          example: "Cantera Norte"
+        destino:
+          type: string
+          maxLength: 255
+          example: Planta
+        detalle:
+          type: string
+          nullable: true
+          maxLength: 255
+          example: null
+
+    ViajeStoreResponse:
+      type: object
+      properties:
+        message: { type: string, example: Viaje registrado exitosamente. }
+        data: { $ref: '#/components/schemas/Viaje' }
+
+    MaterialStoreRequest:
+      type: object
+      description: Cuerpo esperado por `POST /materiales`.
+      required: [material]
+      properties:
+        material:
+          type: string
+          maxLength: 150
+          description: Nombre del material. No puede repetirse (sin distinguir mayúsculas/minúsculas).
+          example: Broza
+
+    MaterialStoreResponse:
+      type: object
+      properties:
+        message: { type: string, example: Material registrado exitosamente. }
+        data: { $ref: '#/components/schemas/MaterialResumen' }
 
     # ── Solicitudes de Mantenimiento ─────────────────────────────────────
     SolicitudMantenimiento:

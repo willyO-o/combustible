@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CargaCombustibleController;
+use App\Http\Controllers\Api\V1\CargaMaterialController;
+use App\Http\Controllers\Api\V1\MaterialController;
 use App\Http\Controllers\Api\V1\NotificacionController;
 use App\Http\Controllers\Api\V1\OperacionDiariaController;
 use App\Http\Controllers\Api\V1\ParametrosController;
@@ -53,6 +55,22 @@ Route::middleware('auth:api')->group(function () {
 
     Route::resource('cargas', CargaCombustibleController::class)
         ->parameters(['cargas' => 'carga'])->except(['create', 'edit'])->names('api.v1.cargas');
+
+    // Control de cargas de material: abrir una carga (opcionalmente con su
+    // primer viaje) y registrar viajes adicionales por separado.
+    Route::post('cargas-material/{cargaMaterial}/viajes', [CargaMaterialController::class, 'registrarViaje'])
+        ->name('api.v1.cargas-material.viajes.registrar');
+
+    Route::resource('cargas-material', CargaMaterialController::class)
+        ->parameters(['cargas-material' => 'cargaMaterial'])
+        ->only(['index', 'store', 'show'])
+        ->names('api.v1.cargas-material');
+
+    // Catálogo de materiales (cola, broza, concentrado, etc.): listar y dar
+    // de alta uno nuevo bajo demanda al registrar un viaje.
+    Route::resource('materiales', MaterialController::class)
+        ->only(['index', 'store'])
+        ->names('api.v1.materiales');
 
     Route::get('solicitudes-mantenimiento/{solicitud}/pdf', [SolicitudMantenimientoController::class, 'pdf'])->name('api.v1.solicitudes-mantenimiento.pdf');
 

@@ -258,6 +258,24 @@ class CargaMaterialControllerTest extends TestCase
         $this->assertSame('Corrección de datos', $carga->observaciones);
     }
 
+    public function test_update_no_falla_cuando_el_formulario_reenvia_el_vehiculo_vacio(): void
+    {
+        // El formulario de edición no muestra el select de vehículo, pero
+        // Inertia igual reenvía id_vehiculo_externo como '' en el payload;
+        // no debe disparar un error de validación sobre un campo que ni
+        // siquiera se está editando.
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->conductor)->put(route('control-cargas.update', $carga->id), [
+            'id_vehiculo_externo' => '',
+            'nombre_conductor' => 'Nuevo Nombre',
+        ]);
+
+        $response->assertRedirect(route('control-cargas.index'));
+        $response->assertSessionDoesntHaveErrors('id_vehiculo_externo');
+        $this->assertSame('Nuevo Nombre', $carga->fresh()->nombre_conductor);
+    }
+
     public function test_update_ignora_cambios_de_vehiculo_externo(): void
     {
         $carga = $this->crearCargaAbiertaPor($this->conductor);

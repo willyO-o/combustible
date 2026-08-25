@@ -20,8 +20,7 @@ const vehiculosList = ref([...props.vehiculosExternos])
 const vehiculoModal = ref(null)
 
 const form = useForm({
-    ...(isEditing.value ? { _method: 'PUT' } : {}),
-    id_vehiculo_externo: '',
+    ...(isEditing.value ? { _method: 'PUT' } : { id_vehiculo_externo: '' }),
     nombre_conductor: props.carga?.nombre_conductor ?? '',
     telefono: props.carga?.telefono ?? '',
     observaciones: props.carga?.observaciones ?? '',

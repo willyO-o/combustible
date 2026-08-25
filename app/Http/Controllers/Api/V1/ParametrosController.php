@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use App\Models\Area;
 use App\Models\Actividad;
 use App\Models\Grifo;
+use App\Models\Material;
 use App\Models\TipoCombustible;
-
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ParametrosController extends Controller
 {
@@ -52,28 +51,34 @@ class ParametrosController extends Controller
             ];
         });
 
-
         $areas = $conductor->areas()->pluck('id')->toArray();
 
         $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
-
 
         $asignaciones = [
             'vehiculos' => $vehiculos,
             'estaciones_servicio' => Grifo::where('estado_grifo', 'ACTIVO')->get(),
             'tipos_combustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')->get(),
             'cargas_combustible' => [
-                'tipos_carga' => ["VALE", "PREPAGO"],
-                'tipos_respaldo_digital' => ["FACTURA", "NOTA", "COMPROBANTE", "OTRO"],
+                'tipos_carga' => ['VALE', 'PREPAGO'],
+                'tipos_respaldo_digital' => ['FACTURA', 'NOTA', 'COMPROBANTE', 'OTRO'],
                 'estado_carga' => ['PENDIENTE', 'USADO', 'ANULADO'],
             ],
-            'solicitudes_mantenimiento' =>[
-                'tipos_mantenimiento' => ["PREVENTIVO", "CORRECTIVO"],
-                'estado' => ['PENDIENTE', 'APROBADA', 'RECHAZADA', 'ANULADA']
+            'solicitudes_mantenimiento' => [
+                'tipos_mantenimiento' => ['PREVENTIVO', 'CORRECTIVO'],
+                'estado' => ['PENDIENTE', 'APROBADA', 'RECHAZADA', 'ANULADA'],
             ],
             'operaciones_diarias' => [
-                'actividades_sugeridas' => $actividadesSugeridas
-            ]
+                'actividades_sugeridas' => $actividadesSugeridas,
+            ],
+            'control_cargas' => [
+                // Catálogo de materiales transportados en cada viaje (cola,
+                // broza, concentrado, etc., según lo que maneje cada
+                // operación minera). También se puede consultar/registrar
+                // uno nuevo directamente en /materiales.
+                'materiales' => Material::orderBy('material')->get(['id', 'material']),
+                'estados_carga' => ['ABIERTA', 'CERRADA', 'PAGADA'],
+            ],
         ];
 
         return response()->json([
