@@ -6,6 +6,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Actions/**/*.php | .ai/rules/actions.md |
 | app/**/*.php | .ai/rules/app.md |
+| app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
 | app/Http/Controllers/**/*.php, app/Http/Controllers/*.php | .ai/rules/controllers.md |
 | public/docs/openapi.yaml | .ai/rules/docs.md |
 | tests/Feature/**/*.php | .ai/rules/feature.md |

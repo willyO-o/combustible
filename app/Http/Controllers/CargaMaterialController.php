@@ -151,7 +151,7 @@ class CargaMaterialController extends Controller
 
     public function show(CargaMaterial $cargaMaterial): Response
     {
-        $cargaMaterial->load(['vehiculoExterno', 'usuarioApertura']);
+        $cargaMaterial->load(['vehiculoExterno', 'usuarioApertura', 'usuarioCierre']);
 
         $viajes = $cargaMaterial->viajes()
             ->with(['material:id,material', 'usuarioRegistro:id,name'])
@@ -185,6 +185,10 @@ class CargaMaterialController extends Controller
                     'propietario' => $cargaMaterial->vehiculoExterno->propietario,
                 ] : null,
                 'abierta_por' => $cargaMaterial->usuarioApertura?->name,
+                'fecha_cierre' => $cargaMaterial->fecha_cierre?->format('d/m/Y H:i'),
+                'cerrada_por' => $cargaMaterial->usuarioCierre?->name,
+                'fecha_pago' => $cargaMaterial->fecha_pago?->format('d/m/Y H:i'),
+                'monto_pago' => $cargaMaterial->monto_pago,
             ],
             'viajes' => $viajes,
             'materiales' => Material::orderBy('material')->get(['id', 'material']),
@@ -225,6 +229,67 @@ class CargaMaterialController extends Controller
 
         return redirect()->route('control-cargas.show', $cargaMaterial->id)
             ->with('success', 'Viaje registrado exitosamente.');
+    }
+
+    /**
+     * Cierra una carga ABIERTA. Disponible para cualquier usuario que ya
+     * puede gestionar la carga (mismo criterio que editar/registrar viajes,
+     * ver assertPuedeGestionar()) — no requiere un permiso aparte.
+     */
+    public function cerrar(CargaMaterial $cargaMaterial): RedirectResponse
+    {
+        $this->assertPuedeGestionar($cargaMaterial);
+
+        $cargaMaterial->update([
+            'estado_carga' => 'CERRADA',
+            'id_usuario_cierre' => auth()->id(),
+            'fecha_cierre' => now(),
+        ]);
+
+        return redirect()->back()
+            ->with('success', "Carga #{$cargaMaterial->nro} cerrada exitosamente.");
+    }
+
+    /**
+     * Marca una carga CERRADA como PAGADA. Sólo disponible para quien tenga
+     * el permiso control-cargas.marcar-pagado (jefe-area, administrador y
+     * super-admin — nunca conductor ni técnico de mantenimiento, ver
+     * UserSeeder::permisosControlCargasPago()). Monto pagado y observaciones
+     * son ambos opcionales.
+     */
+    public function pagar(Request $request, CargaMaterial $cargaMaterial): RedirectResponse
+    {
+        if (! $request->user()->can('control-cargas.marcar-pagado')) {
+            abort(403);
+        }
+
+        if ($cargaMaterial->estado_carga !== 'CERRADA') {
+            return redirect()->back()
+                ->with('error', 'Sólo se puede marcar como pagada una carga que ya esté cerrada.');
+        }
+
+        $datos = $request->validate([
+            'monto_pago' => ['nullable', 'numeric', 'min:0'],
+            'observaciones' => ['nullable', 'string'],
+        ]);
+
+        $datosActualizar = [
+            'estado_carga' => 'PAGADA',
+            'fecha_pago' => now(),
+        ];
+
+        if ($request->filled('monto_pago')) {
+            $datosActualizar['monto_pago'] = $datos['monto_pago'];
+        }
+
+        if ($request->filled('observaciones')) {
+            $datosActualizar['observaciones'] = $datos['observaciones'];
+        }
+
+        $cargaMaterial->update($datosActualizar);
+
+        return redirect()->back()
+            ->with('success', "Carga #{$cargaMaterial->nro} marcada como pagada.");
     }
 
     /**

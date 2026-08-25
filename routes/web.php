@@ -113,6 +113,10 @@ Route::middleware('auth')->group(function () {
         ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::post('control-cargas/{cargaMaterial}/viajes', [CargaMaterialController::class, 'registrarViaje'])
         ->name('control-cargas.viajes.registrar');
+    Route::post('control-cargas/{cargaMaterial}/cerrar', [CargaMaterialController::class, 'cerrar'])
+        ->name('control-cargas.cerrar');
+    Route::post('control-cargas/{cargaMaterial}/pagar', [CargaMaterialController::class, 'pagar'])
+        ->name('control-cargas.pagar');
 
     Route::resource('roles', RolController::class)
         ->except(['show', 'destroy']);

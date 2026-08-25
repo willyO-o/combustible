@@ -1,12 +1,13 @@
 <script setup>
 import { ref, nextTick } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import InputError from '@/Components/InputError.vue'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
+import { confirm as confirmar, showToast } from '@/Utils/alertUtil.js'
 
 const props = defineProps({
     carga: Object,
@@ -135,6 +136,54 @@ function submit() {
         },
     })
 }
+
+/* ------------------------------------------------------------------ *
+ * Cerrar carga
+ * ------------------------------------------------------------------ */
+async function cerrarCarga() {
+    const confirmado = await confirmar(
+        `¿Finalizar el registro de viajes de la carga #${props.carga.nro}? Ya no se podrán registrar más viajes.`,
+        'Confirmación',
+        'Sí, finalizar',
+    )
+    if (!confirmado) return
+
+    router.post(route('control-cargas.cerrar', props.carga.id), {}, {
+        preserveScroll: true,
+        onSuccess: () => showToast('Registro de viajes finalizado exitosamente'),
+    })
+}
+
+/* ------------------------------------------------------------------ *
+ * Modal: marcar como pagado
+ * ------------------------------------------------------------------ */
+const modalPagoEl = ref(null)
+const modalPago = useBootstrapModal()
+
+const formPago = useForm({
+    monto_pago: '',
+    observaciones: '',
+})
+
+function abrirModalPago() {
+    formPago.reset()
+    formPago.clearErrors()
+
+    nextTick(() => {
+        modalPago.mostrar(modalPagoEl.value)
+    })
+}
+
+function submitPago() {
+    formPago.post(route('control-cargas.pagar', props.carga.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            modalPago.ocultar()
+            formPago.reset()
+            showToast('Carga marcada como pagada')
+        },
+    })
+}
 </script>
 
 <template>
@@ -194,8 +243,44 @@ function submit() {
             <div v-if="carga.detalle" class="small text-muted mb-1">
                 <i class="ri-sticky-note-line me-1"></i>{{ carga.detalle }}
             </div>
+            <div v-if="carga.fecha_cierre" class="small text-muted mb-1">
+                <i class="ri-flag-line me-1"></i>Registro de viajes finalizado: {{ carga.fecha_cierre }} · por {{ carga.cerrada_por }}
+            </div>
+            <div v-if="carga.fecha_pago" class="small text-muted mb-1">
+                <i class="ri-money-dollar-circle-line me-1"></i>Pagada: {{ carga.fecha_pago }}
+                <span v-if="carga.monto_pago"> — Bs. {{ carga.monto_pago }}</span>
+            </div>
             <div v-if="carga.observaciones" class="small text-muted mt-2">
                 <i class="ri-file-text-line me-1"></i>{{ carga.observaciones }}
+            </div>
+
+            <div v-if="carga.estado_carga !== 'PAGADA'" class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top">
+                <Link
+                    v-if="carga.estado_carga === 'ABIERTA'"
+                    v-can="'control-cargas.editar'"
+                    :href="route('control-cargas.edit', carga.id)"
+                    class="btn btn-outline-info btn-sm btn-wave"
+                >
+                    <i class="ri-edit-line me-1"></i> Editar
+                </Link>
+                <button
+                    v-if="carga.estado_carga === 'ABIERTA'"
+                    v-can="'control-cargas.editar'"
+                    type="button"
+                    class="btn btn-outline-danger btn-sm btn-wave"
+                    @click="cerrarCarga"
+                >
+                    <i class="ri-flag-line me-1"></i> Finalizar Registro de Viajes
+                </button>
+                <button
+                    v-if="carga.estado_carga === 'CERRADA'"
+                    v-can="'control-cargas.marcar-pagado'"
+                    type="button"
+                    class="btn btn-success btn-sm btn-wave"
+                    @click="abrirModalPago"
+                >
+                    <i class="ri-money-dollar-circle-line me-1"></i> Marcar como Pagado
+                </button>
             </div>
         </div>
     </div>
@@ -360,6 +445,62 @@ function submit() {
                             <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
                             <i v-else class="ri-save-line me-1"></i>
                             {{ form.processing ? 'Guardando...' : 'Registrar Viaje' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: marcar como pagado -->
+    <div ref="modalPagoEl" class="modal fade" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form @submit.prevent="submitPago">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-medium">Marcar como Pagado</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small">
+                            Ambos datos son opcionales y pueden completarse después editando la carga.
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">Monto de Pago</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Bs.</span>
+                                <input
+                                    v-model="formPago.monto_pago"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': formPago.errors.monto_pago }"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <InputError :message="formPago.errors.monto_pago" class="mt-1" />
+                        </div>
+                        <div class="mb-1">
+                            <label class="form-label fw-medium">Observaciones</label>
+                            <textarea
+                                v-model="formPago.observaciones"
+                                class="form-control"
+                                :class="{ 'is-invalid': formPago.errors.observaciones }"
+                                rows="3"
+                                placeholder="Observaciones (opcional)"
+                            ></textarea>
+                            <InputError :message="formPago.errors.observaciones" class="mt-1" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-wave" data-bs-dismiss="modal">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-success btn-wave" :disabled="formPago.processing">
+                            <span v-if="formPago.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <i v-else class="ri-money-dollar-circle-line me-1"></i>
+                            {{ formPago.processing ? 'Guardando...' : 'Marcar como Pagado' }}
                         </button>
                     </div>
                 </form>

@@ -256,6 +256,22 @@ class UserSeeder extends Seeder
     }
 
     /**
+     * Marcar una carga como PAGADA (App\Http\Controllers\CargaMaterialController::pagar()):
+     * a diferencia del resto de permisosControlCargas(), éste NO se otorga al
+     * conductor ni al técnico de mantenimiento — sólo a jefe-area (ver
+     * permisosParaJefeArea()) y, automáticamente, a administrador/super-admin
+     * vía todosLosPermisos(). Cerrar una carga (CargaMaterialController::cerrar())
+     * no requiere un permiso aparte: cualquier usuario que ya puede gestionar
+     * la carga (control-cargas.editar) puede cerrarla.
+     */
+    private function permisosControlCargasPago(): array
+    {
+        return [
+            'control-cargas.marcar-pagado',
+        ];
+    }
+
+    /**
      * Módulo de Roles y Permisos (App\Http\Controllers\RolController): sólo
      * administrador/super-admin lo usan, así que no se agrupa en ningún otro
      * bundle de permisos (no forma parte de permisosCatalogos()).
@@ -328,6 +344,7 @@ class UserSeeder extends Seeder
             ...$this->permisosMateriales(),
             ...$this->permisosVehiculosExternos(),
             ...$this->permisosControlCargas(),
+            ...$this->permisosControlCargasPago(),
             ...$this->permisosRoles(),
             ...$this->permisosParametrosEmpresa(),
         ];
@@ -368,6 +385,7 @@ class UserSeeder extends Seeder
             ...$this->permisosOperacionDiariaJefe(),
             ...$this->permisosCatalogos(),
             ...$this->permisosControlCargas(),
+            ...$this->permisosControlCargasPago(),
             'operacion-diaria.verificar',
         ];
     }

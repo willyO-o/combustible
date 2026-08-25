@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -37,6 +38,12 @@ class CargaMaterialControllerTest extends TestCase
 
         $this->jefeArea = User::factory()->create();
         $this->jefeArea->assignRole('jefe-area');
+
+        // control-cargas.marcar-pagado: sólo jefe-area/administrador/super-admin
+        // lo tienen (ver UserSeeder::permisosControlCargasPago()); un conductor
+        // nunca lo recibe.
+        Permission::firstOrCreate(['name' => 'control-cargas.marcar-pagado', 'guard_name' => 'web']);
+        $this->jefeArea->givePermissionTo('control-cargas.marcar-pagado');
 
         // CargaMaterial::calcularGestion()/getNroAttribute() leen este parámetro.
         ParametrosEmpresa::create([
@@ -512,5 +519,127 @@ class CargaMaterialControllerTest extends TestCase
         $response->assertRedirect(route('control-cargas.show', $carga->id));
         $response->assertSessionHas('error');
         $this->assertSame(0, Viaje::count());
+    }
+
+    /* -----------------------------------------------------------------
+     |  Cerrar carga
+     | ----------------------------------------------------------------- */
+
+    public function test_cerrar_marca_la_carga_como_cerrada_y_registra_usuario_y_fecha(): void
+    {
+        $this->travelTo(now()->setDate(2026, 8, 20)->setTime(10, 0));
+
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->conductor)->post(route('control-cargas.cerrar', $carga->id));
+
+        $response->assertRedirect();
+        $carga->refresh();
+        $this->assertSame('CERRADA', $carga->estado_carga);
+        $this->assertSame($this->conductor->id, $carga->id_usuario_cierre);
+        $this->assertTrue(now()->equalTo($carga->fecha_cierre));
+    }
+
+    public function test_cerrar_bloqueado_para_un_conductor_que_no_es_el_dueno(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $otroConductor = User::factory()->create();
+        $otroConductor->assignRole('conductor');
+
+        $response = $this->actingAs($otroConductor)->post(route('control-cargas.cerrar', $carga->id));
+
+        $response->assertForbidden();
+        $this->assertSame('ABIERTA', $carga->fresh()->estado_carga);
+    }
+
+    public function test_cerrar_permitido_para_jefe_de_area_aunque_no_sea_el_dueno(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->jefeArea)->post(route('control-cargas.cerrar', $carga->id));
+
+        $response->assertRedirect();
+        $this->assertSame('CERRADA', $carga->fresh()->estado_carga);
+        $this->assertSame($this->jefeArea->id, $carga->fresh()->id_usuario_cierre);
+    }
+
+    public function test_cerrar_falla_si_la_carga_ya_no_esta_abierta(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $response = $this->actingAs($this->conductor)->post(route('control-cargas.cerrar', $carga->id));
+
+        $response->assertForbidden();
+    }
+
+    /* -----------------------------------------------------------------
+     |  Marcar como pagado
+     | ----------------------------------------------------------------- */
+
+    public function test_pagar_requiere_el_permiso_marcar_pagado(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $response = $this->actingAs($this->conductor)->post(route('control-cargas.pagar', $carga->id));
+
+        $response->assertForbidden();
+        $this->assertSame('CERRADA', $carga->fresh()->estado_carga);
+    }
+
+    public function test_pagar_marca_la_carga_como_pagada(): void
+    {
+        $this->travelTo(now()->setDate(2026, 8, 20)->setTime(10, 0));
+
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $response = $this->actingAs($this->jefeArea)->post(route('control-cargas.pagar', $carga->id));
+
+        $response->assertRedirect();
+        $carga->refresh();
+        $this->assertSame('PAGADA', $carga->estado_carga);
+        $this->assertTrue(now()->equalTo($carga->fecha_pago));
+    }
+
+    public function test_pagar_guarda_monto_y_observaciones_cuando_se_envian(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $this->actingAs($this->jefeArea)->post(route('control-cargas.pagar', $carga->id), [
+            'monto_pago' => 1500.50,
+            'observaciones' => 'Pagado en efectivo',
+        ]);
+
+        $carga->refresh();
+        $this->assertEquals(1500.50, $carga->monto_pago);
+        $this->assertSame('Pagado en efectivo', $carga->observaciones);
+    }
+
+    public function test_pagar_permite_omitir_monto_y_observaciones(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $response = $this->actingAs($this->jefeArea)->post(route('control-cargas.pagar', $carga->id));
+
+        $response->assertRedirect();
+        $carga->refresh();
+        $this->assertSame('PAGADA', $carga->estado_carga);
+        $this->assertNull($carga->monto_pago);
+    }
+
+    public function test_pagar_falla_si_la_carga_no_esta_cerrada(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->jefeArea)->post(route('control-cargas.pagar', $carga->id));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+        $this->assertSame('ABIERTA', $carga->fresh()->estado_carga);
     }
 }
