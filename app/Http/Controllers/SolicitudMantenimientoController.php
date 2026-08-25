@@ -38,8 +38,8 @@ class SolicitudMantenimientoController extends Controller
             $query->where('id_vehiculo', $request->id_vehiculo);
         }
 
-        if (auth()->user()->hasRole('conductor')) {
-            $query->where('id_conductor', auth()->user()->id_persona);
+        if ($request->user()->hasRole('conductor')) {
+            $query->where('id_conductor', $request->user()->id_persona);
         }
 
         $solicitudes = $query->orderBy('id', 'desc')
@@ -68,9 +68,9 @@ class SolicitudMantenimientoController extends Controller
      * Sólo los conductores registran solicitudes de mantenimiento: el
      * vehículo y el conductor se determinan a partir de su propia persona.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        if (! auth()->user()->hasRole('conductor')) {
+        if (! $request->user()->hasRole('conductor')) {
             abort(403, 'Sólo los conductores pueden registrar solicitudes de mantenimiento.');
         }
 
@@ -79,8 +79,8 @@ class SolicitudMantenimientoController extends Controller
             ->get();
 
         $conductor = null;
-        if (auth()->user()->hasRole('conductor')) {
-            $conductor = Conductor::with('persona')->where('id', auth()->user()->id_persona)->first();
+        if ($request->user()->hasRole('conductor')) {
+            $conductor = Conductor::with('persona')->where('id', $request->user()->id_persona)->first();
             $vehiculos = $conductor->asignacionesActivas;
         } else {
             $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')

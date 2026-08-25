@@ -39,10 +39,9 @@ class CargaMaterialController extends Controller
     }
 
     /**
-     * Abre una nueva carga. La mayoría de los datos (usuario, fecha de
-     * apertura, estado, número/gestión) se asignan automáticamente desde el
-     * usuario autenticado (ver CargaMaterial::boot()), igual que en el
-     * módulo web.
+     * Abre una nueva carga. La mayoría de los datos (usuario, estado,
+     * número/gestión) se asignan automáticamente desde el usuario autenticado
+     * (ver CargaMaterial::boot()), igual que en el módulo web.
      *
      * Opcionalmente, si el cliente envía el bloque "viaje" (id_material,
      * foto, origen, destino y detalle opcional), se registra también el
@@ -52,15 +51,29 @@ class CargaMaterialController extends Controller
     {
         try {
             $carga = DB::transaction(function () use ($request) {
-                $carga = CargaMaterial::create($request->safe()->except('viaje'));
+                $datos = $request->safe()->except('viaje');
+
+                // Observaciones sólo puede definirla un jefe de área (o roles
+                // superiores); si la envía un conductor, se ignora en silencio.
+                if (! $request->user()->hasAnyRole(['jefe-area', 'administrador', 'super-admin'])) {
+                    unset($datos['observaciones']);
+                }
+
+                // fecha_apertura es la fecha/hora actual del servidor, salvo un
+                // registro offline sincronizado desde la app (ver CargaMaterialRequest).
+                if (! $request->boolean('is_offline')) {
+                    $datos['fecha_apertura'] = now();
+                }
+
+                $carga = CargaMaterial::create($datos);
 
                 if ($request->has('viaje')) {
                     $datosViaje = $request->validated('viaje');
                     $datosViaje['foto'] = $request->file('viaje.foto')->store('control-cargas/viajes', 'public');
 
-                    // fecha_hora_carga es la fecha/hora actual del servidor, salvo
-                    // un registro offline sincronizado (ver CargaMaterialRequest).
-                    if (! $request->boolean('viaje.is_offline')) {
+                    // El primer viaje comparte el mismo is_offline que la carga:
+                    // toda la petición corresponde al mismo momento offline.
+                    if (! $request->boolean('is_offline')) {
                         $datosViaje['fecha_hora_carga'] = now();
                     }
 

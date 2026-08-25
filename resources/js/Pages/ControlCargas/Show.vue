@@ -188,6 +188,12 @@ function submit() {
             <div class="small text-muted mb-1">
                 <i class="ri-time-line me-1"></i>Abierta: {{ carga.fecha_apertura }} · por {{ carga.abierta_por }}
             </div>
+            <div v-if="carga.es_al_exterior" class="small text-muted mb-1">
+                <i class="ri-earth-line me-1"></i>Al exterior — {{ carga.pais }}
+            </div>
+            <div v-if="carga.detalle" class="small text-muted mb-1">
+                <i class="ri-sticky-note-line me-1"></i>{{ carga.detalle }}
+            </div>
             <div v-if="carga.observaciones" class="small text-muted mt-2">
                 <i class="ri-file-text-line me-1"></i>{{ carga.observaciones }}
             </div>

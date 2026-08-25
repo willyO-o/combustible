@@ -267,7 +267,24 @@ class CargaMaterialControllerTest extends TestCase
         $response->assertJsonValidationErrors(['fecha_hora_carga']);
     }
 
-    public function test_store_permite_registrar_el_primer_viaje_offline_respetando_su_fecha_hora_carga(): void
+    public function test_store_asigna_la_fecha_de_apertura_actual_del_servidor_por_defecto(): void
+    {
+        $this->travelTo(now()->setDate(2026, 8, 20)->setTime(10, 0));
+
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            // Un intento de forzar la fecha sin is_offline=true se ignora.
+            'fecha_apertura' => '2020-01-01 00:00:00',
+        ]);
+
+        $response->assertCreated();
+        $carga = CargaMaterial::first();
+        $this->assertTrue(now()->equalTo($carga->fecha_apertura));
+    }
+
+    public function test_store_offline_respeta_la_fecha_de_apertura_y_la_fecha_hora_carga_del_primer_viaje(): void
     {
         Storage::fake('public');
 
@@ -276,19 +293,93 @@ class CargaMaterialControllerTest extends TestCase
 
         $response = $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
             'id_vehiculo_externo' => $vehiculoExterno->id,
+            'is_offline' => true,
+            'fecha_apertura' => '2026-08-18 09:00:00',
             'viaje' => [
                 'id_material' => $material->id,
                 'foto' => UploadedFile::fake()->image('viaje.jpg'),
                 'origen' => 'Cantera Norte',
                 'destino' => 'Planta',
-                'is_offline' => true,
                 'fecha_hora_carga' => '2026-08-18 09:15:00',
             ],
         ]);
 
         $response->assertCreated();
-        $viaje = CargaMaterial::first()->viajes()->first();
+        $carga = CargaMaterial::first();
+        $this->assertSame('2026-08-18 09:00:00', $carga->fecha_apertura->format('Y-m-d H:i:s'));
+
+        $viaje = $carga->viajes()->first();
         $this->assertSame('2026-08-18 09:15:00', $viaje->fecha_hora_carga->format('Y-m-d H:i:s'));
+    }
+
+    public function test_store_offline_requiere_fecha_apertura(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'is_offline' => true,
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['fecha_apertura']);
+    }
+
+    public function test_store_requiere_pais_cuando_es_al_exterior(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'es_al_exterior' => true,
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['pais']);
+    }
+
+    public function test_store_guarda_es_al_exterior_pais_y_detalle(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'es_al_exterior' => true,
+            'pais' => 'Perú',
+            'detalle' => 'Carga urgente',
+        ]);
+
+        $response->assertCreated();
+        $carga = CargaMaterial::first();
+        $this->assertTrue($carga->es_al_exterior);
+        $this->assertSame('Perú', $carga->pais);
+        $this->assertSame('Carga urgente', $carga->detalle);
+    }
+
+    public function test_store_ignora_observaciones_enviadas_por_un_conductor(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'observaciones' => 'Intento de un conductor',
+        ]);
+
+        $response->assertCreated();
+        $this->assertNull(CargaMaterial::first()->observaciones);
+    }
+
+    public function test_store_permite_observaciones_de_un_jefe_de_area(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $response = $this->actingAs($this->jefeArea, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'observaciones' => 'Nota del jefe de área',
+        ]);
+
+        $response->assertCreated();
+        $this->assertSame('Nota del jefe de área', CargaMaterial::first()->observaciones);
     }
 
     public function test_registrar_viaje_falla_si_la_carga_esta_cerrada(): void

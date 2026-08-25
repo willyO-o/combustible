@@ -162,6 +162,59 @@ class CargaMaterialControllerTest extends TestCase
         $this->assertSame('000001/'.now()->year, $carga->nro);
     }
 
+    public function test_store_requiere_pais_cuando_es_al_exterior(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $response = $this->actingAs($this->conductor)->post(route('control-cargas.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'es_al_exterior' => true,
+        ]);
+
+        $response->assertSessionHasErrors(['pais']);
+    }
+
+    public function test_store_guarda_es_al_exterior_pais_y_detalle(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $this->actingAs($this->conductor)->post(route('control-cargas.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'es_al_exterior' => true,
+            'pais' => 'Perú',
+            'detalle' => 'Carga urgente',
+        ]);
+
+        $carga = CargaMaterial::first();
+        $this->assertTrue($carga->es_al_exterior);
+        $this->assertSame('Perú', $carga->pais);
+        $this->assertSame('Carga urgente', $carga->detalle);
+    }
+
+    public function test_store_ignora_observaciones_enviadas_por_un_conductor(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $this->actingAs($this->conductor)->post(route('control-cargas.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'observaciones' => 'Intento de un conductor',
+        ]);
+
+        $this->assertNull(CargaMaterial::first()->observaciones);
+    }
+
+    public function test_store_permite_observaciones_de_un_jefe_de_area(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $this->actingAs($this->jefeArea)->post(route('control-cargas.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'observaciones' => 'Nota del jefe de área',
+        ]);
+
+        $this->assertSame('Nota del jefe de área', CargaMaterial::first()->observaciones);
+    }
+
     public function test_store_requiere_vehiculo(): void
     {
         $response = $this->actingAs($this->conductor)->post(route('control-cargas.store'), []);
@@ -194,6 +247,7 @@ class CargaMaterialControllerTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('ControlCargas/Form')
             ->has('vehiculosExternos', 1)
+            ->where('puedeEditarObservaciones', false)
         );
     }
 
@@ -207,6 +261,19 @@ class CargaMaterialControllerTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('ControlCargas/Form')
             ->where('carga.id', $carga->id)
+            ->where('puedeEditarObservaciones', false)
+        );
+    }
+
+    public function test_edit_permite_editar_observaciones_a_un_jefe_de_area(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->jefeArea)->get(route('control-cargas.edit', $carga->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('puedeEditarObservaciones', true)
         );
     }
 
@@ -248,14 +315,42 @@ class CargaMaterialControllerTest extends TestCase
         $response = $this->actingAs($this->conductor)->put(route('control-cargas.update', $carga->id), [
             'nombre_conductor' => 'Nuevo Nombre',
             'telefono' => '77700000',
-            'observaciones' => 'Corrección de datos',
+            'es_al_exterior' => true,
+            'pais' => 'Perú',
+            'detalle' => 'Carga urgente',
         ]);
 
         $response->assertRedirect(route('control-cargas.index'));
         $carga->refresh();
         $this->assertSame('Nuevo Nombre', $carga->nombre_conductor);
         $this->assertSame('77700000', $carga->telefono);
-        $this->assertSame('Corrección de datos', $carga->observaciones);
+        $this->assertTrue($carga->es_al_exterior);
+        $this->assertSame('Perú', $carga->pais);
+        $this->assertSame('Carga urgente', $carga->detalle);
+    }
+
+    public function test_update_ignora_observaciones_enviadas_por_un_conductor(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $this->actingAs($this->conductor)->put(route('control-cargas.update', $carga->id), [
+            'nombre_conductor' => 'Nuevo Nombre',
+            'observaciones' => 'Intento de un conductor',
+        ]);
+
+        $this->assertNull($carga->fresh()->observaciones);
+    }
+
+    public function test_update_permite_observaciones_de_un_jefe_de_area(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->jefeArea)->put(route('control-cargas.update', $carga->id), [
+            'observaciones' => 'Nota del jefe de área',
+        ]);
+
+        $response->assertRedirect(route('control-cargas.index'));
+        $this->assertSame('Nota del jefe de área', $carga->fresh()->observaciones);
     }
 
     public function test_update_no_falla_cuando_el_formulario_reenvia_el_vehiculo_vacio(): void

@@ -15,10 +15,13 @@ use Illuminate\Support\Facades\Auth;
     'id_usuario_cierre',
     'fecha_apertura',
     'fecha_cierre',
+    'es_al_exterior',
+    'pais',
     'nombre_conductor',
     'telefono',
     'fecha_pago',
     'monto_pago',
+    'detalle',
     'observaciones',
     'estado_carga',
 ])]
@@ -40,6 +43,7 @@ class CargaMaterial extends Model
         return [
             'fecha_apertura' => 'datetime',
             'fecha_cierre' => 'datetime',
+            'es_al_exterior' => 'boolean',
             'fecha_pago' => 'datetime',
         ];
     }
@@ -79,7 +83,10 @@ class CargaMaterial extends Model
             $carga->nro_carga = self::siguienteNroCarga($carga->gestion);
 
             $carga->id_usuario_apertura = Auth::id();
-            $carga->fecha_apertura = now();
+            // Fecha/hora actual del servidor, salvo que el controlador ya la
+            // haya asignado explícitamente (registro offline sincronizado
+            // desde la API — ver CargaMaterialController@store en Api/V1).
+            $carga->fecha_apertura = $carga->fecha_apertura ?: now();
             $carga->estado_carga = 'ABIERTA';
         });
     }

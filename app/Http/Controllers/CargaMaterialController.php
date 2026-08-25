@@ -6,6 +6,7 @@ use App\Http\Requests\CargaMaterialRequest;
 use App\Http\Requests\ViajeRequest;
 use App\Models\CargaMaterial;
 use App\Models\Material;
+use App\Models\User;
 use App\Models\VehiculoExterno;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -55,6 +56,8 @@ class CargaMaterialController extends Controller
             'fecha_apertura' => $carga->fecha_apertura?->format('d/m/Y H:i'),
             'nombre_conductor' => $carga->nombre_conductor,
             'telefono' => $carga->telefono,
+            'es_al_exterior' => $carga->es_al_exterior,
+            'pais' => $carga->pais,
             'vehiculo_externo' => $carga->vehiculoExterno ? [
                 'id' => $carga->vehiculoExterno->id,
                 'nro_placa' => $carga->vehiculoExterno->nro_placa,
@@ -80,12 +83,21 @@ class CargaMaterialController extends Controller
     {
         return Inertia::render('ControlCargas/Form', [
             'vehiculosExternos' => VehiculoExterno::orderBy('nro_placa')->get(['id', 'nro_placa', 'propietario']),
+            'puedeEditarObservaciones' => $this->puedeEditarObservaciones(request()->user()),
         ]);
     }
 
     public function store(CargaMaterialRequest $request): RedirectResponse
     {
-        $carga = CargaMaterial::create($request->validated());
+        $datos = $request->validated();
+
+        // Observaciones sólo puede definirla un jefe de área (o roles
+        // superiores); si la envía un conductor, se ignora en silencio.
+        if (! $this->puedeEditarObservaciones($request->user())) {
+            unset($datos['observaciones']);
+        }
+
+        $carga = CargaMaterial::create($datos);
 
         return redirect()->route('control-cargas.show', $carga->id)
             ->with('success', "Carga #{$carga->nro} registrada exitosamente. Ya puedes registrar viajes.");
@@ -104,12 +116,16 @@ class CargaMaterialController extends Controller
                 'estado_carga' => $cargaMaterial->estado_carga,
                 'nombre_conductor' => $cargaMaterial->nombre_conductor,
                 'telefono' => $cargaMaterial->telefono,
+                'es_al_exterior' => $cargaMaterial->es_al_exterior,
+                'pais' => $cargaMaterial->pais,
+                'detalle' => $cargaMaterial->detalle,
                 'observaciones' => $cargaMaterial->observaciones,
                 'vehiculo_externo' => $cargaMaterial->vehiculoExterno ? [
                     'nro_placa' => $cargaMaterial->vehiculoExterno->nro_placa,
                     'propietario' => $cargaMaterial->vehiculoExterno->propietario,
                 ] : null,
             ],
+            'puedeEditarObservaciones' => $this->puedeEditarObservaciones(request()->user()),
         ]);
     }
 
@@ -119,8 +135,15 @@ class CargaMaterialController extends Controller
 
         // El material y el vehículo externo no se pueden cambiar una vez
         // abierta la carga (ver CargaMaterialRequest::rules()): solo se
-        // corrigen los datos del conductor externo y las observaciones.
-        $cargaMaterial->update($request->safe()->only(['nombre_conductor', 'telefono', 'observaciones']));
+        // corrigen los datos del conductor externo y algunos datos del viaje.
+        $campos = ['nombre_conductor', 'telefono', 'es_al_exterior', 'pais', 'detalle'];
+
+        // Observaciones sólo puede editarla un jefe de área (o roles superiores).
+        if ($this->puedeEditarObservaciones($request->user())) {
+            $campos[] = 'observaciones';
+        }
+
+        $cargaMaterial->update($request->safe()->only($campos));
 
         return redirect()->route('control-cargas.index')
             ->with('success', "Carga #{$cargaMaterial->nro} actualizada exitosamente.");
@@ -153,6 +176,9 @@ class CargaMaterialController extends Controller
                 'fecha_apertura' => $cargaMaterial->fecha_apertura?->format('d/m/Y H:i'),
                 'nombre_conductor' => $cargaMaterial->nombre_conductor,
                 'telefono' => $cargaMaterial->telefono,
+                'es_al_exterior' => $cargaMaterial->es_al_exterior,
+                'pais' => $cargaMaterial->pais,
+                'detalle' => $cargaMaterial->detalle,
                 'observaciones' => $cargaMaterial->observaciones,
                 'vehiculo_externo' => $cargaMaterial->vehiculoExterno ? [
                     'nro_placa' => $cargaMaterial->vehiculoExterno->nro_placa,
@@ -218,5 +244,14 @@ class CargaMaterialController extends Controller
         if ($cargaMaterial->estado_carga !== 'ABIERTA') {
             abort(403, 'No se puede editar una carga que ya está cerrada.');
         }
+    }
+
+    /**
+     * Observaciones sólo la puede definir un jefe de área (o roles
+     * superiores); un conductor no, aunque pueda gestionar el resto de la carga.
+     */
+    private function puedeEditarObservaciones(User $user): bool
+    {
+        return $user->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
     }
 }

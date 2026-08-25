@@ -9,6 +9,7 @@ import VehiculoExternoFormModal from '@/Components/VehiculoExternoFormModal.vue'
 const props = defineProps({
     carga: Object, // null en creación
     vehiculosExternos: { type: Array, default: () => [] },
+    puedeEditarObservaciones: { type: Boolean, default: false },
 })
 
 const isEditing = computed(() => !!props.carga)
@@ -23,8 +24,19 @@ const form = useForm({
     ...(isEditing.value ? { _method: 'PUT' } : { id_vehiculo_externo: '' }),
     nombre_conductor: props.carga?.nombre_conductor ?? '',
     telefono: props.carga?.telefono ?? '',
+    es_al_exterior: props.carga?.es_al_exterior ?? false,
+    pais: props.carga?.pais ?? '',
+    detalle: props.carga?.detalle ?? '',
     observaciones: props.carga?.observaciones ?? '',
 })
+
+// Al desmarcar "al exterior" ya no corresponde mantener un país seleccionado.
+function onToggleAlExterior() {
+    if (!form.es_al_exterior) {
+        form.pais = ''
+        form.clearErrors('pais')
+    }
+}
 
 function onVehiculoCreado(vehiculoExterno) {
     vehiculosList.value.push(vehiculoExterno)
@@ -140,7 +152,54 @@ function submit() {
                                 <InputError :message="form.errors.telefono" class="mt-1" />
                             </div>
 
+                            <!-- Al exterior / país -->
+                            <div class="col-sm-6">
+                                <div class="form-check form-switch mt-2">
+                                    <input
+                                        id="es_al_exterior"
+                                        v-model="form.es_al_exterior"
+                                        type="checkbox"
+                                        class="form-check-input"
+                                        role="switch"
+                                        @change="onToggleAlExterior"
+                                    />
+                                    <label class="form-check-label fw-medium" for="es_al_exterior">Carga a país exterior</label>
+                                </div>
+                                <InputError :message="form.errors.es_al_exterior" class="mt-1" />
+                            </div>
+
+                            <div v-if="form.es_al_exterior" class="col-sm-12">
+                                <label class="form-label fw-medium">
+                                    País de destino<span class="text-danger">*</span>
+                                </label>
+                                <input
+                                    v-model="form.pais"
+                                    type="text"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors.pais }"
+                                    placeholder="Ej: Perú, Chile, Brasil..."
+                                    maxlength="50"
+                                />
+                                <InputError :message="form.errors.pais" class="mt-1" />
+                            </div>
+
+                            <!-- Detalle: lo puede registrar el propio conductor -->
                             <div class="col-12">
+                                <label class="form-label fw-medium">Detalle</label>
+                                <textarea
+                                    v-model="form.detalle"
+                                    type="text"
+                                    class="form-control"
+                                    :class="{ 'is-invalid': form.errors.detalle }"
+                                    placeholder="Detalle adicional (opcional)"
+                                    maxlength="50"
+                                    rows="4"
+                                ></textarea>
+                                <InputError :message="form.errors.detalle" class="mt-1" />
+                            </div>
+
+                            <!-- Observaciones: solo un jefe de área (o roles superiores) puede definirlas -->
+                            <div v-if="puedeEditarObservaciones" class="col-12">
                                 <label class="form-label fw-medium">Observaciones</label>
                                 <textarea
                                     v-model="form.observaciones"
@@ -150,6 +209,13 @@ function submit() {
                                     placeholder="Observaciones (opcional)"
                                 ></textarea>
                                 <InputError :message="form.errors.observaciones" class="mt-1" />
+                            </div>
+                            <div v-else-if="carga?.observaciones" class="col-12">
+                                <label class="form-label fw-medium">Observaciones</label>
+                                <div class="form-control-plaintext bg-light rounded-2 px-3 py-2 text-muted">
+                                    {{ carga.observaciones }}
+                                </div>
+                                <div class="form-text">Solo un jefe de área puede editar las observaciones.</div>
                             </div>
 
                         </div>

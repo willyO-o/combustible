@@ -113,6 +113,9 @@ const estadoBadge = (estado) => ({
                     <div class="d-flex flex-wrap gap-1 mb-2">
                         <span class="badge" :class="estadoBadge(carga.estado_carga)">{{ carga.estado_carga }}</span>
                         <span v-if="carga.es_propia" class="badge bg-info-transparent text-info">Tuya</span>
+                        <span v-if="carga.es_al_exterior" class="badge bg-warning-transparent text-warning">
+                            <i class="ri-earth-line me-1"></i>{{ carga.pais || 'Al exterior' }}
+                        </span>
                     </div>
 
                     <div v-if="carga.nombre_conductor" class="small text-muted mb-1">

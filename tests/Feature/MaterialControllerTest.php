@@ -133,6 +133,7 @@ class MaterialControllerTest extends TestCase
             'id_carga_material' => $idCargaMaterial,
             'id_material' => $material->id,
             'id_usuario_registro' => $this->admin->id,
+            'fecha_hora_carga' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
