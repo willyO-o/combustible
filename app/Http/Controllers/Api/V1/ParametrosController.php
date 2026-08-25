@@ -7,6 +7,7 @@ use App\Models\Actividad;
 use App\Models\Grifo;
 use App\Models\Material;
 use App\Models\TipoCombustible;
+use App\Models\VehiculoExterno;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -77,6 +78,10 @@ class ParametrosController extends Controller
                 // operación minera). También se puede consultar/registrar
                 // uno nuevo directamente en /materiales.
                 'materiales' => Material::orderBy('material')->get(['id', 'material']),
+                // Vehículos externos (no pertenecen a la flota propia) que
+                // transportan el material. También se puede consultar/
+                // registrar uno nuevo directamente en /vehiculos-externos.
+                'vehiculos_externos' => VehiculoExterno::orderBy('nro_placa')->get(['id', 'nro_placa', 'propietario']),
                 'estados_carga' => ['ABIERTA', 'CERRADA', 'PAGADA'],
             ],
         ];

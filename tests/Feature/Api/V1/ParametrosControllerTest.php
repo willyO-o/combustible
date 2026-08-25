@@ -6,6 +6,7 @@ use App\Models\Conductor;
 use App\Models\Material;
 use App\Models\Persona;
 use App\Models\User;
+use App\Models\VehiculoExterno;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -53,5 +54,16 @@ class ParametrosControllerTest extends TestCase
             ['ABIERTA', 'CERRADA', 'PAGADA'],
             $response->json('data.control_cargas.estados_carga')
         );
+    }
+
+    public function test_colecciones_incluye_los_vehiculos_externos(): void
+    {
+        VehiculoExterno::factory()->create(['nro_placa' => '148-JLK']);
+
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data.control_cargas.vehiculos_externos'));
+        $this->assertSame('148-JLK', $response->json('data.control_cargas.vehiculos_externos.0.nro_placa'));
     }
 }

@@ -74,9 +74,9 @@ tags:
       Registro y consulta de cargas de material (viajes de un vehículo externo transportando
       un material) y de los viajes individuales dentro de cada carga. Una carga se abre una
       sola vez y permanece `ABIERTA` mientras se le van agregando viajes; opcionalmente, el
-      primer viaje puede registrarse en la misma petición que abre la carga. Incluye también el
-      catálogo de materiales transportados (cola, broza, concentrado, etc.), que puede
-      consultarse y ampliarse bajo demanda.
+      primer viaje puede registrarse en la misma petición que abre la carga. Incluye también los
+      catálogos de materiales transportados (cola, broza, concentrado, etc.) y de vehículos
+      externos, ambos consultables y ampliables bajo demanda.
   - name: Solicitudes de Mantenimiento
     description: |
       Paso 1 del flujo de mantenimiento: el conductor (o quien registre en su nombre) reporta
@@ -399,9 +399,9 @@ paths:
       description: |
         Devuelve los catálogos y colecciones necesarios para alimentar formularios del cliente:
         vehículos actualmente asignados al conductor autenticado, estaciones de servicio activas,
-        tipos de combustible activos, el catálogo de materiales de control de cargas, y los
-        valores enumerados usados por otros módulos (cargas de combustible, solicitudes de
-        mantenimiento, control de cargas).
+        tipos de combustible activos, los catálogos de materiales y vehículos externos de
+        control de cargas, y los valores enumerados usados por otros módulos (cargas de
+        combustible, solicitudes de mantenimiento, control de cargas).
 
         Requiere que el usuario autenticado tenga una persona vinculada con un registro de
         conductor asociado.
@@ -450,6 +450,10 @@ paths:
                         material: Broza
                       - id: 3
                         material: Concentrado
+                    vehiculos_externos:
+                      - id: 3
+                        nro_placa: "148-JLK"
+                        propietario: "Transportes Andina"
                     estados_carga: [ABIERTA, CERRADA, PAGADA]
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1722,6 +1726,82 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /vehiculos-externos:
+    get:
+      tags: [Control de Cargas]
+      summary: Listar el catálogo de vehículos externos
+      description: |
+        Lista completa (sin paginar) del catálogo de vehículos externos (no pertenecen a la
+        flota propia) que transportan material. Este mismo catálogo también se envía en
+        `GET /parametros/colecciones` (`control_cargas.vehiculos_externos`); este endpoint
+        permite además buscar por placa.
+      parameters:
+        - name: nro_placa
+          in: query
+          description: Filtra por placa (coincidencia parcial).
+          schema: { type: string }
+          example: "148"
+      responses:
+        '200':
+          description: Catálogo de vehículos externos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/VehiculoExternoResumen' }
+              example:
+                data:
+                  - id: 3
+                    nro_placa: "148-JLK"
+                    propietario: "Transportes Andina"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Control de Cargas]
+      summary: Registrar un vehículo externo bajo demanda
+      description: |
+        Registra un nuevo vehículo externo en el catálogo — pensado para cuando, al abrir una
+        carga, el vehículo buscado no existe todavía en `GET /vehiculos-externos` (misma idea
+        que el alta rápida del panel web). La placa no puede repetirse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehiculoExternoStoreRequest'
+            example:
+              nro_placa: "148-JLK"
+              propietario: "Transportes Andina"
+      responses:
+        '201':
+          description: Vehículo externo registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehiculoExternoStoreResponse'
+              example:
+                message: Vehículo externo registrado exitosamente.
+                data:
+                  id: 4
+                  nro_placa: "148-JLK"
+                  propietario: "Transportes Andina"
+        '422':
+          description: Error de validación (placa repetida u omitida).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              example:
+                message: The given data was invalid.
+                errors:
+                  nro_placa: ["El campo placa ya ha sido registrado."]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   # ──────────────────────────────────────────────────────────────────────
   # SOLICITUDES DE MANTENIMIENTO
   # ──────────────────────────────────────────────────────────────────────
@@ -2247,6 +2327,13 @@ components:
                     concentrado, etc., según lo que maneje cada operación minera). También se
                     puede consultar/registrar uno nuevo directamente en `GET`/`POST /materiales`.
                   items: { $ref: '#/components/schemas/MaterialResumen' }
+                vehiculos_externos:
+                  type: array
+                  description: |
+                    Catálogo completo de vehículos externos (no pertenecen a la flota propia)
+                    que transportan material. También se puede consultar/registrar uno nuevo
+                    directamente en `GET`/`POST /vehiculos-externos`.
+                  items: { $ref: '#/components/schemas/VehiculoExternoResumen' }
                 estados_carga:
                   type: array
                   items: { type: string }
@@ -3204,6 +3291,28 @@ components:
       properties:
         message: { type: string, example: Material registrado exitosamente. }
         data: { $ref: '#/components/schemas/MaterialResumen' }
+
+    VehiculoExternoStoreRequest:
+      type: object
+      description: Cuerpo esperado por `POST /vehiculos-externos`.
+      required: [nro_placa]
+      properties:
+        nro_placa:
+          type: string
+          maxLength: 20
+          description: Placa del vehículo. No puede repetirse.
+          example: "148-JLK"
+        propietario:
+          type: string
+          nullable: true
+          maxLength: 250
+          example: "Transportes Andina"
+
+    VehiculoExternoStoreResponse:
+      type: object
+      properties:
+        message: { type: string, example: Vehículo externo registrado exitosamente. }
+        data: { $ref: '#/components/schemas/VehiculoExternoResumen' }
 
     # ── Solicitudes de Mantenimiento ─────────────────────────────────────
     SolicitudMantenimiento:
