@@ -47,6 +47,11 @@ class CargaMaterialRequest extends FormRequest
                 'viaje.origen' => ['required', 'string', 'max:255'],
                 'viaje.destino' => ['required', 'string', 'max:255'],
                 'viaje.detalle' => ['nullable', 'string', 'max:255'],
+                // Mismo comportamiento de is_offline que ViajeRequest, aplicado
+                // al viaje anidado: exige fecha_hora_carga sólo cuando viene
+                // marcado como registro sincronizado desde la app offline.
+                'viaje.fecha_hora_carga' => [$this->boolean('viaje.is_offline') ? 'required' : 'nullable', 'date'],
+                'viaje.is_offline' => ['sometimes', 'boolean'],
             ]);
         }
 
@@ -65,6 +70,8 @@ class CargaMaterialRequest extends FormRequest
             'viaje.origen' => 'origen del viaje',
             'viaje.destino' => 'destino del viaje',
             'viaje.detalle' => 'detalle del viaje',
+            'viaje.fecha_hora_carga' => 'fecha y hora de carga del viaje',
+            'viaje.is_offline' => 'registro sin conexión del viaje',
         ];
     }
 

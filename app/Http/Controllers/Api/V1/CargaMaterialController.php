@@ -58,6 +58,12 @@ class CargaMaterialController extends Controller
                     $datosViaje = $request->validated('viaje');
                     $datosViaje['foto'] = $request->file('viaje.foto')->store('control-cargas/viajes', 'public');
 
+                    // fecha_hora_carga es la fecha/hora actual del servidor, salvo
+                    // un registro offline sincronizado (ver CargaMaterialRequest).
+                    if (! $request->boolean('viaje.is_offline')) {
+                        $datosViaje['fecha_hora_carga'] = now();
+                    }
+
                     $carga->viajes()->create($datosViaje);
                 }
 
@@ -111,6 +117,12 @@ class CargaMaterialController extends Controller
         try {
             $data = $request->validated();
             $data['foto'] = $request->file('foto')->store('control-cargas/viajes', 'public');
+
+            // fecha_hora_carga es la fecha/hora actual del servidor, salvo un
+            // registro offline sincronizado desde la API (ver ViajeRequest).
+            if (! $request->boolean('is_offline')) {
+                $data['fecha_hora_carga'] = now();
+            }
 
             $viaje = $cargaMaterial->viajes()->create($data);
             $viaje->load('material');

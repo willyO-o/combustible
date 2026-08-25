@@ -160,6 +160,7 @@ class CargaMaterialControllerTest extends TestCase
             'foto' => 'control-cargas/viajes/foto.jpg',
             'origen' => 'Cantera',
             'destino' => 'Planta',
+            'fecha_hora_carga' => now(),
         ]);
 
         $response = $this->actingAs($this->conductor, 'api')->getJson(route('api.v1.cargas-material.show', $carga->id));
@@ -190,6 +191,104 @@ class CargaMaterialControllerTest extends TestCase
         $response->assertCreated();
         $this->assertDatabaseCount('viaje', 1);
         $this->assertSame($carga->id, $response->json('data.id_carga_material'));
+    }
+
+    public function test_registrar_viaje_asigna_la_fecha_hora_actual_del_servidor_por_defecto(): void
+    {
+        Storage::fake('public');
+        $this->travelTo(now()->setDate(2026, 8, 20)->setTime(10, 0));
+
+        $this->actingAs($this->conductor);
+        $carga = CargaMaterial::factory()->create();
+        $material = Material::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(
+            route('api.v1.cargas-material.viajes.registrar', $carga->id),
+            [
+                'id_material' => $material->id,
+                'foto' => UploadedFile::fake()->image('viaje.jpg'),
+                'origen' => 'Cantera Norte',
+                'destino' => 'Planta',
+                // Un intento de forzar la fecha sin is_offline=true se ignora.
+                'fecha_hora_carga' => '2020-01-01 00:00:00',
+            ]
+        );
+
+        $response->assertCreated();
+        $viaje = $carga->viajes()->first();
+        $this->assertTrue(now()->equalTo($viaje->fecha_hora_carga));
+    }
+
+    public function test_registrar_viaje_offline_respeta_la_fecha_hora_carga_enviada(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->conductor);
+        $carga = CargaMaterial::factory()->create();
+        $material = Material::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(
+            route('api.v1.cargas-material.viajes.registrar', $carga->id),
+            [
+                'id_material' => $material->id,
+                'foto' => UploadedFile::fake()->image('viaje.jpg'),
+                'origen' => 'Cantera Norte',
+                'destino' => 'Planta',
+                'is_offline' => true,
+                'fecha_hora_carga' => '2026-08-18 09:15:00',
+            ]
+        );
+
+        $response->assertCreated();
+        $viaje = $carga->viajes()->first();
+        $this->assertSame('2026-08-18 09:15:00', $viaje->fecha_hora_carga->format('Y-m-d H:i:s'));
+    }
+
+    public function test_registrar_viaje_offline_requiere_fecha_hora_carga(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->conductor);
+        $carga = CargaMaterial::factory()->create();
+        $material = Material::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(
+            route('api.v1.cargas-material.viajes.registrar', $carga->id),
+            [
+                'id_material' => $material->id,
+                'foto' => UploadedFile::fake()->image('viaje.jpg'),
+                'origen' => 'Cantera Norte',
+                'destino' => 'Planta',
+                'is_offline' => true,
+            ]
+        );
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['fecha_hora_carga']);
+    }
+
+    public function test_store_permite_registrar_el_primer_viaje_offline_respetando_su_fecha_hora_carga(): void
+    {
+        Storage::fake('public');
+
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+        $material = Material::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'viaje' => [
+                'id_material' => $material->id,
+                'foto' => UploadedFile::fake()->image('viaje.jpg'),
+                'origen' => 'Cantera Norte',
+                'destino' => 'Planta',
+                'is_offline' => true,
+                'fecha_hora_carga' => '2026-08-18 09:15:00',
+            ],
+        ]);
+
+        $response->assertCreated();
+        $viaje = CargaMaterial::first()->viajes()->first();
+        $this->assertSame('2026-08-18 09:15:00', $viaje->fecha_hora_carga->format('Y-m-d H:i:s'));
     }
 
     public function test_registrar_viaje_falla_si_la_carga_esta_cerrada(): void

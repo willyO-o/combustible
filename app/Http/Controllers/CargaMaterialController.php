@@ -189,6 +189,12 @@ class CargaMaterialController extends Controller
         $data = $request->validated();
         $data['foto'] = $request->file('foto')->store('control-cargas/viajes', 'public');
 
+        // fecha_hora_carga es la fecha/hora actual del servidor, salvo un
+        // registro offline sincronizado desde la API (ver ViajeRequest).
+        if (! $request->boolean('is_offline')) {
+            $data['fecha_hora_carga'] = now();
+        }
+
         $cargaMaterial->viajes()->create($data);
 
         return redirect()->route('control-cargas.show', $cargaMaterial->id)

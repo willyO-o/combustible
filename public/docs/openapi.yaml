@@ -1473,6 +1473,12 @@ paths:
         venir completo. `viaje[detalle]` sigue siendo opcional. Si se omite el bloque `viaje`
         por completo, la carga se abre sin ningún viaje y estos se registran después por
         separado con `POST /cargas-material/{cargaMaterial}/viajes`.
+
+        `viaje[fecha_hora_carga]` se asigna automáticamente a la fecha/hora actual del
+        servidor, salvo que `viaje[is_offline] = true` (uso exclusivo de la app Android, que
+        permite registrar el viaje sin conexión y sincronizarlo después): en ese caso
+        `viaje[fecha_hora_carga]` pasa a ser obligatoria y corresponde a la fecha/hora real en
+        que se generó el viaje offline, no a la de sincronización.
       requestBody:
         required: true
         content:
@@ -1521,6 +1527,7 @@ paths:
                       origen: "Cantera Norte"
                       destino: "Planta"
                       detalle: null
+                      fecha_hora_carga: "2026-08-24T14:30:00.000000Z"
                       material:
                         id: 2
                         material: Arena
@@ -1583,6 +1590,12 @@ paths:
 
         `id_usuario_registro` se asigna automáticamente al usuario autenticado y no debe
         enviarse.
+
+        `fecha_hora_carga` se asigna automáticamente a la fecha/hora actual del servidor, salvo
+        que `is_offline = true` (uso exclusivo de la app Android, que permite registrar el viaje
+        sin conexión y sincronizarlo después): en ese caso `fecha_hora_carga` pasa a ser
+        obligatoria y corresponde a la fecha/hora real en que se generó el viaje offline, no a
+        la de sincronización.
       parameters:
         - name: cargaMaterial
           in: path
@@ -1614,6 +1627,7 @@ paths:
                   origen: "Cantera Norte"
                   destino: "Planta"
                   detalle: null
+                  fecha_hora_carga: "2026-08-24T14:30:00.000000Z"
                   material:
                     id: 2
                     material: Arena
@@ -3117,6 +3131,7 @@ components:
         origen: { type: string, nullable: true, example: "Cantera Norte" }
         destino: { type: string, nullable: true, example: Planta }
         detalle: { type: string, nullable: true, example: null }
+        fecha_hora_carga: { type: string, format: date-time, description: "Fecha/hora en que se generó el viaje. Se asigna automáticamente en el servidor, salvo un registro offline sincronizado desde la app (ver `is_offline` en `ViajeStoreRequest`).", example: "2026-08-17T14:30:00.000000Z" }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         material:
@@ -3235,6 +3250,25 @@ components:
           maxLength: 255
           description: Siempre opcional, incluso si se envía el bloque `viaje`.
           example: null
+        viaje[fecha_hora_carga]:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Opcional si `viaje[is_offline]` se omite o es `false`. **Obligatoria si
+            `viaje[is_offline] = true`** (fecha/hora real en que se generó el viaje offline,
+            antes de sincronizarse).
+          example: "2026-08-17 14:30"
+        viaje[is_offline]:
+          type: boolean
+          nullable: true
+          default: false
+          description: |
+            Uso exclusivo de la app Android (Flutter), que permite registrar el viaje sin
+            conexión y sincronizarlo después. Si se envía `true`, `viaje[fecha_hora_carga]` pasa
+            a ser obligatoria (ver descripción de ese campo). No tiene efecto en peticiones
+            fuera de la API (p. ej. el panel web).
+          example: false
 
     CargaMaterialStoreResponse:
       type: object
@@ -3268,6 +3302,25 @@ components:
           nullable: true
           maxLength: 255
           example: null
+        fecha_hora_carga:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Opcional si `is_offline` se omite o es `false`. **Obligatoria si `is_offline =
+            true`** (fecha/hora real en que se generó el viaje offline, antes de
+            sincronizarse).
+          example: "2026-08-17 14:30"
+        is_offline:
+          type: boolean
+          nullable: true
+          default: false
+          description: |
+            Uso exclusivo de la app Android (Flutter), que permite registrar viajes sin
+            conexión y sincronizarlos después. Si se envía `true`, `fecha_hora_carga` pasa a
+            ser obligatoria (ver descripción de ese campo). No tiene efecto en peticiones fuera
+            de la API (p. ej. el panel web).
+          example: false
 
     ViajeStoreResponse:
       type: object

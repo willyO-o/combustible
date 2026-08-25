@@ -25,6 +25,7 @@ class ViajeFactory extends Factory
             'origen' => fake()->streetName(),
             'destino' => fake()->streetName(),
             'detalle' => fake()->sentence(),
+            'fecha_hora_carga' => now(),
         ];
     }
 }

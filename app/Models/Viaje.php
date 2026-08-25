@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 #[Fillable([
     'id_carga_material',
@@ -16,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
     'origen',
     'destino',
     'detalle',
+    'fecha_hora_carga',
 ])]
 class Viaje extends Model
 {
@@ -26,6 +26,13 @@ class Viaje extends Model
     protected $appends = [
         'foto_url',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'fecha_hora_carga' => 'datetime',
+        ];
+    }
 
     protected static function boot()
     {
