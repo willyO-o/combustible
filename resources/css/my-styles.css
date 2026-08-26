@@ -24,3 +24,102 @@
      background-color: transparent !important;
 }
  */
+
+/* DateRangeFilter.vue (resources/js/Components/DateRangeFilter.vue) */
+.date-range-filter-input {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    background-color: var(--custom-white);
+}
+.date-range-filter-input .ri-calendar-line {
+    color: var(--text-muted);
+    margin-left: .5rem;
+}
+.vue-daterange-picker {
+    display: block;
+    width: 100%;
+}
+
+/* daterange-picker-vue3 trae sus propios colores fijos (fondo blanco, texto
+   heredado) que no siguen el tema Vyzor ni se adaptan a modo oscuro -> en
+   dark el texto queda del mismo color que el fondo (invisible). Se
+   sobreescribe todo con las variables del tema (--custom-white,
+   --default-text-color, --primary-color, etc.), que ya cambian solas según
+   [data-theme-mode=dark]. */
+.daterangepicker {
+    background-color: var(--custom-white);
+    color: var(--default-text-color);
+    border-color: var(--default-border);
+}
+.daterangepicker:before {
+    border-bottom-color: var(--default-border);
+}
+.daterangepicker:after {
+    border-bottom-color: var(--custom-white);
+}
+.daterangepicker .drp-calendar.left {
+    border-color: var(--default-border);
+}
+.daterangepicker .drp-selected {
+    color: var(--default-text-color);
+}
+
+/* Lista de rangos (Hoy, Ayer, Esta semana, ...) */
+.daterangepicker .ranges li {
+    color: var(--default-text-color);
+}
+.daterangepicker .ranges li:hover {
+    background-color: var(--primary01);
+    color: var(--default-text-color);
+}
+.daterangepicker .ranges li.active {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+/* Calendario */
+.daterangepicker .calendar-table {
+    background-color: var(--custom-white);
+    border-color: var(--custom-white);
+}
+.daterangepicker .calendar-table th,
+.daterangepicker .calendar-table td {
+    color: var(--default-text-color);
+}
+.daterangepicker .calendar-table th.month {
+    font-weight: 600;
+}
+.daterangepicker .calendar-table .next span,
+.daterangepicker .calendar-table .prev span {
+    border-color: var(--default-text-color);
+}
+.daterangepicker td.week,
+.daterangepicker th.week {
+    color: var(--text-muted);
+}
+.daterangepicker td.available:hover,
+.daterangepicker th.available:hover {
+    background-color: var(--primary01);
+    color: var(--default-text-color);
+}
+.daterangepicker td.off,
+.daterangepicker td.off.in-range,
+.daterangepicker td.off.start-date,
+.daterangepicker td.off.end-date {
+    background-color: var(--custom-white);
+    color: var(--text-muted);
+}
+.daterangepicker td.in-range {
+    background-color: var(--primary01);
+    color: var(--default-text-color);
+}
+.daterangepicker td.active,
+.daterangepicker td.active:hover {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+.daterangepicker td.disabled {
+    color: var(--text-muted);
+}

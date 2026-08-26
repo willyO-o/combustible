@@ -25,6 +25,7 @@
         "@vueform/multiselect": "^2.6.11",
         "axios": "^1.19.0",
         "bootstrap": "^5.3.8",
+        "daterange-picker-vue3": "^1.0.3",
         "pinia": "^3.0.4",
         "sweetalert2": "^11.26.25",
         "vue-countup-v3": "^1.4.2",

@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 import ValeDetalleModal from '@/Components/ValeDetalleModal.vue'
 import { getExpirationStatus, formatDate } from '@/Utils/dateUtil'
 import { confirm } from '@/Utils/alertUtil.js'
+import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 
 
 defineOptions({ layout: Maindashboard })
@@ -121,13 +122,9 @@ const puedeUsarse = (vale) =>
                     <input v-model="filters.nro_vale" type="text" class="form-control"
                         placeholder="Buscar por nro..." />
                 </div>
-                <div class="col-sm-6 col-xl-2">
-                    <label class="form-label">Fecha desde</label>
-                    <input v-model="filters.fecha_desde" type="date" class="form-control" />
-                </div>
-                <div class="col-sm-6 col-xl-2">
-                    <label class="form-label">Fecha hasta</label>
-                    <input v-model="filters.fecha_hasta" type="date" class="form-control" />
+                <div class="col-sm-6 col-xl-3">
+                    <DateRangeFilter v-model:fecha-desde="filters.fecha_desde"
+                        v-model:fecha-hasta="filters.fecha_hasta" label="Fecha emisión" default-range="Este mes" />
                 </div>
                 <div class="col-sm-6 col-xl-2">
                     <label class="form-label">Estado</label>

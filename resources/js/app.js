@@ -1,9 +1,9 @@
 import '../css/app.css';
 import '../css/style.scss';
-import '../css/my-styles.css';
 import './bootstrap';
 
 import '@vueform/multiselect/themes/default.css'
+import 'daterange-picker-vue3/dist/daterange-picker-vue3.css'
 
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
@@ -16,6 +16,12 @@ import VueApexCharts from 'vue3-apexcharts';
 import Vue3ColorPicker from 'vue3-colorpicker';
 import 'vue3-colorpicker/style.css';
 import 'vue3-toastify/dist/index.css';
+
+// Se importa después de los CSS de librerías de arriba para que sus
+// overrides (multiselect, daterange-picker, etc.) tengan prioridad en el
+// cascade sin depender de especificidad extra.
+import '../css/my-styles.css';
+
 import can from '@/Directives/can';
 import Decimal from '@/Directives/Decimal';
 import Entero from '@/Directives/Entero';
