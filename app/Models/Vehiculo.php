@@ -89,16 +89,19 @@ class Vehiculo extends Model
         );
     }
 
+    // Estado PROVISIONAL o ACTIVO Y fecha_culminacion nula o futura (antes se
+    // evaluaba con "orWhere" entre los tres grupos, lo que hacía que
+    // cualquier asignación con fecha_culminacion nula -incluida una ya
+    // REASIGNADA/CULMINADA sin ese campo registrado- contara como
+    // "asignada", el mismo bug ya corregido en areasAsignadas()).
     public function conductoresAsignados()
     {
-        // para  estados PROVISIONAL   y ACTIVO o tambien que la fecha de culminacion sea nula o mayor a la fecha actual
         return $this->conductores()->where(function ($query) {
             $query->where('asignacion.estado_asignacion', 'PROVISIONAL')
-                ->orWhere('asignacion.estado_asignacion', 'ACTIVO')
-                ->orWhere(function ($query) {
-                    $query->whereNull('asignacion.fecha_culminacion')
-                        ->orWhere('asignacion.fecha_culminacion', '>', now());
-                });
+                ->orWhere('asignacion.estado_asignacion', 'ACTIVO');
+        })->where(function ($query) {
+            $query->whereNull('asignacion.fecha_culminacion')
+                ->orWhere('asignacion.fecha_culminacion', '>', now());
         });
     }
 

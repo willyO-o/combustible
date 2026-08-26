@@ -55,16 +55,6 @@ class UserSeeder extends Seeder
         ];
     }
 
-    private function permisosOperacionDiariaJefe(): array
-    {
-        return [
-            'operacion-diaria.ver',
-            'operacion-diaria.informe',
-            'operacion-diaria.reporte.pdf',
-            'operacion-diaria.verificar',
-        ];
-    }
-
     private function permisosCargasCombustible(): array
     {
         return [
@@ -382,11 +372,14 @@ class UserSeeder extends Seeder
             ...$this->permisosVales(),
             ...$this->permisosCargasCombustible(),
             ...$this->permisosMantenimiento(),
-            ...$this->permisosOperacionDiariaJefe(),
+            // Ahora cualquier rol puede registrar operaciones diarias (antes
+            // sólo el conductor): jefe-area recibe el set completo (ver,
+            // crear, editar, eliminar, informe, reporte.pdf, verificar), no
+            // sólo lectura/verificación.
+            ...$this->permisosOperacionDiaria(),
             ...$this->permisosCatalogos(),
             ...$this->permisosControlCargas(),
             ...$this->permisosControlCargasPago(),
-            'operacion-diaria.verificar',
         ];
     }
 
@@ -402,6 +395,11 @@ class UserSeeder extends Seeder
             'mantenimiento.ordenes.ver',
             'mantenimiento.ordenes.estado.cambiar',
             'mantenimiento.ordenes.ejecucion.registrar',
+            // Cualquier rol puede registrar operaciones diarias (antes sólo
+            // el conductor); un técnico no tiene conductor/área a cargo, así
+            // que ve el listado completo de vehículos sin filtro (ver
+            // OperacionDiariaController::vehiculosDisponibles()).
+            ...$this->permisosOperacionDiaria(),
         ];
     }
 

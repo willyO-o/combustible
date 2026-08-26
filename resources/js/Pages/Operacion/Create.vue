@@ -20,10 +20,17 @@ const isMobile = breakpoints.smaller('md') // Devuelve true si la pantalla es me
 
 
 const props = defineProps({
-    conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
-    vehiculosAsignados: Array, // [{ id, label }] vehículos asignados al conductor (si hay uno)
-    operacion: Object, // { id, label } de la operación (si se está editando una operación existente)
-    actividadesSugeridas: Array, // [{ id, nombre_actividad, unidad_medida }] actividades sugeridas para el conductor
+    // [{ id, label, meta }] vehículos que el usuario puede elegir: ya viene
+    // filtrado por rol desde el backend (conductor -> sus vehículos
+    // asignados; jefe-area -> los de sus áreas a cargo; cualquier otro rol,
+    // sin filtro -> todos). Ver OperacionDiariaController::vehiculosDisponibles().
+    vehiculosAsignados: Array,
+    operacion: Object, // la operación a editar (null en modo creación)
+    actividadesSugeridas: Array, // [{ id, nombre_actividad, unidad_medida }] actividades sugeridas según el/las área(s) del usuario
+    // false para el rol conductor (siempre es él mismo, sin ambigüedad); true
+    // para cualquier otro rol, que debe elegir entre los conductores
+    // realmente asignados al vehículo (titular + provisionales).
+    mostrarSelectorConductor: Boolean,
 })
 
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
@@ -49,6 +56,7 @@ const turnoDefault = function () {
 
 const form = useForm({
     id_vehiculo: null,
+    id_conductor: (props.operacion ? props.operacion.id_conductor : null) ?? null,
     turno: (props.operacion ? props.operacion.turno : turnoDefault()) ?? turnoDefault(),
     fecha_inicio: (props.operacion ? props.operacion.fecha_i_f : today) ?? today,
     fecha_fin: (props.operacion ? props.operacion.fecha_f_f : '') ?? '',
@@ -95,16 +103,57 @@ const formActividad = useForm({
 
 const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
 
+// Horas trabajadas: sólo de referencia en el formulario, se calcula en
+// vivo a partir de fecha_inicio/fecha_fin (el backend igual las recalcula
+// siempre desde esas mismas fechas al guardar, ver OperacionDiaria::booted()).
+// Redondeo hacia arriba a 2 decimales, ej. 4:30 -> 4.50.
+const horasTrabajadasCalculadas = computed(() => {
+    if (!form.fecha_inicio || !form.fecha_fin) return null
+
+    const inicio = new Date(form.fecha_inicio)
+    const fin = new Date(form.fecha_fin)
+
+    if (isNaN(inicio) || isNaN(fin) || fin <= inicio) return null
+
+    const horas = (fin - inicio) / (1000 * 60 * 60)
+
+    return Math.ceil(horas * 100) / 100
+})
+
+watch(horasTrabajadasCalculadas, (val) => {
+    form.horas_trabajadas = val ?? ''
+}, { immediate: true })
+
+// Conductores activos/provisionales del vehículo seleccionado (sólo viene
+// poblado desde el backend cuando mostrarSelectorConductor es true).
+const conductoresDelVehiculo = computed(() => {
+    const vehiculoSelected = vehiculosAsignadosOpt.value.find(v => v.id === form.id_vehiculo)
+    return vehiculoSelected?.meta?.conductoresAsignados ?? []
+})
+
 watch(() => form.id_vehiculo, async (val) => {
 
     tipoMedicion.value = ''
 
-    if (!val) return
+    if (!val) {
+        form.id_conductor = null
+        return
+    }
 
     const vehiculoSelected = vehiculosAsignadosOpt.value.find(v => v.id === val)
 
     if (vehiculoSelected) {
         tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
+    }
+
+    if (props.mostrarSelectorConductor) {
+        const conductores = vehiculoSelected?.meta?.conductoresAsignados ?? []
+
+        // Si el conductor ya elegido no pertenece al nuevo vehículo, se
+        // limpia; si sólo queda una opción, se autoselecciona.
+        if (!conductores.some(c => c.id === form.id_conductor)) {
+            form.id_conductor = conductores.length === 1 ? conductores[0].id : null
+        }
     }
 })
 
@@ -168,19 +217,18 @@ const agregarActividad = () => {
 
 
 onMounted(() => {
-    // Si hay un conductor asignado desde el servidor, auto-seleccionarlo
-
-    if (props.conductor) {
-
-        if (vehiculosAsignadosOpt.value.length == 1 && !form.id_vehiculo) {
-            form.id_vehiculo = vehiculosAsignadosOpt.value[0].id
-        }
-
-        if( props.operacion ){
-            form.id_vehiculo = props.operacion.id_vehiculo
-        }
+    // Si sólo hay un vehículo disponible para elegir, se auto-selecciona.
+    if (vehiculosAsignadosOpt.value.length === 1 && !form.id_vehiculo) {
+        form.id_vehiculo = vehiculosAsignadosOpt.value[0].id
     }
 
+    // Modo edición: preseleccionar el vehículo y conductor que ya tiene la
+    // operación (form.id_conductor se asigna después del id_vehiculo para
+    // que el watcher no lo limpie: ambos se aplican antes de que corra).
+    if (props.operacion) {
+        form.id_vehiculo = props.operacion.id_vehiculo
+        form.id_conductor = props.operacion.id_conductor
+    }
 })
 </script>
 
@@ -202,7 +250,7 @@ onMounted(() => {
                         <li class="breadcrumb-item active">Nueva</li>
                     </ol>
                 </nav>
-                <h1 class="page-title text-center fw-medium fs-18 mb-0">{{ props.conductor ? 'Editar' : 'Registrar' }} operación diaria</h1>
+                <h1 class="page-title text-center fw-medium fs-18 mb-0">{{ props.operacion ? 'Editar' : 'Registrar' }} operación diaria</h1>
             </div>
             <Link :href="route('cargas.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver
@@ -257,9 +305,11 @@ onMounted(() => {
                                     <label class="form-label fw-medium">
                                         Vehículo <span class="text-danger">*</span>
                                     </label>
-                                    <Multiselect v-if="props.conductor" v-model="form.id_vehiculo"
+                                    <Multiselect v-model="form.id_vehiculo"
                                         :options="vehiculosAsignadosOpt" value-prop="id" label="label"
-                                        placeholder="Seleccionar vehículo" />
+                                        :searchable="true" :filter-results="true" placeholder="Buscar vehículo..."
+                                        no-options-text="Sin vehículos disponibles" no-results-text="Sin resultados"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
 
                                     <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">{{
                                         form.errors.id_vehiculo }}</div>
@@ -267,6 +317,25 @@ onMounted(() => {
                                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando datos del
                                         vehículo...
                                     </div>
+                                </div>
+
+                                <!-- Conductor: sólo se muestra a quien no tiene el rol conductor,
+                                     ya que un vehículo puede tener varios conductores asignados
+                                     (1 titular + provisionales por permiso/vacaciones). -->
+                                <div v-if="mostrarSelectorConductor" class="col-12">
+                                    <label class="form-label fw-medium">
+                                        Conductor <span class="text-danger">*</span>
+                                    </label>
+                                    <Multiselect v-model="form.id_conductor"
+                                        :options="conductoresDelVehiculo" value-prop="id" label="label"
+                                        :searchable="true" :filter-results="true" :disabled="!form.id_vehiculo"
+                                        placeholder="Selecciona un conductor..."
+                                        no-options-text="Este vehículo no tiene conductores asignados"
+                                        no-results-text="Sin resultados"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
+
+                                    <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
+                                        form.errors.id_conductor }}</div>
                                 </div>
 
                                 <!-- Tipo Combustible (auto-llenado) -->
@@ -359,18 +428,16 @@ onMounted(() => {
                                 </div>
 
                                 <div class="col-12">
-                                    <label class="form-label fw-medium">
-                                        Horas trabajadas <span class="text-danger">*</span>
+                                    <label class="form-label fw-medium mb-1">
+                                        Horas trabajadas
                                     </label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="bi bi-clock"></i></span>
-                                        <input v-model="form.horas_trabajadas" type="text" class="form-control"
-                                            v-decimal="1" :class="{ 'is-invalid': form.errors.horas_trabajadas }"
-                                            placeholder="0" step="0.1" />
-                                        <span class="input-group-text">h</span>
-                                        <div v-if="form.errors.horas_trabajadas" class="invalid-feedback">{{
-                                            form.errors.horas_trabajadas }}</div>
+                                    <div>
+                                        <span class="badge bg-primary-transparent fs-14 px-3 py-2">
+                                            <i class="bi bi-clock me-1"></i>
+                                            {{ horasTrabajadasCalculadas !== null ? horasTrabajadasCalculadas.toFixed(2) : '—' }} horas
+                                        </span>
                                     </div>
+                                    <div class="form-text">Se calcula automáticamente a partir de la fecha/hora de inicio y fin.</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-medium">

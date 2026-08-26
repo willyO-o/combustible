@@ -2,13 +2,13 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Vehiculo;
+use App\Rules\GreaterThanPreviousReading;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
-use App\Rules\GreaterThanPreviousReading;
-use Illuminate\Foundation\Http\FormRequest;
-use App\Models\Vehiculo;
 
 class OperacionStoreRequest extends FormRequest
 {
@@ -26,12 +26,13 @@ class OperacionStoreRequest extends FormRequest
             throw new HttpResponseException(response()->json([
                 'success' => false,
                 'message' => 'Los datos enviados no son válidos.',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422));
         }
 
         parent::failedValidation($validator);
     }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -41,35 +42,47 @@ class OperacionStoreRequest extends FormRequest
     {
         // dd($this->method());
         return [
-            "id_vehiculo" => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id'],
-            "turno" => "required|in:DIA,NOCHE",
-            "fecha_inicio" => "required|date",
-            "fecha_fin" => "required|date|after:fecha_inicio",
-            "kilometraje_inicio" => [$this->method() === 'POST' ? Rule::requiredIf(function () {
+            'id_vehiculo' => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id'],
+            // El combo de conductor sólo se muestra en el formulario a quien
+            // no tiene el rol conductor (un conductor siempre es él mismo);
+            // para esos roles es obligatorio al crear, ya que un vehículo
+            // puede tener varios conductores asignados a la vez (titular +
+            // provisionales). El controller lo completa automáticamente con
+            // el conductor autenticado cuando sí tiene el rol conductor.
+            'id_conductor' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => ! $this->user()?->hasRole('conductor')) : 'sometimes', 'nullable', 'exists:conductor,id'],
+            'turno' => 'required|in:DIA,NOCHE',
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date|after:fecha_inicio',
+            'kilometraje_inicio' => [$this->method() === 'POST' ? Rule::requiredIf(function () {
                 $vehiculo = Vehiculo::find($this->id_vehiculo);
+
                 return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
             }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
-            "kilometraje_fin" => [$this->method() === 'POST' ? Rule::requiredIf(fn() => $this->kilometraje_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:kilometraje_inicio'],
-            "horometro_inicio" => [$this->method() === 'POST' ? Rule::requiredIf(function () {
+            'kilometraje_fin' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => $this->kilometraje_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:kilometraje_inicio'],
+            'horometro_inicio' => [$this->method() === 'POST' ? Rule::requiredIf(function () {
                 $vehiculo = Vehiculo::find($this->id_vehiculo);
+
                 return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
             }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
-            "horometro_fin" => [$this->method() === 'POST' ? Rule::requiredIf(fn() => $this->horometro_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:horometro_inicio'],
+            'horometro_fin' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => $this->horometro_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:horometro_inicio'],
             // "horas_trabajadas" => 'required|numeric|min:0', se calcula automáticamente a partir de fecha_inicio y fecha_fin
-            "observaciones" => 'nullable|string|min:10',
-            "notificar_observaciones" => 'required|boolean',
+            'observaciones' => 'nullable|string|min:10',
+            'notificar_observaciones' => 'required|boolean',
             'actividades_realizadas' => 'required|array|min:1',
             'actividades_realizadas.*.actividad' => 'required|string|min:3',
             'actividades_realizadas.*.lugar' => [Rule::requiredIf(function () {
                 $vehiculo = Vehiculo::find($this->id_vehiculo);
+
                 return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
             }), 'nullable', 'string'],
             'actividades_realizadas.*.origen' => [Rule::requiredIf(function () {
                 $vehiculo = Vehiculo::find($this->id_vehiculo);
+
                 return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
             }), 'nullable', 'string'],
             'actividades_realizadas.*.destino' => [Rule::requiredIf(function () {
                 $vehiculo = Vehiculo::find($this->id_vehiculo);
+
                 return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
             }), 'nullable', 'string'],
             'actividades_realizadas.*.cantidad' => 'required|numeric|min:1',
@@ -83,6 +96,7 @@ class OperacionStoreRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'id_conductor.required' => 'Debe seleccionar el conductor asignado al vehículo.',
             'actividades_realizadas.required' => 'Debe agregar al menos una actividad realizada.',
             'actividades_realizadas.*.actividad.required' => 'La actividad es obligatoria.',
             'actividades_realizadas.*.lugar.required_without' => 'El lugar es obligatorio.',

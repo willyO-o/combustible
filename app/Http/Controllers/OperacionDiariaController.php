@@ -2,24 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Http\Requests\OperacionStoreRequest;
-use Illuminate\Support\Facades\DB;
-use App\Models\OperacionDiaria;
-use App\Models\Actividad;
-use App\Models\Vehiculo;
-use App\Models\Area;
-use Illuminate\Support\Str;
-use App\Exceptions\AreaNoAsignadaException;
 use App\Actions\OperacionDiaria\CreateOperacionDiariaAction;
-use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
 use App\Actions\OperacionDiaria\ListOperacionesDiariasAction;
-
+use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
+use App\Http\Requests\OperacionStoreRequest;
+use App\Libraries\Reportes;
+use App\Models\Actividad;
+use App\Models\Area;
+use App\Models\Asignacion;
+use App\Models\OperacionDiaria;
+use App\Models\User;
+use App\Models\Vehiculo;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class OperacionDiariaController extends Controller
 {
-
-
     /**
      * Display a listing of the resource.
      */
@@ -51,42 +49,33 @@ class OperacionDiariaController extends Controller
             ];
         })->toArray();
 
-
         return inertia('Operacion/Index', [
             'actividades' => $actividades,
-            'filters'     => $filters,
+            'filters' => $filters,
             'conductores' => $conductores,
-            'flash'       => [
+            'flash' => [
                 'success' => session('success'),
-                'error'   => session('error'),
+                'error' => session('error'),
             ],
         ]);
     }
 
     /**
      * Show the form for creating a new resource.
+     *
+     * Antes sólo el rol conductor podía registrar operaciones diarias; ahora
+     * cualquier rol puede hacerlo, pero el listado de vehículos para elegir
+     * depende del rol (ver vehiculosDisponibles()).
      */
     public function create()
     {
-        //
-        if (!request()->user()->hasRole('conductor')) {
-            abort(403, 'No autorizado. Solo los conductores pueden registrar operaciones diarias.');
-        }
-
-        $conductor = request()->user()->persona;
-        $conductor->load('conductor');
-        $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
-
-
-        $areas = $conductor->conductor->areas()->pluck('id')->toArray();
-
-        $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
+        $user = request()->user();
 
         return inertia('Operacion/Create', [
-            'conductor' => $conductor,
-            'vehiculosAsignados' => $vehiculosAsignados,
+            'vehiculosAsignados' => $this->vehiculosDisponibles($user),
             'operacion' => null,
-            'actividadesSugeridas' => $actividadesSugeridas,
+            'actividadesSugeridas' => $this->actividadesSugeridas($user),
+            'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
         ]);
     }
 
@@ -97,15 +86,31 @@ class OperacionDiariaController extends Controller
     {
 
         try {
-            $operacionDiaria = $action->execute($request->validated());
+            $operacionDiaria = $action->execute($this->datosConConductorResuelto($request));
 
             return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria creada exitosamente.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Error al crear la operación diaria: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error al crear la operación diaria: '.$e->getMessage());
         }
     }
 
+    /**
+     * El combo de conductor sólo se muestra en el formulario a quien no
+     * tiene el rol conductor (un conductor siempre opera su propio vehículo
+     * asignado, sin ambigüedad, así que no elige nada): se completa aquí con
+     * su propio id de conductor antes de pasarlo a la Action.
+     */
+    private function datosConConductorResuelto(OperacionStoreRequest $request): array
+    {
+        $datos = $request->validated();
+        $user = $request->user();
 
+        if ($user->hasRole('conductor') && $user->persona?->conductor) {
+            $datos['id_conductor'] = $user->persona->conductor->id;
+        }
+
+        return $datos;
+    }
 
     /**
      * Display the specified resource.
@@ -114,7 +119,6 @@ class OperacionDiariaController extends Controller
     {
 
         $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas']);
-
 
         return inertia('Operacion/Show', [
             'operacion' => $operacion,
@@ -126,23 +130,194 @@ class OperacionDiariaController extends Controller
      */
     public function edit(OperacionDiaria $operacionDiaria)
     {
-
-        $conductor = request()->user()->persona;
-        $conductor->load('conductor');
-        $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
+        $user = request()->user();
 
         $operacionDiaria->actividades_realizadas_edit = $operacionDiaria->actividadesRealizadasEdit();
 
-        $areas = $conductor->conductor->areas()->pluck('id')->toArray();
-
-        $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
-
         return inertia('Operacion/Create', [
-            'conductor' => $conductor,
-            'vehiculosAsignados' => $vehiculosAsignados,
+            // Se asegura que el vehículo ya asignado a la operación aparezca en
+            // el listado aunque ya no cumpla el filtro por rol (p.ej. fue
+            // reasignado de área/conductor después de crear la operación).
+            'vehiculosAsignados' => $this->vehiculosDisponibles($user, $operacionDiaria->vehiculo),
             'operacion' => $operacionDiaria->load(['vehiculo', 'area']),
-            'actividadesSugeridas' => $actividadesSugeridas,
+            'actividadesSugeridas' => $this->actividadesSugeridas($user),
+            'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
         ]);
+    }
+
+    /**
+     * Vehículos que el usuario puede elegir al registrar/editar una operación
+     * diaria, según su rol:
+     * - conductor: sólo sus propios vehículos asignados (Conductor::asignacionesActivas,
+     *   asignación ACTIVO/PROVISIONAL con fecha_culminacion nula o futura).
+     * - jefe-area: sólo los vehículos de las áreas que tiene a cargo
+     *   (Persona::encargadoAreas + vehiculo_area con asignación ACTIVO/PROVISIONAL
+     *   y fecha_culminacion nula o futura).
+     * - un usuario con ambos roles ve la unión de los dos listados, sin duplicar.
+     * - cualquier otro rol (administrador, super-admin, técnico de mantenimiento,
+     *   etc.): sin filtro, todos los vehículos activos.
+     *
+     * $incluirSiFalta permite garantizar que el vehículo ya asignado a una
+     * operación existente (edit()) aparezca en el listado aunque ya no
+     * cumpla el filtro del rol actual.
+     */
+    private function vehiculosDisponibles(User $user, ?Vehiculo $incluirSiFalta = null): array
+    {
+        $persona = $user->persona;
+        $esConductor = $user->hasRole('conductor') && $persona?->conductor;
+        $esJefeArea = $user->hasRole('jefe-area') && $persona;
+
+        if (! $esConductor && ! $esJefeArea) {
+            $vehiculos = Vehiculo::select($this->columnasVehiculoOpt())
+                ->where('estado_vehiculo', 'ACTIVO')
+                ->get();
+        } else {
+            $vehiculos = collect();
+
+            if ($esConductor) {
+                $vehiculos = $vehiculos->merge($persona->conductor->asignacionesActivas);
+            }
+
+            if ($esJefeArea) {
+                $idsArea = $persona->encargadoAreas()->pluck('id_area');
+
+                if ($idsArea->isNotEmpty()) {
+                    $vehiculosArea = Vehiculo::select($this->columnasVehiculoOpt())
+                        ->where('estado_vehiculo', 'ACTIVO')
+                        ->whereHas('areas', function ($query) use ($idsArea) {
+                            $query->whereIn('area.id', $idsArea)
+                                ->where(function ($query) {
+                                    $query->where('vehiculo_area.estado_asignacion', 'ACTIVO')
+                                        ->orWhere('vehiculo_area.estado_asignacion', 'PROVISIONAL');
+                                })
+                                ->where(function ($query) {
+                                    $query->whereNull('vehiculo_area.fecha_culminacion')
+                                        ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
+                                });
+                        })
+                        ->get();
+
+                    $vehiculos = $vehiculos->merge($vehiculosArea);
+                }
+            }
+
+            $vehiculos = $vehiculos->unique('id');
+        }
+
+        if ($incluirSiFalta && ! $vehiculos->contains('id', $incluirSiFalta->id)) {
+            $vehiculos = $vehiculos->push($incluirSiFalta);
+        }
+
+        $vehiculos = $vehiculos->sortBy('nro_placa')->values();
+
+        // El combo para elegir conductor sólo se muestra a quien no tiene el
+        // rol conductor (ver mostrarSelectorConductor en create()/edit()):
+        // sólo en ese caso vale la pena resolver, en una única consulta
+        // agrupada por vehículo (evita el N+1 de un conductoresAsignados()
+        // por vehículo, relevante con ~200 vehículos para administrador).
+        $conductoresPorVehiculo = $user->hasRole('conductor')
+            ? collect()
+            : $this->conductoresAsignadosPorVehiculo($vehiculos->pluck('id'));
+
+        return $vehiculos
+            ->map(fn (Vehiculo $vehiculo) => $this->vehiculoOpt($vehiculo, $conductoresPorVehiculo->get($vehiculo->id, collect())))
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function columnasVehiculoOpt(): array
+    {
+        return ['id', 'codigo', 'nro_placa', 'marca', 'anio', 'modelo', 'id_tipo_vehiculo', 'id_tipo_combustible', 'tipo_medicion'];
+    }
+
+    /**
+     * Conductores actualmente asignados (ACTIVO o PROVISIONAL, ver
+     * Vehiculo::conductoresAsignados()) de cada vehículo de $idsVehiculo, en
+     * una sola consulta agrupada por id_vehiculo.
+     *
+     * @param  Collection<int, int>  $idsVehiculo
+     * @return Collection<int, Collection>
+     */
+    private function conductoresAsignadosPorVehiculo($idsVehiculo)
+    {
+        if ($idsVehiculo->isEmpty()) {
+            return collect();
+        }
+
+        return Asignacion::with('conductor.persona:id,nombres,paterno,materno,ci')
+            ->whereIn('id_vehiculo', $idsVehiculo)
+            ->where(function ($query) {
+                $query->where('estado_asignacion', 'ACTIVO')
+                    ->orWhere('estado_asignacion', 'PROVISIONAL');
+            })
+            ->where(function ($query) {
+                $query->whereNull('fecha_culminacion')
+                    ->orWhere('fecha_culminacion', '>', now());
+            })
+            ->get()
+            ->groupBy('id_vehiculo');
+    }
+
+    /**
+     * @param  Collection<int, Asignacion>  $conductoresAsignados
+     * @return array{id: int, label: string, meta: array}
+     */
+    private function vehiculoOpt(Vehiculo $vehiculo, $conductoresAsignados = null): array
+    {
+        return [
+            'id' => $vehiculo->id,
+            'label' => "{$vehiculo->codigo} — {$vehiculo->nro_placa} — {$vehiculo->marca} ({$vehiculo->anio})",
+            'meta' => [
+                'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+                'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+                'tipo_medicion' => $vehiculo->tipo_medicion,
+                'marca' => $vehiculo->marca,
+                'nro_placa' => $vehiculo->nro_placa,
+                'anio' => $vehiculo->anio,
+                'modelo' => $vehiculo->modelo,
+                'codigo' => $vehiculo->codigo,
+                // Conductores activos/provisionales asignados a este
+                // vehículo (titular + eventuales reemplazos por permiso o
+                // vacaciones) para el combo "Conductor" del formulario.
+                'conductoresAsignados' => collect($conductoresAsignados)
+                    ->unique('id_conductor')
+                    ->map(fn ($asignacion) => [
+                        'id' => $asignacion->id_conductor,
+                        'label' => "{$asignacion->conductor->persona->nombre_completo} (CI: {$asignacion->conductor->persona->ci})",
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+        ];
+    }
+
+    /**
+     * Actividades sugeridas por área, con el mismo criterio de rol que
+     * vehiculosDisponibles(): conductor -> sus áreas; jefe-area -> las áreas
+     * a su cargo; cualquier otro rol -> sin filtro (todas las actividades).
+     */
+    private function actividadesSugeridas(User $user)
+    {
+        $persona = $user->persona;
+        $idsArea = collect();
+
+        if ($user->hasRole('conductor') && $persona?->conductor) {
+            $idsArea = $idsArea->merge($persona->conductor->areas()->pluck('id'));
+        }
+
+        if ($user->hasRole('jefe-area') && $persona) {
+            $idsArea = $idsArea->merge($persona->encargadoAreas()->pluck('id_area'));
+        }
+
+        $query = Actividad::select('id', 'nombre_actividad', 'unidad_medida');
+
+        if ($idsArea->isNotEmpty()) {
+            $query->whereIn('id_area', $idsArea->unique());
+        }
+
+        return $query->get();
     }
 
     /**
@@ -151,11 +326,11 @@ class OperacionDiariaController extends Controller
     public function update(OperacionStoreRequest $request, OperacionDiaria $operacionDiaria, UpdateOperacionDiariaAction $action)
     {
         try {
-            $operacionDiaria = $action->execute($operacionDiaria, $request->validated());
+            $operacionDiaria = $action->execute($operacionDiaria, $this->datosConConductorResuelto($request));
 
             return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria actualizada exitosamente.');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Error al actualizar la operación diaria: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error al actualizar la operación diaria: '.$e->getMessage());
         }
     }
 
@@ -174,11 +349,10 @@ class OperacionDiariaController extends Controller
 
             $operacionDiaria->delete();
 
-
             return redirect()->route('operacion-diaria.index')->with('success', 'Operación diaria eliminada exitosamente.');
         } catch (\Exception $e) {
 
-            return redirect()->back()->with('error', 'Error al eliminar la operación diaria: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error al eliminar la operación diaria: '.$e->getMessage());
         }
     }
 
@@ -201,12 +375,11 @@ class OperacionDiariaController extends Controller
         return redirect()->route('operacion-diaria.create')->with('success', 'Actividad agregada exitosamente.');
     }
 
-
     public function generarPDF(OperacionDiaria $operacionDiaria)
     {
         $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas']);
 
-        $reporte = new \App\Libraries\Reportes();
+        $reporte = new Reportes;
 
         $reporte->generarReporteOperacionDiaria($operacion);
         exit;

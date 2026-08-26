@@ -2,10 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Support\Facades\Auth;
-
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'nro_operacion',
@@ -22,7 +20,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'horas_trabajadas',
     'id_verificador',
     'estado',
-    'observaciones'
+    'observaciones',
 ])]
 
 class OperacionDiaria extends Model
@@ -55,11 +53,11 @@ class OperacionDiaria extends Model
     {
         return $this->fecha_inicio ? $this->fecha_inicio->format('Y-m-d H:i') : null;
     }
+
     public function getFechaFFAttribute()
     {
         return $this->fecha_fin ? $this->fecha_fin->format('Y-m-d H:i') : null;
     }
-
 
     protected static function booted()
     {
@@ -67,17 +65,20 @@ class OperacionDiaria extends Model
             $ultimoNroOperacion = self::max('nro_operacion');
             $operacion->nro_operacion = $ultimoNroOperacion ? $ultimoNroOperacion + 1 : 1;
 
-            $operacion->id_conductor = Auth::user()->id_persona;
+            // id_conductor ya viene resuelto por CreateOperacionDiariaAction a partir
+            // del conductor actualmente asignado al vehículo (no del usuario
+            // autenticado): ahora cualquier rol puede registrar una operación para
+            // un vehículo que no necesariamente conduce él mismo.
 
-            //horas trabajadas se calcula como la diferencia en horas entre fecha_fin y fecha_inicio
-            //en formato con 1 decimal 4.5, 7.8, 8.0
+            // horas trabajadas se calcula como la diferencia en horas entre fecha_fin y fecha_inicio
+            // en formato con 1 decimal 4.5, 7.8, 8.0
             $operacion->horas_trabajadas = round(($operacion->fecha_fin->diffInMinutes($operacion->fecha_inicio, true) / 60), 1);
         });
 
-        //para crea y actualizar
+        // para crea y actualizar
         static::updating(function ($operacion) {
-            //horas trabajadas se calcula como la diferencia en horas entre fecha_fin y fecha_inicio
-            //en formato con 1 decimal 4.5, 7.8, 8.0
+            // horas trabajadas se calcula como la diferencia en horas entre fecha_fin y fecha_inicio
+            // en formato con 1 decimal 4.5, 7.8, 8.0
             $operacion->horas_trabajadas = round(($operacion->fecha_fin->diffInMinutes($operacion->fecha_inicio, true) / 60), 1);
         });
     }
@@ -110,12 +111,13 @@ class OperacionDiaria extends Model
             'id_operacion_diaria',
             'id_actividad'
         )->using(ActividadRealizada::class)
-        ->withPivot('id', 'origen', 'destino', 'lugar', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
+            ->withPivot('id', 'origen', 'destino', 'lugar', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
     }
 
     public function actividadesRealizadasEdit()
     {
         $actividades = $this->actividadesRealizadas()->get();
+
         return $actividades->map(function ($actividad) {
             return [
                 'id' => $actividad->pivot->id,
