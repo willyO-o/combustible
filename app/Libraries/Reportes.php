@@ -4,10 +4,11 @@ namespace App\Libraries;
 
 use App\Models\CargaCombustible;
 use App\Models\ParametrosEmpresa;
-use FPDF;
+use easyTable;
+use exFPDF;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
-class Reportes extends FPDF
+class Reportes extends exFPDF
 {
     /**
      * @param  string  $modo  Destino de salida de FPDF: 'I' (mostrar inline en el navegador,
@@ -327,309 +328,239 @@ class Reportes extends FPDF
     }
 
     /**
+     * Formulario "SOLICITUD DE MANTENIMIENTO EQUIPO": se dibuja sobre el fondo
+     * completo tamaño carta public/images/reportes/fondo-solicitud-mantenimiento.png
+     * (mismo enfoque que generarComprobanteEgreso()/generarVale() — el fondo trae
+     * impresas todas las cajas, etiquetas y líneas; aquí sólo se ubica el texto
+     * dinámico). La única sección que el fondo NO trae impresa es "TRABAJOS
+     * REALIZADOS": ese bloque (título + tabla) se dibuja íntegramente aquí con
+     * fpdf-easytable, usando el hueco en blanco que deja el fondo entre la caja de
+     * "DESCRIPCIÓN DE LA FALLA DEL EQUIPO" y la de "OBSERVACIONES".
+     *
+     * Las coordenadas de cada elemento se midieron sobre un render real del fondo
+     * a 215.9x279.4mm (no a simple vista sobre el PNG de origen, que tiene un
+     * aspect-ratio ligeramente distinto) — ver la nota en
+     * .ai/rules/libraries-http-controllers.md sobre este mismo enfoque para
+     * fondo-comprobante-egreso.png.
+     *
      * @param  string  $modo  Ver docblock de generarVale().
      */
     public function generarSolicitudMantenimiento($solicitud, string $modo = 'I', ?string $nombreArchivo = null)
     {
-        // ── Datos de ejemplo (reemplazar por parámetro dinámico) ──────────
-        $empresaLocal = 'PLUS METALS LTDA.';
+        // ══════════════════════════════════════════════════════════════════
+        // DATOS
+        // ══════════════════════════════════════════════════════════════════
         $nroSolicitud = $solicitud?->nro;
-        $fechaSolicitud = $solicitud?->fecha_solicitud;
+        $fechaSolicitud = $solicitud->fecha_solicitud?->format('d/m/Y H:i');
         $solicitante = $solicitud->persona?->nombre_completo;
-        $maquinaria = "{$solicitud->vehiculo?->codigo} {$solicitud->vehiculo?->marca}";
-        $modelo = $solicitud->vehiculo?->anio;
+
+        $vehiculo = $solicitud->vehiculo;
+        $maquinaria = trim(($vehiculo?->codigo ?? '').' '.($vehiculo?->marca ?? ''));
+        $modelo = $vehiculo?->anio;
+        $placa = $vehiculo?->nro_placa;
+        $codigoVehiculo = $vehiculo?->codigo;
+        // El horómetro/kilometraje por ítem del detalle a mostrar en la tabla
+        // depende del tipo de medición del vehículo (mismo criterio que
+        // OrdenTrabajoController/DetalleMantenimientoRequest).
+        $tipoMedicion = $vehiculo?->tipo_medicion;
+
         $tipoMant = $solicitud->tipo_mantenimiento === 'PREVENTIVO' ? 'A' : 'B'; // 'A' = PREVENTIVO, 'B' = CORRECTIVO
         $descripcion = $solicitud->descripcion_problema;
-        $observaciones = '';
+        $observaciones = $solicitud->observacion;
 
-        // Los trabajos realizados sólo existen si la solicitud ya derivó en
-        // una orden de trabajo (Paso 2/3 del flujo) con su detalle de
-        // repuestos/insumos cargado. Si no hay orden_trabajo relacionada, o
-        // aún no tiene detalle, la sección se muestra vacía.
+        // Los trabajos realizados sólo existen si la solicitud ya derivó en una
+        // orden de trabajo (Paso 2/3 del flujo) con su detalle de repuestos/
+        // insumos cargado. Si no hay orden_trabajo relacionada, o aún no tiene
+        // detalle, la tabla se dibuja vacía (sólo encabezado + filas en blanco).
         $ordenTrabajo = $solicitud->ordenTrabajo;
-        $fechaTrabajo = $ordenTrabajo?->fecha_culminacion ?? $ordenTrabajo?->fecha_ejecucion;
-        $lecturaTrabajo = $ordenTrabajo?->horometro_actual ?? $ordenTrabajo?->kilometraje_actual;
+        $ejecutor = $ordenTrabajo?->usuarioEjecuta?->name;
+        $vistoBueno = $ordenTrabajo?->usuarioEmite?->name;
+
+        // La sección tiene alto fijo (formulario de una sola página): con las
+        // columnas/alto de fila usados más abajo entran 10 filas de datos bajo
+        // el encabezado.
+        $maxFilas = 10;
 
         $trabajos = $ordenTrabajo
-            ? $ordenTrabajo->detalles
-                // la sección tiene alto fijo (formulario de una sola página): máximo 8 filas
-                ->take(8)
-                ->map(fn ($detalle) => [
-                    'fecha' => $fechaTrabajo?->format('d/m/Y') ?? '',
-                    'horometro' => (string) ($lecturaTrabajo ?? ''),
-                    'repuesto' => $detalle->repuesto?->nombre_repuesto ?? $detalle->detalle ?? '',
-                    'codigo' => $detalle->repuesto?->codigo_repuesto ?? '',
-                    'cantidad' => (string) $detalle->cantidad,
-                ])
-                ->all()
+            ? $ordenTrabajo->detalles->take($maxFilas)->map(fn ($detalle) => [
+                'fecha' => $detalle->fecha?->format('d/m/Y') ?? '',
+                'lectura' => $this->formatearLectura($tipoMedicion === 'kilometraje' ? $detalle->kilometraje : $detalle->horometro),
+                'repuesto' => $detalle->repuesto?->nombre_repuesto ?? 'Mano de obra',
+                'codigo' => $detalle->repuesto?->codigo_repuesto ?? '',
+                'cantidad' => (string) $detalle->cantidad,
+            ])->all()
             : [];
 
-        // ── Colores (consistentes con generarVale) ────────────────────────
-        $azul = [39, 42, 84];
-        $rojo = [190, 30, 30];
+        // ══════════════════════════════════════════════════════════════════
+        // COLORES
+        // ══════════════════════════════════════════════════════════════════
+        $azul = [0, 75, 145]; // mismo azul pedido para la tabla de "TRABAJOS REALIZADOS"
         $negro = [30, 30, 30];
-        $gris = [90, 90, 90];
-        $blanco = [255, 255, 255];
+
+        $pageW = 215.9;
+        $pageH = 279.4;
 
         $this->AddPage('P', 'Letter');
         $this->SetMargins(8, 8, 8);
         $this->SetAutoPageBreak(false);
 
-        $sx = 8;      // origen X
-        $sy = 8;      // origen Y
-        $uw = 199.9;  // ancho útil (215.9 - 16), tamaño Carta/Letter
-        $sBottom = 271.4; // límite inferior útil (279.4 - 8), tamaño Carta/Letter
-
-        // ── Borde exterior ────────────────────────────────────────────────
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.5);
-        $this->Rect($sx, $sy, $uw, $sBottom - $sy);
+        // ----------------------------------------------------------
+        // FONDO (formulario completo tamaño carta: cajas, etiquetas y líneas
+        // ya vienen impresas en la imagen; aquí sólo se ubica el texto).
+        // ----------------------------------------------------------
+        $this->Image(public_path('images/reportes/fondo-solicitud-mantenimiento.png'), 0, 0, $pageW, $pageH);
 
         // ══════════════════════════════════════════════════════════════════
-        // SECCIÓN 1 – ENCABEZADO  (y=8, h=16)
+        // ENCABEZADO: logo (zona x 2.29-48.98) y N° de solicitud (zona x 170.98-212.85)
         // ══════════════════════════════════════════════════════════════════
-        $h1 = 16;
-        $logoW = 45;
-        $nroW = 44;
-        $titW = $uw - $logoW - $nroW; // ~110.9
+        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), 6, 6, 40);
 
-        $this->SetLineWidth(0.3);
-
-        // Celda logo
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $sy, $logoW, $h1);
-        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 4, $sy + 1.5, 40);
-
-        // Celda título
-        $this->Rect($sx + $logoW, $sy, $titW, $h1);
-        $this->SetFont('Arial', 'B', 12);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx + $logoW, $sy);
-        $this->Cell($titW, $h1, utf8Decode('SOLICITUD DE MANTENIMIENTO EQUIPO'), 0, 0, 'C');
-
-        // Celda número
-        $this->Rect($sx + $logoW + $titW, $sy, $nroW, $h1);
         $this->SetFont('Arial', 'B', 14);
-        $this->SetTextColor($rojo[0], $rojo[1], $rojo[2]);
-        $this->SetXY($sx + $logoW + $titW, $sy);
-        $this->Cell($nroW, $h1, utf8Decode('N° '.$nroSolicitud), 0, 0, 'C');
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->SetXY(172, 9);
+        $this->Cell(39, 9, utf8Decode('N° '.$nroSolicitud), 0, 0, 'R');
 
         // ══════════════════════════════════════════════════════════════════
-        // SECCIÓN 2 – DATOS + TIPO MANTENIMIENTO  (y=24, h=44)
+        // DATOS DEL SOLICITANTE/EQUIPO (caja izquierda, x 4.53-113.79, filas de
+        // ~9.1mm entre y=29.04 e y=74.51) + FECHA DE SOLICITUD (caja derecha
+        // superior, x 117.43-210.10, y 29.04-40.00)
         // ══════════════════════════════════════════════════════════════════
-        $s2Y = $sy + $h1; // 24
-        $s2H = 44;
-        $leftW = 130;
-        $rigW = $uw - $leftW; // ~69.9
-
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $s2Y, $leftW, $s2H);
-        $this->Rect($sx + $leftW, $s2Y, $rigW, $s2H);
-
-        // -- Campos lado izquierdo --
-        $labelW = 54;
-        $rowH = 10;
-        $campos = [
-            ['FECHA DE SOLICITUD :',      $fechaSolicitud],
-            ['NOMBRE DEL SOLICITANTE :',  $solicitante],
-            ['MAQUINARIA Y/O EQUIPO :',   $maquinaria],
-            ['MODELO :',                  $modelo],
-        ];
-
-        $this->SetLineWidth(0.2);
-        $yF = $s2Y + 2;
-        foreach ($campos as [$etiq, $val]) {
-            $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-            $this->Line($sx + 2, $yF + $rowH - 1, $sx + $leftW - 2, $yF + $rowH - 1);
-
-            $this->SetFont('Arial', 'B', 8);
-            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->SetXY($sx + 2, $yF);
-            $this->Cell($labelW, $rowH, utf8Decode($etiq), 0, 0, 'L');
-
-            $this->SetFont('Arial', '', 8);
-            $this->Cell($leftW - $labelW - 4, $rowH, utf8Decode($val), 0, 0, 'L');
-            $yF += $rowH;
-        }
-
-        // -- Tipo de mantenimiento (lado derecho) --
-        $rx = $sx + $leftW;
-
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.3);
-        $this->Rect($rx, $s2Y, $rigW, 10, 'FD');
-        $this->SetFont('Arial', 'B', 8.5);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->SetXY($rx, $s2Y);
-        $this->Cell($rigW, 10, utf8Decode('TIPO DE MANTENIMIENTO'), 0, 0, 'C');
-
-        $opciones = [['A = PREVENTIVO', 'A'], ['B = CORRECTIVO', 'B']];
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.4);
-        $yOp = $s2Y + 13;
-        foreach ($opciones as [$texto, $tipo]) {
-            $this->SetFont('Arial', '', 9);
-            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->SetXY($rx + 5, $yOp);
-            $this->Cell($rigW - 20, 8, utf8Decode($texto), 0, 0, 'L');
-
-            $cirX = $rx + $rigW - 9;
-            $cirY = $yOp + 4;
-            $this->drawCircle($cirX, $cirY, 4);
-            if ($tipoMant === $tipo) {
-                $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-                $this->drawCircle($cirX, $cirY, 2.5, 'F');
-            }
-            $yOp += 15;
-        }
-
-        // ══════════════════════════════════════════════════════════════════
-        // SECCIÓN 3 – DESCRIPCIÓN DE LA FALLA  (y=68, h=36)
-        // ══════════════════════════════════════════════════════════════════
-        $s3Y = $s2Y + $s2H; // 68
-        $s3H = 36;
-
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $s3Y, $uw, 8, 'FD');
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->SetXY($sx, $s3Y);
-        $this->Cell($uw, 8, utf8Decode('DESCRIPCION DE LA FALLA DEL EQUIPO'), 0, 0, 'C');
-
-        $this->SetLineWidth(0.3);
-        $this->Rect($sx, $s3Y + 8, $uw, $s3H - 8);
-        if ($descripcion) {
-            $this->SetFont('Arial', '', 8.5);
-            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->SetXY($sx + 2, $s3Y + 10);
-            $this->MultiCell($uw - 4, 5, utf8Decode($descripcion), 0, 'L');
-        }
-
-        // ══════════════════════════════════════════════════════════════════
-        // SECCIÓN 4 – TRABAJOS REALIZADOS  (y=104)
-        // ══════════════════════════════════════════════════════════════════
-        $s4Y = $s3Y + $s3H; // 104
-        $tblRowH = 8;
-
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $s4Y, $uw, 8, 'FD');
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->SetXY($sx, $s4Y);
-        $this->Cell($uw, 8, utf8Decode('TRABAJOS REALIZADOS'), 0, 0, 'C');
-
-        // Cabecera de columnas — anchos suman $uw (199.9, tamaño Carta/Letter)
-        $cols = [
-            ['label' => 'FECHA',                     'w' => 24.7, 'align' => 'C'],
-            ['label' => 'HOROMETRO',                 'w' => 25.8, 'align' => 'C'],
-            ['label' => 'REPUESTO UTILIZADO',        'w' => 58.7, 'align' => 'C'],
-            ['label' => 'CODIGO O NRO. DE REPUESTO', 'w' => 62.9, 'align' => 'C'],
-            ['label' => 'CANTIDAD',                  'w' => 27.8, 'align' => 'C'],
-        ];
-
-        $colHdrY = $s4Y + 8;
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.25);
-        $this->SetFont('Arial', 'B', 7.5);
+        $this->SetFont('Arial', '', 9);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
 
-        $cx = $sx;
-        foreach ($cols as $col) {
-            $this->Rect($cx, $colHdrY, $col['w'], $tblRowH);
-            $this->SetXY($cx, $colHdrY);
-            $this->Cell($col['w'], $tblRowH, utf8Decode($col['label']), 0, 0, 'C');
-            $cx += $col['w'];
+        $filasIzq = [
+            [29.9, $solicitante],
+            [39.0, $maquinaria],
+            [48.1, $modelo],
+            [57.2, $placa],
+            [66.3, $codigoVehiculo],
+        ];
+        foreach ($filasIzq as [$y, $valor]) {
+            $this->SetXY(55, $y);
+            $this->Cell(56, 6, utf8Decode((string) ($valor ?? '')), 0, 0, 'L');
         }
 
-        // Filas de datos
-        $this->SetFont('Arial', '', 7.5);
-        $dataY = $colHdrY + $tblRowH;
+        $this->SetXY(168, 30.9);
+        $this->Cell(40, 6, utf8Decode((string) $fechaSolicitud), 0, 0, 'L');
 
-        foreach ($trabajos as $t) {
-            $vals = [$t['fecha'], $t['horometro'], $t['repuesto'], $t['codigo'], $t['cantidad']];
-            $cx = $sx;
-            foreach ($cols as $idx => $col) {
-                $this->Rect($cx, $dataY, $col['w'], $tblRowH);
-                $this->SetXY($cx + 1, $dataY);
-                $align = ($idx === 2 || $idx === 3) ? 'L' : 'C';
-                $this->Cell($col['w'] - 2, $tblRowH, utf8Decode($vals[$idx]), 0, 0, $align);
-                $cx += $col['w'];
-            }
-            $dataY += $tblRowH;
+        // -- Tipo de mantenimiento: casilla marcada con una "X" (caja derecha
+        // inferior, checkboxes ya impresos en el fondo en (149.78-155.96,
+        // 60.41-66.08) para "A" y (195.41-201.34, 60.41-66.08) para "B") --
+        $this->SetFont('Arial', 'B', 10);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $cx = $tipoMant === 'A' ? 149.78 : 195.41;
+        $this->SetXY($cx, 60.9);
+        $this->Cell(6.2, 5.2, 'X', 0, 0, 'C');
+
+        // ══════════════════════════════════════════════════════════════════
+        // DESCRIPCIÓN DE LA FALLA DEL EQUIPO (caja punteada x 6.5-209.4, y 85.30-123.32)
+        // ══════════════════════════════════════════════════════════════════
+        if ($descripcion) {
+            $this->SetFont('Arial', '', 9);
+            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+            $this->SetXY(8, 87.5);
+            $this->MultiCell(200, 5, utf8Decode($descripcion), 0, 'L');
         }
 
         // ══════════════════════════════════════════════════════════════════
-        // SECCIÓN 5 – OBSERVACIONES  (dinámico, después de tabla)
+        // TRABAJOS REALIZADOS: única sección que el fondo NO trae impresa —
+        // ocupa el hueco en blanco entre la caja de DESCRIPCIÓN (termina en
+        // y=125.48) y la de OBSERVACIONES (empieza en y=211.29), con un margen
+        // de ~3mm arriba y abajo para no tocar ninguna de las dos.
         // ══════════════════════════════════════════════════════════════════
-        $s5Y = $dataY;
-        $s5H = 30; // altura reducida para que todo entre en tamaño Carta/Letter
+        $s4X = 2.29;
+        $s4W = 210.56; // 212.85 - 2.29, mismo ancho que las demás cajas del fondo
+        $s4Y = 128.5;
+        // Bottom disponible: 208.3 (211.29 de OBSERVACIONES - 3mm de margen). Con
+        // el título (8mm) + $maxFilas=10 filas de 6.5mm de alto (65mm) la tabla
+        // termina en 128.5 + 8 + 65 = 201.5, dentro de ese límite.
 
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $s5Y, $uw, 8, 'FD');
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->SetXY($sx, $s5Y);
-        $this->Cell($uw, 8, utf8Decode('OBSERVACIONES'), 0, 0, 'C');
-
         $this->SetLineWidth(0.3);
-        $this->Rect($sx, $s5Y + 8, $uw, $s5H - 8);
+        $this->Rect($s4X, $s4Y, $s4W, 8);
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($s4X, $s4Y);
+        $this->Cell($s4W, 8, utf8Decode('TRABAJOS REALIZADOS'), 0, 0, 'C');
+
+        $etiquetaLectura = $tipoMedicion === 'kilometraje' ? 'KILOMETRAJE' : 'HOROMETRO';
+        $anchos = [26, 27.2, 61.8, 66.3, 29.26]; // suma = $s4W (210.56)
+        $encabezados = ['FECHA', $etiquetaLectura, 'REPUESTO UTILIZADO', 'CODIGO O NRO. DE REPUESTO', 'CANTIDAD'];
+
+        $this->SetXY($s4X, $s4Y + 8);
+        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$s4W}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; min-height:6.5;");
+
+        $tabla->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-color:255,255,255; font-style:B; font-size:7.5; align:C;");
+        foreach ($encabezados as $encabezado) {
+            $tabla->easyCell(utf8Decode($encabezado));
+        }
+        $tabla->printRow(true);
+
+        // Filas de datos reales, seguidas de filas en blanco hasta completar
+        // $maxFilas: la tabla siempre ocupa todo el espacio disponible, tenga
+        // o no tenga (todavía) el detalle de trabajo cargado.
+        $filasVacias = max(0, $maxFilas - count($trabajos));
+        $filas = array_merge($trabajos, array_fill(0, $filasVacias, ['fecha' => '', 'lectura' => '', 'repuesto' => '', 'codigo' => '', 'cantidad' => '']));
+
+        $this->SetFont('Arial', '', 7.5);
+        foreach ($filas as $fila) {
+            $tabla->rowStyle('font-color:30,30,30; font-style:; align:C;');
+            $tabla->easyCell(utf8Decode($fila['fecha']));
+            $tabla->easyCell(utf8Decode($fila['lectura']));
+            $tabla->easyCell(utf8Decode($fila['repuesto']), 'align:L;');
+            $tabla->easyCell(utf8Decode($fila['codigo']), 'align:L;');
+            $tabla->easyCell(utf8Decode($fila['cantidad']));
+            $tabla->printRow();
+        }
+
+        $tabla->endTable();
+
+        // ══════════════════════════════════════════════════════════════════
+        // OBSERVACIONES (caja punteada x 6.5-209.4, y 219.16-233.26)
+        // ══════════════════════════════════════════════════════════════════
         if ($observaciones) {
             $this->SetFont('Arial', '', 8.5);
             $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->SetXY($sx + 2, $s5Y + 10);
-            $this->MultiCell($uw - 4, 5, utf8Decode($observaciones), 0, 'L');
+            $this->SetXY(8, 221);
+            $this->MultiCell(200, 4.5, utf8Decode($observaciones), 0, 'L');
         }
 
         // ══════════════════════════════════════════════════════════════════
-        // SECCIÓN 6 – FIRMAS  (ocupa el resto hasta $sBottom, altura reducida)
+        // FIRMAS (SOLICITANTE / EJECUTOR DE TRABAJO / Vo. Bo. — columnas ya
+        // impresas en el fondo en x 4.53-71.50 / 71.50-141.18 / 141.18-210.10;
+        // cada nombre se imprime centrado justo encima de su línea de firma,
+        // en y=256.37). El ejecutor y el visto bueno sólo existen si la
+        // solicitud ya derivó en una orden de trabajo emitida (Paso 2).
         // ══════════════════════════════════════════════════════════════════
-        $s6Y = $s5Y + $s5H;
-        $s6H = $sBottom - $s6Y;
-        $cw3 = $uw / 3; // ~66.6 mm por columna
+        $columnasFirma = [
+            [4.53, 71.50 - 4.53, $solicitante],
+            [71.50, 141.18 - 71.50, $ejecutor],
+            [141.18, 210.10 - 141.18, $vistoBueno],
+        ];
 
-        $firmas = ['SOLICITANTE:', 'EJECUTOR DE TRABAJO:', 'Vo. Bo.'];
-
-        for ($i = 0; $i < 3; $i++) {
-            $fx = $sx + ($i * $cw3);
-
-            $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-            $this->SetLineWidth(0.3);
-            $this->Rect($fx, $s6Y, $cw3, $s6H);
-
-            // Etiqueta superior
-            $this->SetFont('Arial', 'B', 8);
-            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->SetXY($fx + 2, $s6Y + 3);
-            $this->Cell($cw3 - 4, 6, utf8Decode($firmas[$i]), 0, 0, 'L');
-
-            // Línea de firma
-            $this->SetLineWidth(0.2);
-            $this->Line($fx + 3, $s6Y + $s6H - 19, $fx + $cw3 - 3, $s6Y + $s6H - 19);
-
-            if ($i === 0) {
-                // imprimir sobre la línea de firma el nombre del solicitante
-                $this->SetFont('Arial', 'B', 9);
-                $this->SetXY($fx + 2, $s6Y + $s6H - 25);
-                $this->Cell($cw3 - 4, 5, utf8Decode($solicitante), 0, 0, 'C');
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        foreach ($columnasFirma as [$x, $w, $nombre]) {
+            if (! $nombre) {
+                continue;
             }
-
-            // NOMBRE COMPLETO
-            $this->SetFont('Arial', 'B', 7);
-            $this->SetXY($fx, $s6Y + $s6H - 17);
-            $this->Cell($cw3, 5, 'NOMBRE COMPLETO', 0, 0, 'C');
-
-            // FECHA
-            $this->SetFont('Arial', '', 7);
-            $this->SetXY($fx + 2, $s6Y + $s6H - 10);
-            $this->Cell($cw3 - 4, 5, utf8Decode('FECHA ......../......../........'), 0, 0, 'C');
+            $this->SetXY($x, 250);
+            $this->Cell($w, 5, utf8Decode($nombre), 0, 0, 'C');
         }
 
         // El '/' de $nroSolicitud ("NNNNNN/GESTION") no es válido dentro de un nombre
         // de archivo, así que se reemplaza por '-' sólo para el nombre sugerido.
         return $this->Output($modo, $nombreArchivo ?? 'solicitud_mantenimiento_'.str_replace('/', '-', (string) $nroSolicitud).'.pdf');
+    }
+
+    /**
+     * Formatea una lectura de horómetro/kilometraje (decimal:2, llega como
+     * string o null) para la tabla de "TRABAJOS REALIZADOS". Devuelve '' si
+     * el ítem del detalle no registró esa lectura.
+     */
+    private function formatearLectura(?string $valor): string
+    {
+        return $valor !== null ? number_format((float) $valor, 2, ',', '.') : '';
     }
 
     public function generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo = null)

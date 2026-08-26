@@ -101,7 +101,10 @@ class SolicitudMantenimientoController extends Controller
             abort(403, 'No tienes permiso para descargar esta solicitud.');
         }
 
-        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo.detalles.repuesto']);
+        $solicitud->load([
+            'vehiculo', 'conductor.persona', 'usuarioRegistra',
+            'ordenTrabajo.detalles.repuesto', 'ordenTrabajo.usuarioEjecuta', 'ordenTrabajo.usuarioEmite',
+        ]);
 
         $contenido = (new Reportes)->generarSolicitudMantenimiento($solicitud, 'S');
 

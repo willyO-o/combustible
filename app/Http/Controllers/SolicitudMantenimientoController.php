@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\SolicitudMantenimiento\CreateSolicitudMantenimientoAction;
 use App\Http\Requests\SolicitudMantenimientoRequest;
 use App\Libraries\Reportes;
 use App\Models\Conductor;
@@ -9,10 +10,8 @@ use App\Models\SolicitudMantenimiento;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Actions\SolicitudMantenimiento\CreateSolicitudMantenimientoAction;
 
 /**
  * Paso 1 del flujo de mantenimiento: el CHOFER registra una solicitud
@@ -124,7 +123,10 @@ class SolicitudMantenimientoController extends Controller
 
     public function imprimir(SolicitudMantenimiento $solicitud)
     {
-        $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo.detalles.repuesto']);
+        $solicitud->load([
+            'vehiculo', 'conductor.persona', 'usuarioRegistra',
+            'ordenTrabajo.detalles.repuesto', 'ordenTrabajo.usuarioEjecuta', 'ordenTrabajo.usuarioEmite',
+        ]);
         $reporte = new Reportes;
         $reporte->generarSolicitudMantenimiento($solicitud);
         exit;

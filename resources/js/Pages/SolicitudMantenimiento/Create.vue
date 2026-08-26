@@ -1,12 +1,21 @@
 <script setup>
-import { ref } from 'vue'
+import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
+import Multiselect from '@vueform/multiselect'
 
 const props = defineProps({
     vehiculos: Array,
 })
+
+// El combo nativo se reemplaza por un Multiselect con filtrado local (sin
+// búsqueda remota, ver SearchSelect.vue) para no volverse impracticable
+// cuando hay muchos vehículos registrados.
+const vehiculosOpt = computed(() => props.vehiculos.map((v) => ({
+    id: v.id,
+    label: `${v.codigo} – ${v.nro_placa} – ${v.marca}`,
+})))
 
 // El conductor y la fecha/hora de la solicitud se asignan automáticamente
 // en el modelo (a partir del usuario autenticado y del momento del registro),
@@ -60,14 +69,11 @@ function submit() {
                             <label class="form-label fw-medium">
                                 Vehículo <span class="text-danger">*</span>
                             </label>
-                            <select v-model="form.id_vehiculo" class="form-select"
-                                :class="{ 'is-invalid': form.errors.id_vehiculo }">
-                                <option value="">— Seleccione —</option>
-                                <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                                    {{ v.codigo }} – {{ v.nro_placa }} – {{ v.marca }}
-                                </option>
-                            </select>
-                            <div v-if="form.errors.id_vehiculo" class="invalid-feedback">
+                            <Multiselect v-model="form.id_vehiculo" :options="vehiculosOpt" value-prop="id" label="label"
+                                :searchable="true" :filter-results="true" placeholder="Buscar vehículo..."
+                                no-options-text="Sin vehículos activos" no-results-text="Sin resultados"
+                                :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                            <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">
                                 {{ form.errors.id_vehiculo }}
                             </div>
                         </div>
