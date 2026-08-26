@@ -62,7 +62,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     ],
   },
   {
-    menutitle: 'REPORTES', permission: ['dashboard.ver', 'vales.ver', 'cargas-combustible.ver', 'cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', 'mantenimiento.solicitudes.ver', 'mantenimiento.ordenes.ver']
+    menutitle: 'REPORTES', permission: ['cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', ]
   },
   {
     title: 'Reportes Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',

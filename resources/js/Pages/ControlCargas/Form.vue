@@ -53,7 +53,7 @@ function submit() {
 </script>
 
 <template>
-    <Head :title="isEditing ? `Editar Flete #${carga.nro}` : 'Nuevo Flete'" />
+    <Head :title="isEditing ? `Editar Carga #${carga.nro}` : 'Nueva Carga'" />
 
     <!-- Breadcrumb -->
     <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -70,8 +70,8 @@ function submit() {
                 </ol>
             </nav>
             <h1 class="page-title fw-medium fs-18 mb-0">
-                <template v-if="isEditing">Editar Flete #{{ carga.nro }}</template>
-                <template v-else>Nuevo Flete</template>
+                <template v-if="isEditing">Editar Carga #{{ carga.nro }}</template>
+                <template v-else>Registrar Carga</template>
             </h1>
         </div>
         <Link :href="route('control-cargas.index')" class="btn btn-outline-secondary btn-wave">
@@ -85,7 +85,7 @@ function submit() {
                 <div class="card custom-card">
                     <div class="card-header">
                         <div class="card-title">
-                            <i class="ri-truck-line me-2"></i>Datos del Flete
+                            <i class="ri-truck-line me-2"></i>Datos de la Carga
                         </div>
                     </div>
                     <div class="card-body">
@@ -163,7 +163,7 @@ function submit() {
                                         role="switch"
                                         @change="onToggleAlExterior"
                                     />
-                                    <label class="form-check-label fw-medium" for="es_al_exterior">Flete al exterior</label>
+                                    <label class="form-check-label fw-medium" for="es_al_exterior">Viajes al exterior</label>
                                 </div>
                                 <InputError :message="form.errors.es_al_exterior" class="mt-1" />
                             </div>
@@ -231,7 +231,7 @@ function submit() {
                         <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
                         <i v-else class="ri-save-line me-1"></i>
                         <template v-if="isEditing">{{ form.processing ? 'Actualizando...' : 'Actualizar' }}</template>
-                        <template v-else>{{ form.processing ? 'Abriendo...' : 'Abrir Flete' }}</template>
+                        <template v-else>{{ form.processing ? 'Registrando...' : 'Registrar Carga' }}</template>
                     </button>
                 </div>
             </form>

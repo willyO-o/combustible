@@ -14,6 +14,8 @@ return new class extends Migration
         Schema::create('carga_combustible', function (Blueprint $table) {
             $table->id();
             $table->dateTime('fecha_carga');
+            $table->integer('nro_carga');
+            $table->string('gestion', 4);
             $table->decimal('litros', 10, 2);
             $table->decimal('precio', 10, 2);
             $table->decimal('kilometraje', 12, 2)->nullable();
@@ -27,8 +29,10 @@ return new class extends Migration
             $table->enum('tipo_carga', ['VALE', 'PREPAGO'])->default('VALE');
             $table->string('estado_carga', 30)->nullable();
             $table->integer('id_usuario')->nullable();
+            $table->string('concepto', 255)->nullable();
             $table->timestamps();
 
+            $table->unique(['nro_carga', 'gestion'], 'unique_nro_carga_gestion');
 
         });
     }

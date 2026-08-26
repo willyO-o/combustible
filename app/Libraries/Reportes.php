@@ -51,7 +51,7 @@ class Reportes extends FPDF
         $negro = [30, 30, 30];
         $gris = [90, 90, 90];
 
-        $this->AddPage('L', [219, 140]);
+        $this->AddPage('P', 'Letter');
         $this->SetMargins(5, 5, 5);
         $this->SetAutoPageBreak(false);
 
