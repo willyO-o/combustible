@@ -239,14 +239,14 @@ class Reportes extends FPDF
         $this->Cell(105, 9, utf8Decode('DE COMBUSTIBLE'), 0, 2, 'C');
 
         // Nro. de comprobante, sobre el recuadro azul relleno del encabezado
-        $this->SetXY(159, 13.2);
-        $this->SetFont('Arial', 'B', 13);
+        $this->SetXY(158, 13.2);
+        $this->SetFont('Arial', 'B', 11);
         $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->Cell(27, 6, utf8Decode($numeroComprobante), 0, 0, 'C');
+        $this->Cell(29, 6, utf8Decode($numeroComprobante), 0, 0, 'C');
 
         // Fecha, debajo de la etiqueta "FECHA:" impresa en el fondo (a la
         // derecha, sobre el ícono del surtidor, no hay espacio suficiente)
-        $this->SetXY(159, 29);
+        $this->SetXY(165, 26);
         $this->SetFont('Arial', '', 9);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->Cell(34, 5, utf8Decode($fecha), 0, 0, 'L');
@@ -256,15 +256,15 @@ class Reportes extends FPDF
         // concepto (etiquetas ya impresas en el fondo; cada valor va
         // sobre su línea correspondiente).
         // ----------------------------------------------------------
-        $valX = 24;
+        $valX = 55;
         $valW = 208.73 - 4 - $valX;
 
         $filas = [
-            [52.5, 4, $areaNombre],
-            [68.7, 3.5, $encargadoNombre],
-            [80, 4, $automovil],
-            [91.8, 4, $conductorNombre],
-            [104, 4.5, $concepto],
+            [50, 4, $areaNombre],
+            [64, 3.5, $encargadoNombre],
+            [77, 4, $automovil],
+            [88, 4, $conductorNombre],
+            [100, 4.5, $concepto],
         ];
 
         $this->SetFont('Arial', '', 9);
