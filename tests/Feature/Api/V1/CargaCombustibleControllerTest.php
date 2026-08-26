@@ -63,6 +63,16 @@ class CargaCombustibleControllerTest extends TestCase
         $grifo = $this->crearGrifo();
         $tipoCombustible = TipoCombustible::factory()->create();
 
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Empresa de Prueba',
+            'direccion_empresa' => 'Av. Siempre Viva',
+            'telefono_empresa' => '70000000',
+            'correo_empresa' => 'empresa@example.com',
+            'nit_empresa' => '123456',
+            'parametros_vale' => ['tiempo_expiracion' => 5],
+            'estado' => 'ACTIVO',
+        ]);
+
         $response = $this->actingAs($this->admin, 'api')
             ->post(route('api.v1.cargas.store'), [
                 'fecha_carga' => now()->format('Y-m-d H:i'),
@@ -245,6 +255,16 @@ class CargaCombustibleControllerTest extends TestCase
         $conductor = $this->crearConductor();
         $grifo = $this->crearGrifo();
         $tipoCombustible = TipoCombustible::factory()->create();
+
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Empresa de Prueba',
+            'direccion_empresa' => 'Av. Siempre Viva',
+            'telefono_empresa' => '70000000',
+            'correo_empresa' => 'empresa@example.com',
+            'nit_empresa' => '123456',
+            'parametros_vale' => ['tiempo_expiracion' => 5],
+            'estado' => 'ACTIVO',
+        ]);
 
         CargaCombustible::create([
             'fecha_carga' => now(),

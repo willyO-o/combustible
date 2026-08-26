@@ -146,6 +146,7 @@ const tipoBadge = (tipo) =>
                     <table class="table table-hover text-wrap mb-0">
                         <thead class="table-light">
                             <tr>
+                                <th>Nro.</th>
                                 <th>Fecha</th>
                                 <th>Vehículo</th>
                                 <th>Conductor</th>
@@ -161,12 +162,13 @@ const tipoBadge = (tipo) =>
                         </thead>
                         <tbody>
                             <tr v-if="cargas.data.length === 0">
-                                <td colspan="11" class="text-center py-4 text-muted">
+                                <td colspan="12" class="text-center py-4 text-muted">
                                     <i class="ri-gas-station-line fs-3 d-block mb-2"></i>
                                     No se encontraron registros
                                 </td>
                             </tr>
                             <tr v-for="carga in cargas.data" :key="carga.id">
+                                <td class="fw-medium">{{ carga.nro }}</td>
                                 <td>{{ (carga.fecha_carga_formateada) }}</td>
                                 <td class="text-nowrap">
                                     <span class="fw-semibold d-block" >{{ carga.vehiculo?.codigo ?? '—' }}</span>

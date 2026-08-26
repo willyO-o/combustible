@@ -337,6 +337,7 @@ class CargaCombustibleController extends Controller
 
         return response()->json([
             'id' => $carga->id,
+            'nro' => $carga->nro,
             'fecha_carga' => $carga->fecha_carga_formateada,
             'litros' => $carga->litros,
             'precio' => $carga->precio,
@@ -344,6 +345,7 @@ class CargaCombustibleController extends Controller
             'kilometraje' => $carga->kilometraje,
             'horometro' => $carga->horometro,
             'nro_factura' => $carga->nro_factura,
+            'concepto' => $carga->concepto,
             'tipo_carga' => $carga->tipo_carga,
             'estado_carga' => $carga->estado_carga,
             'tipo_combustible' => $carga->tipoCombustible?->tipo_combustible,

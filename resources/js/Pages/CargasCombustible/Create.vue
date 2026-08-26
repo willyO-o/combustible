@@ -60,6 +60,7 @@ const form = useForm({
     kilometraje: isEdit.value ? (props.carga.kilometraje ?? '') : '',
     horometro: isEdit.value ? (props.carga.horometro ?? '') : '',
     nro_factura: isEdit.value ? (props.carga.nro_factura ?? '') : '',
+    concepto: isEdit.value ? (props.carga.concepto ?? '') : '',
     tipo_carga: isEdit.value ? props.carga.tipo_carga : 'PREPAGO',
     estado_carga: isEdit.value ? (props.carga.estado_carga ?? 'REGISTRADO') : 'REGISTRADO',
     id_vehiculo: isEdit.value ? (props.vehiculoActual?.id ?? null) : (modoVale.value ? props.valePreseleccionado.id_vehiculo : null),
@@ -389,7 +390,7 @@ onMounted(() => {
                 <h1 class="page-title fw-medium fs-18 mb-0">
                     {{ isEdit ? 'Editar Carga de Combustible' : 'Registrar Carga de Combustible' }}
                     <template v-if="isEdit">
-                        <span class="text-primary">— {{ carga.vehiculo?.nro_placa }}</span>
+                        <span class="text-primary">— #{{ carga.nro }} · {{ carga.vehiculo?.nro_placa }}</span>
                         <span class="text-muted fs-14 ms-2">{{ carga.fecha_carga }}</span>
                     </template>
                     <template v-else-if="modoVale">
@@ -750,7 +751,13 @@ onMounted(() => {
                                         placeholder="Nro de factura..." maxlength="50" />
                                 </div>
 
-
+                                <div class="col-12">
+                                    <label class="form-label fw-medium">A utilizarse en:</label>
+                                    <input v-model="form.concepto" type="text" class="form-control" :disabled="isEdit"
+                                        :class="{ 'is-invalid': form.errors.concepto }"
+                                        placeholder="Ej: Traslado de personal a planta norte..." maxlength="255" />
+                                    <div v-if="form.errors.concepto" class="invalid-feedback">{{ form.errors.concepto }}</div>
+                                </div>
 
                             </div>
                         </div>

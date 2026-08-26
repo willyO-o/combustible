@@ -70,6 +70,8 @@ class CargaCombustibleControllerTest extends TestCase
 
     public function test_muestra_el_detalle_de_una_carga_de_combustible_tipo_prepago(): void
     {
+        $this->crearParametrosEmpresa();
+
         $vehiculo = Vehiculo::factory()->create();
         $conductor = $this->crearConductor();
         $grifo = $this->crearGrifo();
@@ -146,6 +148,8 @@ class CargaCombustibleControllerTest extends TestCase
 
     public function test_actualiza_el_kilometraje_de_una_carga_prepago(): void
     {
+        $this->crearParametrosEmpresa();
+
         $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
         $conductor = $this->crearConductor();
         $grifo = $this->crearGrifo();

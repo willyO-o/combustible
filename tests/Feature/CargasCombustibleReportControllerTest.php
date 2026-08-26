@@ -6,6 +6,7 @@ use App\Models\Area;
 use App\Models\CargaCombustible;
 use App\Models\Conductor;
 use App\Models\Grifo;
+use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoCombustible;
 use App\Models\User;
@@ -52,6 +53,16 @@ class CargasCombustibleReportControllerTest extends TestCase
         ]);
 
         $this->tipoCombustible = TipoCombustible::factory()->create();
+
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Empresa de Prueba',
+            'direccion_empresa' => 'Av. Siempre Viva',
+            'telefono_empresa' => '70000000',
+            'correo_empresa' => 'empresa@example.com',
+            'nit_empresa' => '123456',
+            'parametros_vale' => ['tiempo_expiracion' => 5],
+            'estado' => 'ACTIVO',
+        ]);
     }
 
     private function crearCarga(Vehiculo $vehiculo, array $overrides = []): CargaCombustible

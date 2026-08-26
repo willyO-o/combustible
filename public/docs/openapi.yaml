@@ -1324,7 +1324,10 @@ paths:
         ya que el campo `respaldos` adjunta uno o más archivos (imagen o PDF) por carga.
 
         `id_usuario` se asigna automáticamente al usuario autenticado en el servidor y no debe
-        enviarse.
+        enviarse. Lo mismo ocurre con `nro_carga` y `gestion`: correlativo autogenerado dentro
+        de la gestión actual (configurable en los parámetros de la empresa; por defecto la
+        gestión avanza en diciembre), expuesto en la respuesta de `GET /cargas` como `nro`
+        (`nro_carga` formateado con ceros a la izquierda seguido de `/gestion`).
 
         ## Reglas condicionales relevantes
 
@@ -1340,6 +1343,8 @@ paths:
         - Si se envía `id_vale`, debe referenciar un vale con `estado_vale = PENDIENTE`, del
           mismo `id_vehiculo`, y aún no vencido (`fecha_vencimiento > ahora`). Al registrarse la
           carga, ese vale queda marcado como `USADO`.
+        - `concepto` ("A utilizarse en") es un texto libre y opcional que describe para qué se
+          usará el combustible cargado (ej. "Traslado de personal a planta norte").
         - `is_offline` (uso exclusivo de la app Android, que permite registrar cargas sin
           conexión y sincronizarlas después), si se envía `true`:
           - Omite, solo para esta petición, la exigencia anterior de que `id_vale` siga
@@ -2944,6 +2949,9 @@ components:
       type: object
       properties:
         id: { type: integer, example: 15 }
+        nro_carga: { type: integer, description: Correlativo autogenerado dentro de la gestión., example: 1 }
+        gestion: { type: string, example: "2026" }
+        nro: { type: string, description: "`nro_carga` formateado con ceros a la izquierda (cantidad de dígitos configurable en los parámetros de la empresa) seguido de `/gestion`.", example: "000001/2026" }
         fecha_carga: { type: string, description: "Formateada como `Y-m-d H:i` por el cast del modelo.", example: "2026-08-17 14:30" }
         litros: { type: string, example: "50.00" }
         precio: { type: string, example: "10.00" }
@@ -2955,6 +2963,7 @@ components:
         id_conductor: { type: integer, example: 1 }
         id_vale: { type: integer, nullable: true, example: null }
         nro_factura: { type: string, nullable: true, example: "F-00123" }
+        concepto: { type: string, nullable: true, description: "\"A utilizarse en\": para qué se usará el combustible cargado.", example: "Traslado de personal a planta norte" }
         tipo_carga: { type: string, enum: [VALE, PREPAGO], example: PREPAGO }
         estado_carga: { type: string, nullable: true, enum: [REGISTRADO, VERIFICADO, ANULADO], example: REGISTRADO }
         id_usuario: { type: integer, nullable: true, description: Usuario que registró la carga (asignado automáticamente al crear)., example: 2 }
@@ -3071,6 +3080,12 @@ components:
           nullable: true
           maxLength: 50
           example: "F-00123"
+        concepto:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: "\"A utilizarse en\": describe para qué se usará el combustible cargado."
+          example: "Traslado de personal a planta norte"
         tipo_carga:
           type: string
           enum: [VALE, PREPAGO]

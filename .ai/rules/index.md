@@ -20,6 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/**, app/Models/*.php | .ai/rules/models.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
 | app/Http/Controllers/Api/V1/*.php,app/Http/Requests/CargaMaterialRequest.php,app/Http/Requests/ViajeRequest.php | .ai/rules/requests-http-requests.md |
+| app/Models/CargaCombustible.php,app/Http/Controllers/CargaCombustibleController.php,app/Http/Requests/CargaCombustibleRequest.php,database/migrations/2026_05_28_000010_create_carga_combustible_table.php | .ai/rules/requests-migrations.md |
 | app/Http/Controllers/Api/V1/CargaMaterialController.php,app/Http/Controllers/CargaMaterialController.php,app/Http/Requests/ViajeRequest.php,app/Http/Requests/CargaMaterialRequest.php,app/Models/Viaje.php | .ai/rules/requests-models.md |
 | app/Http/Requests/**/*.php, app/Http/Requests/*.php | .ai/rules/requests.md |
 | routes/*.php, routes/web.php | .ai/rules/routes.md |

@@ -32,7 +32,7 @@ return new class extends Migration
             $table->string('concepto', 255)->nullable();
             $table->timestamps();
 
-            $table->unique(['nro_carga', 'gestion'], 'unique_nro_carga_gestion');
+            $table->unique(['nro_carga', 'gestion'], 'unique_carga_combustible_nro_gestion');
 
         });
     }

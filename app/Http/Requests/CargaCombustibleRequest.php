@@ -4,8 +4,8 @@ namespace App\Http\Requests;
 
 use App\Models\Vehiculo;
 use App\Rules\GreaterThanPreviousReading;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
@@ -22,7 +22,7 @@ class CargaCombustibleRequest extends FormRequest
             throw new HttpResponseException(response()->json([
                 'success' => false,
                 'message' => 'Los datos enviados no son válidos.',
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], 422));
         }
 
@@ -81,6 +81,7 @@ class CargaCombustibleRequest extends FormRequest
                 ]),
             ],
             'nro_factura' => ['nullable', 'string', 'max:50'],
+            'concepto' => ['nullable', 'string', 'max:255'],
             'tipo_carga' => ['required', Rule::in(['VALE', 'PREPAGO'])],
             'estado_carga' => ['nullable', 'string', Rule::in(['REGISTRADO', 'VERIFICADO', 'ANULADO'])],
             // Sólo tiene efecto en la API (ver $esRegistroOffline arriba): marca
@@ -103,6 +104,7 @@ class CargaCombustibleRequest extends FormRequest
             'id_conductor' => 'conductor',
             'id_vale' => 'vale',
             'nro_factura' => 'número de factura',
+            'concepto' => 'a utilizarse en',
             'tipo_carga' => 'tipo de carga',
             'estado_carga' => 'estado',
             'is_offline' => 'registro sin conexión',

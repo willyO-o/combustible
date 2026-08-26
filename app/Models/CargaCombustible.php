@@ -21,6 +21,9 @@ use Illuminate\Support\Facades\Auth;
     'tipo_carga',
     'estado_carga',
     'id_usuario',
+    'nro_carga',
+    'gestion',
+    'concepto',
 
 ])]
 
@@ -38,11 +41,38 @@ class CargaCombustible extends Model
 
     protected $appends = [
         'fecha_carga_formateada',
+        'nro',
     ];
 
     public function getFechaCargaFormateadaAttribute()
     {
         return $this->fecha_carga ? $this->fecha_carga->format('d/m/Y H:i') : '—';
+    }
+
+    public function getNroAttribute()
+    {
+        $digitos = ParametrosEmpresa::first()->parametros_vale->digitos_serie;
+
+        return $this->nro_carga ? str_pad($this->nro_carga, $digitos, '0', STR_PAD_LEFT).'/'.$this->gestion : null;
+    }
+
+    protected function calcularGestion(): int
+    {
+        $mesCicloContable = ParametrosEmpresa::first()->parametros_vale->mes_ciclo_contable;
+
+        // Si el mes actual alcanzó el mes de inicio del ciclo contable
+        // configurado, la gestión ya pertenece al año siguiente.
+        return now()->month >= $mesCicloContable ? now()->year + 1 : now()->year;
+    }
+
+    public static function siguienteNroCarga(int $gestion): int
+    {
+        $ultimo = self::where('gestion', $gestion)
+            ->lockForUpdate()
+            ->orderBy('nro_carga', 'desc')
+            ->first();
+
+        return $ultimo ? $ultimo->nro_carga + 1 : 1;
     }
 
     // Relaciones
@@ -89,6 +119,8 @@ class CargaCombustible extends Model
         static::creating(function ($model) {
             $model->id_usuario = Auth::id();
 
+            $model->gestion = $model->calcularGestion();
+            $model->nro_carga = self::siguienteNroCarga($model->gestion);
         });
     }
 

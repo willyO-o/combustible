@@ -79,7 +79,7 @@ const fmt = (val, decimals = 2) =>
                             <div>
                                 <h5 class="modal-title mb-0 fw-semibold">
                                     Detalle de Carga de Combustible
-                                    <span v-if="carga" class="ms-2 fs-14 opacity-75">#{{ carga.id }}</span>
+                                    <span v-if="carga" class="ms-2 fs-14 opacity-75">#{{ carga.nro ?? carga.id }}</span>
                                 </h5>
                             </div>
                         </div>
@@ -219,6 +219,12 @@ const fmt = (val, decimals = 2) =>
                                     <p class="text-muted fs-11 text-uppercase mb-1">Horómetro</p>
                                     <p class="fw-semibold mb-0">{{ fmt(carga.horometro, 2) }} hr</p>
                                 </div>
+                            </div>
+
+                            <!-- Concepto -->
+                            <div v-if="carga.concepto" class="mb-4">
+                                <p class="text-muted fs-11 text-uppercase mb-1">A utilizarse en</p>
+                                <p class="fw-semibold mb-0">{{ carga.concepto }}</p>
                             </div>
 
                             <!-- Vale utilizado -->
