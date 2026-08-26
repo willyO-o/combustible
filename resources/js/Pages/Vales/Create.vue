@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import SearchSelect from '@/Components/SearchSelect.vue'
+import GrifoFormModal from '@/Components/GrifoFormModal.vue'
 
 import { ref, watch } from 'vue'
 
@@ -14,6 +15,17 @@ const props = defineProps({
     conductorActual: Object,
     grifos: Array,
 })
+
+// Copia local editable: al dar de alta un grifo nuevo desde el "+", se
+// agrega aquí mismo y queda seleccionado de inmediato.
+const grifosList = ref([...props.grifos])
+
+const grifoModal = ref(null)
+
+function onGrifoCreado(grifo) {
+    grifosList.value.push(grifo)
+    form.id_grifo = grifo.id
+}
 
 
 const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
@@ -65,7 +77,7 @@ const vehiculoSeleccionado = (vehiculo) => {
     if (vehiculo?.meta?.tipo_medicion == 'horometro') {
 
         //extraer la extacion de servicio que tenga el valor del campo es_pricipal = true y asignar su id al campo id_grifo
-        const grifoPrincipal = props.grifos.find(g => g.es_principal);
+        const grifoPrincipal = grifosList.value.find(g => g.es_principal);
         form.id_grifo = grifoPrincipal ? grifoPrincipal.id : null;
     }
 
@@ -155,13 +167,18 @@ const vehiculoSeleccionado = (vehiculo) => {
                                     Estación de servicio <span class="text-danger">*</span>
                                 </label>
 
-
-                                <select v-model="form.id_grifo" class="form-select"
-                                    :class="{ 'is-invalid': form.errors.id_grifo }">
-                                    <option :value="null" disabled>Seleccione una opcion...</option>
-                                    <option v-for="grifo in props.grifos" :key="grifo.id" :value="grifo.id">{{
-                                        grifo.razon_social }} - {{ grifo.ciudad }}</option>
-                                </select>
+                                <div class="d-flex gap-2">
+                                    <select v-model="form.id_grifo" class="form-select"
+                                        :class="{ 'is-invalid': form.errors.id_grifo }">
+                                        <option :value="null" disabled>Seleccione una opcion...</option>
+                                        <option v-for="grifo in grifosList" :key="grifo.id" :value="grifo.id">{{
+                                            grifo.razon_social }} - {{ grifo.ciudad }}</option>
+                                    </select>
+                                    <button type="button" class="btn btn-outline-primary flex-shrink-0"
+                                        title="Registrar nueva estación de servicio" @click="grifoModal?.open()">
+                                        <i class="ri-add-line"></i>
+                                    </button>
+                                </div>
 
                                 <div v-if="form.errors.id_grifo" class="text-danger small mt-1">{{
                                     form.errors.id_grifo }}</div>
@@ -264,4 +281,7 @@ const vehiculoSeleccionado = (vehiculo) => {
             </button>
         </div>
     </form>
+
+    <!-- Modal reutilizable para dar de alta un grifo al vuelo -->
+    <GrifoFormModal ref="grifoModal" @created="onGrifoCreado" />
 </template>

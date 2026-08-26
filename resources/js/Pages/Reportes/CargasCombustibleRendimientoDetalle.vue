@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -127,12 +128,8 @@ const chartSeries = computed(() => [
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-sm-6 col-lg-3">
-                    <label class="form-label">Fecha Inicio</label>
-                    <input v-model="filtros.fecha_inicio" type="date" class="form-control">
-                </div>
-                <div class="col-sm-6 col-lg-3">
-                    <label class="form-label">Fecha Fin</label>
-                    <input v-model="filtros.fecha_fin" type="date" class="form-control">
+                    <DateRangeFilter v-model:fecha-desde="filtros.fecha_inicio"
+                        v-model:fecha-hasta="filtros.fecha_fin" label="Rango de fechas" default-range="Este mes" />
                 </div>
                 <div class="col-lg-6">
                     <label class="form-label">Vehículo <span class="text-danger">*</span></label>

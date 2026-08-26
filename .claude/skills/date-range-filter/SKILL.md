@@ -43,11 +43,14 @@ import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 - `placeholder`: texto cuando no hay rango elegido (opcional).
 - `opens`: `'left' | 'right' | 'center' | 'inline'`, hacia dónde abre el dropdown (default
   `'right'`).
-- `default-range`: nombre exacto de uno de los presets (ver lista abajo, ej. `"Este mes"`) para
-  preseleccionarlo cuando el padre todavía no trae `fechaDesde`/`fechaHasta` (primera carga sin
-  filtros en la URL). Al montar, el componente lo marca "activo" en la lista de presets **y**
-  emite el rango hacia el `v-model` del padre, así el filtro/petición del listado queda
-  sincronizado con lo marcado. Omitir el prop = sin selección por defecto (como estaba antes).
+- `default-range`: nombre exacto de uno de los presets (ver lista abajo). **Convención del
+  proyecto: usar siempre `default-range="Este mes"`** salvo que el usuario pida explícitamente
+  otro comportamiento — así está en las 6 páginas que ya usan este componente (Vales, Cargas de
+  Combustible, Operación Diaria y los 3 reportes de combustible). Preselecciona ese rango cuando
+  el padre todavía no trae `fechaDesde`/`fechaHasta` (primera carga sin filtros en la URL); al
+  montar, el componente lo marca "activo" en la lista de presets **y** emite el rango hacia el
+  `v-model` del padre, así el filtro/petición del listado queda sincronizado con lo marcado.
+  Omitir el prop = sin selección por defecto.
 
 ## Presets incluidos (en español)
 

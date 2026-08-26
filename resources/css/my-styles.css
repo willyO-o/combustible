@@ -1,29 +1,59 @@
-.multiselect-search {
-    /* --ms-bg: #161623; */
+/* @vueform/multiselect: el theme "default.css" de la librería trae sus
+   propios colores fijos (verde/gris del theme "vueform", ver
+   node_modules/@vueform/multiselect/themes/default.css) que no siguen el
+   tema Vyzor. Todo ahí está expuesto como var(--ms-x, #fallback), así que
+   definir esas variables en .multiselect (el wrapper raíz de cada instancia)
+   alcanza para que se apliquen en cascada a hijos e hijos-de-hijos, sin
+   pelear con la especificidad del theme. Mismos tokens y mismos valores que
+   usa .form-control:focus del tema (border-color: var(--primary-color),
+   box-shadow con var(--primary03)) para que se vea igual que el resto de
+   inputs, en modo claro y oscuro (las variables ya cambian solas con
+   [data-theme-mode=dark]). */
+.multiselect {
     --ms-bg: var(--custom-white);
-}
-.multiselect-dropdown{
+    --ms-border-color: var(--input-border);
+    --ms-border-color-active: var(--primary-color);
+    --ms-border-width-active: 1px;
+    --ms-ring-width: 2px;
+    --ms-ring-color: var(--primary03);
+    --ms-radius: var(--bs-border-radius, 0.375rem);
+    --ms-placeholder-color: var(--text-muted);
+    --ms-bg-disabled: var(--bs-secondary-bg);
+
+    --ms-caret-color: var(--text-muted);
+    --ms-clear-color: var(--text-muted);
+    --ms-clear-color-hover: var(--default-text-color);
+
     --ms-dropdown-bg: var(--custom-white);
-}
-.multiselect-option.is-pointed {
-    --ms-option-bg-pointed: var(--primary-color);
+    --ms-dropdown-border-color: var(--input-border);
+
+    --ms-option-bg-pointed: var(--primary01);
     --ms-option-color-pointed: var(--default-text-color);
+    --ms-option-bg-selected: var(--primary-color);
+    --ms-option-color-selected: #fff;
+    --ms-option-bg-selected-pointed: var(--primary-color);
+    --ms-option-color-selected-pointed: #fff;
+    --ms-option-bg-disabled: var(--custom-white);
+    --ms-option-color-disabled: var(--text-muted);
+    --ms-option-bg-selected-disabled: var(--bs-secondary-bg);
+    --ms-option-color-selected-disabled: var(--text-muted);
+
+    --ms-group-label-bg: var(--bs-secondary-bg);
+    --ms-group-label-color: var(--default-text-color);
+    --ms-group-label-bg-pointed: var(--primary01);
+    --ms-group-label-color-pointed: var(--default-text-color);
+    --ms-group-label-bg-selected: var(--primary-color);
+    --ms-group-label-color-selected: #fff;
+
+    --ms-tag-bg: var(--primary-color);
+    --ms-tag-color: #fff;
+    --ms-tag-bg-disabled: var(--text-muted);
+    --ms-tag-color-disabled: #fff;
+
+    --ms-empty-color: var(--text-muted);
+
+    color: var(--default-text-color);
 }
-.multiselect-option.is-selected.is-pointed{
-    /* --ms-option-bg-selected-pointed: var(--primary-color); */
-    --ms-option-color-selected-pointed: var(--default-text-color);
-}
-/* .multiselect.is-disabled{
-    --ms-bg-disabled: var(--bs-gray-200);
-}
- .multiselect.is-disabled{
-    --ms-bg-disabled: var(--bs-gray-900);
-}
-.multiselect.is-disabled .multiselect-wrapper{
-    background-color: var(--bs-gray-200) ;
-     background-color: transparent !important;
-}
- */
 
 /* DateRangeFilter.vue (resources/js/Components/DateRangeFilter.vue) */
 .date-range-filter-input {

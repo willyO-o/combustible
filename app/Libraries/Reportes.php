@@ -379,7 +379,7 @@ class Reportes extends exFPDF
         // La sección tiene alto fijo (formulario de una sola página): con las
         // columnas/alto de fila usados más abajo entran 10 filas de datos bajo
         // el encabezado.
-        $maxFilas = 10;
+        $maxFilas = 11;
 
         $trabajos = $ordenTrabajo
             ? $ordenTrabajo->detalles->take($maxFilas)->map(fn ($detalle) => [
@@ -469,7 +469,7 @@ class Reportes extends exFPDF
         // de ~3mm arriba y abajo para no tocar ninguna de las dos.
         // ══════════════════════════════════════════════════════════════════
         $s4X = 2.29;
-        $s4W = 210.56; // 212.85 - 2.29, mismo ancho que las demás cajas del fondo
+        $s4W = 210; // 212.85 - 2.29, mismo ancho que las demás cajas del fondo
         $s4Y = 128.5;
         // Bottom disponible: 208.3 (211.29 de OBSERVACIONES - 3mm de margen). Con
         // el título (8mm) + $maxFilas=10 filas de 6.5mm de alto (65mm) la tabla
@@ -477,22 +477,24 @@ class Reportes extends exFPDF
 
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
         $this->SetLineWidth(0.3);
-        $this->Rect($s4X, $s4Y, $s4W, 8);
+        $this->Rect($s4X+2, $s4Y, $s4W - 4, 8);
         $this->SetFont('Arial', 'B', 9);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);
         $this->SetXY($s4X, $s4Y);
         $this->Cell($s4W, 8, utf8Decode('TRABAJOS REALIZADOS'), 0, 0, 'C');
 
         $etiquetaLectura = $tipoMedicion === 'kilometraje' ? 'KILOMETRAJE' : 'HOROMETRO';
-        $anchos = [26, 27.2, 61.8, 66.3, 29.26]; // suma = $s4W (210.56)
-        $encabezados = ['FECHA', $etiquetaLectura, 'REPUESTO UTILIZADO', 'CODIGO O NRO. DE REPUESTO', 'CANTIDAD'];
+        $anchos = [23, 25, 110, 30, 18]; // suma = $s4W (210.56)
+        $encabezados = ['FECHA', $etiquetaLectura, 'REPUESTO UTILIZADO', 'COD. REPUESTO', 'CANTIDAD'];
 
-        $this->SetXY($s4X, $s4Y + 8);
-        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$s4W}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; min-height:6.5;");
+        $this->SetMargins(-1, 0, 0);
+        $this->SetXY(0, $s4Y + 8);
+        $anchoTabla= array_sum($anchos);
+        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$anchoTabla}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; min-height:6.5;");
 
         $tabla->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-color:255,255,255; font-style:B; font-size:7.5; align:C;");
         foreach ($encabezados as $encabezado) {
-            $tabla->easyCell(utf8Decode($encabezado));
+            $tabla->easyCell(utf8Decode($encabezado), 'align:C;');
         }
         $tabla->printRow(true);
 
@@ -504,16 +506,17 @@ class Reportes extends exFPDF
 
         $this->SetFont('Arial', '', 7.5);
         foreach ($filas as $fila) {
-            $tabla->rowStyle('font-color:30,30,30; font-style:; align:C;');
-            $tabla->easyCell(utf8Decode($fila['fecha']));
-            $tabla->easyCell(utf8Decode($fila['lectura']));
+            $tabla->rowStyle('font-color:30,30,30; font-style:; align:C;min-height:5.5;');
+            $tabla->easyCell(utf8Decode($fila['fecha']), 'align:C;');
+            $tabla->easyCell(utf8Decode($fila['lectura']), 'align:R;');
             $tabla->easyCell(utf8Decode($fila['repuesto']), 'align:L;');
-            $tabla->easyCell(utf8Decode($fila['codigo']), 'align:L;');
-            $tabla->easyCell(utf8Decode($fila['cantidad']));
+            $tabla->easyCell(utf8Decode($fila['codigo']), 'align:C;');
+            $tabla->easyCell(utf8Decode($fila['cantidad']), 'align:C;');
             $tabla->printRow();
         }
 
         $tabla->endTable();
+        $this->SetMargins(8, 8, 8);
 
         // ══════════════════════════════════════════════════════════════════
         // OBSERVACIONES (caja punteada x 6.5-209.4, y 219.16-233.26)
@@ -560,7 +563,7 @@ class Reportes extends exFPDF
      */
     private function formatearLectura(?string $valor): string
     {
-        return $valor !== null ? number_format((float) $valor, 2, ',', '.') : '';
+        return $valor !== null ? number_format((float) $valor, 2, ',', ' ') : '';
     }
 
     public function generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo = null)

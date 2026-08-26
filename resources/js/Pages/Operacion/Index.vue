@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import Multiselect from '@vueform/multiselect'
+import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 
 import { confirm, showToast } from '@/Utils/alertUtil'
 
@@ -105,13 +106,9 @@ const estadoBadge = (estado) => {
                         <label class="form-label">Nro. Placa</label>
                         <input v-model="filters.nro_placa" type="text" class="form-control" placeholder="Placa..." />
                     </div>
-                    <div class="col-sm-6 col-xl-2">
-                        <label class="form-label">Fecha desde</label>
-                        <input v-model="filters.fecha_desde" type="date" class="form-control" />
-                    </div>
-                    <div class="col-sm-6 col-xl-2">
-                        <label class="form-label">Fecha hasta</label>
-                        <input v-model="filters.fecha_hasta" type="date" class="form-control" />
+                    <div class="col-sm-6 col-xl-3">
+                        <DateRangeFilter v-model:fecha-desde="filters.fecha_desde"
+                            v-model:fecha-hasta="filters.fecha_hasta" label="Fecha operación" default-range="Este mes" />
                     </div>
                     <div v-if="props.conductores.length" class="col-sm-6 col-xl-4">
                         <label class="form-label">Conductor</label>
