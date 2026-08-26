@@ -140,8 +140,8 @@ class SolicitudMantenimientoPdfControllerTest extends TestCase
             'id_orden_trabajo' => $orden->id,
             'id_repuesto' => $repuesto->id,
             'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'fecha' => now()->toDateString(),
             'cantidad' => 2,
-            'costo_unitario' => 50,
         ]);
 
         $response = $this->get(route('api.v1.solicitudes-mantenimiento.pdf', $solicitud->id));

@@ -20,7 +20,7 @@ class RepuestoRequest extends FormRequest
             'nombre_repuesto' => ['required', 'string', 'max:200'],
             'codigo_repuesto' => ['required', 'string', 'max:100', Rule::unique('repuesto', 'codigo_repuesto')->ignore($repuesto?->id)],
             'descripcion_repuesto' => ['nullable', 'string', 'max:1000'],
-            'unidad_medida' => ['required', Rule::in(['UNIDAD', 'LITRO', 'KILOGRAMO', 'METRO', 'JUEGO', 'CAJA', 'BOLSA', 'PAQUETE'])],
+            'unidad_medida' => ['required', Rule::in(['UNIDAD', 'LITRO', 'KILOGRAMO', 'METRO', 'JUEGO', 'CAJA', 'BOLSA', 'PAQUETE', 'OTRO'])],
             'stock_actual' => ['required', 'integer', 'min:0'],
             'estado_repuesto' => ['required', Rule::in(['ACTIVO', 'INACTIVO', 'AGOTADO'])],
         ];

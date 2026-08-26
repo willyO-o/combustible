@@ -16,9 +16,10 @@ return new class extends Migration
             $table->foreignId('id_orden_trabajo')->constrained('orden_trabajo')->onDelete('cascade');
             $table->foreignId('id_repuesto')->nullable()->constrained('repuesto')->onDelete('restrict');
             $table->foreignId('id_tipo_mantenimiento')->constrained('tipo_mantenimiento')->onDelete('restrict');
-            $table->string('detalle')->nullable();
+            $table->date('fecha');
+            $table->decimal('horometro', 10, 2)->nullable();
+            $table->decimal('kilometraje', 10, 2)->nullable();
             $table->integer('cantidad');
-            $table->decimal('costo_unitario', 10, 2);
             $table->timestamps();
         });
     }

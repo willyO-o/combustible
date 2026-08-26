@@ -58,9 +58,11 @@ async function cambiarEstado(nuevoEstado) {
     )
 }
 
-const costoTotal = computed(() =>
-    (props.orden.detalles ?? []).reduce((acc, d) => acc + parseFloat(d.subtotal ?? 0), 0).toFixed(2)
-)
+const formatFecha = (fecha) => fecha ? fecha.substring(0, 10).split('-').reverse().join('/') : '—'
+
+// El horómetro/kilometraje de cada ítem del detalle a mostrar depende del
+// tipo de medición del vehículo (mismo criterio que Ejecucion/Create.vue).
+const tipoMedicion = computed(() => props.orden.vehiculo?.tipo_medicion)
 </script>
 
 <template>
@@ -190,32 +192,33 @@ const costoTotal = computed(() =>
                                 <thead class="table-light">
                                     <tr>
                                         <th>#</th>
+                                        <th>Fecha</th>
                                         <th>Tipo de Mantenimiento</th>
-                                        <th>Ítem</th>
+                                        <th>Repuesto</th>
                                         <th class="text-end">Cantidad</th>
-                                        <th class="text-end">Costo Unit.</th>
-                                        <th class="text-end">Subtotal</th>
+                                        <th class="text-end">{{ tipoMedicion === 'kilometraje' ? 'Kilometraje' : 'Horómetro' }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="(d, idx) in orden.detalles" :key="d.id">
                                         <td>{{ idx + 1 }}</td>
+                                        <td>{{ formatFecha(d.fecha) }}</td>
                                         <td>{{ d.tipo_mantenimiento?.tipo_mantenimiento ?? '—' }}</td>
                                         <td>
                                             <span v-if="d.repuesto">{{ d.repuesto.codigo_repuesto }} – {{ d.repuesto.nombre_repuesto }}</span>
-                                            <span v-else>{{ d.detalle ?? '—' }}</span>
+                                            <span v-else class="text-muted">— Mano de obra —</span>
                                         </td>
                                         <td class="text-end">{{ d.cantidad }}</td>
-                                        <td class="text-end">Bs {{ Number(d.costo_unitario).toFixed(2) }}</td>
-                                        <td class="text-end fw-medium">Bs {{ Number(d.subtotal).toFixed(2) }}</td>
+                                        <td class="text-end">
+                                            <template v-if="tipoMedicion === 'kilometraje'">
+                                                {{ d.kilometraje != null ? Number(d.kilometraje).toFixed(2) + ' km' : '—' }}
+                                            </template>
+                                            <template v-else>
+                                                {{ d.horometro != null ? Number(d.horometro).toFixed(2) + ' h' : '—' }}
+                                            </template>
+                                        </td>
                                     </tr>
                                 </tbody>
-                                <tfoot class="table-light">
-                                    <tr>
-                                        <td colspan="5" class="text-end fw-bold">Total:</td>
-                                        <td class="text-end fw-bold text-primary">Bs {{ costoTotal }}</td>
-                                    </tr>
-                                </tfoot>
                             </table>
                         </div>
                     </div>

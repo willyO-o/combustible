@@ -9,7 +9,7 @@ use Illuminate\Validation\Rule;
 class EjecucionOrdenTrabajoRequest extends FormRequest
 {
     /**
-     * Un jefe de área/administrador puede registrar la ejecución de cualquier
+     * Un jefe de área/administrador puede culminar la ejecución de cualquier
      * orden; un técnico de mantenimiento sólo la de sus propias órdenes
      * asignadas (id_usuario_ejecuta).
      */
@@ -33,15 +33,15 @@ class EjecucionOrdenTrabajoRequest extends FormRequest
 
     protected function failedAuthorization(): never
     {
-        throw new AuthorizationException('Sólo puede registrar la ejecución de las órdenes que tiene asignadas.');
+        throw new AuthorizationException('Sólo puede culminar la ejecución de las órdenes que tiene asignadas.');
     }
 
     public function rules(): array
     {
-        // fecha_ejecucion se registra al marcar la orden EN_EJECUCION (cambiarEstado) y
-        // fecha_culminacion se fija automáticamente al registrar esta ejecución: ninguna
-        // de las dos es un campo del formulario.
-        // El km/horómetro a pedir depende del tipo de medición del vehículo de la orden.
+        // fecha_ejecucion ya debería estar registrada desde que se marcó EN_EJECUCION
+        // (cambiarEstado) y fecha_culminacion se fija automáticamente al culminar:
+        // ninguna de las dos es un campo del formulario.
+        // El km/horómetro final a pedir depende del tipo de medición del vehículo.
         $tipoMedicion = $this->route('orden')?->vehiculo?->tipo_medicion;
 
         return [
@@ -58,14 +58,6 @@ class EjecucionOrdenTrabajoRequest extends FormRequest
                 'min:0',
             ],
             'observacion' => ['nullable', 'string', 'max:500'],
-
-            // Detalle de repuestos / insumos / mano de obra aplicados
-            'detalles' => ['required', 'array', 'min:1'],
-            'detalles.*.id_tipo_mantenimiento' => ['required', 'exists:tipo_mantenimiento,id'],
-            'detalles.*.id_repuesto' => ['nullable', 'exists:repuesto,id'],
-            'detalles.*.detalle' => ['nullable', 'string', 'max:255'],
-            'detalles.*.cantidad' => ['required', 'integer', 'min:1'],
-            'detalles.*.costo_unitario' => ['required', 'numeric', 'min:0'],
         ];
     }
 
@@ -74,10 +66,6 @@ class EjecucionOrdenTrabajoRequest extends FormRequest
         return [
             'kilometraje_actual.required' => 'El kilometraje actual es obligatorio.',
             'horometro_actual.required' => 'El horómetro actual es obligatorio.',
-            'detalles.required' => 'Debe registrar al menos un ítem del trabajo realizado.',
-            'detalles.*.id_tipo_mantenimiento.required' => 'Cada ítem debe indicar el tipo de mantenimiento.',
-            'detalles.*.cantidad.required' => 'La cantidad es obligatoria.',
-            'detalles.*.costo_unitario.required' => 'El costo unitario es obligatorio.',
         ];
     }
 }

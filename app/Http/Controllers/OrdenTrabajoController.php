@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DetalleMantenimientoRequest;
 use App\Http\Requests\EjecucionOrdenTrabajoRequest;
 use App\Http\Requests\OrdenTrabajoRequest;
 use App\Models\DetalleMantenimiento;
@@ -14,7 +15,6 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -292,9 +292,11 @@ class OrdenTrabajoController extends Controller
     }
 
     /**
-     * Formulario para registrar la ejecución/culminación de la orden (Paso 3).
+     * Formulario para gestionar la ejecución de la orden (Paso 3): el técnico
+     * va registrando el detalle del trabajo realizado ítem por ítem, a su
+     * propio ritmo, y culmina la orden cuando termina.
      *
-     * Un técnico de mantenimiento sólo puede registrar la ejecución de las
+     * Un técnico de mantenimiento sólo puede gestionar la ejecución de las
      * órdenes que tiene asignadas.
      */
     public function createEjecucion(Request $request, OrdenTrabajo $orden): Response
@@ -303,7 +305,7 @@ class OrdenTrabajoController extends Controller
             abort(403, 'Sólo puede registrar la ejecución de las órdenes que tiene asignadas.');
         }
 
-        $orden->load(['vehiculo', 'taller']);
+        $orden->load(['vehiculo', 'taller', 'detalles.repuesto', 'detalles.tipoMantenimiento']);
 
         $tiposMantenimiento = TipoMantenimiento::select('id', 'tipo_mantenimiento')
             ->orderBy('tipo_mantenimiento')
@@ -318,44 +320,102 @@ class OrdenTrabajoController extends Controller
             'orden' => $orden,
             'tiposMantenimiento' => $tiposMantenimiento,
             'repuestos' => $repuestos,
+            // Una vez culminada (o verificada/cancelada) la orden, el detalle
+            // queda congelado: ni se agregan, editan o eliminan ítems.
+            'puedeModificar' => in_array($orden->estado_orden, ['PENDIENTE', 'EN_EJECUCION'], true),
+            'flash' => [
+                'success' => session('success'),
+                'error' => session('error'),
+            ],
         ]);
     }
 
     /**
-     * Guarda el registro de ejecución/culminación (detalle de trabajo + insumos).
+     * Registra un ítem del detalle de trabajo realizado. El técnico llama a
+     * este endpoint cada vez que completa una acción (puede ir agregando
+     * ítems de a poco, no hace falta cargarlos todos de una vez).
+     */
+    public function storeDetalle(DetalleMantenimientoRequest $request, OrdenTrabajo $orden): RedirectResponse
+    {
+        $this->assertDetalleModificable($orden);
+
+        $orden->detalles()->create($request->validated());
+
+        return redirect()->route('mantenimiento.ordenes.ejecucion.create', $orden)
+            ->with('success', 'Detalle registrado exitosamente.');
+    }
+
+    /**
+     * Corrige un ítem del detalle ya registrado (mientras la orden no esté
+     * culminada).
+     */
+    public function updateDetalle(DetalleMantenimientoRequest $request, OrdenTrabajo $orden, DetalleMantenimiento $detalle): RedirectResponse
+    {
+        $this->assertDetalleModificable($orden);
+        abort_if($detalle->id_orden_trabajo !== $orden->id, 404);
+
+        $detalle->update($request->validated());
+
+        return redirect()->route('mantenimiento.ordenes.ejecucion.create', $orden)
+            ->with('success', 'Detalle actualizado exitosamente.');
+    }
+
+    /**
+     * Elimina un ítem del detalle (mientras la orden no esté culminada).
+     */
+    public function destroyDetalle(Request $request, OrdenTrabajo $orden, DetalleMantenimiento $detalle): RedirectResponse
+    {
+        if ($this->esSoloTecnico($request->user()) && $orden->id_usuario_ejecuta !== $request->user()->id) {
+            abort(403, 'Sólo puede registrar la ejecución de las órdenes que tiene asignadas.');
+        }
+
+        $this->assertDetalleModificable($orden);
+        abort_if($detalle->id_orden_trabajo !== $orden->id, 404);
+
+        $detalle->delete();
+
+        return redirect()->route('mantenimiento.ordenes.ejecucion.create', $orden)
+            ->with('success', 'Detalle eliminado exitosamente.');
+    }
+
+    /**
+     * Culmina la ejecución de la orden: registra las lecturas finales y
+     * congela el detalle de trabajo (ya no admite más ítems ni ediciones).
      *
      * El acceso ya queda restringido a las órdenes asignadas al técnico por
      * EjecucionOrdenTrabajoRequest::authorize().
      */
-    public function storeEjecucion(EjecucionOrdenTrabajoRequest $request, OrdenTrabajo $orden): RedirectResponse
+    public function culminarEjecucion(EjecucionOrdenTrabajoRequest $request, OrdenTrabajo $orden): RedirectResponse
     {
-        DB::transaction(function () use ($request, $orden) {
-            $data = $request->safe()->except('detalles');
-            // fecha_ejecucion ya debería estar registrada desde que se marcó EN_EJECUCION
-            // (cambiarEstado); si no lo está, se completa aquí como respaldo.
-            $data['fecha_ejecucion'] = $orden->fecha_ejecucion ?? now();
-            $data['fecha_culminacion'] = now();
-            $data['estado_orden'] = 'CULMINADO';
+        $this->assertDetalleModificable($orden);
 
-            $orden->update($data);
+        if ($orden->detalles()->doesntExist()) {
+            return redirect()->back()
+                ->with('error', 'Debe registrar al menos un ítem del detalle antes de culminar la orden.');
+        }
 
-            // Eliminar detalle anterior (por si se re-envía el formulario)
-            $orden->detalles()->delete();
+        $data = $request->validated();
+        // fecha_ejecucion ya debería estar registrada desde que se marcó EN_EJECUCION
+        // (cambiarEstado); si no lo está, se completa aquí como respaldo.
+        $data['fecha_ejecucion'] = $orden->fecha_ejecucion ?? now();
+        $data['fecha_culminacion'] = now();
+        $data['estado_orden'] = 'CULMINADO';
 
-            foreach ($request->detalles as $item) {
-                DetalleMantenimiento::create([
-                    'id_orden_trabajo' => $orden->id,
-                    'id_repuesto' => $item['id_repuesto'] ?? null,
-                    'id_tipo_mantenimiento' => $item['id_tipo_mantenimiento'],
-                    'detalle' => $item['detalle'] ?? null,
-                    'cantidad' => $item['cantidad'],
-                    'costo_unitario' => $item['costo_unitario'],
-                ]);
-            }
-        });
+        $orden->update($data);
 
         return redirect()->route('mantenimiento.ordenes.show', $orden)
-            ->with('success', 'Ejecución de la orden de trabajo registrada exitosamente.');
+            ->with('success', 'Ejecución de la orden de trabajo culminada exitosamente.');
+    }
+
+    /**
+     * El detalle de trabajo sólo se puede modificar mientras la orden no
+     * esté culminada/verificada/cancelada.
+     */
+    private function assertDetalleModificable(OrdenTrabajo $orden): void
+    {
+        if (! in_array($orden->estado_orden, ['PENDIENTE', 'EN_EJECUCION'], true)) {
+            abort(403, 'La orden ya fue culminada: no se puede modificar su detalle de trabajo.');
+        }
     }
 
     /**

@@ -185,7 +185,10 @@ Route::middleware('auth')->group(function () {
 
         // Ejecución / registro de trabajo realizado (Paso 3 – Jefe de Transportes)
         Route::get('ordenes/{orden}/ejecucion', [OrdenTrabajoController::class, 'createEjecucion'])->name('ordenes.ejecucion.create');
-        Route::post('ordenes/{orden}/ejecucion', [OrdenTrabajoController::class, 'storeEjecucion'])->name('ordenes.ejecucion.store');
+        Route::post('ordenes/{orden}/ejecucion/detalles', [OrdenTrabajoController::class, 'storeDetalle'])->name('ordenes.ejecucion.detalles.store');
+        Route::put('ordenes/{orden}/ejecucion/detalles/{detalle}', [OrdenTrabajoController::class, 'updateDetalle'])->name('ordenes.ejecucion.detalles.update');
+        Route::delete('ordenes/{orden}/ejecucion/detalles/{detalle}', [OrdenTrabajoController::class, 'destroyDetalle'])->name('ordenes.ejecucion.detalles.destroy');
+        Route::post('ordenes/{orden}/ejecucion/culminar', [OrdenTrabajoController::class, 'culminarEjecucion'])->name('ordenes.ejecucion.culminar');
     });
 
     // ── Reportes de Cargas de Combustible ────────────────────────────────────

@@ -176,7 +176,7 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertNotNull($orden->fecha_ejecucion);
     }
 
-    public function test_store_ejecucion_registra_el_detalle_y_culmina_la_orden(): void
+    public function test_store_detalle_registra_un_item_del_detalle(): void
     {
         $orden = $this->crearOrden();
         $tipoMantenimiento = TipoMantenimiento::create([
@@ -185,17 +185,134 @@ class OrdenTrabajoControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)
-            ->post(route('mantenimiento.ordenes.ejecucion.store', $orden), [
+            ->post(route('mantenimiento.ordenes.ejecucion.detalles.store', $orden), [
+                'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+                'fecha' => now()->toDateString(),
+                // El vehículo de crearOrden() usa tipo_medicion "kilometraje" por
+                // defecto (VehiculoFactory), así que ese es el campo exigido.
+                'kilometraje' => 1250.5,
+                'cantidad' => 2,
+            ]);
+
+        $response->assertRedirect(route('mantenimiento.ordenes.ejecucion.create', $orden));
+        $this->assertSame(1, DetalleMantenimiento::where('id_orden_trabajo', $orden->id)->count());
+
+        $detalle = DetalleMantenimiento::first();
+        $this->assertSame($orden->id, $detalle->id_orden_trabajo);
+        $this->assertSame(2, $detalle->cantidad);
+        $this->assertSame('1250.50', (string) $detalle->kilometraje);
+    }
+
+    public function test_store_detalle_exige_la_lectura_que_corresponde_al_tipo_de_medicion_del_vehiculo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);
+        $orden = $this->crearOrden(['id_vehiculo' => $vehiculo->id]);
+        $tipoMantenimiento = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+        ]);
+
+        // El vehículo mide por horómetro: enviar kilometraje en su lugar debe
+        // fallar la validación (horometro es el campo exigido).
+        $response = $this->actingAs($this->admin)
+            ->from(route('mantenimiento.ordenes.ejecucion.create', $orden))
+            ->post(route('mantenimiento.ordenes.ejecucion.detalles.store', $orden), [
+                'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 500,
+                'cantidad' => 1,
+            ]);
+
+        $response->assertSessionHasErrors('horometro');
+        $this->assertSame(0, DetalleMantenimiento::where('id_orden_trabajo', $orden->id)->count());
+
+        $response = $this->actingAs($this->admin)
+            ->post(route('mantenimiento.ordenes.ejecucion.detalles.store', $orden), [
+                'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+                'fecha' => now()->toDateString(),
+                'horometro' => 500,
+                'cantidad' => 1,
+            ]);
+
+        $response->assertRedirect(route('mantenimiento.ordenes.ejecucion.create', $orden));
+        $this->assertSame(1, DetalleMantenimiento::where('id_orden_trabajo', $orden->id)->count());
+    }
+
+    public function test_update_detalle_permite_corregir_un_item(): void
+    {
+        $orden = $this->crearOrden();
+        $tipoMantenimiento = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+        ]);
+        $detalle = $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'fecha' => now()->toDateString(),
+            'cantidad' => 1,
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->put(route('mantenimiento.ordenes.ejecucion.detalles.update', [$orden, $detalle]), [
+                'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 1000,
+                'cantidad' => 5,
+            ]);
+
+        $response->assertRedirect(route('mantenimiento.ordenes.ejecucion.create', $orden));
+        $this->assertSame(5, $detalle->fresh()->cantidad);
+    }
+
+    public function test_destroy_detalle_elimina_un_item(): void
+    {
+        $orden = $this->crearOrden();
+        $tipoMantenimiento = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+        ]);
+        $detalle = $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'fecha' => now()->toDateString(),
+            'cantidad' => 1,
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->delete(route('mantenimiento.ordenes.ejecucion.detalles.destroy', [$orden, $detalle]));
+
+        $response->assertRedirect(route('mantenimiento.ordenes.ejecucion.create', $orden));
+        $this->assertDatabaseMissing('detalle_mantenimiento', ['id' => $detalle->id]);
+    }
+
+    public function test_culminar_ejecucion_exige_al_menos_un_item_de_detalle(): void
+    {
+        $orden = $this->crearOrden();
+
+        $response = $this->actingAs($this->admin)
+            ->post(route('mantenimiento.ordenes.ejecucion.culminar', $orden), [
+                'kilometraje_actual' => 90000,
+            ]);
+
+        $response->assertRedirect();
+        $this->assertSame('PENDIENTE', $orden->fresh()->estado_orden);
+    }
+
+    public function test_culminar_ejecucion_culmina_la_orden_con_las_lecturas_finales(): void
+    {
+        $orden = $this->crearOrden();
+        $tipoMantenimiento = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+        ]);
+        $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'fecha' => now()->toDateString(),
+            'cantidad' => 1,
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->post(route('mantenimiento.ordenes.ejecucion.culminar', $orden), [
                 'kilometraje_actual' => 90000,
                 'observacion' => 'Trabajo finalizado sin novedad',
-                'detalles' => [
-                    [
-                        'id_tipo_mantenimiento' => $tipoMantenimiento->id,
-                        'detalle' => 'Mano de obra',
-                        'cantidad' => 2,
-                        'costo_unitario' => 50,
-                    ],
-                ],
             ]);
 
         $response->assertRedirect(route('mantenimiento.ordenes.show', $orden));
@@ -204,12 +321,50 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame('CULMINADO', $orden->estado_orden);
         $this->assertNotNull($orden->fecha_culminacion);
         $this->assertNotNull($orden->fecha_ejecucion);
-        $this->assertSame(1, DetalleMantenimiento::where('id_orden_trabajo', $orden->id)->count());
+        $this->assertSame(90000, $orden->kilometraje_actual);
+    }
 
-        $detalle = DetalleMantenimiento::first();
-        $this->assertSame(2, $detalle->cantidad);
-        $this->assertSame('50.00', (string) $detalle->costo_unitario);
-        $this->assertSame(100.0, (float) $detalle->subtotal);
+    public function test_no_se_puede_modificar_el_detalle_de_una_orden_ya_culminada(): void
+    {
+        // OrdenTrabajo::boot() fuerza estado_orden = PENDIENTE al crear, así que
+        // el estado CULMINADO se fija en un segundo paso, después de crear.
+        $orden = $this->crearOrden();
+        $orden->update(['estado_orden' => 'CULMINADO']);
+        $tipoMantenimiento = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+        ]);
+        $detalle = DetalleMantenimiento::create([
+            'id_orden_trabajo' => $orden->id,
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'fecha' => now()->toDateString(),
+            'cantidad' => 1,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('mantenimiento.ordenes.ejecucion.detalles.store', $orden), [
+                'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 1000,
+                'cantidad' => 1,
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($this->admin)
+            ->put(route('mantenimiento.ordenes.ejecucion.detalles.update', [$orden, $detalle]), [
+                'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 1000,
+                'cantidad' => 9,
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($this->admin)
+            ->delete(route('mantenimiento.ordenes.ejecucion.detalles.destroy', [$orden, $detalle]))
+            ->assertForbidden();
+
+        $this->assertSame(1, $detalle->fresh()->cantidad);
+        $this->assertSame(1, DetalleMantenimiento::where('id_orden_trabajo', $orden->id)->count());
     }
 
     public function test_index_filtra_ordenes_externas(): void
@@ -403,7 +558,7 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame('VERIFICADO', $orden->fresh()->estado_orden);
     }
 
-    public function test_un_tecnico_solo_registra_la_ejecucion_de_sus_propias_ordenes(): void
+    public function test_un_tecnico_solo_gestiona_el_detalle_de_sus_propias_ordenes(): void
     {
         $tecnico = $this->crearTecnico();
         $ordenAjena = $this->crearOrden(); // asignada a otro técnico
@@ -416,17 +571,20 @@ class OrdenTrabajoControllerTest extends TestCase
             ->assertForbidden();
 
         $this->actingAs($tecnico)
-            ->post(route('mantenimiento.ordenes.ejecucion.store', $ordenAjena), [
-                'fecha_culminacion' => now()->toDateString(),
-                'detalles' => [[
-                    'id_tipo_mantenimiento' => $tipoMantenimiento->id,
-                    'detalle' => 'Mano de obra',
-                    'cantidad' => 1,
-                    'costo_unitario' => 10,
-                ]],
+            ->post(route('mantenimiento.ordenes.ejecucion.detalles.store', $ordenAjena), [
+                'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+                'fecha' => now()->toDateString(),
+                'cantidad' => 1,
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($tecnico)
+            ->post(route('mantenimiento.ordenes.ejecucion.culminar', $ordenAjena), [
+                'kilometraje_actual' => 90000,
             ])
             ->assertForbidden();
 
         $this->assertSame('PENDIENTE', $ordenAjena->fresh()->estado_orden);
+        $this->assertSame(0, DetalleMantenimiento::where('id_orden_trabajo', $ordenAjena->id)->count());
     }
 }

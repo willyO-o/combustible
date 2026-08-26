@@ -195,8 +195,8 @@ class RepuestoControllerTest extends TestCase
             'id_orden_trabajo' => $orden->id,
             'id_repuesto' => $repuesto->id,
             'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'fecha' => now()->toDateString(),
             'cantidad' => 2,
-            'costo_unitario' => 50,
         ]);
 
         $response = $this->delete(route('repuestos.destroy', $repuesto->id));

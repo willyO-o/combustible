@@ -6,16 +6,20 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Línea de detalle de una orden de trabajo: repuesto/insumo o mano de obra
- * aplicada, con su cantidad y costo unitario. Reemplaza a MantenimientoRepuesto.
+ * Línea de detalle de una orden de trabajo: un repuesto/insumo aplicado (o
+ * una acción de mano de obra sin repuesto asociado) en una fecha puntual,
+ * con la lectura de horómetro/kilometraje del vehículo en ese momento.
+ * Reemplaza a MantenimientoRepuesto. El técnico va registrando estas líneas
+ * una a una a medida que avanza el trabajo (ver OrdenTrabajoController).
  */
 #[Fillable([
     'id_orden_trabajo',
     'id_repuesto',
     'id_tipo_mantenimiento',
-    'detalle',
+    'fecha',
+    'horometro',
+    'kilometraje',
     'cantidad',
-    'costo_unitario',
 ])]
 class DetalleMantenimiento extends Model
 {
@@ -24,15 +28,10 @@ class DetalleMantenimiento extends Model
     protected function casts(): array
     {
         return [
-            'costo_unitario' => 'decimal:2',
+            'fecha' => 'date',
+            'horometro' => 'decimal:2',
+            'kilometraje' => 'decimal:2',
         ];
-    }
-
-    protected $appends = ['subtotal'];
-
-    public function getSubtotalAttribute()
-    {
-        return round($this->cantidad * $this->costo_unitario, 2);
     }
 
     // Relaciones

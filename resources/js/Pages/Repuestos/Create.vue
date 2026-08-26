@@ -99,6 +99,7 @@ function submit() {
                                 <option value="CAJA">CAJA</option>
                                 <option value="BOLSA">BOLSA</option>
                                 <option value="PAQUETE">PAQUETE</option>
+                                <option value="OTRO">OTRO</option>
                             </select>
                             <div v-if="form.errors.unidad_medida" class="invalid-feedback">
                                 {{ form.errors.unidad_medida }}

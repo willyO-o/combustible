@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('nombre_repuesto', 200);
             $table->string('codigo_repuesto', 100)->unique();
             $table->text('descripcion_repuesto')->nullable();
-            $table->enum('unidad_medida', ['UNIDAD', 'LITRO', 'KILOGRAMO', 'METRO', 'JUEGO','CAJA','BOLSA','PAQUETE'])->default('UNIDAD');
+            $table->enum('unidad_medida', ['UNIDAD', 'LITRO', 'KILOGRAMO', 'METRO', 'JUEGO', 'CAJA', 'BOLSA', 'PAQUETE', 'OTRO'])->default('UNIDAD');
             $table->integer('stock_actual')->default(0);
             $table->enum('estado_repuesto', ['ACTIVO', 'INACTIVO', 'AGOTADO'])->default('ACTIVO');
             $table->timestamps();
