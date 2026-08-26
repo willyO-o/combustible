@@ -205,6 +205,10 @@ const tipoBadge = (tipo) =>
                                         <button type="button" class="btn btn-sm btn-icon btn-primary-light" title="Ver detalle" @click="verDetalle(carga)">
                                             <i class="ri-eye-line"></i>
                                         </button>
+                                        <Link :href="route('cargas.comprobante', carga.id)" target="_blank"
+                                            class="btn btn-sm btn-icon btn-warning-light" title="Imprimir comprobante de egreso">
+                                            <i class="ri-printer-line"></i>
+                                        </Link>
                                         <Link  v-if="carga.estado != 'REGISTRADO'" v-can="'cargas-combustible.editar'" :href="route('cargas.edit', carga.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>

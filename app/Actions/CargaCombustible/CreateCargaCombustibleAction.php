@@ -40,7 +40,9 @@ class CreateCargaCombustibleAction
                 $datos['precio'] = $vale->precio;
                 $datos['tipo_carga'] = 'VALE';
 
+
                 $cargaCombustible = CargaCombustible::create($datos);
+
 
                 $vale->update([
                     'estado_vale' => 'USADO',

@@ -14,6 +14,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/ConductorController.php,app/Models/Conductor.php,app/Http/Requests/ConductorRequest.php | .ai/rules/http-requests.md |
 | app/Http/**/*.php | .ai/rules/http.md |
 | resources/js/**/*.vue | .ai/rules/js.md |
+| app/Libraries/Reportes.php,app/Http/Controllers/CargaCombustibleController.php | .ai/rules/libraries-http-controllers.md |
 | app/Libraries/*.php | .ai/rules/libraries.md |
 | database/migrations/*.php | .ai/rules/migrations.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Models/CargaMaterial.php,app/Models/Viaje.php | .ai/rules/models-models.md |

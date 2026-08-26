@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\CargaCombustible\CreateCargaCombustibleAction;
 use App\Actions\CargaCombustible\ListCargaCombustibleAction;
 use App\Http\Requests\CargaCombustibleRequest;
+use App\Libraries\Reportes;
 use App\Models\CargaCombustible;
 use App\Models\Grifo;
 use App\Models\RespaldoDigital;
@@ -117,9 +118,10 @@ class CargaCombustibleController extends Controller
     public function store(CargaCombustibleRequest $request, CreateCargaCombustibleAction $action): RedirectResponse
     {
 
+
         try {
             $carga = $action->execute($request);
-
+            // dd($carga);
             return redirect()->route('cargas.index')
                 ->with('success', 'Carga de combustible registrada exitosamente.');
         } catch (\Exception $e) {
@@ -207,6 +209,22 @@ class CargaCombustibleController extends Controller
 
         return redirect()->route('cargas.index')
             ->with('success', 'Carga de combustible eliminada exitosamente.');
+    }
+
+    /**
+     * Comprobante de egreso de combustible en PDF, emitido después de
+     * registrar la carga (ver Reportes::generarComprobanteEgreso()).
+     */
+    public function imprimirComprobante(CargaCombustible $carga)
+    {
+        $carga->load(['vehiculo.tipoVehiculo', 'conductor.persona', 'tipoCombustible']);
+
+        $contenido = (new Reportes)->generarComprobanteEgreso($carga, 'S');
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="comprobante_egreso_'.str_replace('/', '-', (string) $carga->nro).'.pdf"',
+        ]);
     }
 
     /* ------------------------------------------------------------------ */

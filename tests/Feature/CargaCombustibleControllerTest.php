@@ -2,15 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Models\Area;
 use App\Models\CargaCombustible;
 use App\Models\Conductor;
+use App\Models\EncargadoArea;
 use App\Models\Grifo;
 use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoCombustible;
+use App\Models\TipoVehiculo;
 use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -444,5 +448,81 @@ class CargaCombustibleControllerTest extends TestCase
         $response->assertSessionDoesntHaveErrors();
         $response->assertRedirect(route('cargas.index'));
         $this->assertSame('VALE', $carga->fresh()->tipo_carga);
+    }
+
+    public function test_imprime_el_comprobante_de_egreso_de_una_carga_de_combustible(): void
+    {
+        $this->crearParametrosEmpresa();
+
+        $tipoVehiculo = TipoVehiculo::factory()->create(['tipo_vehiculo' => 'Camioneta']);
+        $vehiculo = Vehiculo::factory()->create(['id_tipo_vehiculo' => $tipoVehiculo->id]);
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        $area = Area::factory()->create();
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        EncargadoArea::create([
+            'id_persona' => $conductor->persona->id,
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now()->subMonth(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+
+        $carga = CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => 30,
+            'precio' => 6.96,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+            'concepto' => 'Trabajos administrativos',
+        ]);
+
+        $response = $this->get(route('cargas.comprobante', $carga->id));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    /**
+     * Un vehículo sin área asignada no debe romper la generación del PDF:
+     * los campos Área/Encargado de área quedan en "N/A".
+     */
+    public function test_imprime_el_comprobante_de_egreso_cuando_el_vehiculo_no_tiene_area_asignada(): void
+    {
+        $this->crearParametrosEmpresa();
+
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        $carga = CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => 30,
+            'precio' => 6.96,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $response = $this->get(route('cargas.comprobante', $carga->id));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
     }
 }

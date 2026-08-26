@@ -160,6 +160,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/cargas-combustible/vehiculo-info/{id}', [CargaCombustibleController::class, 'vehiculoInfo'])->name('cargas.vehiculo-info');
     Route::get('/search/vales-carga', [CargaCombustibleController::class, 'searchVales'])->name('search.vales-carga');
     Route::get('cargas/{carga}/detalle', [CargaCombustibleController::class, 'detalle'])->name('cargas.detalle');
+    Route::get('cargas/{carga}/comprobante', [CargaCombustibleController::class, 'imprimirComprobante'])->name('cargas.comprobante');
     Route::resource('cargas', CargaCombustibleController::class)
         ->parameters(['cargas' => 'carga']);
 

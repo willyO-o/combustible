@@ -174,6 +174,140 @@ class Reportes extends FPDF
         return $this->Output($modo, $nombreArchivo ?? 'vale_'.str_replace('/', '-', (string) $numeroVale).'.pdf');
     }
 
+    /**
+     * Comprobante de egreso de combustible: se emite después de registrar una
+     * carga de combustible (módulo Cargas de Combustible). Usa el mismo
+     * esquema que generarVale() — el fondo trae impresos los cuadros,
+     * etiquetas, líneas e íconos; aquí sólo se ubica el texto dinámico.
+     *
+     * @param  string  $modo  Ver docblock de generarVale().
+     */
+    public function generarComprobanteEgreso($carga, string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        // ==========================================================
+        // DATOS
+        // ==========================================================
+        $numeroComprobante = $carga->nro; // Correlativo formateado (nro_carga/gestion)
+        $fecha = $carga->fecha_carga?->format('d/m/Y');
+
+        $vehiculo = $carga->vehiculo;
+        // Área asignada al vehículo (si tiene) y su encargado activo, para
+        // dejar constancia de a qué área/jefe corresponde el gasto.
+        $area = $vehiculo?->areasAsignadas()->first();
+        $encargadoArea = $area?->encargadosActivos()->first();
+
+        $areaNombre = $area?->nombre_area ?? 'N/A';
+        $encargadoNombre = $encargadoArea?->nombre_completo ?? 'N/A';
+        $automovil = trim(($vehiculo?->tipoVehiculo?->tipo_vehiculo ?? '').' '.($vehiculo?->nro_placa ?? ''));
+        $conductorNombre = $carga->conductor?->persona?->nombre_completo ?? 'N/A';
+        $concepto = $carga->concepto ?: 'N/A';
+
+        $tipoCombustible = $carga->tipoCombustible->tipo_combustible;
+        $litros = $carga->litros;
+        $precioUnitario = $carga->precio;
+        $total = round($litros * $precioUnitario, 2);
+
+        // Colores (consistentes con generarVale)
+        $azul = [1, 82, 145];
+        $negro = [30, 30, 30];
+        $blanco = [255, 255, 255];
+
+        $pageW = 215.9;
+        $pageH = 279.4;
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(5, 5, 5);
+        $this->SetAutoPageBreak(false);
+
+        // ----------------------------------------------------------
+        // FONDO (diseño completo tamaño carta: cuadros, tabla, líneas e
+        // íconos ya vienen impresos en la imagen; aquí sólo se ubica el
+        // texto).
+        // ----------------------------------------------------------
+        $this->Image(public_path('images/reportes/fondo-comprobante-egreso.png'), 0, 0, $pageW, $pageH);
+
+        // ----------------------------------------------------------
+        // ENCABEZADO: logo, título, correlativo y fecha
+        // ----------------------------------------------------------
+        $this->Image(public_path('images/logo/logo-min.png'), 8, 8, 40);
+
+        $this->SetXY(50, 8);
+        $this->SetFont('Arial', 'B', 18);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->Cell(105, 9, utf8Decode('COMPROBANTE DE EGRESO'), 0, 2, 'C');
+        $this->SetX(50);
+        $this->Cell(105, 9, utf8Decode('DE COMBUSTIBLE'), 0, 2, 'C');
+
+        // Nro. de comprobante, sobre el recuadro azul relleno del encabezado
+        $this->SetXY(159, 13.2);
+        $this->SetFont('Arial', 'B', 13);
+        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
+        $this->Cell(27, 6, utf8Decode($numeroComprobante), 0, 0, 'C');
+
+        // Fecha, debajo de la etiqueta "FECHA:" impresa en el fondo (a la
+        // derecha, sobre el ícono del surtidor, no hay espacio suficiente)
+        $this->SetXY(159, 29);
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->Cell(34, 5, utf8Decode($fecha), 0, 0, 'L');
+
+        // ----------------------------------------------------------
+        // CUADRO SUPERIOR: área, encargado, automóvil, conductor y
+        // concepto (etiquetas ya impresas en el fondo; cada valor va
+        // sobre su línea correspondiente).
+        // ----------------------------------------------------------
+        $valX = 24;
+        $valW = 208.73 - 4 - $valX;
+
+        $filas = [
+            [52.5, 4, $areaNombre],
+            [68.7, 3.5, $encargadoNombre],
+            [80, 4, $automovil],
+            [91.8, 4, $conductorNombre],
+            [104, 4.5, $concepto],
+        ];
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        foreach ($filas as [$y, $h, $valor]) {
+            $this->SetXY($valX, $y);
+            $this->Cell($valW, $h, utf8Decode(mb_strtoupper($valor)), 0, 0, 'L');
+        }
+
+        // ----------------------------------------------------------
+        // TABLA: única línea de concepto (la carga de combustible
+        // registrada). CargaCombustible sólo admite un tipo de
+        // combustible por registro, así que siempre es una sola fila.
+        // ----------------------------------------------------------
+        $this->SetFont('Arial', 'B', 10);
+        $this->SetXY(10.5, 130);
+        $this->Cell(100, 6, utf8Decode(mb_strtoupper($tipoCombustible)), 0, 0, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetXY(117.48, 130);
+        $this->Cell(30.1, 6, number_format($litros, 2, ',', '.').' LT', 0, 0, 'C');
+
+        $this->SetXY(147.58, 130);
+        $this->Cell(29.98, 6, number_format($precioUnitario, 2, ',', '.'), 0, 0, 'C');
+
+        $this->SetXY(177.56, 130);
+        $this->Cell(31.14, 6, 'Bs '.number_format($total, 2, ',', '.'), 0, 0, 'C');
+
+        // Total estimado: la franja "TOTAL ESTIMADO" sólo trae relleno azul
+        // del lado de la etiqueta; el lado del valor queda en blanco, así
+        // que el monto va en color oscuro, no blanco.
+        $this->SetFont('Arial', 'B', 13);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->SetXY(80, 205);
+        $this->Cell(125, 7, 'Bs '.number_format($total, 2, ',', '.'), 0, 0, 'R');
+
+        // Salida del PDF
+        // El '/' de $numeroComprobante ("NNNNNN/GESTION") no es válido dentro
+        // de un nombre de archivo, así que se reemplaza por '-' sólo para el
+        // nombre sugerido.
+        return $this->Output($modo, $nombreArchivo ?? 'comprobante_egreso_'.str_replace('/', '-', (string) $numeroComprobante).'.pdf');
+    }
+
     public function getBase64Qr($text, $size = 400, $format = 'png', $qualy = 'Q', $logoPath = '', $margin = 0)
     {
 
