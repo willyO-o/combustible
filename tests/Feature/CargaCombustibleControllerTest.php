@@ -72,6 +72,74 @@ class CargaCombustibleControllerTest extends TestCase
         ]);
     }
 
+    /**
+     * El listado sin fecha_desde/fecha_hasta en el request debe llegar ya
+     * filtrado por "Este mes" desde el servidor (1º del mes actual -> hoy):
+     * evita que el frontend tenga que disparar una segunda petición para
+     * aplicar el rango por defecto de DateRangeFilter.vue.
+     */
+    public function test_index_filtra_por_defecto_el_mes_actual(): void
+    {
+        $this->crearParametrosEmpresa();
+
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        $cargaDeEsteMes = CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => 50,
+            'precio' => 10,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $cargaDelMesPasado = CargaCombustible::create([
+            'fecha_carga' => now()->subMonth(),
+            'litros' => 30,
+            'precio' => 10,
+            'kilometraje' => 900,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $response = $this->get(route('cargas.index'));
+
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.fecha_desde', now()->startOfMonth()->format('Y-m-d'))
+                ->where('filters.fecha_hasta', now()->format('Y-m-d'))
+            );
+
+        $ids = collect($response->original->getData()['page']['props']['cargas']['data'])->pluck('id');
+        $this->assertTrue($ids->contains($cargaDeEsteMes->id));
+        $this->assertFalse($ids->contains($cargaDelMesPasado->id));
+
+        // Limpiar el filtro (fecha_desde/fecha_hasta explícitos, no ausentes)
+        // debe mostrar de nuevo la carga del mes pasado.
+        $response = $this->get(route('cargas.index', ['fecha_desde' => '', 'fecha_hasta' => '']));
+
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.fecha_desde', null)
+                ->where('filters.fecha_hasta', null)
+            );
+
+        $ids = collect($response->original->getData()['page']['props']['cargas']['data'])->pluck('id');
+        $this->assertTrue($ids->contains($cargaDeEsteMes->id));
+        $this->assertTrue($ids->contains($cargaDelMesPasado->id));
+    }
+
     public function test_muestra_el_detalle_de_una_carga_de_combustible_tipo_prepago(): void
     {
         $this->crearParametrosEmpresa();

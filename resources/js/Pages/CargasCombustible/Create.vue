@@ -526,10 +526,10 @@ onMounted(() => {
 
                                 <!-- Grifo -->
                                 <div class="col-sm-6">
-                                    <label class="form-label fw-medium">Grifo <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-medium">Surtidor <span class="text-danger">*</span></label>
                                     <Multiselect v-model="form.id_grifo" :options="grifos" value-prop="id" label="label"
-                                        :searchable="true" :filter-results="true" placeholder="Buscar grifo..."
-                                        no-options-text="Sin grifos activos" no-results-text="Sin resultados"
+                                        :searchable="true" :filter-results="true" placeholder="Buscar surtidor..."
+                                        no-options-text="Sin resultados" no-results-text="Sin resultados"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_grifo }" />
                                     <div v-if="form.errors.id_grifo" class="text-danger small mt-1">{{
                                         form.errors.id_grifo }}</div>
@@ -755,7 +755,7 @@ onMounted(() => {
                                     <label class="form-label fw-medium">A utilizarse en:</label>
                                     <input v-model="form.concepto" type="text" class="form-control" :disabled="isEdit"
                                         :class="{ 'is-invalid': form.errors.concepto }"
-                                        placeholder="Ej: Traslado de personal a planta norte..." maxlength="255" />
+                                        placeholder="Ej: Operaciones de planta..." maxlength="255" />
                                     <div v-if="form.errors.concepto" class="invalid-feedback">{{ form.errors.concepto }}</div>
                                 </div>
 

@@ -31,8 +31,11 @@ watch(filters, (val) => {
     debounceTimer = setTimeout(() => {
         router.get(route('operacion-diaria.index'), {
             nro_placa: val.nro_placa || undefined,
-            fecha_desde: val.fecha_desde || undefined,
-            fecha_hasta: val.fecha_hasta || undefined,
+            // Sin "|| undefined": si el usuario limpia el filtro debe viajar
+            // como '' explícito (no ausente), o el backend reaplicaría el
+            // rango por defecto ("Este mes") al no encontrar la clave en el request.
+            fecha_desde: val.fecha_desde,
+            fecha_hasta: val.fecha_hasta,
             id_conductor: val.id_conductor || undefined,
             estado_operacion: val.estado_operacion || undefined,
         }, { preserveState: true, replace: true })

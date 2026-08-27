@@ -153,3 +153,14 @@
 .daterangepicker td.disabled {
     color: var(--text-muted);
 }
+
+/* Vales/Index.vue: tarjetas del listado para tablet/celular (breakpoints.smaller('lg')). */
+.vale-card-mobile {
+    cursor: pointer;
+    background-color: var(--custom-white);
+    border-color: var(--default-border) !important;
+    transition: background-color .15s ease;
+}
+.vale-card-mobile:active {
+    background-color: var(--primary01);
+}

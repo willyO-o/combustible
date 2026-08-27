@@ -6,9 +6,16 @@ import ValeDetalleModal from '@/Components/ValeDetalleModal.vue'
 import { getExpirationStatus, formatDate } from '@/Utils/dateUtil'
 import { confirm } from '@/Utils/alertUtil.js'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 
 defineOptions({ layout: Maindashboard })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas en vez de la tabla: más fácil de leer/tocar en
+// pantallas angostas que una tabla de 11 columnas con scroll horizontal.
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const props = defineProps({
     vales: Object,
@@ -33,8 +40,12 @@ watch(
                 route('vales.index'),
                 {
                     nro_vale: val.nro_vale || undefined,
-                    fecha_desde: val.fecha_desde || undefined,
-                    fecha_hasta: val.fecha_hasta || undefined,
+                    // Sin "|| undefined": si el usuario limpia el filtro debe
+                    // viajar como '' explícito (no ausente), o el backend
+                    // reaplicaría el rango por defecto ("Este mes") al no
+                    // encontrar la clave en el request.
+                    fecha_desde: val.fecha_desde,
+                    fecha_hasta: val.fecha_hasta,
                     estado_vale: val.estado_vale || undefined,
                 },
                 { preserveState: true, replace: true },
@@ -154,9 +165,10 @@ const puedeUsarse = (vale) =>
                 </span>
             </div>
         </div>
-        <div class="card-body p-0">
+        <!-- Vista tabla: desktop -->
+        <div v-if="!isMobile" class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover text-nowrap mb-0">
+                <table class="table table-hover text-wrap mb-0">
                     <thead class="table-light">
                         <tr>
                             <th>Nro. Vale</th>
@@ -247,6 +259,103 @@ const puedeUsarse = (vale) =>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Vista tarjetas: tablet y celular (más fácil de leer/tocar que
+             una tabla de 11 columnas con scroll horizontal) -->
+        <div v-else class="card-body p-2">
+            <div v-if="vales.data.length === 0" class="text-center py-4 text-muted">
+                <i class="ri-file-list-3-line fs-3 d-block mb-2"></i>
+                No se encontraron vales
+            </div>
+
+            <div class="d-flex flex-column gap-2">
+                <div v-for="vale in vales.data" :key="vale.id" class="vale-card-mobile border rounded-3 p-3"
+                    @click="openDetalle(vale.id)">
+
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="badge bg-primary fs-13 fw-semibold">{{ vale.nro }}</span>
+                        <span class="badge" :class="estadoBadge(vale.estado_vale)">{{ vale.estado_vale }}</span>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="fw-semibold">
+                            {{ vale.vehiculo?.codigo ?? '—' }} — {{ vale.vehiculo?.nro_placa ?? '—' }}
+                        </div>
+                        <small v-if="vale.vehiculo?.marca" class="text-muted">{{ vale.vehiculo.marca }}</small>
+                    </div>
+
+                    <div class="row g-2 small mb-2">
+                        <div class="col-6">
+                            <span class="text-muted d-block">Conductor</span>
+                            <span>{{ vale.conductor ? `${vale.conductor.persona.nombre_completo}`.trim() : '—' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Estación de servicio</span>
+                            <span>{{ vale.grifo?.razon_social ?? '—' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Emisión</span>
+                            <span>{{ formatDate(vale.fecha_emision, true) }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Vencimiento</span>
+                            <span :class="`text-${getExpirationStatus(vale.fecha_vencimiento).color}`">
+                                {{ getExpirationStatus(vale.fecha_vencimiento).text }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between border-top pt-2">
+                        <div class="small">
+                            <span class="fw-medium">{{ Number(vale.litros).toFixed(2) }} Lt</span>
+                            <span class="text-muted mx-1">×</span>
+                            <span class="fw-medium">Bs {{ Number(vale.precio).toFixed(2) }}</span>
+                            <div class="fw-bold">
+                                Bs {{ (Number(vale.litros) * Number(vale.precio)).toFixed(2) }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-1" @click.stop>
+                            <Link v-can="'cargas-combustible.registrar'" v-if="puedeUsarse(vale)"
+                                :href="route('cargas.create', { vale: vale.id })"
+                                class="btn btn-icon btn-success-light" title="Usar vale (registrar carga)">
+                                <i class="ri-gas-station-line"></i>
+                            </Link>
+
+                            <div class="dropdown">
+                                <button type="button" class="btn btn-icon btn-light" data-bs-toggle="dropdown"
+                                    aria-expanded="false" title="Más acciones">
+                                    <i class="ri-more-2-fill"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="javascript:void(0);" @click="openDetalle(vale.id)">
+                                            <i class="ri-eye-line me-2"></i> Ver detalles
+                                        </a>
+                                    </li>
+                                    <li v-if="vale.estado_vale != 'USADO'" v-can="'vales.editar'">
+                                        <Link class="dropdown-item" :href="route('vales.edit', vale.id)">
+                                            <i class="ri-edit-line me-2"></i> Editar
+                                        </Link>
+                                    </li>
+                                    <li v-can="'vales.imprimir'">
+                                        <a class="dropdown-item" :href="route('vales.imprimir', vale.id)" target="_blank">
+                                            <i class="ri-printer-line me-2"></i> Imprimir
+                                        </a>
+                                    </li>
+                                    <li v-if="vale.estado_vale != 'USADO'" v-can="'vales.eliminar'">
+                                        <a class="dropdown-item text-danger" href="javascript:void(0);"
+                                            @click="confirmDelete(vale)">
+                                            <i class="ri-delete-bin-line me-2"></i> Eliminar
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

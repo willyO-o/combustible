@@ -34,8 +34,11 @@ watch(filtros, (val) => {
     clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
         router.get(route('cargas-combustible.reporte.rendimiento'), {
-            fecha_inicio: val.fecha_inicio || undefined,
-            fecha_fin: val.fecha_fin || undefined,
+            // Sin "|| undefined": si el usuario limpia el filtro debe viajar
+            // como '' explícito (no ausente), o el backend reaplicaría el
+            // rango por defecto ("Este mes") al no encontrar la clave en el request.
+            fecha_inicio: val.fecha_inicio,
+            fecha_fin: val.fecha_fin,
             id_vehiculo: val.id_vehiculo.length ? val.id_vehiculo : undefined,
             id_tipo_combustible: val.id_tipo_combustible || undefined,
             id_area: val.id_area || undefined,

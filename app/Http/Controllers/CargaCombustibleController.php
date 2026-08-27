@@ -27,7 +27,14 @@ class CargaCombustibleController extends Controller
 
     public function index(Request $request, ListCargaCombustibleAction $listCargaCombustibleAction): Response
     {
-        $filters = $request->only(['nro_placa', 'fecha_desde', 'fecha_hasta', 'tipo_carga', 'estado_carga']);
+        $filters = $request->only(['nro_placa', 'tipo_carga', 'estado_carga']);
+        // Por defecto "Este mes" (1º del mes actual -> hoy), igual que el preset
+        // seleccionado por defecto en DateRangeFilter.vue: así la primera carga
+        // de la página ya llega filtrada del servidor y se evita la doble
+        // petición que causaba el propio componente al autoseleccionar el
+        // rango en el cliente después del primer render.
+        $filters['fecha_desde'] = $request->input('fecha_desde', now()->startOfMonth()->format('Y-m-d'));
+        $filters['fecha_hasta'] = $request->input('fecha_hasta', now()->format('Y-m-d'));
 
         $cargas = $listCargaCombustibleAction->execute($filters, $request->user(), $request->input('per_page', 10));
 
@@ -118,9 +125,9 @@ class CargaCombustibleController extends Controller
     public function store(CargaCombustibleRequest $request, CreateCargaCombustibleAction $action): RedirectResponse
     {
 
-
         try {
             $carga = $action->execute($request);
+
             // dd($carga);
             return redirect()->route('cargas.index')
                 ->with('success', 'Carga de combustible registrada exitosamente.');

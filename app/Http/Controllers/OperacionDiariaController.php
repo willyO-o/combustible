@@ -26,7 +26,14 @@ class OperacionDiariaController extends Controller
         ListOperacionesDiariasAction $listAction
     ) {
 
-        $filters = $request->only(['nro_placa', 'fecha_desde', 'fecha_hasta', 'id_conductor', 'estado_operacion']);
+        $filters = $request->only(['nro_placa', 'id_conductor', 'estado_operacion']);
+        // Por defecto "Este mes" (1º del mes actual -> hoy), igual que el preset
+        // seleccionado por defecto en DateRangeFilter.vue: así la primera carga
+        // de la página ya llega filtrada del servidor y se evita la doble
+        // petición que causaba el propio componente al autoseleccionar el
+        // rango en el cliente después del primer render.
+        $filters['fecha_desde'] = $request->input('fecha_desde', now()->startOfMonth()->format('Y-m-d'));
+        $filters['fecha_hasta'] = $request->input('fecha_hasta', now()->format('Y-m-d'));
 
         $actividades = $listAction->execute($filters, $request->user());
 

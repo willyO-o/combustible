@@ -27,7 +27,14 @@ class ValeController extends Controller
 
     public function index(Request $request, ListValeAction $listValeAction): Response
     {
-        $filters = $request->only(['nro_vale', 'fecha_desde', 'fecha_hasta', 'estado_vale', 'id_conductor']);
+        $filters = $request->only(['nro_vale', 'estado_vale', 'id_conductor']);
+        // Por defecto "Este mes" (1º del mes actual -> hoy), igual que el preset
+        // seleccionado por defecto en DateRangeFilter.vue: así la primera carga
+        // de la página ya llega filtrada del servidor y se evita la doble
+        // petición que causaba el propio componente al autoseleccionar el
+        // rango en el cliente después del primer render.
+        $filters['fecha_desde'] = $request->input('fecha_desde', now()->startOfMonth()->format('Y-m-d'));
+        $filters['fecha_hasta'] = $request->input('fecha_hasta', now()->format('Y-m-d'));
 
         $vales = $listValeAction->execute($filters, $request->user());
 

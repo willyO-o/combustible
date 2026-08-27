@@ -146,6 +146,73 @@ class OperacionDiariaControllerTest extends TestCase
         );
     }
 
+    /**
+     * El listado sin fecha_desde/fecha_hasta en el request debe llegar ya
+     * filtrado por "Este mes" desde el servidor (1º del mes actual -> hoy):
+     * evita que el frontend tenga que disparar una segunda petición para
+     * aplicar el rango por defecto de DateRangeFilter.vue.
+     */
+    public function test_index_filtra_por_defecto_el_mes_actual(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+
+        $vehiculo = Vehiculo::factory()->create();
+        $area = Area::factory()->create();
+        [, $conductor] = $this->crearConductorConUsuario();
+
+        $operacionDeEsteMes = OperacionDiaria::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_area' => $area->id,
+            'turno' => 'DIA',
+            'fecha_inicio' => now()->subHours(4),
+            'fecha_fin' => now(),
+            'kilometraje_inicio' => 1000,
+            'kilometraje_fin' => 1050,
+            'estado' => 'PENDIENTE',
+        ]);
+
+        $operacionDelMesPasado = OperacionDiaria::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_area' => $area->id,
+            'turno' => 'DIA',
+            'fecha_inicio' => now()->subMonth()->subHours(4),
+            'fecha_fin' => now()->subMonth(),
+            'kilometraje_inicio' => 900,
+            'kilometraje_fin' => 950,
+            'estado' => 'PENDIENTE',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('operacion-diaria.index'));
+
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.fecha_desde', now()->startOfMonth()->format('Y-m-d'))
+                ->where('filters.fecha_hasta', now()->format('Y-m-d'))
+            );
+
+        $ids = collect($response->original->getData()['page']['props']['actividades']['data'])->pluck('id');
+        $this->assertTrue($ids->contains($operacionDeEsteMes->id));
+        $this->assertFalse($ids->contains($operacionDelMesPasado->id));
+
+        // Limpiar el filtro (fecha_desde/fecha_hasta explícitos, no ausentes)
+        // debe mostrar de nuevo la operación del mes pasado.
+        $response = $this->actingAs($admin)
+            ->get(route('operacion-diaria.index', ['fecha_desde' => '', 'fecha_hasta' => '']));
+
+        $response->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.fecha_desde', null)
+                ->where('filters.fecha_hasta', null)
+            );
+
+        $ids = collect($response->original->getData()['page']['props']['actividades']['data'])->pluck('id');
+        $this->assertTrue($ids->contains($operacionDeEsteMes->id));
+        $this->assertTrue($ids->contains($operacionDelMesPasado->id));
+    }
+
     public function test_un_administrador_ve_todos_los_vehiculos_activos_sin_filtro(): void
     {
         $admin = User::factory()->create();
