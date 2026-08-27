@@ -73,9 +73,7 @@ class SolicitudMantenimientoController extends Controller
      */
     public function create(Request $request): Response
     {
-        if (! $request->user()->hasRole('conductor')) {
-            abort(403, 'Sólo los conductores pueden registrar solicitudes de mantenimiento.');
-        }
+
 
         $conductores = Conductor::join('persona', 'conductor.id', '=', 'persona.id')
             ->orderBy('persona.nombres')

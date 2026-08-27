@@ -127,7 +127,7 @@ const tipoBadge = (tipo) => {
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Solicitudes de Mantenimiento</h1>
             </div>
-            <Link v-if="esUsuarioConductor" v-can="'mantenimiento.solicitudes.crear'" :href="route('mantenimiento.solicitudes.create')"
+            <Link v-can="'mantenimiento.solicitudes.crear'" :href="route('mantenimiento.solicitudes.create')"
                 class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nueva Solicitud
             </Link>

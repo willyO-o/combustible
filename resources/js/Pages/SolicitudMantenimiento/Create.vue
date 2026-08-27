@@ -14,7 +14,7 @@ const props = defineProps({
 // cuando hay muchos vehículos registrados.
 const vehiculosOpt = computed(() => props.vehiculos.map((v) => ({
     id: v.id,
-    label: `${v.codigo} – ${v.nro_placa} – ${v.marca}`,
+    label: `${v.codigo} – ${v.nro_placa ?? ''} – ${v.marca}`,
 })))
 
 // El conductor y la fecha/hora de la solicitud se asignan automáticamente
