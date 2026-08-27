@@ -518,6 +518,39 @@ class CargaCombustibleControllerTest extends TestCase
         $this->assertSame('VALE', $carga->fresh()->tipo_carga);
     }
 
+    /**
+     * El select de vales al elegir un vehículo (Create.vue::cambioVehiculo)
+     * sólo debe ofrecer vales PENDIENTE y vigentes: ni USADO/ANULADO ni
+     * vencidos, aunque sigan PENDIENTE (ver también CargaCombustibleRequest,
+     * que ya exigía esto al guardar).
+     */
+    public function test_search_vales_excluye_vencidos_usados_y_anulados(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        $valeVigente = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible);
+
+        $valeVencido = Vale::create([
+            'litros' => 40, 'precio' => 9.5,
+            'id_vehiculo' => $vehiculo->id, 'id_conductor' => $conductor->id, 'id_grifo' => $grifo->id,
+            'estado_vale' => 'PENDIENTE', 'id_tipo_combustible' => $tipoCombustible->id,
+        ]);
+        $valeVencido->update(['fecha_vencimiento' => now()->subDay()]);
+
+        $valeUsado = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible, ['estado_vale' => 'USADO']);
+
+        $response = $this->getJson(route('search.vales-carga', ['id_vehiculo' => $vehiculo->id]));
+
+        $response->assertOk();
+        $ids = collect($response->json())->pluck('id');
+        $this->assertTrue($ids->contains($valeVigente->id));
+        $this->assertFalse($ids->contains($valeVencido->id));
+        $this->assertFalse($ids->contains($valeUsado->id));
+    }
+
     public function test_destroy_elimina_una_carga_prepago(): void
     {
         $this->crearParametrosEmpresa();

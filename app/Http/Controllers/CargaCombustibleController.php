@@ -77,6 +77,7 @@ class CargaCombustibleController extends Controller
 
             $valesConductor = Vale::with(['grifo', 'tipoCombustible'])
                 ->where('estado_vale', 'PENDIENTE')
+                ->where('fecha_vencimiento', '>', now())
                 ->where('id_conductor', $conductor->id)
                 ->orderBy('fecha_emision', 'desc')
                 ->get()->map(fn ($v) => [
@@ -443,7 +444,9 @@ class CargaCombustibleController extends Controller
         if (! $q && ! $idVehiculo) {
             return response()->json([]);
         }
-        $query = Vale::with(['conductor.persona', 'grifo', 'tipoCombustible'])->where('estado_vale', 'PENDIENTE');
+        $query = Vale::with(['conductor.persona', 'grifo', 'tipoCombustible'])
+            ->where('estado_vale', 'PENDIENTE')
+            ->where('fecha_vencimiento', '>', now());
 
         if ($idVehiculo) {
             $query->where('id_vehiculo', $idVehiculo);
