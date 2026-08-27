@@ -39,7 +39,13 @@ class ValeController extends Controller
         $vales = $listValeAction->execute($filters, $request->user());
 
         return Inertia::render('Vales/Index', [
-            'vales' => $vales,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). La paginación numérica de la tabla desktop
+            // no se ve afectada porque sus <Link> son visitas completas, no
+            // recargas parciales (ver .ai/rules/pages.md).
+            'vales' => Inertia::scroll($vales),
             'filters' => $filters,
             'flash' => [
                 'success' => session('success'),

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import ValeDetalleModal from '@/Components/ValeDetalleModal.vue'
 import { getExpirationStatus, formatDate } from '@/Utils/dateUtil'
@@ -263,14 +263,16 @@ const puedeUsarse = (vale) =>
         </div>
 
         <!-- Vista tarjetas: tablet y celular (más fácil de leer/tocar que
-             una tabla de 11 columnas con scroll horizontal) -->
+             una tabla de 11 columnas con scroll horizontal). Scroll infinito
+             sólo acá: la tabla desktop sigue con el paginador numerado de
+             siempre (ver .ai/rules/pages.md). -->
         <div v-else class="card-body p-2">
             <div v-if="vales.data.length === 0" class="text-center py-4 text-muted">
                 <i class="ri-file-list-3-line fs-3 d-block mb-2"></i>
                 No se encontraron vales
             </div>
 
-            <div class="d-flex flex-column gap-2">
+            <InfiniteScroll v-else data="vales" only-next as="div" class="d-flex flex-column gap-2">
                 <div v-for="vale in vales.data" :key="vale.id" class="vale-card-mobile border rounded-3 p-3"
                     @click="openDetalle(vale.id)">
 
@@ -356,11 +358,23 @@ const puedeUsarse = (vale) =>
                         </div>
                     </div>
                 </div>
-            </div>
+
+                <!-- Indicador de carga / fin de lista del scroll infinito -->
+                <template #next="{ loading, hasMore }">
+                    <div v-if="loading" class="text-center text-muted small py-2">
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        Cargando más vales...
+                    </div>
+                    <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                        No hay más vales para mostrar.
+                    </div>
+                </template>
+            </InfiniteScroll>
         </div>
 
-        <!-- Paginador -->
-        <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <!-- Paginador: sólo la tabla desktop. El listado mobile usa scroll
+             infinito (InfiniteScroll arriba) en vez de páginas numeradas. -->
+        <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="text-muted small">
                 Mostrando {{ vales.from ?? 0 }} - {{ vales.to ?? 0 }}
                 de {{ vales.total }} resultados

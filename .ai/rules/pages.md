@@ -44,3 +44,22 @@ $filters['fecha_desde'] = $request->input('fecha_desde', now()->startOfMonth()->
 $filters['fecha_hasta'] = $request->input('fecha_hasta', now()->format('Y-m-d'));
 ```
 Importante: en el Vue de la página, el watcher que dispara `router.get(...)` NO debe omitir fecha_desde/fecha_hasta con `|| undefined` cuando están vacíos (a diferencia de los demás filtros) — deben viajar como `val.fecha_desde`/`val.fecha_hasta` tal cual, incluso `''`. Si se omiten, "Limpiar filtros" ya no podría quitar el rango de fechas: el request llegaría sin esas claves y el controlador reaplicaría el default. Laravel además normaliza ese '' a `null` vía ConvertEmptyStringsToNull, pero la clave sigue presente en el request, así que `$request->input('fecha_desde', $default)` devuelve `null` (no el default) — sigue distinguiendo "el usuario limpió el filtro" de "todavía no se mandó nada".
+
+## Scroll infinito en un listado paginado: <InfiniteScroll> de Inertia v2, no useInfiniteScroll de VueUse
+Para "cargar más" un listado paginado con LengthAwarePaginator sin romper la paginación numérica existente (usada en otra vista del mismo listado, ej. la tabla desktop), usa el componente nativo `<InfiniteScroll>` de `@inertiajs/vue3` (v2) en vez de reimplementarlo con `useInfiniteScroll`/`useIntersectionObserver` de VueUse — Inertia ya trae el merge de props, el intersection observer y el tracking de página resuelto y probado; VueUse sólo el intersection observer, dejando el resto (merge de arrays, sincronía con el paginador de Laravel, header de versión) por reinventar.
+
+Referencia: resources/js/Pages/Vales/Index.vue (sólo en la vista de tarjetas mobile; la tabla desktop conserva su paginador numerado de siempre, sin tocar).
+
+Backend — envolver el paginador con `Inertia::scroll()` en vez de pasarlo tal cual:
+```php
+'vales' => Inertia::scroll($vales), // $vales = LengthAwarePaginator (::paginate())
+```
+Esto NO cambia la forma de la prop (sigue trayendo data/total/from/to/last_page/links igual que antes — sólo agrega metadata de merge a nivel de protocolo), así que cualquier código que ya lea `vales.total`, `vales.links`, etc. (el paginador numerado de la tabla desktop) sigue funcionando sin cambios.
+
+Frontend — envolver sólo el listado que debe scrollear infinito (no toda la página):
+```vue
+<InfiniteScroll data="vales" only-next as="div" class="...">
+    <div v-for="vale in vales.data" :key="vale.id">...</div>
+</InfiniteScroll>
+```
+`only-next` porque el listado siempre arranca en la página 1 (no hay caso de "cargar anteriores"). El merge (agregar en vez de reemplazar) sólo aplica a recargas parciales (`only`/`X-Inertia-Partial-Data`, que es justamente lo que dispara `<InfiniteScroll>` al hacer scroll); una visita completa normal (cambiar un filtro con `router.get(...)` sin `only`) siempre reemplaza la prop entera, así que los filtros existentes (que no usan `only`) siguen reseteando el listado sin necesidad de `reset: [...]` extra.

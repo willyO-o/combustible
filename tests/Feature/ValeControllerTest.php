@@ -141,6 +141,65 @@ class ValeControllerTest extends TestCase
         $this->assertTrue($ids->contains($valeDelMesPasado->id));
     }
 
+    /**
+     * El listado mobile (Vales/Index.vue) usa <InfiniteScroll> para paginar
+     * sin botones: el backend debe marcar "vales" como scrolleable
+     * (Inertia::scroll()) para que una recarga parcial pidiendo la página 2
+     * llegue con la metadata de merge que el componente necesita para
+     * agregar (no reemplazar) los datos ya cargados.
+     */
+    public function test_index_marca_vales_como_scrolleable_para_el_infinite_scroll_mobile(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = Conductor::factory()->create();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $grifo = Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        // 12 vales -> con paginate(10) hay una página 2 que el scroll infinito
+        // debe poder pedir.
+        for ($i = 0; $i < 12; $i++) {
+            Vale::create([
+                'id_vehiculo' => $vehiculo->id,
+                'id_conductor' => $conductor->id,
+                'id_grifo' => $grifo->id,
+                'id_tipo_combustible' => $tipoCombustible->id,
+                'litros' => 10,
+                'precio' => 6.97,
+            ]);
+        }
+
+        // El middleware de Inertia recalcula la versión de assets en cada
+        // request (hash de public/build/manifest.json) y la exige igual en
+        // X-Inertia-Version para las recargas parciales; si no coincide,
+        // responde 409 y fuerza una visita completa en vez de la parcial.
+        $version = file_exists(public_path('build/manifest.json'))
+            ? hash_file('xxh128', public_path('build/manifest.json'))
+            : null;
+
+        // Recarga parcial como la que dispara <InfiniteScroll> al llegar al
+        // final del listado.
+        $response = $this->actingAs($this->admin)->get(route('vales.index', ['page' => 2]), [
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => $version,
+            'X-Inertia-Partial-Component' => 'Vales/Index',
+            'X-Inertia-Partial-Data' => 'vales',
+        ]);
+
+        $response->assertOk();
+
+        // Para una respuesta JSON de Inertia (X-Inertia: true), "original" es
+        // directamente el array de la página (JsonResponse::setData() lo
+        // guarda ahí); a diferencia de una visita completa en HTML, donde
+        // "original" es la View y hace falta ->getData()['page'].
+        $pagina = $response->original;
+        $this->assertContains('vales.data', $pagina['mergeProps'] ?? []);
+        $this->assertSame(2, $pagina['props']['vales']['current_page']);
+        $this->assertCount(2, $pagina['props']['vales']['data']);
+    }
+
     public function test_search_vehiculos_restringe_a_un_jefe_de_area_a_los_vehiculos_de_su_area(): void
     {
         $area = Area::factory()->create();
