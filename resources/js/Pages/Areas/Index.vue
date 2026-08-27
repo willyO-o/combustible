@@ -1,17 +1,24 @@
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import { confirm as confirmSwal } from '@/Utils/alertUtil.js'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 const props = defineProps({
     areas: Object,
     flash: Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 /* ------------------------------------------------------------------ *
  * Modal: crear / editar área
@@ -223,7 +230,8 @@ const encargoBadge = (tipo) =>
                     </span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
@@ -310,8 +318,69 @@ const encargoBadge = (tipo) =>
                 </div>
             </div>
 
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="areas.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-building-line fs-3 d-block mb-2"></i>
+                    No se encontraron áreas
+                </div>
+
+                <InfiniteScroll v-else data="areas" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="area in areas.data" :key="area.id" class="list-card-mobile border rounded-3 p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-semibold">{{ area.nombre_area }}</span>
+                            <span class="badge" :class="estadoBadge(area.estado_area)">{{ area.estado_area }}</span>
+                        </div>
+
+                        <p v-if="area.descripcion_area" class="text-muted small mb-2">{{ area.descripcion_area }}</p>
+
+                        <div class="d-flex align-items-center justify-content-between small mb-2">
+                            <span class="text-muted">Vehículos asignados</span>
+                            <span class="badge bg-primary-transparent text-primary">{{ area.vehiculos_count }}</span>
+                        </div>
+
+                        <div class="mb-2">
+                            <span class="text-muted d-block small">Encargados</span>
+                            <div v-if="area.encargados_activos.length === 0" class="text-muted small">Sin asignar</div>
+                            <div v-for="e in area.encargados_activos" :key="e.id_encargo" class="small mb-1">
+                                <span class="badge" :class="encargoBadge(e.tipo_encargo)">{{ e.tipo_encargo }}</span>
+                                {{ e.nombre_completo }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2">
+                            <button v-can="'areas.encargados.asignar'" type="button" class="btn btn-icon btn-primary-light"
+                                title="Encargados" @click="abrirEncargados(area)">
+                                <i class="ri-user-star-line"></i>
+                            </button>
+                            <button v-can="'areas.editar'" type="button" class="btn btn-icon btn-info-light"
+                                title="Editar" @click="abrirEditar(area)">
+                                <i class="ri-edit-line"></i>
+                            </button>
+                            <button v-can="'areas.eliminar'" type="button" class="btn btn-icon btn-danger-light"
+                                title="Eliminar" @click="confirmDelete(area)">
+                                <i class="ri-delete-bin-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más áreas...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más áreas para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">
                     Mostrando
                     <strong>{{ areas.from ?? 0 }}</strong> -

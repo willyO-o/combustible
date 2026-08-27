@@ -310,6 +310,119 @@ class ValeControllerTest extends TestCase
         $this->assertDatabaseHas('vale', ['id_vehiculo' => $vehiculoSinArea->id]);
     }
 
+    /**
+     * Los vales no se eliminan: destroy() los anula (estado_vale = ANULADO)
+     * en vez de borrar el registro, reutilizando la misma ruta/permiso.
+     */
+    public function test_destroy_anula_el_vale_en_lugar_de_eliminarlo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = Conductor::factory()->create();
+        $grifo = Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        $vale = Vale::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+            'estado_vale' => 'PENDIENTE',
+        ]);
+
+        $response = $this->actingAs($this->admin)->delete(route('vales.destroy', $vale->id));
+
+        $response->assertRedirect(route('vales.index'));
+        $this->assertDatabaseHas('vale', ['id' => $vale->id, 'estado_vale' => 'ANULADO', 'deleted_at' => null]);
+    }
+
+    public function test_destroy_rechaza_un_vale_usado(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = Conductor::factory()->create();
+        $grifo = Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        $vale = Vale::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+            'estado_vale' => 'USADO',
+        ]);
+
+        $response = $this->actingAs($this->admin)->delete(route('vales.destroy', $vale->id));
+
+        $response->assertRedirect(route('vales.index'));
+        $this->assertDatabaseHas('vale', ['id' => $vale->id, 'estado_vale' => 'USADO']);
+    }
+
+    public function test_destroy_rechaza_un_vale_ya_anulado(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = Conductor::factory()->create();
+        $grifo = Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        $vale = Vale::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+            'estado_vale' => 'ANULADO',
+        ]);
+
+        $response = $this->actingAs($this->admin)->delete(route('vales.destroy', $vale->id));
+
+        $response->assertRedirect(route('vales.index'))->assertSessionHas('error');
+    }
+
+    /**
+     * Un vale ANULADO (o USADO) ya no debe poder editarse, en línea con que
+     * el botón "Editar" del listado también se oculta en esos estados.
+     */
+    public function test_update_rechaza_un_vale_anulado(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = Conductor::factory()->create();
+        $grifo = Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        $vale = Vale::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+            'estado_vale' => 'ANULADO',
+        ]);
+
+        $response = $this->actingAs($this->admin)->put(route('vales.update', $vale->id), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'litros' => 99,
+            'precio' => 7.00,
+        ]);
+
+        $response->assertRedirect(route('vales.index'))->assertSessionHas('error');
+        $this->assertEquals(20, $vale->fresh()->litros);
+    }
+
     public function test_update_no_reevalua_la_restriccion_de_area(): void
     {
         $area = Area::factory()->create();

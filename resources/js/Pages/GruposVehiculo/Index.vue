@@ -1,16 +1,23 @@
 <script setup>
 import { ref, nextTick } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import { confirm } from '@/Utils/alertUtil.js'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 const props = defineProps({
     grupos: Object,
     flash:  Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const modalEl = ref(null)
 const modal = useBootstrapModal()
@@ -121,7 +128,8 @@ const estadoBadge = (estado) =>
                     </span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
@@ -183,8 +191,56 @@ const estadoBadge = (estado) =>
                 </div>
             </div>
 
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="grupos.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-stack-line fs-3 d-block mb-2"></i>
+                    No se encontraron grupos de vehículo
+                </div>
+
+                <InfiniteScroll v-else data="grupos" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="grupo in grupos.data" :key="grupo.id" class="list-card-mobile border rounded-3 p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-semibold">{{ grupo.grupo_vehiculo }}</span>
+                            <span class="badge" :class="estadoBadge(grupo.estado_grupo_vehiculo)">
+                                {{ grupo.estado_grupo_vehiculo }}
+                            </span>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between small mb-2">
+                            <span class="text-muted">Tipos asignados</span>
+                            <span class="badge bg-primary-transparent text-primary">{{ grupo.tipos_vehiculos_count }}</span>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2">
+                            <button v-can="'grupos-vehiculo.editar'" type="button" class="btn btn-icon btn-info-light"
+                                title="Editar" @click="abrirEditar(grupo)">
+                                <i class="ri-edit-line"></i>
+                            </button>
+                            <button v-can="'grupos-vehiculo.eliminar'" type="button" class="btn btn-icon btn-danger-light"
+                                title="Eliminar" @click="confirmDelete(grupo)">
+                                <i class="ri-delete-bin-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más grupos...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más grupos para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">
                     Mostrando
                     <strong>{{ grupos.from ?? 0 }}</strong> -

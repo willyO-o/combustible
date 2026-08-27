@@ -28,7 +28,11 @@ class RepuestoController extends Controller
         $repuestos = $query->orderBy('nombre_repuesto')->paginate(10)->withQueryString();
 
         return Inertia::render('Repuestos/Index', [
-            'repuestos' => $repuestos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'repuestos' => Inertia::scroll($repuestos),
             'filters' => $request->only(['nombre_repuesto', 'codigo_repuesto', 'estado_repuesto']),
             'flash' => [
                 'success' => session('success'),

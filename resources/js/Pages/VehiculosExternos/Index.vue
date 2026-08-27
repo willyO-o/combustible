@@ -1,15 +1,22 @@
 <script setup>
 import { ref } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import VehiculoExternoFormModal from '@/Components/VehiculoExternoFormModal.vue'
 import { confirm as confirmSwal } from '@/Utils/alertUtil.js'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 const props = defineProps({
     vehiculosExternos: Object,
     flash: Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const modalRef = ref(null)
 
@@ -83,7 +90,8 @@ async function confirmDelete(vehiculoExterno) {
                 </span>
             </div>
         </div>
-        <div class="card-body p-0">
+        <!-- Vista tabla: desktop -->
+        <div v-if="!isMobile" class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
@@ -137,8 +145,49 @@ async function confirmDelete(vehiculoExterno) {
             </div>
         </div>
 
-        <!-- Paginador -->
-        <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+        <div v-else class="card-body p-2">
+            <div v-if="vehiculosExternos.data.length === 0" class="text-center py-4 text-muted">
+                <i class="ri-truck-line fs-3 d-block mb-2"></i>
+                No se encontraron vehículos externos
+            </div>
+
+            <InfiniteScroll v-else data="vehiculosExternos" only-next as="div" class="d-flex flex-column gap-2">
+                <div v-for="vehiculoExterno in vehiculosExternos.data" :key="vehiculoExterno.id" class="list-card-mobile border rounded-3 p-3">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="fw-medium d-block">{{ vehiculoExterno.nro_placa }}</span>
+                            <small class="text-muted">{{ vehiculoExterno.propietario || '—' }}</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button v-can="'vehiculos-externos.editar'" type="button" class="btn btn-icon btn-info-light"
+                                title="Editar" @click="abrirEditar(vehiculoExterno)">
+                                <i class="ri-edit-line"></i>
+                            </button>
+                            <button v-can="'vehiculos-externos.eliminar'" type="button" class="btn btn-icon btn-danger-light"
+                                title="Eliminar" @click="confirmDelete(vehiculoExterno)">
+                                <i class="ri-delete-bin-line"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Indicador de carga / fin de lista del scroll infinito -->
+                <template #next="{ loading, hasMore }">
+                    <div v-if="loading" class="text-center text-muted small py-2">
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        Cargando más vehículos...
+                    </div>
+                    <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                        No hay más vehículos para mostrar.
+                    </div>
+                </template>
+            </InfiniteScroll>
+        </div>
+
+        <!-- Paginador: sólo la tabla desktop. El listado mobile usa scroll
+             infinito (InfiniteScroll arriba) en vez de páginas numeradas. -->
+        <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="text-muted small">
                 Mostrando
                 <strong>{{ vehiculosExternos.from ?? 0 }}</strong> -

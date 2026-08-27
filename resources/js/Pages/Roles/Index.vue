@@ -1,6 +1,7 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -10,6 +11,12 @@ const props = defineProps({
 })
 
 const esProtegido = (role) => props.rolesProtegidos.includes(role.name)
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 </script>
 
 <template>
@@ -61,7 +68,8 @@ const esProtegido = (role) => props.rolesProtegidos.includes(role.name)
                     </span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
@@ -114,8 +122,53 @@ const esProtegido = (role) => props.rolesProtegidos.includes(role.name)
                 </div>
             </div>
 
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="roles.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-shield-user-line fs-3 d-block mb-2"></i>
+                    No se encontraron roles
+                </div>
+
+                <InfiniteScroll v-else data="roles" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="role in roles.data" :key="role.id" class="list-card-mobile border rounded-3 p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-semibold">
+                                {{ role.name }}
+                                <span v-if="esProtegido(role)" class="badge bg-warning-transparent text-warning ms-1">
+                                    Protegido
+                                </span>
+                            </span>
+                            <Link v-can="'roles.ver'" :href="route('roles.edit', role.id)" class="btn btn-icon btn-info-light" title="Editar permisos">
+                                <i class="ri-edit-line"></i>
+                            </Link>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <span class="text-muted">Permisos asignados</span>
+                            <span class="badge bg-primary-transparent text-primary">{{ role.permissions_count }}</span>
+                        </div>
+                        <div class="text-muted small mt-1">
+                            Creado: {{ new Date(role.created_at).toLocaleDateString('es-BO') }}
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más roles...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más roles para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">
                     Mostrando
                     <strong>{{ roles.from ?? 0 }}</strong> -

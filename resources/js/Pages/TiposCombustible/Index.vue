@@ -1,8 +1,9 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import { confirm } from '@/Utils/alertUtil.js'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -10,6 +11,12 @@ const props = defineProps({
     filters: Object,
     flash:   Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const filters = ref({
     tipo_combustible:        props.filters?.tipo_combustible        ?? '',
@@ -137,7 +144,8 @@ const estadoBadge = (estado) =>
                     </span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
@@ -203,8 +211,59 @@ const estadoBadge = (estado) =>
                 </div>
             </div>
 
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="tipos.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-drop-line fs-3 d-block mb-2"></i>
+                    No se encontraron tipos de combustible
+                </div>
+
+                <InfiniteScroll v-else data="tipos" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="tipo in tipos.data" :key="tipo.id" class="list-card-mobile border rounded-3 p-3">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="avatar avatar-sm rounded-circle bg-primary-transparent text-primary d-flex align-items-center justify-content-center fw-semibold">
+                                    {{ tipo.tipo_combustible.charAt(0).toUpperCase() }}
+                                </span>
+                                <div>
+                                    <span class="fw-medium d-block">{{ tipo.tipo_combustible }}</span>
+                                    <small class="text-muted">{{ new Date(tipo.created_at).toLocaleDateString('es-BO') }}</small>
+                                </div>
+                            </div>
+                            <span class="badge" :class="estadoBadge(tipo.estado_tipo_combustible)">
+                                {{ tipo.estado_tipo_combustible }}
+                            </span>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2 mt-2">
+                            <Link v-can="'tipos-combustible.editar'" :href="route('tipos-combustible.edit', tipo.id)"
+                                class="btn btn-icon btn-info-light" title="Editar">
+                                <i class="ri-edit-line"></i>
+                            </Link>
+                            <button v-can="'tipos-combustible.eliminar'" type="button" class="btn btn-icon btn-danger-light"
+                                title="Eliminar" @click="confirmDelete(tipo)">
+                                <i class="ri-delete-bin-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más tipos...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más tipos para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">
                     Mostrando
                     <strong>{{ tipos.from ?? 0 }}</strong> -

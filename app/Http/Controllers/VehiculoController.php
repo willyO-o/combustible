@@ -49,7 +49,11 @@ class VehiculoController extends Controller
             ->withQueryString();
 
         return Inertia::render('Vehiculos/Index', [
-            'vehiculos' => $vehiculos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'vehiculos' => Inertia::scroll($vehiculos),
             'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
             'filters' => $request->only(['nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo', 'id_area']),

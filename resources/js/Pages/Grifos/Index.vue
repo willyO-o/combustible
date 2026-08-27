@@ -1,8 +1,9 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import { confirm } from '@/Utils/alertUtil.js'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -10,6 +11,12 @@ const props = defineProps({
     filters: Object,
     flash:   Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const filters = ref({
     razon_social: props.filters?.razon_social ?? '',
@@ -151,7 +158,8 @@ const estadoBadge = (estado) =>
                     </span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover text-nowrap mb-0">
                         <thead class="table-light">
@@ -220,8 +228,68 @@ const estadoBadge = (estado) =>
                 </div>
             </div>
 
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="grifos.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-gas-station-line fs-3 d-block mb-2"></i>
+                    No se encontraron surtidores que coincidan con los filtros aplicados.
+                </div>
+
+                <InfiniteScroll v-else data="grifos" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="grifo in grifos.data" :key="grifo.id" class="list-card-mobile border rounded-3 p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-semibold">{{ grifo.razon_social }}</span>
+                            <span class="badge" :class="estadoBadge(grifo.estado_grifo)">{{ grifo.estado_grifo }}</span>
+                        </div>
+
+                        <div class="row g-2 small mb-2">
+                            <div class="col-6">
+                                <span class="text-muted d-block">NIT</span>
+                                <span>{{ grifo.nit }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Ciudad</span>
+                                <span>{{ grifo.ciudad ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Teléfono</span>
+                                <span>{{ grifo.telefono ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Dirección</span>
+                                <span>{{ grifo.direccion ?? '—' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2">
+                            <Link v-can="'grifos.editar'" :href="route('grifos.edit', grifo.id)"
+                                class="btn btn-icon btn-info-light" title="Editar">
+                                <i class="ri-edit-line"></i>
+                            </Link>
+                            <button v-can="'grifos.eliminar'" type="button" class="btn btn-icon btn-danger-light"
+                                title="Eliminar" @click="confirmDelete(grifo)">
+                                <i class="ri-delete-bin-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más surtidores...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más surtidores para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">
                     Mostrando {{ grifos.from ?? 0 }} - {{ grifos.to ?? 0 }}
                     de {{ grifos.total }} resultados

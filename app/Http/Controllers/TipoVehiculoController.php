@@ -30,7 +30,11 @@ class TipoVehiculoController extends Controller
         $tipos = $query->orderBy('tipo_vehiculo')->paginate(10)->withQueryString();
 
         return Inertia::render('TiposVehiculo/Index', [
-            'tipos' => $tipos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'tipos' => Inertia::scroll($tipos),
             'filters' => $request->only(['tipo_vehiculo', 'estado_tipo_vehiculo']),
             'flash' => [
                 'success' => session('success'),

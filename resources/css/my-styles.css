@@ -154,13 +154,17 @@
     color: var(--text-muted);
 }
 
-/* Vales/Index.vue: tarjetas del listado para tablet/celular (breakpoints.smaller('lg')). */
-.vale-card-mobile {
+/* Tarjetas del listado para tablet/celular (breakpoints.smaller('lg')),
+   compartida por todos los Index.vue con tabla + paginación (Vales,
+   CargasCombustible, Operacion, Conductores, Vehiculos, etc. — ver
+   .ai/rules/pages.md, "Listado responsivo (tabla desktop + tarjetas mobile)
+   con scroll infinito"). */
+.list-card-mobile {
     cursor: pointer;
     background-color: var(--custom-white);
     border-color: var(--default-border) !important;
     transition: background-color .15s ease;
 }
-.vale-card-mobile:active {
+.list-card-mobile:active {
     background-color: var(--primary01);
 }

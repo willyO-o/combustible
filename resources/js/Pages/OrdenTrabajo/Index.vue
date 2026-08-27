@@ -1,7 +1,8 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -10,6 +11,12 @@ const props = defineProps({
     filters: Object,
     flash: Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const filters = ref({
     estado_orden: props.filters?.estado_orden ?? '',
@@ -140,7 +147,8 @@ const ordenBadge = (tipo) =>
                     <span class="badge bg-primary-transparent text-primary ms-2">{{ ordenes.total }} registros</span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover text-nowrap mb-0">
                         <thead class="table-light">
@@ -199,8 +207,78 @@ const ordenBadge = (tipo) =>
                     </table>
                 </div>
             </div>
-            <!-- Paginación -->
-            <div v-if="ordenes.last_page > 1" class="card-footer d-flex justify-content-between align-items-center">
+
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="ordenes.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-file-list-3-line fs-3 d-block mb-2"></i>
+                    No se encontraron órdenes
+                </div>
+
+                <InfiniteScroll v-else data="ordenes" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="o in ordenes.data" :key="o.id" class="list-card-mobile border rounded-3 p-3"
+                        @click="router.get(route('mantenimiento.ordenes.show', o.id))">
+
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-primary fs-13 fw-semibold">{{ o.nro }}</span>
+                            <span class="badge" :class="estadoBadge(o.estado_orden)">{{ o.estado_orden }}</span>
+                        </div>
+
+                        <div class="mb-2">
+                            <span class="fw-semibold d-block">{{ o.vehiculo?.codigo ?? '—' }} – {{ o.vehiculo?.nro_placa ?? '—' }}</span>
+                            <small v-if="o.vehiculo?.marca" class="text-muted">{{ o.vehiculo.marca }}</small>
+                        </div>
+
+                        <div class="row g-2 small mb-2">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Tipo Mant.</span>
+                                <span class="badge" :class="tipoBadge(o.tipo_mantenimiento)">{{ o.tipo_mantenimiento }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Tipo Orden</span>
+                                <span class="badge" :class="ordenBadge(o.tipo_orden)">{{ o.tipo_orden }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Fecha Emisión</span>
+                                <span>{{ o.fecha_emision?.substring(0, 10) ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Responsable</span>
+                                <span>{{ o.usuario_ejecuta?.name ?? '—' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2" @click.stop>
+                            <Link v-can="'mantenimiento.ordenes.editar'" v-if="o.estado_orden === 'PENDIENTE'"
+                                :href="route('mantenimiento.ordenes.edit', o.id)" class="btn btn-icon btn-light" title="Editar">
+                                <i class="ri-pencil-line"></i>
+                            </Link>
+                            <Link v-can="'mantenimiento.ordenes.ejecucion.registrar'"
+                                v-if="['PENDIENTE','EN_EJECUCION'].includes(o.estado_orden)"
+                                :href="route('mantenimiento.ordenes.ejecucion.create', o.id)"
+                                class="btn btn-icon btn-success-light" title="Registrar ejecución">
+                                <i class="ri-tools-line"></i>
+                            </Link>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más órdenes...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más órdenes para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginación: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile && ordenes.last_page > 1" class="card-footer d-flex justify-content-between align-items-center">
                 <small class="text-muted">
                     Mostrando {{ ordenes.from }}–{{ ordenes.to }} de {{ ordenes.total }}
                 </small>

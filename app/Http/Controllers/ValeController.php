@@ -127,23 +127,40 @@ class ValeController extends Controller
 
     public function update(ValeRequest $request, Vale $vale): RedirectResponse
     {
+        // Sólo un vale PENDIENTE puede editarse: uno USADO ya generó su carga
+        // de combustible y uno ANULADO ya no debe modificarse (ver destroy()).
+        if ($vale->estado_vale !== 'PENDIENTE') {
+            return redirect()->route('vales.index')
+                ->with('error', "No se puede editar el Vale #{$vale->nro} porque ya no está PENDIENTE.");
+        }
+
         $vale->update($request->validated());
 
         return redirect()->route('vales.index')
             ->with('success', "Vale #{$vale->nro} actualizado exitosamente.");
     }
 
+    /**
+     * Los vales no se eliminan: se anulan. Conserva la misma ruta, método y
+     * permiso ('vales.eliminar') que un destroy() normal, pero en vez de
+     * borrar el registro sólo cambia su estado_vale a ANULADO.
+     */
     public function destroy(Vale $vale): RedirectResponse
     {
         if ($vale->estado_vale === 'USADO') {
             return redirect()->route('vales.index')
-                ->with('error', "No se puede eliminar el Vale #{$vale->nro} porque ya ha sido usado.");
+                ->with('error', "No se puede anular el Vale #{$vale->nro} porque ya ha sido usado.");
         }
 
-        $vale->delete();
+        if ($vale->estado_vale === 'ANULADO') {
+            return redirect()->route('vales.index')
+                ->with('error', "El Vale #{$vale->nro} ya se encuentra anulado.");
+        }
+
+        $vale->update(['estado_vale' => 'ANULADO']);
 
         return redirect()->route('vales.index')
-            ->with('success', "Vale #{$vale->nro} eliminado exitosamente.");
+            ->with('success', "Vale #{$vale->nro} anulado exitosamente.");
     }
 
     /* ------------------------------------------------------------------ */

@@ -35,7 +35,11 @@ class GrifoController extends Controller
             ->withQueryString();
 
         return Inertia::render('Grifos/Index', [
-            'grifos' => $grifos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'grifos' => Inertia::scroll($grifos),
             'filters' => $request->only(['razon_social', 'nit', 'ciudad', 'estado_grifo']),
             'flash' => [
                 'success' => session('success'),

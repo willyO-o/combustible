@@ -29,7 +29,11 @@ class RolController extends Controller
             ->withQueryString();
 
         return Inertia::render('Roles/Index', [
-            'roles' => $roles,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'roles' => Inertia::scroll($roles),
             'rolesProtegidos' => config('acl.roles_protegidos'),
             'flash' => [
                 'success' => session('success'),

@@ -68,7 +68,11 @@ class OrdenTrabajoController extends Controller
             ->get();
 
         return Inertia::render('OrdenTrabajo/Index', [
-            'ordenes' => $ordenes,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'ordenes' => Inertia::scroll($ordenes),
             'vehiculos' => $vehiculos,
             'filters' => $request->only(['estado_orden', 'tipo_mantenimiento', 'tipo_orden', 'id_vehiculo']),
             'flash' => [

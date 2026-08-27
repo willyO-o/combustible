@@ -19,7 +19,11 @@ class GrupoVehiculoController extends Controller
             ->withQueryString();
 
         return Inertia::render('GruposVehiculo/Index', [
-            'grupos' => $grupos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'grupos' => Inertia::scroll($grupos),
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),

@@ -51,7 +51,11 @@ class SolicitudMantenimientoController extends Controller
             ->get();
 
         return Inertia::render('SolicitudMantenimiento/Index', [
-            'solicitudes' => $solicitudes,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'solicitudes' => Inertia::scroll($solicitudes),
             'vehiculos' => $vehiculos,
             'filters' => $request->only(['estado', 'tipo_mantenimiento', 'id_vehiculo']),
             'flash' => [

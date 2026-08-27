@@ -46,7 +46,11 @@ class AreaController extends Controller
         ]);
 
         return Inertia::render('Areas/Index', [
-            'areas' => $areas,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'areas' => Inertia::scroll($areas),
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),

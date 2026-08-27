@@ -16,7 +16,7 @@ class TipoMantenimientoController extends Controller
         $query = TipoMantenimiento::query();
 
         if ($request->filled('tipo_mantenimiento')) {
-            $query->where('tipo_mantenimiento', 'like', '%' . $request->tipo_mantenimiento . '%');
+            $query->where('tipo_mantenimiento', 'like', '%'.$request->tipo_mantenimiento.'%');
         }
         if ($request->filled('estado_tipo_mantenimiento')) {
             $query->where('estado_tipo_mantenimiento', $request->estado_tipo_mantenimiento);
@@ -25,11 +25,15 @@ class TipoMantenimientoController extends Controller
         $tipos = $query->orderBy('tipo_mantenimiento')->paginate(10)->withQueryString();
 
         return Inertia::render('TiposMantenimiento/Index', [
-            'tipos'   => $tipos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'tipos' => Inertia::scroll($tipos),
             'filters' => $request->only(['tipo_mantenimiento', 'estado_tipo_mantenimiento']),
-            'flash'   => [
+            'flash' => [
                 'success' => session('success'),
-                'error'   => session('error'),
+                'error' => session('error'),
             ],
         ]);
     }

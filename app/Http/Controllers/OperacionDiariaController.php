@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Inertia\Inertia;
 
 class OperacionDiariaController extends Controller
 {
@@ -57,7 +58,11 @@ class OperacionDiariaController extends Controller
         })->toArray();
 
         return inertia('Operacion/Index', [
-            'actividades' => $actividades,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'actividades' => Inertia::scroll($actividades),
             'filters' => $filters,
             'conductores' => $conductores,
             'flash' => [

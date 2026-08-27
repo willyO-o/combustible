@@ -37,7 +37,11 @@ class UserController extends Controller
         $usuarios = $query->orderBy('name')->paginate(10)->withQueryString();
 
         return Inertia::render('Usuarios/Index', [
-            'usuarios' => $usuarios,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'usuarios' => Inertia::scroll($usuarios),
             'filters' => $request->only(['name', 'email', 'estado_usuario']),
             'flash' => [
                 'success' => session('success'),
@@ -56,8 +60,8 @@ class UserController extends Controller
 
     public function store(UserRequest $request, UpdatePersonaAction $action): RedirectResponse
     {
-        //validar por permiso no por rol
-        if( !$request->user()->can('crear-usuario') ){
+        // validar por permiso no por rol
+        if (! $request->user()->can('crear-usuario')) {
             abort(403);
         }
 

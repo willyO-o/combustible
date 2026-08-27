@@ -38,7 +38,11 @@ class PersonaController extends Controller
             ->withQueryString();
 
         return Inertia::render('Personas/Index', [
-            'personas' => $personas,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'personas' => Inertia::scroll($personas),
             'filters' => $request->only(['ci', 'nombres', 'paterno', 'celular']),
             'flash' => [
                 'success' => session('success'),

@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'id_vehiculo',
@@ -18,8 +19,9 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 ])]
 class Asignacion extends Model
 {
-    protected $table = 'asignacion';
+    use SoftDeletes;
 
+    protected $table = 'asignacion';
 
     protected function casts()
     {
@@ -28,7 +30,6 @@ class Asignacion extends Model
             'fecha_culminacion' => 'date',
         ];
     }
-
 
     // Relaciones
     public function vehiculo()

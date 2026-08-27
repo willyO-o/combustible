@@ -24,7 +24,11 @@ class VehiculoExternoController extends Controller
         $vehiculosExternos = $query->orderBy('nro_placa')->paginate(10)->withQueryString();
 
         return Inertia::render('VehiculosExternos/Index', [
-            'vehiculosExternos' => $vehiculosExternos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'vehiculosExternos' => Inertia::scroll($vehiculosExternos),
             'filters' => $request->only(['nro_placa']),
             'flash' => [
                 'success' => session('success'),

@@ -1,16 +1,23 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import { showToast, confirm } from '@/Utils/alertUtil.js'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 const props = defineProps({
     usuarios: Object,
     filters: Object,
     flash: Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const filters = ref({
     name: props.filters?.name ?? '',
@@ -146,7 +153,8 @@ const tipoBadge = (tipo) => ({
                 <span class="badge bg-primary-transparent text-primary ms-2">{{ usuarios.total }} registros</span>
             </div>
         </div>
-        <div class="card-body p-0">
+        <!-- Vista tabla: desktop -->
+        <div v-if="!isMobile" class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead class="table-light">
@@ -217,8 +225,75 @@ const tipoBadge = (tipo) => ({
             </div>
         </div>
 
-        <!-- Paginador -->
-        <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+        <div v-else class="card-body p-2">
+            <div v-if="usuarios.data.length === 0" class="text-center py-4 text-muted">
+                <i class="ri-user-search-line fs-3 d-block mb-2"></i>
+                No se encontraron usuarios
+            </div>
+
+            <InfiniteScroll v-else data="usuarios" only-next as="div" class="d-flex flex-column gap-2">
+                <div v-for="usuario in usuarios.data" :key="usuario.id" class="list-card-mobile border rounded-3 p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="avatar avatar-sm rounded-circle fw-semibold d-flex align-items-center justify-content-center"
+                            :class="avatarColor(usuario.name)">
+                            {{ usuario.name.charAt(0).toUpperCase() }}
+                        </span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">{{ usuario.name }}</div>
+                            <small class="text-muted">{{ usuario.email }}</small>
+                        </div>
+                        <span class="badge" :class="estadoBadge(usuario.estado_usuario)">{{ usuario.estado_usuario }}</span>
+                    </div>
+
+                    <div class="row g-2 small mb-2">
+                        <div class="col-6">
+                            <span class="text-muted d-block">Persona (CI)</span>
+                            <span v-if="usuario.persona">{{ usuario.persona.ci }}</span>
+                            <span v-else class="text-muted">—</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Tipo</span>
+                            <span class="badge" :class="tipoBadge(usuario.persona?.tipo_actual)">
+                                {{ tipoLabel(usuario.persona?.tipo_actual) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2">
+                        <Link v-can="'usuarios.editar'" :href="route('usuarios.edit', usuario.id)" class="btn btn-icon btn-info-light" title="Editar">
+                            <i class="ri-edit-line"></i>
+                        </Link>
+                        <Link v-can="'usuarios.contrasena.cambiar'" :href="route('usuarios.edit-password', usuario.id)" class="btn btn-icon btn-warning-light" title="Cambiar contraseña">
+                            <i class="ri-lock-password-line"></i>
+                        </Link>
+                        <button v-if="usuario.estado_usuario === 'ACTIVO'" v-can="'usuarios.eliminar'" type="button" class="btn btn-icon btn-danger-light"
+                            title="Inactivar" @click="cambiarEstado(usuario, 'INACTIVO')">
+                            <i class="ri-user-unfollow-line"></i>
+                        </button>
+                        <button v-else v-can="'usuarios.eliminar'" type="button" class="btn btn-icon btn-success-light"
+                            title="Activar" @click="cambiarEstado(usuario, 'ACTIVO')">
+                            <i class="ri-user-follow-line"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Indicador de carga / fin de lista del scroll infinito -->
+                <template #next="{ loading, hasMore }">
+                    <div v-if="loading" class="text-center text-muted small py-2">
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        Cargando más usuarios...
+                    </div>
+                    <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                        No hay más usuarios para mostrar.
+                    </div>
+                </template>
+            </InfiniteScroll>
+        </div>
+
+        <!-- Paginador: sólo la tabla desktop. El listado mobile usa scroll
+             infinito (InfiniteScroll arriba) en vez de páginas numeradas. -->
+        <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="text-muted small">
                 Mostrando <strong>{{ usuarios.from ?? 0 }}</strong> - <strong>{{ usuarios.to ?? 0 }}</strong>
                 de <strong>{{ usuarios.total }}</strong> resultados

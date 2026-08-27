@@ -39,7 +39,11 @@ class CargaCombustibleController extends Controller
         $cargas = $listCargaCombustibleAction->execute($filters, $request->user(), $request->input('per_page', 10));
 
         return Inertia::render('CargasCombustible/Index', [
-            'cargas' => $cargas,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'cargas' => Inertia::scroll($cargas),
             'filters' => $filters,
             'flash' => [
                 'success' => session('success'),

@@ -16,7 +16,7 @@ class TipoCombustibleController extends Controller
         $query = TipoCombustible::query();
 
         if ($request->filled('tipo_combustible')) {
-            $query->where('tipo_combustible', 'like', '%' . $request->tipo_combustible . '%');
+            $query->where('tipo_combustible', 'like', '%'.$request->tipo_combustible.'%');
         }
         if ($request->filled('estado_tipo_combustible')) {
             $query->where('estado_tipo_combustible', $request->estado_tipo_combustible);
@@ -25,11 +25,15 @@ class TipoCombustibleController extends Controller
         $tipos = $query->orderBy('tipo_combustible')->paginate(10)->withQueryString();
 
         return Inertia::render('TiposCombustible/Index', [
-            'tipos'   => $tipos,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'tipos' => Inertia::scroll($tipos),
             'filters' => $request->only(['tipo_combustible', 'estado_tipo_combustible']),
-            'flash'   => [
+            'flash' => [
                 'success' => session('success'),
-                'error'   => session('error'),
+                'error' => session('error'),
             ],
         ]);
     }

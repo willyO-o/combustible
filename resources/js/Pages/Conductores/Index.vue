@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
@@ -8,12 +8,19 @@ import { showToast, confirm , showError} from '@/Utils/alertUtil.js'
 import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 const props = defineProps({
     conductores: Object,
     filters: Object,
     flash: Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 // Filtros reactivos inicializados con los valores que llegan del servidor
 const filters = ref({
@@ -270,7 +277,8 @@ const tipoAsignacionBadge = (tipo) =>
                     </span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover text-nowrap mb-0">
                         <thead class="table-light">
@@ -375,8 +383,94 @@ const tipoAsignacionBadge = (tipo) =>
                 </div>
             </div>
 
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="conductores.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-user-search-line fs-3 d-block mb-2"></i>
+                    No se encontraron conductores
+                </div>
+
+                <InfiniteScroll v-else data="conductores" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="conductor in conductores.data" :key="conductor.id" class="list-card-mobile border rounded-3 p-3"
+                        @click="router.get(route('conductores.show', conductor.id))">
+
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="avatar avatar-md">
+                                <img :src="fotoUrl(conductor.foto)" :alt="conductor.nombres" class="rounded-circle"
+                                    style="width:36px;height:36px;object-fit:cover;" />
+                            </span>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">{{ conductor.nombres }} {{ conductor.paterno ?? '' }} {{ conductor.materno ?? '' }}</div>
+                                <small class="text-muted">CI: {{ conductor.ci }}</small>
+                            </div>
+                            <span class="badge" :class="estadoBadge(conductor.estado_conductor)">{{ conductor.estado_conductor }}</span>
+                        </div>
+
+                        <div class="row g-2 small mb-2">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Celular</span>
+                                <span>{{ conductor.celular ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Vehículo(s) asignado(s)</span>
+                                <span v-if="conductor.asignaciones_activas.length === 0" class="text-danger">No asignado</span>
+                                <span v-else>
+                                    <span v-for="vehiculo in conductor.asignaciones_activas" :key="vehiculo.id" class="d-block">
+                                        {{ vehiculo.nro_placa }} ({{ vehiculo.marca }})
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2" @click.stop>
+                            <button v-can="'conductores.asignar-vehiculo'" type="button" class="btn btn-icon btn-primary-light"
+                                title="Reasignar Vehículo" @click="abrirAsignacion(conductor)">
+                                <i class="ri-exchange-line"></i>
+                            </button>
+
+                            <div class="dropdown">
+                                <button type="button" class="btn btn-icon btn-light" data-bs-toggle="dropdown"
+                                    aria-expanded="false" title="Más acciones">
+                                    <i class="ri-more-2-fill"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <Link class="dropdown-item" :href="route('conductores.show', conductor.id)">
+                                            <i class="ri-eye-line me-2"></i> Ver
+                                        </Link>
+                                    </li>
+                                    <li v-can="'conductores.editar'">
+                                        <Link class="dropdown-item" :href="route('conductores.edit', conductor.id)">
+                                            <i class="ri-edit-line me-2"></i> Editar
+                                        </Link>
+                                    </li>
+                                    <li v-can="'conductores.eliminar'">
+                                        <a class="dropdown-item text-danger" href="javascript:void(0);" @click="confirmDelete(conductor)">
+                                            <i class="ri-delete-bin-line me-2"></i> Eliminar
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más conductores...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más conductores para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">
                     Mostrando {{ conductores.from ?? 0 }} - {{ conductores.to ?? 0 }}
                     de {{ conductores.total }} resultados

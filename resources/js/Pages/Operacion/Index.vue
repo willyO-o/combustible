@@ -1,13 +1,20 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import Multiselect from '@vueform/multiselect'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 import { confirm, showToast } from '@/Utils/alertUtil'
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const props = defineProps({
     actividades: Object,
@@ -151,7 +158,8 @@ const estadoBadge = (estado) => {
                     <span class="badge bg-primary-transparent text-primary ms-2">{{ actividades.total }}</span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover text-nowrap mb-0">
                         <thead class="table-light">
@@ -242,8 +250,116 @@ const estadoBadge = (estado) => {
                     </table>
                 </div>
             </div>
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="actividades.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-gas-station-line fs-3 d-block mb-2"></i>
+                    No se encontraron registros
+                </div>
+
+                <InfiniteScroll v-else data="actividades" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="actividad in actividades.data" :key="actividad.id" class="list-card-mobile border rounded-3 p-3"
+                        @click="router.get(route('operacion-diaria.show', actividad.id))">
+
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-primary fs-13 fw-semibold">{{ actividad.nro }}</span>
+                            <span class="badge" :class="estadoBadge(actividad.estado)">{{ actividad.estado }}</span>
+                        </div>
+
+                        <div class="mb-2">
+                            <div class="fw-semibold">
+                                {{ actividad.vehiculo?.codigo ?? '—' }} — {{ actividad.vehiculo?.nro_placa ?? '—' }}
+                            </div>
+                            <small v-if="actividad.vehiculo?.marca" class="text-muted">{{ actividad.vehiculo.marca }}</small>
+                        </div>
+
+                        <div class="row g-2 small mb-2">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Conductor</span>
+                                <span>{{ actividad.conductor?.persona?.nombre_completo ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Turno</span>
+                                <span>{{ actividad.turno }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Inicio</span>
+                                <span>{{ actividad.fecha_inicio }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Fin</span>
+                                <span>{{ actividad.fecha_fin }}</span>
+                            </div>
+                            <div v-if="actividad.kilometraje_inicio" class="col-6">
+                                <span class="text-muted d-block">Km I / F</span>
+                                <span>{{ actividad.kilometraje_inicio }} / {{ actividad.kilometraje_fin }}</span>
+                            </div>
+                            <div v-if="actividad.horometro_inicio" class="col-6">
+                                <span class="text-muted d-block">Hm I / F</span>
+                                <span>{{ actividad.horometro_inicio }} / {{ actividad.horometro_fin }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between border-top pt-2">
+                            <div class="small">
+                                <span class="fw-bold">{{ actividad.horas_trabajadas ?? '—' }} H</span>
+                                <small v-if="actividad.verificador?.nombre_completo" class="text-muted d-block">
+                                    {{ actividad.verificador.nombre_completo }}
+                                </small>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-1" @click.stop>
+                                <a v-can="'operacion-diaria.informe'" :href="route('operacion-diaria.reporte.pdf', actividad.id)"
+                                    target="_blank" class="btn btn-icon btn-danger-light" title="PDF">
+                                    <i class="ri-file-pdf-line"></i>
+                                </a>
+
+                                <div class="dropdown">
+                                    <button type="button" class="btn btn-icon btn-light" data-bs-toggle="dropdown"
+                                        aria-expanded="false" title="Más acciones">
+                                        <i class="ri-more-2-fill"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <Link class="dropdown-item" :href="route('operacion-diaria.show', actividad.id)">
+                                                <i class="ri-eye-line me-2"></i> Ver
+                                            </Link>
+                                        </li>
+                                        <li v-if="actividad.estado != 'VERIFICADO'" v-can="'operacion-diaria.editar'">
+                                            <Link class="dropdown-item" :href="route('operacion-diaria.edit', actividad.id)">
+                                                <i class="ri-edit-line me-2"></i> Editar
+                                            </Link>
+                                        </li>
+                                        <li v-if="actividad.estado != 'VERIFICADO'" v-can="'operacion-diaria.eliminar'">
+                                            <a class="dropdown-item text-danger" href="javascript:void(0);"
+                                                @click="confirmDelete(actividad)">
+                                                <i class="ri-delete-bin-line me-2"></i> Eliminar
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más registros...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más registros para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">Mostrando {{ actividades.from ?? 0 }} - {{ actividades.to ?? 0 }} de {{
                     actividades.total }}</div>
                 <nav v-if="actividades.last_page > 1">

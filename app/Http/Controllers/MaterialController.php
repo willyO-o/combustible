@@ -24,7 +24,11 @@ class MaterialController extends Controller
         $materiales = $query->orderBy('material')->paginate(10)->withQueryString();
 
         return Inertia::render('Materiales/Index', [
-            'materiales' => $materiales,
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'materiales' => Inertia::scroll($materiales),
             'filters' => $request->only(['material']),
             'flash' => [
                 'success' => session('success'),

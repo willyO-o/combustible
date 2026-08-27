@@ -1,10 +1,11 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
-import { Head, Link, router, usePage } from '@inertiajs/vue3'
+import { Head, Link, router, usePage, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import { showToast, confirm } from '@/Utils/alertUtil.js'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 const page = usePage()
 
@@ -14,6 +15,12 @@ const props = defineProps({
     filters: Object,
     flash: Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const filters = ref({
     estado: props.filters?.estado ?? '',
@@ -247,7 +254,8 @@ const tipoBadge = (tipo) => {
                     <span class="badge bg-primary-transparent text-primary ms-2">{{ solicitudes.total }} registros</span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover text-nowrap mb-0">
                         <thead class="table-light">
@@ -309,8 +317,76 @@ const tipoBadge = (tipo) => {
                     </table>
                 </div>
             </div>
-            <!-- Paginación -->
-            <div v-if="solicitudes.last_page > 1" class="card-footer d-flex justify-content-between align-items-center">
+
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="solicitudes.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-tools-line fs-3 d-block mb-2"></i>
+                    No se encontraron solicitudes
+                </div>
+
+                <InfiniteScroll v-else data="solicitudes" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="s in solicitudes.data" :key="s.id" class="list-card-mobile border rounded-3 p-3"
+                        @click="router.get(route('mantenimiento.solicitudes.show', s.id))">
+
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-primary fs-13 fw-semibold">{{ s.nro }}</span>
+                            <span class="badge" :class="estadoBadge(s.estado)">{{ s.estado }}</span>
+                        </div>
+
+                        <div class="mb-2">
+                            <span class="fw-semibold d-block">{{ s.vehiculo?.codigo ?? '—' }} – {{ s.vehiculo?.nro_placa ?? '—' }}</span>
+                            <small v-if="s.vehiculo?.marca" class="text-muted">{{ s.vehiculo.marca }}</small>
+                        </div>
+
+                        <p class="small text-muted mb-2">
+                            {{ s.descripcion_problema?.substring(0, 100) }}{{ s.descripcion_problema?.length > 100 ? '…' : '' }}
+                        </p>
+
+                        <div class="row g-2 small mb-2">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Conductor</span>
+                                <span>{{ s.conductor ? `${s.conductor.persona.nombre_completo}` : '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Tipo</span>
+                                <span class="badge" :class="tipoBadge(s.tipo_mantenimiento)">{{ s.tipo_mantenimiento }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Fecha</span>
+                                <span>{{ s.fecha }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Km actual</span>
+                                <span>{{ s.kilometraje_actual != null ? s.kilometraje_actual.toLocaleString() + ' km' : '—' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2" @click.stop>
+                            <Link v-can="'mantenimiento.solicitudes.imprimir'" :href="route('mantenimiento.solicitudes.imprimir', s.id)"
+                                target="_blank" class="btn btn-icon btn-light" title="Imprimir">
+                                <i class="ri-file-list-3-line"></i>
+                            </Link>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más solicitudes...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más solicitudes para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginación: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile && solicitudes.last_page > 1" class="card-footer d-flex justify-content-between align-items-center">
                 <small class="text-muted">
                     Mostrando {{ solicitudes.from }}–{{ solicitudes.to }} de {{ solicitudes.total }}
                 </small>

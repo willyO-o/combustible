@@ -1,16 +1,23 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import { showToast, confirm } from '@/Utils/alertUtil.js'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 const props = defineProps({
     personas: Object,
     filters: Object,
     flash: Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 // Filtros reactivos inicializados con los valores que llegan del servidor
 const filters = ref({
@@ -157,7 +164,8 @@ const fotoUrl = (foto) => (foto ? `/storage/${foto}` : '/images/faces/1.jpg')
                 </span>
             </div>
         </div>
-        <div class="card-body p-0">
+        <!-- Vista tabla: desktop -->
+        <div v-if="!isMobile" class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover text-nowrap mb-0">
                     <thead class="table-light">
@@ -224,8 +232,72 @@ const fotoUrl = (foto) => (foto ? `/storage/${foto}` : '/images/faces/1.jpg')
             </div>
         </div>
 
-        <!-- Paginador -->
-        <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+        <div v-else class="card-body p-2">
+            <div v-if="personas.data.length === 0" class="text-center py-4 text-muted">
+                <i class="ri-user-search-line fs-3 d-block mb-2"></i>
+                No se encontraron personas
+            </div>
+
+            <InfiniteScroll v-else data="personas" only-next as="div" class="d-flex flex-column gap-2">
+                <div v-for="persona in personas.data" :key="persona.id" class="list-card-mobile border rounded-3 p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="avatar avatar-md">
+                            <img :src="fotoUrl(persona.foto)" :alt="persona.nombres" class="rounded-circle"
+                                style="width:36px;height:36px;object-fit:cover;" />
+                        </span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">{{ persona.nombres }} {{ persona.paterno ?? '' }} {{ persona.materno ?? '' }}</div>
+                            <small class="text-muted">CI: {{ persona.ci }}</small>
+                        </div>
+                        <span class="badge" :class="estadoBadge(persona.estado_persona)">{{ persona.estado_persona }}</span>
+                    </div>
+
+                    <div class="row g-2 small mb-2">
+                        <div class="col-6">
+                            <span class="text-muted d-block">Celular</span>
+                            <span>{{ persona.celular ?? '—' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Tipo</span>
+                            <span class="badge" :class="tipoBadge(persona.tipo_actual)">{{ tipoLabel(persona.tipo_actual) }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Usuario</span>
+                            <span v-if="persona.user" class="badge" :class="estadoBadge(persona.user.estado_usuario)">
+                                {{ persona.user.estado_usuario }}
+                            </span>
+                            <span v-else class="text-muted">Sin usuario</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2">
+                        <Link v-can="'personas.editar'" :href="route('personas.edit', persona.id)" class="btn btn-icon btn-light" title="Editar">
+                            <i class="ri-edit-line"></i>
+                        </Link>
+                        <button v-can="'personas.eliminar'" type="button" class="btn btn-icon btn-light" title="Eliminar"
+                            @click="confirmDelete(persona)">
+                            <i class="ri-delete-bin-line"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Indicador de carga / fin de lista del scroll infinito -->
+                <template #next="{ loading, hasMore }">
+                    <div v-if="loading" class="text-center text-muted small py-2">
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        Cargando más personas...
+                    </div>
+                    <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                        No hay más personas para mostrar.
+                    </div>
+                </template>
+            </InfiniteScroll>
+        </div>
+
+        <!-- Paginador: sólo la tabla desktop. El listado mobile usa scroll
+             infinito (InfiniteScroll arriba) en vez de páginas numeradas. -->
+        <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="text-muted small">
                 Mostrando {{ personas.from ?? 0 }} - {{ personas.to ?? 0 }}
                 de {{ personas.total }} resultados

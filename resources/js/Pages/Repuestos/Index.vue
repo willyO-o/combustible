@@ -1,8 +1,9 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import { confirm } from '@/Utils/alertUtil.js'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -10,6 +11,12 @@ const props = defineProps({
     filters:   Object,
     flash:     Object,
 })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const filters = ref({
     nombre_repuesto: props.filters?.nombre_repuesto ?? '',
@@ -149,7 +156,8 @@ const estadoBadge = (estado) => {
                     </span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
@@ -215,8 +223,69 @@ const estadoBadge = (estado) => {
                 </div>
             </div>
 
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="repuestos.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-tools-line fs-3 d-block mb-2"></i>
+                    No se encontraron repuestos
+                </div>
+
+                <InfiniteScroll v-else data="repuestos" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="repuesto in repuestos.data" :key="repuesto.id" class="list-card-mobile border rounded-3 p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-primary-transparent text-primary">{{ repuesto.codigo_repuesto }}</span>
+                            <span class="badge" :class="estadoBadge(repuesto.estado_repuesto)">
+                                {{ repuesto.estado_repuesto }}
+                            </span>
+                        </div>
+
+                        <div class="mb-2">
+                            <span class="fw-semibold d-block">{{ repuesto.nombre_repuesto }}</span>
+                            <small v-if="repuesto.descripcion_repuesto" class="text-muted">
+                                {{ repuesto.descripcion_repuesto.substring(0, 80) }}{{ repuesto.descripcion_repuesto.length > 80 ? '…' : '' }}
+                            </small>
+                        </div>
+
+                        <div class="row g-2 small mb-2">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Unidad</span>
+                                <span>{{ repuesto.unidad_medida }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Stock</span>
+                                <span class="fw-medium">{{ repuesto.stock_actual }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2">
+                            <Link v-can="'repuestos.editar'" :href="route('repuestos.edit', repuesto.id)"
+                                class="btn btn-icon btn-info-light" title="Editar">
+                                <i class="ri-edit-line"></i>
+                            </Link>
+                            <button v-can="'repuestos.eliminar'" type="button" class="btn btn-icon btn-danger-light"
+                                title="Eliminar" @click="confirmDelete(repuesto)">
+                                <i class="ri-delete-bin-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más repuestos...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más repuestos para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">
                     Mostrando
                     <strong>{{ repuestos.from ?? 0 }}</strong> -

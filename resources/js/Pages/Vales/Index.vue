@@ -59,8 +59,10 @@ function clearFilters() {
     filters.value = { nro_vale: '', fecha_desde: '', fecha_hasta: '', estado_vale: '' }
 }
 
-async function confirmDelete(vale) {
-    const confirmado = await confirm(`¿Eliminar el Vale #${vale.nro_vale}?`, 'Eliminar Vale', 'Sí, eliminar')
+// Los vales no se eliminan: se anulan (ver ValeController::destroy). Se
+// reutiliza la misma ruta/método DELETE y el permiso 'vales.eliminar'.
+async function confirmAnular(vale) {
+    const confirmado = await confirm(`¿Anular el Vale #${vale.nro_vale}?`, 'Anular Vale', 'Sí, anular')
 
     if (!confirmado) {
         return
@@ -68,6 +70,10 @@ async function confirmDelete(vale) {
 
     router.delete(route('vales.destroy', vale.id))
 }
+
+// Sólo un vale PENDIENTE puede editarse o anularse: uno USADO ya no debe
+// modificarse, y uno ANULADO tampoco (ni tiene sentido volver a anularlo).
+const puedeEditarseOAnularse = (vale) => vale.estado_vale === 'PENDIENTE'
 
 const selectedValeId = ref(null)
 const openDetalle = (id) => { selectedValeId.value = id }
@@ -242,7 +248,7 @@ const puedeUsarse = (vale) =>
                                         class="btn btn-sm btn-icon btn-success-light" title="Usar vale (registrar carga)">
                                         <i class="ri-gas-station-line"></i>
                                     </Link>
-                                    <Link v-can="'vales.editar'" v-if="vale.estado_vale != 'USADO'" :href="route('vales.edit', vale.id)"
+                                    <Link v-can="'vales.editar'" v-if="puedeEditarseOAnularse(vale)" :href="route('vales.edit', vale.id)"
                                         class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                         <i class="ri-edit-line"></i>
                                     </Link>
@@ -250,9 +256,9 @@ const puedeUsarse = (vale) =>
                                         class="btn btn-sm btn-icon btn-warning-light" title="Imprimir">
                                         <i class="ri-printer-line"></i>
                                     </Link>
-                                    <button v-can="'vales.eliminar'" v-if="vale.estado_vale != 'USADO'" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar"
-                                        @click="confirmDelete(vale)">
-                                        <i class="ri-delete-bin-line"></i>
+                                    <button v-can="'vales.eliminar'" v-if="puedeEditarseOAnularse(vale)" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Anular"
+                                        @click="confirmAnular(vale)">
+                                        <i class="ri-close-circle-line"></i>
                                     </button>
                                 </div>
                             </td>
@@ -273,7 +279,7 @@ const puedeUsarse = (vale) =>
             </div>
 
             <InfiniteScroll v-else data="vales" only-next as="div" class="d-flex flex-column gap-2">
-                <div v-for="vale in vales.data" :key="vale.id" class="vale-card-mobile border rounded-3 p-3"
+                <div v-for="vale in vales.data" :key="vale.id" class="list-card-mobile border rounded-3 p-3"
                     @click="openDetalle(vale.id)">
 
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -337,7 +343,7 @@ const puedeUsarse = (vale) =>
                                             <i class="ri-eye-line me-2"></i> Ver detalles
                                         </a>
                                     </li>
-                                    <li v-if="vale.estado_vale != 'USADO'" v-can="'vales.editar'">
+                                    <li v-if="puedeEditarseOAnularse(vale)" v-can="'vales.editar'">
                                         <Link class="dropdown-item" :href="route('vales.edit', vale.id)">
                                             <i class="ri-edit-line me-2"></i> Editar
                                         </Link>
@@ -347,10 +353,10 @@ const puedeUsarse = (vale) =>
                                             <i class="ri-printer-line me-2"></i> Imprimir
                                         </a>
                                     </li>
-                                    <li v-if="vale.estado_vale != 'USADO'" v-can="'vales.eliminar'">
+                                    <li v-if="puedeEditarseOAnularse(vale)" v-can="'vales.eliminar'">
                                         <a class="dropdown-item text-danger" href="javascript:void(0);"
-                                            @click="confirmDelete(vale)">
-                                            <i class="ri-delete-bin-line me-2"></i> Eliminar
+                                            @click="confirmAnular(vale)">
+                                            <i class="ri-close-circle-line me-2"></i> Anular
                                         </a>
                                     </li>
                                 </ul>

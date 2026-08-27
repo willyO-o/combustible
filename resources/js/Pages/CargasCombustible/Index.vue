@@ -1,12 +1,19 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
+import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import CargaCombustibleDetalleModal from '@/Components/CargaCombustibleDetalleModal.vue'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 import { confirm } from '@/Utils/alertUtil.js'
+import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 defineOptions({ layout: Maindashboard })
+
+// Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
+// listado en tarjetas con scroll infinito en vez de la tabla (ver
+// .ai/rules/pages.md, "Listado responsivo con scroll infinito").
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isMobile = breakpoints.smaller('lg')
 
 const props = defineProps({
     cargas:  Object,
@@ -141,7 +148,8 @@ const tipoBadge = (tipo) =>
                     <span class="badge bg-primary-transparent text-primary ms-2">{{ cargas.total }}</span>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <!-- Vista tabla: desktop -->
+            <div v-if="!isMobile" class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover text-wrap mb-0">
                         <thead class="table-light">
@@ -222,8 +230,109 @@ const tipoBadge = (tipo) =>
                     </table>
                 </div>
             </div>
-            <!-- Paginador -->
-            <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+
+            <!-- Vista tarjetas: tablet y celular, con scroll infinito -->
+            <div v-else class="card-body p-2">
+                <div v-if="cargas.data.length === 0" class="text-center py-4 text-muted">
+                    <i class="ri-gas-station-line fs-3 d-block mb-2"></i>
+                    No se encontraron registros
+                </div>
+
+                <InfiniteScroll v-else data="cargas" only-next as="div" class="d-flex flex-column gap-2">
+                    <div v-for="carga in cargas.data" :key="carga.id" class="list-card-mobile border rounded-3 p-3"
+                        @click="verDetalle(carga)">
+
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="badge bg-primary fs-13 fw-semibold">{{ carga.nro }}</span>
+                            <span v-if="carga.estado_carga" class="badge" :class="estadoBadge(carga.estado_carga)">
+                                {{ carga.estado_carga }}
+                            </span>
+                        </div>
+
+                        <div class="mb-2">
+                            <div class="fw-semibold">
+                                {{ carga.vehiculo?.codigo ?? '—' }} — {{ carga.vehiculo?.nro_placa ?? '—' }}
+                            </div>
+                            <small v-if="carga.vehiculo?.marca" class="text-muted">{{ carga.vehiculo.marca }}</small>
+                        </div>
+
+                        <div class="row g-2 small mb-2">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Conductor</span>
+                                <span>{{ carga.conductor?.persona?.nombre_completo ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Estación de servicio</span>
+                                <span>{{ carga.grifo?.razon_social ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Fecha</span>
+                                <span>{{ carga.fecha_carga_formateada }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Tipo</span>
+                                <span class="badge" :class="tipoBadge(carga.tipo_carga)">{{ carga.tipo_carga }}</span>
+                                <span v-if="carga?.vale?.nro" class="text-muted"> {{ carga.vale.nro }}</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between border-top pt-2">
+                            <div class="small">
+                                <span class="badge bg-warning-transparent text-warning">
+                                    {{ carga.tipo_combustible?.tipo_combustible ?? '—' }}
+                                </span>
+                                <div class="fw-bold mt-1">
+                                    {{ Number(carga.litros).toFixed(2) }} Lt × Bs {{ Number(carga.precio).toFixed(2) }}
+                                    = Bs {{ (Number(carga.litros) * Number(carga.precio)).toFixed(2) }}
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-1" @click.stop>
+                                <Link :href="route('cargas.comprobante', carga.id)" target="_blank"
+                                    class="btn btn-icon btn-warning-light" title="Imprimir comprobante de egreso">
+                                    <i class="ri-printer-line"></i>
+                                </Link>
+
+                                <div v-if="carga.estado != 'REGISTRADO'" class="dropdown">
+                                    <button type="button" class="btn btn-icon btn-light" data-bs-toggle="dropdown"
+                                        aria-expanded="false" title="Más acciones">
+                                        <i class="ri-more-2-fill"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li v-can="'cargas-combustible.editar'">
+                                            <Link class="dropdown-item" :href="route('cargas.edit', carga.id)">
+                                                <i class="ri-edit-line me-2"></i> Editar
+                                            </Link>
+                                        </li>
+                                        <li v-can="'cargas-combustible.eliminar'">
+                                            <a class="dropdown-item text-danger" href="javascript:void(0);"
+                                                @click="confirmDelete(carga)">
+                                                <i class="ri-delete-bin-line me-2"></i> Eliminar
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de carga / fin de lista del scroll infinito -->
+                    <template #next="{ loading, hasMore }">
+                        <div v-if="loading" class="text-center text-muted small py-2">
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Cargando más registros...
+                        </div>
+                        <div v-else-if="!hasMore" class="text-center text-muted small py-2">
+                            No hay más registros para mostrar.
+                        </div>
+                    </template>
+                </InfiniteScroll>
+            </div>
+
+            <!-- Paginador: sólo la tabla desktop. El listado mobile usa
+                 scroll infinito (InfiniteScroll arriba) en vez de páginas
+                 numeradas. -->
+            <div v-if="!isMobile" class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="text-muted small">Mostrando {{ cargas.from ?? 0 }} - {{ cargas.to ?? 0 }} de {{ cargas.total }}</div>
                 <nav v-if="cargas.last_page > 1">
                     <ul class="pagination pagination-sm mb-0">
