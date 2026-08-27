@@ -210,6 +210,15 @@ class CargaCombustibleController extends Controller
 
     public function destroy(CargaCombustible $carga): RedirectResponse
     {
+        // Una carga registrada con un vale queda ligada a ese vale (que ya
+        // pasó a USADO): eliminarla dejaría el vale huérfano/inconsistente,
+        // así que no se permite para ningún rol (ver también el botón
+        // oculto en CargasCombustible/Index.vue).
+        if ($carga->id_vale) {
+            return redirect()->route('cargas.index')
+                ->with('error', 'No se puede eliminar la carga: fue registrada con un vale de combustible.');
+        }
+
         // Eliminar respaldos físicos
         foreach ($carga->respaldosDigitales as $respaldo) {
             Storage::disk('public')->delete($respaldo->ruta_respaldo);

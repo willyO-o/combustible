@@ -640,6 +640,8 @@ onMounted(() => {
                                             <i class="ri-lock-line me-1"></i>Bloqueado
                                         </span>
                                     </div>
+                                    <div v-if="form.errors.id_vale" class="text-danger small mt-1">{{
+                                        form.errors.id_vale }}</div>
                                 </div>
 
                                 <!-- Edición sin vale (Prepago): sólo indicador, sin selector -->
@@ -674,6 +676,7 @@ onMounted(() => {
                                         <option v-for="vale in valesVehiculo" :key="vale.id" :value="vale.id">
                                             {{ vale.label }}
                                         </option>
+
                                     </select>
 
                                     <small class="text-muted">

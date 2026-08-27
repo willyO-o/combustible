@@ -518,6 +518,66 @@ class CargaCombustibleControllerTest extends TestCase
         $this->assertSame('VALE', $carga->fresh()->tipo_carga);
     }
 
+    public function test_destroy_elimina_una_carga_prepago(): void
+    {
+        $this->crearParametrosEmpresa();
+
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        $carga = CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => 50,
+            'precio' => 10,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $response = $this->delete(route('cargas.destroy', $carga->id));
+
+        $response->assertRedirect(route('cargas.index'));
+        $this->assertDatabaseMissing('carga_combustible', ['id' => $carga->id]);
+    }
+
+    /**
+     * Una carga registrada con un vale no debe poder eliminarse, sin
+     * importar el rol: dejaría el vale (ya USADO) huérfano/inconsistente.
+     * Ver también el botón oculto en CargasCombustible/Index.vue.
+     */
+    public function test_destroy_rechaza_una_carga_registrada_con_un_vale(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible, ['estado_vale' => 'USADO']);
+
+        $carga = CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => 40,
+            'precio' => 9.5,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'id_vale' => $vale->id,
+            'tipo_carga' => 'VALE',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+
+        $response = $this->delete(route('cargas.destroy', $carga->id));
+
+        $response->assertRedirect(route('cargas.index'))->assertSessionHas('error');
+        $this->assertDatabaseHas('carga_combustible', ['id' => $carga->id]);
+    }
+
     public function test_imprime_el_comprobante_de_egreso_de_una_carga_de_combustible(): void
     {
         $this->crearParametrosEmpresa();

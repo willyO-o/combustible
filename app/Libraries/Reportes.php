@@ -169,6 +169,26 @@ class Reportes extends exFPDF
         $this->SetXY(5, 268);
         $this->Cell(203, 4, utf8Decode('Fecha de impresión: '.now()->format('d/m/Y H:i')), 0, 0, 'R');
 
+        // ----------------------------------------------------------
+        // SELLO "ANULADO": se dibuja al final para quedar por encima de
+        // todo lo demás. El PNG ya trae el sello rotado con fondo
+        // transparente (canal alpha), así que sólo se centra en la
+        // página; FPDF soporta el canal alpha de forma nativa (SMask).
+        // ----------------------------------------------------------
+        if ($vale->estado_vale === 'ANULADO') {
+            $selloAncho = 130;
+            [$selloAnchoPx, $selloAltoPx] = getimagesize(public_path('images/reportes/anulado.png'));
+            $selloAlto = $selloAncho * ($selloAltoPx / $selloAnchoPx);
+
+            $this->Image(
+                public_path('images/reportes/anulado.png'),
+                ($pageW - $selloAncho) / 2,
+                ($pageH - $selloAlto) / 2,
+                $selloAncho,
+                $selloAlto
+            );
+        }
+
         // Salida del PDF
         // El '/' de $numeroVale ("NNNNNN/GESTION") no es válido dentro de un nombre
         // de archivo, así que se reemplaza por '-' sólo para el nombre sugerido.
@@ -477,7 +497,7 @@ class Reportes extends exFPDF
 
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
         $this->SetLineWidth(0.3);
-        $this->Rect($s4X+2, $s4Y, $s4W - 4, 8);
+        $this->Rect($s4X + 2, $s4Y, $s4W - 4, 8);
         $this->SetFont('Arial', 'B', 9);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);
         $this->SetXY($s4X, $s4Y);
@@ -489,7 +509,7 @@ class Reportes extends exFPDF
 
         $this->SetMargins(-1, 0, 0);
         $this->SetXY(0, $s4Y + 8);
-        $anchoTabla= array_sum($anchos);
+        $anchoTabla = array_sum($anchos);
         $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$anchoTabla}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; min-height:6.5;");
 
         $tabla->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-color:255,255,255; font-style:B; font-size:7.5; align:C;");

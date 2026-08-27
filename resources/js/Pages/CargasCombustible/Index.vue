@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 import CargaCombustibleDetalleModal from '@/Components/CargaCombustibleDetalleModal.vue'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 import { confirm } from '@/Utils/alertUtil.js'
+import { formatDate } from '@/Utils/dateUtil'
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 
 defineOptions({ layout: Maindashboard })
@@ -220,7 +221,7 @@ const tipoBadge = (tipo) =>
                                         <Link  v-if="carga.estado != 'REGISTRADO'" v-can="'cargas-combustible.editar'" :href="route('cargas.edit', carga.id)" class="btn btn-sm btn-icon btn-info-light" title="Editar">
                                             <i class="ri-edit-line"></i>
                                         </Link>
-                                        <button v-if="carga.estado != 'REGISTRADO'" v-can="'cargas-combustible.eliminar'" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar" @click="confirmDelete(carga)">
+                                        <button v-if="carga.estado != 'REGISTRADO' && !carga.vale" v-can="'cargas-combustible.eliminar'" type="button" class="btn btn-sm btn-icon btn-danger-light" title="Eliminar" @click="confirmDelete(carga)">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>
                                     </div>
@@ -304,7 +305,7 @@ const tipoBadge = (tipo) =>
                                                 <i class="ri-edit-line me-2"></i> Editar
                                             </Link>
                                         </li>
-                                        <li v-can="'cargas-combustible.eliminar'">
+                                        <li v-if="!carga.vale" v-can="'cargas-combustible.eliminar'">
                                             <a class="dropdown-item text-danger" href="javascript:void(0);"
                                                 @click="confirmDelete(carga)">
                                                 <i class="ri-delete-bin-line me-2"></i> Eliminar
