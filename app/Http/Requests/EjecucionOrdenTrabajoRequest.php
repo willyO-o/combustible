@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 class EjecucionOrdenTrabajoRequest extends FormRequest
@@ -34,6 +36,19 @@ class EjecucionOrdenTrabajoRequest extends FormRequest
     protected function failedAuthorization(): never
     {
         throw new AuthorizationException('Sólo puede culminar la ejecución de las órdenes que tiene asignadas.');
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => 'Los datos enviados no son válidos.',
+                'errors' => $validator->errors(),
+            ], 422));
+        }
+
+        parent::failedValidation($validator);
     }
 
     public function rules(): array

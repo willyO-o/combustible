@@ -247,9 +247,9 @@ const fmt = (val, decimals = 2) =>
                                             </div>
                                         </div>
 
-                                        <!-- Grifo de la carga (si difiere) -->
+                                        <!-- Surtidor de la carga (si difiere) -->
                                         <div v-if="vale.carga.grifo" class="mt-3 pt-3 border-top">
-                                            <p class="text-muted fs-11 text-uppercase mb-1">Grifo de la carga</p>
+                                            <p class="text-muted fs-11 text-uppercase mb-1">Estación de servicio</p>
                                             <p class="fw-semibold mb-0">
                                                 {{ vale.carga.grifo.razon_social }}
                                                 <span v-if="vale.carga.grifo.ciudad" class="text-muted fw-normal"> — {{ vale.carga.grifo.ciudad }}</span>

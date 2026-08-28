@@ -406,7 +406,7 @@ onMounted(() => {
         <div v-if="isEdit" class="alert alert-info-transparent d-flex align-items-center gap-2 mb-4">
             <i class="ri-lock-line fs-16"></i>
             <small>
-                Los datos originales de la carga (vehículo, conductor, vale, tipo de combustible, grifo, fecha,
+                Los datos originales de la carga (vehículo, conductor, vale, tipo de combustible, surtidor, fecha,
                 litros y precio) quedan bloqueados. Solo puedes actualizar el <strong>kilometraje/horómetro</strong>
                 y los <strong>respaldos digitales</strong>.
             </small>
@@ -415,7 +415,7 @@ onMounted(() => {
         <div v-else-if="modoVale" class="alert alert-info-transparent d-flex align-items-center gap-2 mb-4">
             <i class="ri-lock-line fs-16"></i>
             <small>
-                Estás usando el <strong>Vale #{{ valePreseleccionado.nro }}</strong>. El vehículo, conductor, grifo,
+                Estás usando el <strong>Vale #{{ valePreseleccionado.nro }}</strong>. El vehículo, conductor, surtidor,
                 combustible, litros y precio vienen del vale y quedan bloqueados. Solo debes completar el
                 <strong>kilometraje/horómetro</strong>, el <strong>número de factura</strong> y los
                 <strong>respaldos digitales</strong>.

@@ -70,7 +70,7 @@ function submit() {
                             type="text"
                             class="form-control"
                             :class="{ 'is-invalid': form.errors.razon_social }"
-                            placeholder="Nombre o razón social del grifo"
+                            placeholder="Nombre o razón social del surtidor"
                             maxlength="255"
                         />
                         <div v-if="form.errors.razon_social" class="invalid-feedback">
@@ -154,7 +154,7 @@ function submit() {
                             class="form-control"
                             :class="{ 'is-invalid': form.errors.direccion }"
                             rows="2"
-                            placeholder="Dirección del grifo"
+                            placeholder="Dirección del surtidor"
                             maxlength="250"
                         ></textarea>
                         <div v-if="form.errors.direccion" class="invalid-feedback">

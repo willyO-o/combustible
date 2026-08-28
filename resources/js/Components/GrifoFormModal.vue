@@ -119,7 +119,7 @@ defineExpose({ open, close })
                                     type="text"
                                     class="form-control"
                                     :class="{ 'is-invalid': errors.razon_social }"
-                                    placeholder="Nombre o razón social del grifo"
+                                    placeholder="Nombre o razón social "
                                     maxlength="255"
                                     autofocus
                                 />
@@ -178,7 +178,7 @@ defineExpose({ open, close })
                                     class="form-control"
                                     :class="{ 'is-invalid': errors.direccion }"
                                     rows="2"
-                                    placeholder="Dirección del grifo"
+                                    placeholder="Dirección de la estación de servicio"
                                     maxlength="250"
                                 ></textarea>
                                 <InputError :message="errors.direccion" class="mt-1" />

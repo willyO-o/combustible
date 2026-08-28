@@ -51,7 +51,7 @@ function clearFilters() {
 }
 
 async function confirmDelete(grifo) {
-    const confirmado = await confirm(`¿Eliminar el grifo "${grifo.razon_social}"?`, 'Eliminar Grifo', 'Sí, eliminar')
+    const confirmado = await confirm(`¿Eliminar el surtidor "${grifo.razon_social}"?`, 'Eliminar Surtidor', 'Sí, eliminar')
 
     if (!confirmado) {
         return
