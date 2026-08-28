@@ -117,6 +117,12 @@
 .daterangepicker .calendar-table th,
 .daterangepicker .calendar-table td {
     color: var(--default-text-color);
+    /* la librería pinta cada <td>/<th> con background-color:#fff fijo (regla
+       scoped) -> en modo oscuro el número queda blanco sobre blanco
+       (invisible). Se deja transparente para que herede el fondo del
+       calendario (--custom-white) y sólo los estados (hover/in-range/active)
+       pongan su propio color. */
+    background-color: transparent;
 }
 .daterangepicker .calendar-table th.month {
     font-weight: 600;

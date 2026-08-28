@@ -51,8 +51,8 @@ const verificarYMostrarModal = () => {
         return
     }
 
-    const yaVisto = sessionStorage.getItem(modalKey)
-    if (!yaVisto && solicitudesPendientes.value.length > 0) {
+    // const yaVisto = sessionStorage.getItem(modalKey)
+    if ( solicitudesPendientes.value.length > 0) {
         showPendingModal.value = true
         sessionStorage.setItem(modalKey, 'true')
         // Mostrar modal cuando el DOM esté listo
