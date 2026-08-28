@@ -2,6 +2,8 @@
 paths:
   - 'app/Http/Controllers/**/*.php'
   - 'app/Http/Controllers/*.php'
+  - app/Http/Controllers/DashboardController.php
+  - app/Http/Controllers/OrdenTrabajoController.php
 ---
 
 # Controllers
@@ -29,3 +31,35 @@ Shape Eloquent query results for Inertia/JSON output with ->get()->map(fn ($x) =
 
 ## auth() helper in domain code, Auth:: only in Breeze auth flows
 Use the auth() helper for current-user checks in domain code. The Auth:: facade appears only in the Breeze-generated authentication controllers (app/Http/Controllers/Auth/**) — don't extend Auth:: usage beyond that scaffolding.
+
+## Dashboard: un permiso por widget + alcance por área para jefe-area
+Cada widget del dashboard (4 tarjetas + gráfico) está detrás de un permiso `dashboard.tarjeta-*.ver` / `dashboard.grafico-combustible.ver`. El controlador SOLO calcula/envía la métrica si `$user->can(...)` (además del `v-can` en Dashboard.vue). Los reciben admin/super-admin/jefe-area (UserSeeder::permisosDashboardWidgets()).
+
+Alcance: `DashboardController::idsVehiculosEnAlcance()` devuelve null (admin/super-admin ven todo) o una Collection de ids de vehículo cuando es jefe-area (vía `Persona::encargadoAreas()` + `Vehiculo::areasAsignadas`), y TODA métrica se filtra por esos vehículos (cargas, vales, vehículos, conductores por asignación, y `CargaCombustible::reporteCargaCombustibleMes($anio, $idVehiculos)`).
+
+conductor: sin widgets todavía (gráficas propias = iteración futura); Dashboard.vue muestra un empty state si el usuario no tiene ninguno de los 5 permisos.
+
+`CargaCombustible::reporteCargaCombustibleMes()` se reescribió para agrupar por mes en PHP (no `MONTH()`/`groupByRaw`) para funcionar en SQLite (tests) y MySQL.
+
+## Dashboard: gráfico de órdenes de trabajo por estado (técnico de mantenimiento)
+Widget adicional al de los 5 de `permisosDashboardWidgets()`: permiso `dashboard.grafico-ordenes.ver`, gráfico donut de órdenes de trabajo agrupadas por `estado_orden` (PENDIENTE/EN_EJECUCION/CULMINADO/VERIFICADO/CANCELADO).
+
+Lo reciben: tecnico-mantenimiento (en `permisosParaTecnicoMantenimiento()`) y administrador (en `todosLosPermisos()`, línea suelta — NO está en `permisosDashboardWidgets()` para no dárselo a jefe-area). super-admin por bypass.
+
+`DashboardController::metricaOrdenesPorEstado()`: el COUNT/GROUP BY va en la consulta (`->groupBy('estado_orden')->selectRaw('estado_orden, COUNT(*) as total')->pluck('total','estado_orden')`); en PHP sólo se ordena por flujo del estado, se traducen etiquetas y se descartan estados con 0. Devuelve `{labels:[], series:[]}`. Un técnico "puro" (sin rol de gestión) sólo ve sus órdenes (`id_usuario_ejecuta`), igual criterio que `OrdenTrabajoController::esSoloTecnico()`.
+
+Frontend: `Dashboard.vue` prop `ordenesPorEstado`, `<Apexchart type="donut">` con `v-can` + `v-if` (mostrarOrdenes). Convención confirmada por el usuario: los cálculos de agregación se hacen en la BD siempre que se pueda.
+
+## Dashboard: gráfico de horas trabajadas por día/semana (rol conductor)
+Permiso `dashboard.grafico-horas.ver`: lo reciben conductor (`permisosParaConductor()`) y administrador (línea suelta en `todosLosPermisos()`, junto a `dashboard.grafico-ordenes.ver`); super-admin por bypass. NO jefe-area ni técnico.
+
+`DashboardController::metricaHorasTrabajadas()`: SUM(horas_trabajadas) de `operacion_diaria` agrupado por `DATE(fecha_inicio)` en la BD (`groupByRaw('DATE(fecha_inicio)')` + `selectRaw` — portable SQLite/MySQL, cubre 42 días). El reparto de esos totales diarios en semanas (lunes-domingo) se hace en PHP porque la función de semana no es portable entre motores. Devuelve `{ dia: {labels,series}, semana: {labels,series} }` (últimos 7 días / 6 semanas). Un conductor "puro" (sin rol de gestión) sólo ve sus operaciones (`id_conductor = $user->id_persona`, mismo criterio que ListOperacionesDiariasAction); admin ve todas.
+
+Frontend `Dashboard.vue`: gráfico de barras (`type: 'bar'`) con toggle "Por día / Por semana" (radios, mismo patrón que "Gastos de Combustible por Mes"), prop `horasTrabajadas`, `v-can` + `v-if` (mostrarHoras). Siempre visible para el conductor (la serie trae 7 puntos aunque sean 0).
+
+## Notificación al técnico cuando se le asigna una orden de trabajo
+Al emitir (`store`) o reasignar (`update`, sólo si `id_usuario_ejecuta` cambió) una orden de trabajo se dispara `OrdenTrabajoAsignada::dispatch($orden)`. El listener `NotificarOrdenTrabajoAsignada` (auto-descubierto, síncrono) manda `OrdenTrabajoAsignadaNotification` (canal `database`) al `usuarioEjecuta`.
+
+Mismo patrón que `ObservacionOperacionEvent` / `NotificarObservacionOperacion` / `ObservacionOperacionNotification`. La notificación lleva `data['tipo'] => 'orden_trabajo_asignada'` + `nro_orden`, `id_orden_trabajo`, `id_vehiculo`, `url` (ruta a `mantenimiento.ordenes.show`).
+
+Todo tipo de notificación nuevo debe añadir su `match` en AMBOS formateadores: `HandleInertiaRequests::formatearNotificacion()` (dropdown web) y `Api/V1/NotificacionController::formatear()` (API). Ícono usado: `ri-tools-line`.

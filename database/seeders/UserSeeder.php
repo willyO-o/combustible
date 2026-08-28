@@ -31,6 +31,23 @@ class UserSeeder extends Seeder
         ];
     }
 
+    /**
+     * Un permiso por widget del dashboard (4 tarjetas + gráfico de barras).
+     * Deliberadamente separado de permisosDashboard(): sólo administrador,
+     * super-admin y jefe-area los reciben; para jefe-area cada métrica se
+     * calcula sólo sobre los vehículos de sus áreas (ver DashboardController).
+     */
+    private function permisosDashboardWidgets(): array
+    {
+        return [
+            'dashboard.tarjeta-cargas.ver',
+            'dashboard.tarjeta-vales.ver',
+            'dashboard.tarjeta-vehiculos.ver',
+            'dashboard.tarjeta-conductores.ver',
+            'dashboard.grafico-combustible.ver',
+        ];
+    }
+
     private function permisosVales(): array
     {
         return [
@@ -326,6 +343,12 @@ class UserSeeder extends Seeder
     {
         return [
             ...$this->permisosDashboard(),
+            ...$this->permisosDashboardWidgets(),
+            // Widgets del dashboard específicos de un rol (administrador los
+            // recibe vía este listado; super-admin por bypass): el gráfico de
+            // órdenes de trabajo (técnico) y el de horas trabajadas (conductor).
+            'dashboard.grafico-ordenes.ver',
+            'dashboard.grafico-horas.ver',
             ...$this->permisosOperacionVehiculo(),
             ...$this->permisosCatalogos(),
             ...$this->permisosUsuarios(),
@@ -350,6 +373,8 @@ class UserSeeder extends Seeder
     {
         return [
             ...$this->permisosDashboard(),
+            // Gráfico de sus horas trabajadas por día/semana en el dashboard.
+            'dashboard.grafico-horas.ver',
             'vales.ver',
             'vales.imprimir',
             'cargas-combustible.ver',
@@ -371,6 +396,7 @@ class UserSeeder extends Seeder
     {
         return [
             ...$this->permisosDashboard(),
+            ...$this->permisosDashboardWidgets(),
             ...$this->permisosVales(),
             ...$this->permisosCargasCombustible(),
             ...$this->permisosMantenimiento(),
@@ -396,6 +422,8 @@ class UserSeeder extends Seeder
     {
         return [
             ...$this->permisosDashboard(),
+            // Gráfico de sus órdenes de trabajo por estado en el dashboard.
+            'dashboard.grafico-ordenes.ver',
             'mantenimiento.ordenes.ver',
             'mantenimiento.ordenes.estado.cambiar',
             'mantenimiento.ordenes.ejecucion.registrar',

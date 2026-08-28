@@ -4,6 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Multiselect from '@vueform/multiselect'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
+import BotonDescargarGrafico from '@/Components/BotonDescargarGrafico.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -106,6 +107,9 @@ const gruposPorMedicion = computed(() => {
     }
     return grupos
 })
+
+// Un <Apexchart> por tipo de medición (v-for) -> se guardan las refs por clave.
+const graficosRef = ref({})
 
 function chartOptions(tipoMedicion) {
     return {
@@ -256,14 +260,17 @@ function chartSeries(tipoMedicion) {
     <div v-else class="row g-3 mb-4">
         <div v-for="(grupo, tipoMedicion) in gruposPorMedicion" :key="tipoMedicion" class="col-xl-6">
             <div class="card custom-card h-100">
-                <div class="card-header">
+                <div class="card-header justify-content-between">
                     <div class="card-title">
                         Comparativa de Rendimiento — {{ tipoMedicionLabel(tipoMedicion) }}
                         <span class="badge bg-secondary-transparent text-secondary ms-1">{{ unidadLabel(tipoMedicion) }}</span>
                     </div>
+                    <BotonDescargarGrafico :grafico="graficosRef[tipoMedicion]" :nombre="`rendimiento-combustible-${tipoMedicion}`"
+                        :titulo="`Comparativa de Rendimiento — ${tipoMedicionLabel(tipoMedicion)}`"
+                        subtitulo="Reporte de Rendimiento de Combustible" />
                 </div>
                 <div class="card-body">
-                    <Apexchart type="bar" height="300" :options="chartOptions(tipoMedicion)" :series="chartSeries(tipoMedicion)" />
+                    <Apexchart :ref="(el) => (graficosRef[tipoMedicion] = el)" type="bar" height="300" :options="chartOptions(tipoMedicion)" :series="chartSeries(tipoMedicion)" />
                     <p v-if="grupo.some(sinDatosSuficientes)" class="text-muted fs-12 mb-0 mt-2">
                         <i class="ri-information-line me-1"></i>
                         Los vehículos sin datos suficientes no se incluyen en el gráfico (ver tabla).

@@ -56,6 +56,13 @@ return [
             'label' => 'Dashboard',
             'permisos' => [
                 'dashboard.ver' => 'Ver',
+                'dashboard.tarjeta-cargas.ver' => 'Tarjeta "Cargas de Combustible"',
+                'dashboard.tarjeta-vales.ver' => 'Tarjeta "Vales utilizados"',
+                'dashboard.tarjeta-vehiculos.ver' => 'Tarjeta "Total Vehículos"',
+                'dashboard.tarjeta-conductores.ver' => 'Tarjeta "Total Conductores"',
+                'dashboard.grafico-combustible.ver' => 'Gráfico "Gastos de Combustible por Mes"',
+                'dashboard.grafico-ordenes.ver' => 'Gráfico "Órdenes de Trabajo por Estado"',
+                'dashboard.grafico-horas.ver' => 'Gráfico "Horas Trabajadas por Día/Semana"',
             ],
         ],
 

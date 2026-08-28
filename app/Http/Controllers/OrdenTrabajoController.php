@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrdenTrabajoAsignada;
 use App\Http\Requests\DetalleMantenimientoRequest;
 use App\Http\Requests\EjecucionOrdenTrabajoRequest;
 use App\Http\Requests\OrdenTrabajoRequest;
@@ -165,6 +166,8 @@ class OrdenTrabajoController extends Controller
                 ->update(['estado' => 'APROBADA']);
         }
 
+        OrdenTrabajoAsignada::dispatch($orden);
+
         return redirect()->route('mantenimiento.ordenes.show', $orden)
             ->with('success', 'Orden de trabajo N° '.$orden->nro.' emitida exitosamente.');
     }
@@ -245,7 +248,14 @@ class OrdenTrabajoController extends Controller
      */
     public function update(OrdenTrabajoRequest $request, OrdenTrabajo $orden): RedirectResponse
     {
+        $tecnicoAnterior = $orden->id_usuario_ejecuta;
+
         $orden->update($request->validated());
+
+        // Sólo se notifica si la orden pasó a manos de otro técnico.
+        if ($orden->id_usuario_ejecuta !== $tecnicoAnterior) {
+            OrdenTrabajoAsignada::dispatch($orden);
+        }
 
         return redirect()->route('mantenimiento.ordenes.show', $orden)
             ->with('success', 'Orden de trabajo actualizada exitosamente.');

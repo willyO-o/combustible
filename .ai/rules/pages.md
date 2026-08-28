@@ -63,3 +63,43 @@ Frontend — envolver sólo el listado que debe scrollear infinito (no toda la p
 </InfiniteScroll>
 ```
 `only-next` porque el listado siempre arranca en la página 1 (no hay caso de "cargar anteriores"). El merge (agregar en vez de reemplazar) sólo aplica a recargas parciales (`only`/`X-Inertia-Partial-Data`, que es justamente lo que dispara `<InfiniteScroll>` al hacer scroll); una visita completa normal (cambiar un filtro con `router.get(...)` sin `only`) siempre reemplaza la prop entera, así que los filtros existentes (que no usan `only`) siguen reseteando el listado sin necesidad de `reset: [...]` extra.
+
+## Valores de gráficos: redondear siempre a máximo 2 decimales
+Todo dato que se pasa a un gráfico (Apexchart) debe redondearse a máximo 2 decimales, tanto en el backend que arma la serie como en el mapeo del .vue antes de asignarlo a `series`.
+
+Backend: `round((float) $valor, 2)` al construir cada punto (ej. `CargaCombustible::reporteCargaCombustibleMes()` redondea `total_litros` y `total_precio`).
+Frontend: helper `a2Decimales(v) = Math.round((Number(v)||0)*100)/100` aplicado en `.map(...)` de la serie (ej. `Dashboard.vue` cambiarDatos()).
+
+Aplica a cualquier gráfico nuevo del proyecto, no solo el dashboard.
+
+## ApexCharts: resolver las variables del tema, no pasar var(--x) como color
+ApexCharts (componente global `Apexchart`, vue3-apexcharts) NO entiende `colors: ['var(--primary-color)']` — lo ignora y cae a su paleta por defecto (se vio en Dashboard.vue: donut "deforme" con 2 colores).
+
+Usar los helpers de `resources/js/Utils/chartUtil.js`:
+- `colorTema('--primary-rgb', fallback)` — resuelve una variable CSS a un color usable (las `*-rgb` del tema vienen "r, g, b" -> `rgb(...)`).
+- `paletaGraficos()` — paleta categórica del tema (primary/success/warning/info/danger/secondary).
+
+Para que siga al tema al alternar claro/oscuro, usar el composable `resources/js/Composables/useTemaGraficos.js`:
+```js
+const { paleta } = useTemaGraficos()   // ref<string[]>, se re-resuelve con un MutationObserver sobre <html>
+const opciones = computed(() => ({ colors: paleta.value, ... }))
+```
+(Dashboard.vue tiene su propia paleta ordenada por estado + observer; el resto de gráficos usan el composable.)
+
+Donut circular: envolver `<Apexchart>` en un div con `max-width` y centrar.
+
+## Gráficos ApexCharts: botón de descarga PNG con <BotonDescargarGrafico>
+Todo `<Apexchart>` (dashboard y reportes) debe permitir descargar la imagen. NO se usa la toolbar nativa de ApexCharts: su export hereda los colores del modo oscuro y sale ilegible (texto blanco sobre el fondo blanco del PNG), y además `vue3-apexcharts` hace `JSON.parse(JSON.stringify(options))` en cada cambio de la prop `options`, lo que borra cualquier función dentro de `toolbar.tools.customIcons`.
+
+Patrón:
+```vue
+<Apexchart ref="miGrafico" ... :options="..." />   <!-- options.chart.toolbar: { show: false } -->
+<BotonDescargarGrafico :grafico="miGrafico" nombre="horas-trabajadas"
+    titulo="Horas Trabajadas por Día" subtitulo="Dashboard" />   <!-- en el card-header -->
+```
+
+`BotonDescargarGrafico` (resources/js/Components/BotonDescargarGrafico.vue) llama a `descargarGraficoPng(ref, nombre, titulo, subtitulo)` de `resources/js/Utils/chartUtil.js`, que: (1) aplica temporalmente `LOOK_EXPORT` (fondo `#fff`, `foreColor`/leyenda `#373d3f`, tooltip light) + `title`/`subtitle` incrustados vía `chart.updateOptions(..., true, false, false)`, (2) `await chart.dataURI()` -> descarga el PNG, (3) revierte al look anterior (snapshot de las claves tocadas, título/subtítulo a texto vacío) en `finally`. Funciona igual en modo claro y oscuro. Siempre pasar `titulo` + `subtitulo` (módulo) para que la imagen se entienda sola.
+
+Para `<Apexchart>` dentro de un `v-for`: guardar las refs en un objeto (`const graficosRef = ref({})`, `:ref="(el) => (graficosRef[clave] = el)"`).
+
+Aplicado en: Dashboard.vue (3), Reportes/CargasCombustibleRendimientoReporte.vue (1 por tipo de medición), Reportes/CargasCombustibleRendimientoDetalle.vue (1), Reportes/CargasCombustibleReporte.vue (2: barras costo/litros/cargas/precio por vehículo con toggle + donut gasto por tipo de combustible, ambos derivados en el cliente de `datosResumen`, sin tocar el controlador).

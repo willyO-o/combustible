@@ -124,7 +124,12 @@ class CargaCombustible extends Model
         });
     }
 
-    public static function reporteCargaCombustibleMes($anio = null)
+    /**
+     * @param  array<int>|null  $idVehiculos  Si se pasa, acota el reporte a esos
+     *                                        vehículos (usado por el dashboard para
+     *                                        el alcance por área del jefe de área).
+     */
+    public static function reporteCargaCombustibleMes($anio = null, ?array $idVehiculos = null)
     {
         if (! $anio) {
             $anio = now()->year;
@@ -145,27 +150,32 @@ class CargaCombustible extends Model
             12 => 'Diciembre',
         ];
 
-        // reporte agrupado por meses de enero a diciembre, con total de litros y total de precio si el mes no tiene registros, debe aparecer con total 0 el formato deve ser un array [["mes" => 1, "total_litros" => 0, "total_precio" => 0], ["mes" => 2, "total_litros" => 0, "total_precio" => 0], ...]
-        return self::selectRaw('MONTH(fecha_carga) as mes, SUM(litros) as total_litros, ROUND(SUM(precio * litros), 2) as total_precio')
+        // Reporte agrupado por mes (enero a diciembre); los meses sin registros
+        // aparecen con total 0. Formato:
+        // [["mes" => "Enero", "total_litros" => 0, "total_precio" => 0], ...]
+        // Se agrupa en PHP (no con MONTH()/groupByRaw) para no depender del
+        // motor de base de datos. toBase() evita hidratar modelos y sus $appends.
+        $cargas = self::query()
+            ->toBase()
             ->whereYear('fecha_carga', $anio)
-            ->groupByRaw('MONTH(fecha_carga)')
-            ->orderByRaw('MONTH(fecha_carga)')
-            ->get()
-            ->mapWithKeys(function ($item) use ($months) {
-                return [$item->mes => [
-                    'mes' => $months[$item->mes],
-                    'total_litros' => $item->total_litros,
-                    'total_precio' => $item->total_precio,
-                ]];
-            })
-            ->union(collect(range(1, 12))->mapWithKeys(function ($mes) use ($months) {
-                return [$mes => [
-                    'mes' => $months[$mes],
-                    'total_litros' => 0,
-                    'total_precio' => 0,
-                ]];
-            })->except(self::selectRaw('MONTH(fecha_carga) as mes')->whereYear('fecha_carga', $anio)->pluck('mes')->toArray()))
-            ->sortKeys()
+            ->when($idVehiculos !== null, fn ($query) => $query->whereIn('id_vehiculo', $idVehiculos))
+            ->get(['fecha_carga', 'litros', 'precio']);
+
+        $acumulado = [];
+
+        foreach ($cargas as $carga) {
+            $mes = (int) date('n', strtotime((string) $carga->fecha_carga));
+            $acumulado[$mes]['litros'] = ($acumulado[$mes]['litros'] ?? 0) + $carga->litros;
+            $acumulado[$mes]['precio'] = ($acumulado[$mes]['precio'] ?? 0) + $carga->precio * $carga->litros;
+        }
+
+        // Todo valor que va a un gráfico se redondea a máximo 2 decimales.
+        return collect(range(1, 12))
+            ->map(fn ($mes) => [
+                'mes' => $months[$mes],
+                'total_litros' => round((float) ($acumulado[$mes]['litros'] ?? 0), 2),
+                'total_precio' => round((float) ($acumulado[$mes]['precio'] ?? 0), 2),
+            ])
             ->values()
             ->toArray();
     }

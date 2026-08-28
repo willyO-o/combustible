@@ -61,6 +61,11 @@ class NotificacionController extends Controller
                 $data['observaciones'] ?? '',
                 'ri-error-warning-line',
             ],
+            'orden_trabajo_asignada' => [
+                'Orden de trabajo asignada',
+                'Se te asignó la orden N° '.($data['nro_orden'] ?? '').' para su ejecución.',
+                'ri-tools-line',
+            ],
             default => [
                 'Notificación',
                 $data['mensaje'] ?? '',

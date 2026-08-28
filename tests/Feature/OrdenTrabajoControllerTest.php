@@ -10,7 +10,9 @@ use App\Models\Taller;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Notifications\OrdenTrabajoAsignadaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -102,6 +104,51 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertNull($orden->id_taller);
         $this->assertSame('INTERNO', $orden->tipo_orden);
         $this->assertSame('APROBADA', $solicitud->fresh()->estado);
+    }
+
+    public function test_store_notifica_al_tecnico_asignado(): void
+    {
+        Notification::fake();
+
+        $ejecutor = $this->crearTecnico();
+
+        $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_usuario_ejecuta' => $ejecutor->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ])->assertRedirect();
+
+        Notification::assertSentTo($ejecutor, OrdenTrabajoAsignadaNotification::class);
+    }
+
+    public function test_update_notifica_solo_cuando_cambia_el_tecnico_asignado(): void
+    {
+        Notification::fake();
+
+        $tecnicoA = $this->crearTecnico();
+        $tecnicoB = $this->crearTecnico();
+        $orden = $this->crearOrden(['id_usuario_ejecuta' => $tecnicoA->id]);
+
+        // Editar la orden sin tocar el responsable: no debe notificar.
+        $this->actingAs($this->admin)->put(route('mantenimiento.ordenes.update', $orden), [
+            'id_vehiculo' => $orden->id_vehiculo,
+            'id_usuario_ejecuta' => $tecnicoA->id,
+            'tipo_mantenimiento' => 'CORRECTIVO',
+            'kilometraje_actual' => 1000,
+        ])->assertRedirect();
+
+        Notification::assertNothingSentTo($tecnicoA);
+
+        // Reasignar a otro técnico: notifica al nuevo responsable.
+        $this->actingAs($this->admin)->put(route('mantenimiento.ordenes.update', $orden), [
+            'id_vehiculo' => $orden->id_vehiculo,
+            'id_usuario_ejecuta' => $tecnicoB->id,
+            'tipo_mantenimiento' => 'CORRECTIVO',
+            'kilometraje_actual' => 1000,
+        ])->assertRedirect();
+
+        Notification::assertSentTo($tecnicoB, OrdenTrabajoAsignadaNotification::class);
     }
 
     public function test_store_con_solicitud_origen_ignora_vehiculo_y_categoria_manipulados(): void

@@ -33,6 +33,7 @@ class UserSeederTest extends TestCase
 
         $this->assertEqualsCanonicalizing([
             'dashboard.ver',
+            'dashboard.grafico-ordenes.ver',
             'mantenimiento.ordenes.ver',
             'mantenimiento.ordenes.estado.cambiar',
             'mantenimiento.ordenes.ejecucion.registrar',
@@ -49,6 +50,75 @@ class UserSeederTest extends TestCase
             $this->assertTrue(
                 Role::findByName($rol, 'web')->hasPermissionTo('dashboard.ver'),
                 "El rol {$rol} debería tener el permiso dashboard.ver",
+            );
+        }
+    }
+
+    public function test_los_widgets_del_dashboard_los_reciben_solo_admin_super_admin_y_jefe_area(): void
+    {
+        $this->ejecutarSeeder();
+
+        $widgets = [
+            'dashboard.tarjeta-cargas.ver',
+            'dashboard.tarjeta-vales.ver',
+            'dashboard.tarjeta-vehiculos.ver',
+            'dashboard.tarjeta-conductores.ver',
+            'dashboard.grafico-combustible.ver',
+        ];
+
+        foreach (['administrador', 'super-admin', 'jefe-area'] as $rol) {
+            foreach ($widgets as $widget) {
+                $this->assertTrue(
+                    Role::findByName($rol, 'web')->hasPermissionTo($widget),
+                    "El rol {$rol} debería tener el permiso {$widget}",
+                );
+            }
+        }
+
+        foreach (['conductor', 'tecnico-mantenimiento'] as $rol) {
+            $permisos = Role::findByName($rol, 'web')->permissions->pluck('name');
+            $this->assertEmpty(
+                $permisos->filter(fn (string $permiso) => str_starts_with($permiso, 'dashboard.tarjeta-')
+                    || $permiso === 'dashboard.grafico-combustible.ver'),
+                "El rol {$rol} no debería tener permisos de widgets del dashboard",
+            );
+        }
+    }
+
+    public function test_el_grafico_de_ordenes_lo_reciben_tecnico_mantenimiento_y_admin_pero_no_jefe_area(): void
+    {
+        $this->ejecutarSeeder();
+
+        foreach (['tecnico-mantenimiento', 'administrador', 'super-admin'] as $rol) {
+            $this->assertTrue(
+                Role::findByName($rol, 'web')->hasPermissionTo('dashboard.grafico-ordenes.ver'),
+                "El rol {$rol} debería tener dashboard.grafico-ordenes.ver",
+            );
+        }
+
+        foreach (['jefe-area', 'conductor'] as $rol) {
+            $this->assertFalse(
+                Role::findByName($rol, 'web')->hasPermissionTo('dashboard.grafico-ordenes.ver'),
+                "El rol {$rol} no debería tener dashboard.grafico-ordenes.ver",
+            );
+        }
+    }
+
+    public function test_el_grafico_de_horas_trabajadas_lo_reciben_conductor_y_admin_pero_no_jefe_area(): void
+    {
+        $this->ejecutarSeeder();
+
+        foreach (['conductor', 'administrador', 'super-admin'] as $rol) {
+            $this->assertTrue(
+                Role::findByName($rol, 'web')->hasPermissionTo('dashboard.grafico-horas.ver'),
+                "El rol {$rol} debería tener dashboard.grafico-horas.ver",
+            );
+        }
+
+        foreach (['jefe-area', 'tecnico-mantenimiento'] as $rol) {
+            $this->assertFalse(
+                Role::findByName($rol, 'web')->hasPermissionTo('dashboard.grafico-horas.ver'),
+                "El rol {$rol} no debería tener dashboard.grafico-horas.ver",
             );
         }
     }

@@ -3,6 +3,8 @@ import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
+import BotonDescargarGrafico from '@/Components/BotonDescargarGrafico.vue'
+import { useTemaGraficos } from '@/Composables/useTemaGraficos'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -84,6 +86,119 @@ const costoPorLitro = computed(() => {
     const costo = props.datosResumen?.total_costo || 0
     return total > 0 ? (costo / total).toFixed(2) : 0
 })
+
+/* ------------------------------------------------------------------ */
+/*  Gráficos comparativos (todo desde datosResumen, sin pedir nada    */
+/*  más al backend)                                                    */
+/* ------------------------------------------------------------------ */
+const { paleta } = useTemaGraficos()
+
+const num = (v) => Number(v ?? 0)
+const bs = (v) => `Bs. ${num(v).toLocaleString('es-ES', { maximumFractionDigits: 2 })}`
+const litros = (v) => `${num(v).toLocaleString('es-ES', { maximumFractionDigits: 2 })} L`
+
+const vehiculosResumen = computed(() => props.datosResumen?.vehiculos ?? [])
+const hayDatos = computed(() => vehiculosResumen.value.length > 0)
+
+const grafBarChart = ref(null)
+const grafDonutChart = ref(null)
+
+// Bar chart: métrica seleccionable por vehículo.
+const metricaVehiculo = ref('total_costo')
+const METRICAS_VEHICULO = {
+    total_costo: { titulo: 'Costo Total por Vehículo', serie: 'Costo (Bs.)', aditiva: true, fmt: bs },
+    total_litros: { titulo: 'Litros Consumidos por Vehículo', serie: 'Litros', aditiva: true, fmt: litros },
+    cantidad_cargas: { titulo: 'Cantidad de Cargas por Vehículo', serie: 'Cargas', aditiva: true, fmt: (v) => `${num(v)}` },
+    precio_promedio: { titulo: 'Precio Promedio (Bs./L) por Vehículo', serie: 'Bs./L', aditiva: false, fmt: (v) => `Bs. ${num(v).toFixed(2)}` },
+}
+
+const TOPE_VEHICULOS = 15
+
+// Ordena por la métrica y, si hay muchos vehículos, agrupa la cola en "Otros"
+// (sólo para métricas que se pueden sumar).
+const vehiculosGrafico = computed(() => {
+    const metrica = metricaVehiculo.value
+    const ordenados = [...vehiculosResumen.value].sort((a, b) => num(b[metrica]) - num(a[metrica]))
+
+    if (ordenados.length <= TOPE_VEHICULOS) {
+        return ordenados
+    }
+
+    const top = ordenados.slice(0, TOPE_VEHICULOS)
+
+    if (! METRICAS_VEHICULO[metrica].aditiva) {
+        return top
+    }
+
+    const resto = ordenados.slice(TOPE_VEHICULOS)
+
+    return [
+        ...top,
+        {
+            codigo: `Otros (${resto.length})`,
+            nro_placa: '',
+            total_costo: resto.reduce((s, v) => s + num(v.total_costo), 0),
+            total_litros: resto.reduce((s, v) => s + num(v.total_litros), 0),
+            cantidad_cargas: resto.reduce((s, v) => s + num(v.cantidad_cargas), 0),
+        },
+    ]
+})
+
+const barSeries = computed(() => [{
+    name: METRICAS_VEHICULO[metricaVehiculo.value].serie,
+    data: vehiculosGrafico.value.map((v) => Math.round(num(v[metricaVehiculo.value]) * 100) / 100),
+}])
+
+const barOptions = computed(() => {
+    const meta = METRICAS_VEHICULO[metricaVehiculo.value]
+    const horizontal = vehiculosGrafico.value.length > 6
+
+    return {
+        chart: { type: 'bar', toolbar: { show: false } },
+        colors: [paleta.value[0]],
+        plotOptions: { bar: { horizontal, borderRadius: 4, columnWidth: '55%', barHeight: '65%' } },
+        dataLabels: {
+            enabled: vehiculosGrafico.value.length <= 12,
+            formatter: (v) => meta.fmt(v),
+            offsetY: horizontal ? 0 : -18,
+            offsetX: horizontal ? 0 : 0,
+            style: { fontSize: '10px' },
+        },
+        xaxis: { categories: vehiculosGrafico.value.map((v) => v.codigo || v.nro_placa || '—') },
+        yaxis: { title: { text: horizontal ? '' : meta.serie } },
+        tooltip: { y: { formatter: (v) => meta.fmt(v) } },
+        grid: { strokeDashArray: 4 },
+        legend: { show: false },
+    }
+})
+
+// Donut: reparto del gasto total por tipo de combustible.
+const gastoPorCombustible = computed(() => {
+    const acumulado = {}
+
+    for (const v of vehiculosResumen.value) {
+        const tipo = v.tipo_combustible || 'Sin tipo'
+        acumulado[tipo] = (acumulado[tipo] ?? 0) + num(v.total_costo)
+    }
+
+    return {
+        labels: Object.keys(acumulado),
+        series: Object.values(acumulado).map((x) => Math.round(x * 100) / 100),
+    }
+})
+
+const mostrarDonut = computed(() => gastoPorCombustible.value.labels.length > 1)
+
+const donutOptions = computed(() => ({
+    chart: { type: 'donut', toolbar: { show: false } },
+    labels: gastoPorCombustible.value.labels,
+    colors: paleta.value,
+    legend: { position: 'bottom' },
+    dataLabels: { enabled: true, formatter: (val) => `${Number(val).toFixed(1)}%` },
+    plotOptions: { pie: { donut: { size: '62%' } } },
+    tooltip: { y: { formatter: (v) => bs(v) } },
+    stroke: { width: 2 },
+}))
 </script>
 
 <template>
@@ -204,6 +319,44 @@ const costoPorLitro = computed(() => {
                             <div class="avatar avatar-lg bg-warning-transparent">
                                 <i class="ri-car-line fs-24 text-warning"></i>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos comparativos -->
+        <div v-if="hayDatos" class="row g-3 mb-4">
+            <div :class="mostrarDonut ? 'col-xl-8' : 'col-12'">
+                <div class="card custom-card h-100">
+                    <div class="card-header justify-content-between flex-wrap gap-2">
+                        <div class="card-title">{{ METRICAS_VEHICULO[metricaVehiculo].titulo }}</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <select v-model="metricaVehiculo" class="form-select form-select-sm" style="width: auto;">
+                                <option value="total_costo">Costo (Bs.)</option>
+                                <option value="total_litros">Litros</option>
+                                <option value="cantidad_cargas">Cantidad de cargas</option>
+                                <option value="precio_promedio">Precio promedio</option>
+                            </select>
+                            <BotonDescargarGrafico :grafico="grafBarChart" :nombre="`cargas-combustible-${metricaVehiculo}`"
+                                :titulo="METRICAS_VEHICULO[metricaVehiculo].titulo" subtitulo="Reporte de Cargas de Combustible" />
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <Apexchart ref="grafBarChart" type="bar" height="360" :options="barOptions" :series="barSeries" />
+                    </div>
+                </div>
+            </div>
+            <div v-if="mostrarDonut" class="col-xl-4">
+                <div class="card custom-card h-100">
+                    <div class="card-header justify-content-between">
+                        <div class="card-title">Gasto por Tipo de Combustible</div>
+                        <BotonDescargarGrafico :grafico="grafDonutChart" nombre="cargas-combustible-por-tipo"
+                            titulo="Gasto por Tipo de Combustible" subtitulo="Reporte de Cargas de Combustible" />
+                    </div>
+                    <div class="card-body d-flex justify-content-center">
+                        <div style="width: 100%; max-width: 320px;">
+                            <Apexchart ref="grafDonutChart" type="donut" height="320" :options="donutOptions" :series="gastoPorCombustible.series" />
                         </div>
                     </div>
                 </div>

@@ -84,4 +84,25 @@ class NotificacionControllerTest extends TestCase
             ->where('notificaciones.items.0.titulo', 'Observación en operación diaria')
         );
     }
+
+    public function test_una_notificacion_de_orden_de_trabajo_asignada_se_formatea_para_el_frontend(): void
+    {
+        $user = User::factory()->create();
+        $this->crearNotificacion($user, [
+            'type' => 'App\\Notifications\\OrdenTrabajoAsignadaNotification',
+            'data' => [
+                'tipo' => 'orden_trabajo_asignada',
+                'nro_orden' => '00007/2026',
+                'url' => '/mantenimiento/ordenes/7',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('profile.edit'));
+
+        $response->assertInertia(fn ($page) => $page
+            ->where('notificaciones.items.0.titulo', 'Orden de trabajo asignada')
+            ->where('notificaciones.items.0.icono', 'ri-tools-line')
+            ->where('notificaciones.items.0.url', '/mantenimiento/ordenes/7')
+        );
+    }
 }

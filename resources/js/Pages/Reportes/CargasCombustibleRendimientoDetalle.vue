@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
+import BotonDescargarGrafico from '@/Components/BotonDescargarGrafico.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -76,6 +77,8 @@ function formatFecha(fecha) {
     if (!fecha) return '—'
     return new Date(fecha).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+const chartRef = ref(null)
 
 const chartOptions = computed(() => ({
     chart: { type: 'line', toolbar: { show: false } },
@@ -207,11 +210,17 @@ const chartSeries = computed(() => [
         <template v-else>
             <!-- Tendencia de rendimiento -->
             <div class="card custom-card mb-4">
-                <div class="card-header">
+                <div class="card-header d-flex align-items-center justify-content-between">
                     <div class="card-title">Tendencia de Rendimiento por Carga</div>
+                    <BotonDescargarGrafico :grafico="chartRef"
+                        :nombre="vehiculoSeleccionado ? `rendimiento-${vehiculoSeleccionado.codigo}` : 'rendimiento-detalle-vehiculo'"
+                        :titulo="vehiculoSeleccionado
+                            ? `Tendencia de Rendimiento — ${vehiculoSeleccionado.codigo} (${vehiculoSeleccionado.nro_placa})`
+                            : 'Tendencia de Rendimiento por Carga'"
+                        subtitulo="Reporte de Rendimiento de Combustible" />
                 </div>
                 <div class="card-body">
-                    <Apexchart type="line" height="300" :options="chartOptions" :series="chartSeries" />
+                    <Apexchart ref="chartRef" type="line" height="300" :options="chartOptions" :series="chartSeries" />
                 </div>
             </div>
 
