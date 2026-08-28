@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Models\Area;
 use App\Models\Conductor;
 use App\Models\Material;
 use App\Models\Persona;
 use App\Models\User;
+use App\Models\Vehiculo;
 use App\Models\VehiculoExterno;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -20,17 +22,48 @@ class ParametrosControllerTest extends TestCase
         parent::setUp();
 
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+    }
+
+    private function crearUsuario(): User
+    {
+        $persona = Persona::factory()->create();
+
+        return User::factory()->create(['id_persona' => $persona->id]);
     }
 
     private function crearUsuarioConductor(): User
     {
-        $persona = Persona::factory()->create();
-        Conductor::create(['id' => $persona->id, 'estado_conductor' => 'ACTIVO']);
-
-        $user = User::factory()->create(['id_persona' => $persona->id]);
+        $user = $this->crearUsuario();
+        Conductor::create(['id' => $user->id_persona, 'estado_conductor' => 'ACTIVO']);
         $user->assignRole('conductor');
 
         return $user;
+    }
+
+    private function asignarVehiculoAConductor(Conductor $conductor, Vehiculo $vehiculo): void
+    {
+        $conductor->asignacionesActivas()->attach($vehiculo->id, [
+            'estado_asignacion' => 'ACTIVO',
+            'fecha_asignacion' => now()->toDateString(),
+        ]);
+    }
+
+    private function ponerVehiculoEnArea(Vehiculo $vehiculo, Area $area): void
+    {
+        $vehiculo->areas()->attach($area->id, [
+            'estado_asignacion' => 'ACTIVO',
+            'fecha_asignacion' => now()->toDateString(),
+        ]);
+    }
+
+    private function ponerPersonaACargoDeArea(Persona $persona, Area $area): void
+    {
+        $persona->areas()->attach($area->id, [
+            'tipo_encargo' => 'TITULAR',
+            'estado_encargo' => 'ACTIVO',
+            'fecha_inicio' => now()->toDateString(),
+        ]);
     }
 
     public function test_index_devuelve_los_parametros_generales(): void
@@ -65,5 +98,70 @@ class ParametrosControllerTest extends TestCase
         $response->assertOk();
         $this->assertCount(1, $response->json('data.control_cargas.vehiculos_externos'));
         $this->assertSame('148-JLK', $response->json('data.control_cargas.vehiculos_externos.0.nro_placa'));
+    }
+
+    public function test_colecciones_devuelve_los_vehiculos_asignados_al_conductor(): void
+    {
+        $user = $this->crearUsuarioConductor();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAConductor($user->persona->conductor, $vehiculo);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $this->assertSame([$vehiculo->id], $response->json('data.vehiculos.*.id'));
+    }
+
+    public function test_colecciones_no_falla_para_un_jefe_de_area_sin_registro_de_conductor(): void
+    {
+        $user = $this->crearUsuario();
+        $user->assignRole('jefe-area');
+
+        $area = Area::factory()->create();
+        $this->ponerPersonaACargoDeArea($user->persona, $area);
+
+        $vehiculoArea = Vehiculo::factory()->create();
+        $this->ponerVehiculoEnArea($vehiculoArea, $area);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $this->assertSame([$vehiculoArea->id], $response->json('data.vehiculos.*.id'));
+    }
+
+    public function test_colecciones_unifica_sin_duplicados_los_vehiculos_propios_y_los_del_area_a_cargo(): void
+    {
+        $user = $this->crearUsuarioConductor();
+        $user->assignRole('jefe-area');
+
+        $area = Area::factory()->create();
+        $this->ponerPersonaACargoDeArea($user->persona, $area);
+
+        // Vehículo que conduce y que además pertenece al área que administra:
+        // debe aparecer una sola vez.
+        $vehiculoCompartido = Vehiculo::factory()->create();
+        $this->asignarVehiculoAConductor($user->persona->conductor, $vehiculoCompartido);
+        $this->ponerVehiculoEnArea($vehiculoCompartido, $area);
+
+        // Otro vehículo del área que no conduce.
+        $vehiculoSoloArea = Vehiculo::factory()->create();
+        $this->ponerVehiculoEnArea($vehiculoSoloArea, $area);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $ids = $response->json('data.vehiculos.*.id');
+        sort($ids);
+        $this->assertSame([$vehiculoCompartido->id, $vehiculoSoloArea->id], $ids);
+    }
+
+    public function test_colecciones_devuelve_vehiculos_vacios_para_un_usuario_sin_conductor_ni_area(): void
+    {
+        $user = $this->crearUsuario();
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $this->assertSame([], $response->json('data.vehiculos'));
     }
 }

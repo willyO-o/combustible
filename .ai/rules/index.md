@@ -18,7 +18,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Libraries/*.php, app/Libraries/Reportes.php | .ai/rules/libraries.md |
 | database/migrations/*.php | .ai/rules/migrations.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Models/CargaMaterial.php,app/Models/Viaje.php | .ai/rules/models-models.md |
-| app/Models/**, app/Models/*.php | .ai/rules/models.md |
+| app/Models/**, app/Models/*.php, app/Models/CargaCombustible.php | .ai/rules/models.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/operacion.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
 | app/Http/Controllers/Api/V1/*.php,app/Http/Requests/CargaMaterialRequest.php,app/Http/Requests/ViajeRequest.php | .ai/rules/requests-http-requests.md |
@@ -28,3 +28,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/*.php, routes/web.php | .ai/rules/routes.md |
 | database/seeders/UserSeeder.php | .ai/rules/seeders.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
+| app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php | .ai/rules/v1.md |

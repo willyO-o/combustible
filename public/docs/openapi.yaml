@@ -29,15 +29,17 @@ info:
     Estas cuentas están precargadas en el entorno de pruebas y sirven para probar la
     API con cada rol desde `POST /auth/login`:
 
-    | Rol         | Email                    | Contraseña      | Alcance de `GET /operacion-diaria` |
-    |-------------|--------------------------|-----------------|-------------------------------------|
-    | conductor   | conductor@gmail.com      | `conductor123`  | Solo sus propias operaciones |
-    | conductor   | conductor2@gmail.com     | `conductor123`  | Solo sus propias operaciones |
-    | conductor   | conductor3@gmail.com     | `conductor123`  | Solo sus propias operaciones |
-    | jefe-area   | jefearea1@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
-    | jefe-area   | jefearea2@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
-    | jefe-area   | jefearea3@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
-    | super-admin | super-admin@gmail.com    | `superadmin123` | Sin restricción |
+    | Rol                   | Email                    | Contraseña      | Alcance / uso principal |
+    |-----------------------|--------------------------|-----------------|-------------------------------------|
+    | conductor             | conductor@gmail.com      | `conductor123`  | Solo sus propias operaciones |
+    | conductor             | conductor2@gmail.com     | `conductor123`  | Solo sus propias operaciones |
+    | conductor             | conductor3@gmail.com     | `conductor123`  | Solo sus propias operaciones |
+    | jefe-area             | jefearea1@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
+    | jefe-area             | jefearea2@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
+    | jefe-area             | jefearea3@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
+    | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
+    | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
+    | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
   version: "1.0.0"
   contact:
     name: Equipo de Desarrollo — Combustible
@@ -83,6 +85,20 @@ tags:
       una solicitud o alarma de mantenimiento preventivo/correctivo para un vehículo. Por ahora
       solo se documentan los endpoints de **listado** y **registro**; el resto del flujo
       (aprobación, orden de trabajo, ejecución) se documentará más adelante, una vez probado.
+  - name: Órdenes de Trabajo
+    description: |
+      Paso 3 del flujo de mantenimiento, visto desde la app móvil del **técnico de
+      mantenimiento**: consulta las órdenes de trabajo que le fueron asignadas, **marca el
+      inicio** del trabajo, va registrando el detalle del trabajo realizado (repuestos/insumos
+      aplicados) **ítem por ítem** a su propio ritmo, y al terminar **marca la orden como
+      culminada** con las lecturas finales del vehículo.
+
+      Flujo de estados que maneja el técnico:
+      `PENDIENTE` → (`PATCH /ordenes-trabajo/{orden}/iniciar`) → `EN_EJECUCION` →
+      (`POST /ordenes-trabajo/{orden}/culminar`) → `CULMINADO`.
+      `VERIFICADO` y `CANCELADO` quedan para el emisor de la orden desde el panel web, igual
+      que la emisión de la orden (Paso 2). La misma colección de estados y acciones se expone
+      en `GET /parametros/colecciones` → `ordenes_trabajo`.
   - name: Notificaciones
     description: |
       Notificaciones de base de datos (`illuminate/notifications`) del usuario autenticado
@@ -398,13 +414,15 @@ paths:
       summary: Colecciones y catálogos de apoyo
       description: |
         Devuelve los catálogos y colecciones necesarios para alimentar formularios del cliente:
-        vehículos actualmente asignados al conductor autenticado, estaciones de servicio activas,
+        vehículos disponibles para el usuario autenticado, estaciones de servicio activas,
         tipos de combustible activos, los catálogos de materiales y vehículos externos de
         control de cargas, y los valores enumerados usados por otros módulos (cargas de
         combustible, solicitudes de mantenimiento, control de cargas).
 
-        Requiere que el usuario autenticado tenga una persona vinculada con un registro de
-        conductor asociado.
+        El listado `vehiculos` unifica, sin duplicados, los vehículos que el usuario tiene
+        asignados como conductor y todos los vehículos activos de las áreas que administra
+        como jefe de área. Un usuario puede tener ambos roles, uno solo o ninguno; si no
+        tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor.
       responses:
         '200':
           description: Colecciones disponibles para el usuario autenticado.
@@ -429,19 +447,72 @@ paths:
                       tipo_medicion: kilometraje
                   estaciones_servicio:
                     - id: 1
-                      nombre_grifo: Grifo Central YPFB
+                      razon_social: Grifo Central YPFB S.R.L.
+                      nit: "1023456789"
+                      direccion: "Av. 6 de Agosto #123"
+                      ciudad: Oruro
+                      telefono: "25551234"
                       estado_grifo: ACTIVO
+                      es_principal: true
                   tipos_combustible:
                     - id: 1
-                      nombre_tipo_combustible: Diésel
+                      tipo_combustible: Diésel
                       estado_tipo_combustible: ACTIVO
                   cargas_combustible:
                     tipos_carga: [VALE, PREPAGO]
                     tipos_respaldo_digital: [FACTURA, NOTA, COMPROBANTE, OTRO]
-                    estado_carga: [PENDIENTE, USADO, ANULADO]
+                    estado_carga: [REGISTRADO, VERIFICADO, ANULADO]
                   solicitudes_mantenimiento:
                     tipos_mantenimiento: [PREVENTIVO, CORRECTIVO]
                     estado: [PENDIENTE, APROBADA, RECHAZADA, ANULADA]
+                  ordenes_trabajo:
+                    estados_orden: [PENDIENTE, EN_EJECUCION, CULMINADO, CANCELADO, VERIFICADO]
+                    estados:
+                      - value: PENDIENTE
+                        label: Pendiente
+                        descripcion: La orden fue emitida y está a la espera de que el técnico inicie el trabajo.
+                      - value: EN_EJECUCION
+                        label: En ejecución
+                        descripcion: El técnico inició el mantenimiento y está registrando el detalle del trabajo realizado.
+                      - value: CULMINADO
+                        label: Culminado
+                        descripcion: El técnico terminó el trabajo y registró las lecturas finales. El detalle queda congelado.
+                      - value: VERIFICADO
+                        label: Verificado
+                        descripcion: El usuario que emitió la orden validó la ejecución. Estado final.
+                      - value: CANCELADO
+                        label: Cancelado
+                        descripcion: La orden fue anulada y no se ejecutará.
+                    acciones_tecnico:
+                      - accion: iniciar
+                        metodo: PATCH
+                        ruta: "ordenes-trabajo/{orden}/iniciar"
+                        desde: [PENDIENTE]
+                        estado_resultante: EN_EJECUCION
+                      - accion: agregar_detalle
+                        metodo: POST
+                        ruta: "ordenes-trabajo/{orden}/detalles"
+                        desde: [PENDIENTE, EN_EJECUCION]
+                        estado_resultante: null
+                      - accion: eliminar_detalle
+                        metodo: DELETE
+                        ruta: "ordenes-trabajo/{orden}/detalles/{detalle}"
+                        desde: [PENDIENTE, EN_EJECUCION]
+                        estado_resultante: null
+                      - accion: culminar
+                        metodo: POST
+                        ruta: "ordenes-trabajo/{orden}/culminar"
+                        desde: [EN_EJECUCION]
+                        estado_resultante: CULMINADO
+                    tipos_mantenimiento:
+                      - id: 3
+                        tipo_mantenimiento: Cambio de aceite
+                    repuestos:
+                      - id: 8
+                        nombre_repuesto: Filtro de aceite
+                        codigo_repuesto: FIL-001
+                        unidad_medida: UNIDAD
+                        stock_actual: 10
                   control_cargas:
                     materiales:
                       - id: 1
@@ -457,13 +528,6 @@ paths:
                     estados_carga: [ABIERTA, CERRADA, PAGADA]
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '500':
-          description: El usuario autenticado no tiene una persona/conductor asociado.
-          content:
-            application/json:
-              example:
-                message: "Error al obtener colecciones."
-                error: "Detalle técnico interno del error (varía según la causa)."
 
   # ──────────────────────────────────────────────────────────────────────
   # OPERACIÓN DIARIA
@@ -2063,6 +2127,359 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ──────────────────────────────────────────────────────────────────────
+  # ÓRDENES DE TRABAJO
+  # ──────────────────────────────────────────────────────────────────────
+  /ordenes-trabajo:
+    get:
+      tags: [Órdenes de Trabajo]
+      summary: Listar órdenes de trabajo
+      description: |
+        Lista paginada de órdenes de trabajo, ordenadas por `id` descendente.
+
+        Visibilidad según el rol del usuario autenticado:
+        - **técnico de mantenimiento** (sin además ser jefe de área/administrador): sólo ve las
+          órdenes que tiene asignadas (`id_usuario_ejecuta` = usuario autenticado).
+        - **jefe de área / administrador / super-admin**: ven todas.
+
+        Cada orden incluye `detalles_count` (cantidad de ítems de detalle ya registrados).
+      parameters:
+        - name: estado_orden
+          in: query
+          description: Filtra por estado exacto de la orden.
+          schema: { type: string, enum: [PENDIENTE, EN_EJECUCION, CULMINADO, CANCELADO, VERIFICADO] }
+          example: EN_EJECUCION
+        - name: id_vehiculo
+          in: query
+          description: Filtra por vehículo.
+          schema: { type: integer }
+          example: 1
+        - name: per_page
+          in: query
+          description: Cantidad de resultados por página.
+          schema: { type: integer, default: 10 }
+          example: 10
+        - name: page
+          in: query
+          description: Número de página a obtener. Si se omite, se asume `1`.
+          schema: { type: integer, default: 1, minimum: 1 }
+          example: 1
+      responses:
+        '200':
+          description: Listado paginado de órdenes de trabajo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdenTrabajoPaginada'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /ordenes-trabajo/{orden}:
+    get:
+      tags: [Órdenes de Trabajo]
+      summary: Ver una orden de trabajo con su detalle
+      description: |
+        Devuelve la orden de trabajo con el vehículo, la solicitud de origen, el taller (si es
+        externa) y **todos los ítems de detalle** ya registrados (`detalles`), cada uno con su
+        repuesto y tipo de mantenimiento.
+
+        Un técnico de mantenimiento sólo puede ver las órdenes que tiene asignadas; cualquier
+        otra responde `403`.
+      parameters:
+        - name: orden
+          in: path
+          required: true
+          description: ID de la orden de trabajo.
+          schema: { type: integer }
+          example: 1
+      responses:
+        '200':
+          description: Orden de trabajo con su detalle.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrdenTrabajo' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El técnico autenticado intenta ver una orden que no tiene asignada.
+          content:
+            application/json:
+              example:
+                message: No tiene acceso a esta orden de trabajo.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /ordenes-trabajo/{orden}/iniciar:
+    patch:
+      tags: [Órdenes de Trabajo]
+      summary: Marcar el mantenimiento como iniciado
+      description: |
+        El técnico marca el inicio del trabajo: la orden pasa de `PENDIENTE` a `EN_EJECUCION`
+        y se registra la fecha/hora de ejecución. A partir de aquí puede ir agregando ítems al
+        detalle (`POST /ordenes-trabajo/{orden}/detalles`) y, al terminar, culminarla.
+
+        Sin cuerpo. Sólo funciona si la orden está `PENDIENTE`; en cualquier otro estado
+        responde `422`. Misma restricción de acceso que el resto de acciones del técnico.
+      parameters:
+        - name: orden
+          in: path
+          required: true
+          description: ID de la orden de trabajo.
+          schema: { type: integer }
+          example: 1
+      responses:
+        '200':
+          description: Mantenimiento iniciado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Mantenimiento iniciado. }
+                  data: { $ref: '#/components/schemas/OrdenTrabajo' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El técnico autenticado intenta iniciar una orden que no tiene asignada.
+          content:
+            application/json:
+              example:
+                message: No tiene acceso a esta orden de trabajo.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: La orden no está `PENDIENTE`.
+          content:
+            application/json:
+              example:
+                message: Sólo se puede iniciar una orden que está PENDIENTE.
+
+  /ordenes-trabajo/{orden}/culminar:
+    post:
+      tags: [Órdenes de Trabajo]
+      summary: Marcar el mantenimiento como culminado
+      description: |
+        El técnico cierra la ejecución: la orden pasa de `EN_EJECUCION` a `CULMINADO`, se
+        registran las **lecturas finales** del vehículo y una observación opcional, y el
+        detalle de trabajo queda **congelado** (ya no admite más ítems ni ediciones).
+
+        Requisitos:
+        - La orden debe estar `EN_EJECUCION` (debe haberse iniciado antes); en otro estado
+          responde `422`.
+        - Debe tener **al menos un ítem** de detalle registrado; si no, responde `422`.
+
+        El campo de lectura final obligatorio depende del `tipo_medicion` del vehículo:
+        `kilometraje_actual` si mide por kilometraje, `horometro_actual` si mide por horómetro.
+
+        Misma restricción de acceso que el resto de acciones del técnico.
+      parameters:
+        - name: orden
+          in: path
+          required: true
+          description: ID de la orden de trabajo.
+          schema: { type: integer }
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenTrabajoCulminarRequest'
+            example:
+              kilometraje_actual: 85300
+              observacion: Se cambió aceite y filtros. Todo en orden.
+      responses:
+        '200':
+          description: Mantenimiento culminado exitosamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Mantenimiento culminado exitosamente. }
+                  data: { $ref: '#/components/schemas/OrdenTrabajo' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El técnico autenticado intenta culminar una orden que no tiene asignada.
+          content:
+            application/json:
+              example:
+                message: Sólo puede culminar la ejecución de las órdenes que tiene asignadas.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: |
+            Error de validación, o la orden no está `EN_EJECUCION`, o no tiene ningún ítem de
+            detalle registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              examples:
+                validacion:
+                  summary: Falta la lectura final
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      kilometraje_actual: ["El kilometraje actual es obligatorio."]
+                sin_iniciar:
+                  summary: La orden no fue iniciada
+                  value:
+                    message: Sólo se puede culminar una orden que está EN_EJECUCION (primero debe iniciarla).
+                sin_detalle:
+                  summary: Sin ítems de detalle
+                  value:
+                    message: Debe registrar al menos un ítem del detalle antes de culminar la orden.
+
+  /ordenes-trabajo/{orden}/detalles:
+    post:
+      tags: [Órdenes de Trabajo]
+      summary: Registrar un ítem del detalle de trabajo
+      description: |
+        Registra **un** ítem del detalle de trabajo de la orden (un repuesto/insumo aplicado, o
+        una acción de mano de obra sin repuesto asociado). El técnico llama a este endpoint cada
+        vez que completa una acción: los ítems se agregan de a uno, no hace falta enviarlos
+        todos juntos.
+
+        Se envía como `application/json`. `id_orden_trabajo` se toma de la URL y no debe
+        enviarse.
+
+        **Restricción de acceso:** un jefe de área/administrador puede registrar el detalle de
+        cualquier orden; un técnico de mantenimiento, sólo el de las órdenes que tiene asignadas
+        (`id_usuario_ejecuta`). Cualquier otro caso responde `403`.
+
+        El campo de lectura obligatorio (`horometro` **o** `kilometraje`) depende del
+        `tipo_medicion` del vehículo de la orden. Sólo se puede registrar detalle mientras la
+        orden está `PENDIENTE` o `EN_EJECUCION`; si ya fue culminada/verificada/cancelada
+        responde `422`.
+      parameters:
+        - name: orden
+          in: path
+          required: true
+          description: ID de la orden de trabajo.
+          schema: { type: integer }
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetalleMantenimientoStoreRequest'
+            example:
+              id_tipo_mantenimiento: 3
+              id_repuesto: 8
+              fecha: "2026-08-27"
+              kilometraje: 85230.5
+              cantidad: 2
+      responses:
+        '201':
+          description: Ítem de detalle registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetalleMantenimientoStoreResponse'
+              example:
+                message: Detalle de mantenimiento registrado exitosamente.
+                data:
+                  id: 15
+                  id_orden_trabajo: 1
+                  id_repuesto: 8
+                  id_tipo_mantenimiento: 3
+                  fecha: "2026-08-27"
+                  horometro: null
+                  kilometraje: "85230.50"
+                  cantidad: 2
+                  created_at: "2026-08-27T14:30:00.000000Z"
+                  updated_at: "2026-08-27T14:30:00.000000Z"
+                  repuesto:
+                    id: 8
+                    nombre_repuesto: Filtro de aceite
+                    codigo_repuesto: FIL-001
+                    unidad_medida: UNIDAD
+                  tipo_mantenimiento:
+                    id: 3
+                    tipo_mantenimiento: Cambio de aceite
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El técnico autenticado intenta registrar detalle en una orden que no tiene asignada.
+          content:
+            application/json:
+              example:
+                message: Sólo puede registrar el detalle de las órdenes que tiene asignadas.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: |
+            Error de validación, o la orden ya no admite cambios en su detalle (estado distinto
+            de `PENDIENTE`/`EN_EJECUCION`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              examples:
+                validacion:
+                  summary: Error de validación
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      id_tipo_mantenimiento: ["Debe indicar el tipo de mantenimiento."]
+                      kilometraje: ["El kilometraje es obligatorio."]
+                orden_congelada:
+                  summary: La orden ya fue culminada
+                  value:
+                    message: "La orden ya no admite cambios en su detalle de trabajo (sólo mientras está PENDIENTE o EN_EJECUCION)."
+
+  /ordenes-trabajo/{orden}/detalles/{detalle}:
+    delete:
+      tags: [Órdenes de Trabajo]
+      summary: Eliminar un ítem del detalle de trabajo
+      description: |
+        Elimina un ítem del detalle registrado por error. Sólo mientras la orden está
+        `PENDIENTE` o `EN_EJECUCION`; misma restricción de acceso que el registro de detalle.
+      parameters:
+        - name: orden
+          in: path
+          required: true
+          description: ID de la orden de trabajo.
+          schema: { type: integer }
+          example: 1
+        - name: detalle
+          in: path
+          required: true
+          description: ID del ítem de detalle a eliminar (debe pertenecer a la orden).
+          schema: { type: integer }
+          example: 15
+      responses:
+        '200':
+          description: Ítem de detalle eliminado exitosamente.
+          content:
+            application/json:
+              example:
+                message: Detalle de mantenimiento eliminado exitosamente.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El técnico autenticado intenta eliminar detalle de una orden que no tiene asignada.
+          content:
+            application/json:
+              example:
+                message: No tiene acceso a esta orden de trabajo.
+        '404':
+          description: La orden o el ítem de detalle no existen, o el ítem no pertenece a esa orden.
+        '422':
+          description: La orden ya no admite cambios en su detalle (estado distinto de `PENDIENTE`/`EN_EJECUCION`).
+          content:
+            application/json:
+              example:
+                message: "La orden ya no admite cambios en su detalle de trabajo (sólo mientras está PENDIENTE o EN_EJECUCION)."
+
+  # ──────────────────────────────────────────────────────────────────────
   # NOTIFICACIONES
   # ──────────────────────────────────────────────────────────────────────
   /notificaciones:
@@ -2310,16 +2727,22 @@ components:
 
     Grifo:
       type: object
+      description: Estación de servicio activa. Se devuelve el registro completo tal como está almacenado.
       properties:
         id: { type: integer, example: 1 }
-        nombre_grifo: { type: string, example: Grifo Central YPFB }
+        razon_social: { type: string, example: "Grifo Central YPFB S.R.L." }
+        nit: { type: string, nullable: true, example: "1023456789" }
+        direccion: { type: string, nullable: true, example: "Av. 6 de Agosto #123" }
+        ciudad: { type: string, nullable: true, example: Oruro }
+        telefono: { type: string, nullable: true, example: "25551234" }
         estado_grifo: { type: string, enum: [ACTIVO, INACTIVO], example: ACTIVO }
+        es_principal: { type: boolean, example: true }
 
     TipoCombustible:
       type: object
       properties:
         id: { type: integer, example: 1 }
-        nombre_tipo_combustible: { type: string, example: Diésel }
+        tipo_combustible: { type: string, example: Diésel }
         estado_tipo_combustible: { type: string, enum: [ACTIVO, INACTIVO], example: ACTIVO }
 
     ColeccionesResponse:
@@ -2342,12 +2765,65 @@ components:
               properties:
                 tipos_carga: { type: array, items: { type: string }, example: [VALE, PREPAGO] }
                 tipos_respaldo_digital: { type: array, items: { type: string }, example: [FACTURA, NOTA, COMPROBANTE, OTRO] }
-                estado_carga: { type: array, items: { type: string }, example: [PENDIENTE, USADO, ANULADO] }
+                estado_carga: { type: array, items: { type: string }, example: [REGISTRADO, VERIFICADO, ANULADO] }
             solicitudes_mantenimiento:
               type: object
               properties:
                 tipos_mantenimiento: { type: array, items: { type: string }, example: [PREVENTIVO, CORRECTIVO] }
                 estado: { type: array, items: { type: string }, example: [PENDIENTE, APROBADA, RECHAZADA, ANULADA] }
+            ordenes_trabajo:
+              type: object
+              description: |
+                Catálogos de apoyo para el flujo de ejecución de una orden de trabajo por el
+                técnico (ver los endpoints bajo el tag *Órdenes de Trabajo*).
+              properties:
+                estados_orden:
+                  type: array
+                  description: Lista simple de todos los estados posibles de una orden.
+                  items: { type: string }
+                  example: [PENDIENTE, EN_EJECUCION, CULMINADO, CANCELADO, VERIFICADO]
+                estados:
+                  type: array
+                  description: Los mismos estados con etiqueta y descripción para mostrar en la app.
+                  items:
+                    type: object
+                    properties:
+                      value: { type: string, example: EN_EJECUCION }
+                      label: { type: string, example: En ejecución }
+                      descripcion: { type: string, example: "El técnico inició el mantenimiento y está registrando el detalle del trabajo realizado." }
+                acciones_tecnico:
+                  type: array
+                  description: |
+                    Acciones que puede realizar el técnico sobre una orden, con el método/ruta,
+                    los estados desde los que están permitidas y el estado al que llevan la orden
+                    (`null` si no cambia el estado).
+                  items:
+                    type: object
+                    properties:
+                      accion: { type: string, example: iniciar }
+                      metodo: { type: string, example: PATCH }
+                      ruta: { type: string, example: "ordenes-trabajo/{orden}/iniciar" }
+                      desde: { type: array, items: { type: string }, example: [PENDIENTE] }
+                      estado_resultante: { type: string, nullable: true, example: EN_EJECUCION }
+                tipos_mantenimiento:
+                  type: array
+                  description: Catálogo de tipos de mantenimiento activos (`id_tipo_mantenimiento` de cada ítem de detalle).
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 3 }
+                      tipo_mantenimiento: { type: string, example: Cambio de aceite }
+                repuestos:
+                  type: array
+                  description: Catálogo de repuestos activos (`id_repuesto`, opcional, de cada ítem de detalle).
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 8 }
+                      nombre_repuesto: { type: string, example: Filtro de aceite }
+                      codigo_repuesto: { type: string, nullable: true, example: FIL-001 }
+                      unidad_medida: { type: string, example: UNIDAD }
+                      stock_actual: { type: integer, example: 10 }
             control_cargas:
               type: object
               description: |
@@ -3095,7 +3571,7 @@ components:
           type: string
           nullable: true
           enum: [REGISTRADO, VERIFICADO, ANULADO]
-          description: Opcional; si se omite, la carga queda registrada sin estado (`null`).
+          description: Opcional; si se omite, la carga se crea con estado `REGISTRADO`.
           example: REGISTRADO
         is_offline:
           type: boolean
@@ -3574,6 +4050,178 @@ components:
       properties:
         message: { type: string, example: Solicitud de mantenimiento registrada exitosamente. }
         data: { $ref: '#/components/schemas/SolicitudMantenimiento' }
+
+    # ── Órdenes de Trabajo ───────────────────────────────────────────────
+    DetalleMantenimiento:
+      type: object
+      description: Un ítem del detalle de trabajo de una orden — un repuesto/insumo aplicado (o mano de obra sin repuesto) en una fecha puntual, con la lectura del vehículo en ese momento.
+      properties:
+        id: { type: integer, example: 15 }
+        id_orden_trabajo: { type: integer, example: 1 }
+        id_repuesto: { type: integer, nullable: true, description: "`null` cuando el ítem es sólo mano de obra.", example: 8 }
+        id_tipo_mantenimiento: { type: integer, example: 3 }
+        fecha: { type: string, format: date, example: "2026-08-27" }
+        horometro: { type: string, nullable: true, description: "Decimal con 2 posiciones. Obligatorio si el vehículo de la orden mide por horómetro.", example: null }
+        kilometraje: { type: string, nullable: true, description: "Decimal con 2 posiciones. Obligatorio si el vehículo de la orden mide por kilometraje.", example: "85230.50" }
+        cantidad: { type: integer, minimum: 1, example: 2 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        repuesto:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer, example: 8 }
+            nombre_repuesto: { type: string, example: Filtro de aceite }
+            codigo_repuesto: { type: string, nullable: true, example: FIL-001 }
+            unidad_medida: { type: string, example: UNIDAD }
+        tipo_mantenimiento:
+          type: object
+          description: Tipo de mantenimiento del catálogo (`tipo_mantenimiento`), no el enum PREVENTIVO/CORRECTIVO de la orden.
+          properties:
+            id: { type: integer, example: 3 }
+            tipo_mantenimiento: { type: string, example: Cambio de aceite }
+
+    OrdenTrabajo:
+      type: object
+      description: Orden de trabajo (Paso 2/3 del flujo de mantenimiento) con su detalle de trabajo.
+      properties:
+        id: { type: integer, example: 1 }
+        id_solicitud_mantenimiento: { type: integer, nullable: true, example: 12 }
+        id_vehiculo: { type: integer, example: 1 }
+        id_conductor: { type: integer, nullable: true, example: 1 }
+        id_taller: { type: integer, nullable: true, description: "`null` en órdenes internas.", example: null }
+        id_usuario_emite: { type: integer, example: 2 }
+        id_usuario_ejecuta: { type: integer, description: Técnico de mantenimiento responsable de ejecutar la orden. Se asigna al emitirla., example: 5 }
+        nro_orden: { type: integer, example: 1 }
+        gestion: { type: string, example: "2026" }
+        fecha_emision: { type: string, format: date-time }
+        fecha_ejecucion: { type: string, format: date-time, nullable: true }
+        fecha_culminacion: { type: string, format: date-time, nullable: true }
+        nota_emisor: { type: string, nullable: true, example: Revisar también el sistema de frenos. }
+        observacion: { type: string, nullable: true }
+        tipo_mantenimiento: { type: string, enum: [PREVENTIVO, CORRECTIVO], example: PREVENTIVO }
+        kilometraje_actual: { type: integer, nullable: true, example: 85000 }
+        horometro_actual: { type: integer, nullable: true, example: null }
+        estado_orden: { type: string, enum: [PENDIENTE, EN_EJECUCION, CULMINADO, CANCELADO, VERIFICADO], example: EN_EJECUCION }
+        nro: { type: string, description: "`nro_orden` formateado con ceros a la izquierda + `/gestion`.", example: "000001/2026" }
+        tipo_orden: { type: string, enum: [INTERNO, EXTERNO], description: "Derivado: `EXTERNO` si tiene `id_taller`, `INTERNO` si no.", example: INTERNO }
+        detalles_count: { type: integer, description: "Sólo en el listado (`GET /ordenes-trabajo`). Cantidad de ítems de detalle registrados.", example: 3 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        vehiculo: { $ref: '#/components/schemas/Vehiculo' }
+        solicitudMantenimiento:
+          allOf: [{ $ref: '#/components/schemas/SolicitudMantenimiento' }]
+          nullable: true
+        taller:
+          type: object
+          nullable: true
+          properties:
+            id: { type: integer, example: 4 }
+            razon_social: { type: string, example: Taller Mecánico Central S.R.L. }
+        usuarioEmite:
+          allOf: [{ $ref: '#/components/schemas/Usuario' }]
+          nullable: true
+        usuarioEjecuta:
+          allOf: [{ $ref: '#/components/schemas/Usuario' }]
+          nullable: true
+        detalles:
+          type: array
+          description: "Ítems del detalle de trabajo. Presente en `GET /ordenes-trabajo/{orden}`."
+          items: { $ref: '#/components/schemas/DetalleMantenimiento' }
+
+    OrdenTrabajoPaginada:
+      type: object
+      description: Estructura estándar de paginación.
+      properties:
+        current_page: { type: integer, example: 1 }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/OrdenTrabajo' }
+        first_page_url: { type: string, example: "http://localhost/api/v1/ordenes-trabajo?page=1" }
+        from: { type: integer, nullable: true, example: 1 }
+        last_page: { type: integer, example: 1 }
+        last_page_url: { type: string, example: "http://localhost/api/v1/ordenes-trabajo?page=1" }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              url: { type: string, nullable: true }
+              label: { type: string, example: "1" }
+              active: { type: boolean, example: true }
+        next_page_url: { type: string, nullable: true, example: null }
+        path: { type: string, example: "http://localhost/api/v1/ordenes-trabajo" }
+        per_page: { type: integer, example: 10 }
+        prev_page_url: { type: string, nullable: true, example: null }
+        to: { type: integer, nullable: true, example: 1 }
+        total: { type: integer, example: 1 }
+
+    DetalleMantenimientoStoreRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `POST /ordenes-trabajo/{orden}/detalles`. `id_orden_trabajo` se toma
+        de la URL y no debe enviarse.
+      required: [id_tipo_mantenimiento, fecha, cantidad]
+      properties:
+        id_tipo_mantenimiento:
+          type: integer
+          description: Debe existir en el catálogo `tipo_mantenimiento` (ver `GET /parametros/colecciones` → `ordenes_trabajo.tipos_mantenimiento`).
+          example: 3
+        id_repuesto:
+          type: integer
+          nullable: true
+          description: Opcional. Debe existir en `repuesto` (ver `GET /parametros/colecciones` → `ordenes_trabajo.repuestos`). Se omite cuando el ítem es sólo mano de obra.
+          example: 8
+        fecha:
+          type: string
+          format: date
+          example: "2026-08-27"
+        horometro:
+          type: number
+          nullable: true
+          minimum: 0
+          description: "**Obligatorio si el vehículo de la orden mide por horómetro**; ignorado en caso contrario."
+          example: null
+        kilometraje:
+          type: number
+          nullable: true
+          minimum: 0
+          description: "**Obligatorio si el vehículo de la orden mide por kilometraje**; ignorado en caso contrario."
+          example: 85230.5
+        cantidad:
+          type: integer
+          minimum: 1
+          example: 2
+
+    DetalleMantenimientoStoreResponse:
+      type: object
+      properties:
+        message: { type: string, example: Detalle de mantenimiento registrado exitosamente. }
+        data: { $ref: '#/components/schemas/DetalleMantenimiento' }
+
+    OrdenTrabajoCulminarRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `POST /ordenes-trabajo/{orden}/culminar`. `fecha_ejecucion`,
+        `fecha_culminacion` y `estado_orden` se fijan en el servidor y no deben enviarse.
+      properties:
+        kilometraje_actual:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: "Lectura final del odómetro. **Obligatoria si el vehículo de la orden mide por kilometraje.**"
+          example: 85300
+        horometro_actual:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: "Lectura final del horómetro. **Obligatoria si el vehículo de la orden mide por horómetro.**"
+          example: null
+        observacion:
+          type: string
+          nullable: true
+          maxLength: 500
+          example: Se cambió aceite y filtros. Todo en orden.
 
     Notificacion:
       type: object

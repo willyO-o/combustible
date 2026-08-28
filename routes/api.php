@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CargaMaterialController;
 use App\Http\Controllers\Api\V1\MaterialController;
 use App\Http\Controllers\Api\V1\NotificacionController;
 use App\Http\Controllers\Api\V1\OperacionDiariaController;
+use App\Http\Controllers\Api\V1\OrdenTrabajoController;
 use App\Http\Controllers\Api\V1\ParametrosController;
 use App\Http\Controllers\Api\V1\SolicitudMantenimientoController;
 use App\Http\Controllers\Api\V1\ValeController;
@@ -85,4 +86,20 @@ Route::middleware('auth:api')->group(function () {
         ->parameters(['solicitudes-mantenimiento' => 'solicitud'])
         ->only(['index', 'store', 'show', 'update'])
         ->names('api.v1.solicitudes-mantenimiento');
+
+    // Órdenes de trabajo (Paso 3 del flujo de mantenimiento): el técnico de
+    // mantenimiento consulta las órdenes que tiene asignadas y registra el
+    // detalle del trabajo realizado ítem por ítem.
+    Route::get('ordenes-trabajo', [OrdenTrabajoController::class, 'index'])
+        ->name('api.v1.ordenes-trabajo.index');
+    Route::get('ordenes-trabajo/{orden}', [OrdenTrabajoController::class, 'show'])
+        ->name('api.v1.ordenes-trabajo.show');
+    Route::patch('ordenes-trabajo/{orden}/iniciar', [OrdenTrabajoController::class, 'iniciar'])
+        ->name('api.v1.ordenes-trabajo.iniciar');
+    Route::post('ordenes-trabajo/{orden}/culminar', [OrdenTrabajoController::class, 'culminar'])
+        ->name('api.v1.ordenes-trabajo.culminar');
+    Route::post('ordenes-trabajo/{orden}/detalles', [OrdenTrabajoController::class, 'storeDetalle'])
+        ->name('api.v1.ordenes-trabajo.detalles.store');
+    Route::delete('ordenes-trabajo/{orden}/detalles/{detalle}', [OrdenTrabajoController::class, 'destroyDetalle'])
+        ->name('api.v1.ordenes-trabajo.detalles.destroy');
 });

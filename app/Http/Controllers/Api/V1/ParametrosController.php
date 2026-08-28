@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Actividad;
 use App\Models\Grifo;
 use App\Models\Material;
+use App\Models\Repuesto;
 use App\Models\TipoCombustible;
+use App\Models\TipoMantenimiento;
 use App\Models\VehiculoExterno;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,26 +35,48 @@ class ParametrosController extends Controller
 
     public function colecciones(Request $request): JsonResponse
     {
-        $conductor = $request->user()->persona->conductor;
+        $persona = $request->user()->persona;
 
-        $vehiculos = $conductor->asignacionesActivas->map(function ($vehiculo) {
-            return [
-                'id' => $vehiculo->id,
-                'uuid' => $vehiculo->uuid,
-                'nro_placa' => $vehiculo->nro_placa,
-                'codigo' => $vehiculo->codigo,
-                'anio' => $vehiculo->anio,
-                'marca' => $vehiculo->marca,
-                'modelo' => $vehiculo->modelo,
-                'estado_vehiculo' => $vehiculo->estado_vehiculo,
-                'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
-                'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
-                'url_fotografia' => $vehiculo->url_fotografia,
-                'tipo_medicion' => $vehiculo->tipo_medicion,
-            ];
-        });
+        // Una persona puede no ser conductor (p. ej. un jefe de área) y puede
+        // tener ambos roles a la vez. Cada fuente de vehículos se deriva de los
+        // registros relacionados, no del rol, tolerando que cualquiera falte.
+        $conductor = $persona?->conductor;
 
-        $areas = $conductor->areas()->pluck('id')->toArray();
+        $areasACargo = $persona
+            ? $persona->encargadoAreas()->with('vehiculosActivos')->get()
+            : collect();
+
+        // Vehículos propios del conductor autenticado (si lo es) unificados con
+        // los de las áreas que administra como jefe de área. unique('id') evita
+        // duplicar el vehículo que un jefe de área también conduce.
+        $vehiculos = ($conductor ? $conductor->asignacionesActivas : collect())
+            ->merge($areasACargo->flatMap(fn ($area) => $area->vehiculosActivos))
+            ->unique('id')
+            ->values()
+            ->map(function ($vehiculo) {
+                return [
+                    'id' => $vehiculo->id,
+                    'uuid' => $vehiculo->uuid,
+                    'nro_placa' => $vehiculo->nro_placa,
+                    'codigo' => $vehiculo->codigo,
+                    'anio' => $vehiculo->anio,
+                    'marca' => $vehiculo->marca,
+                    'modelo' => $vehiculo->modelo,
+                    'estado_vehiculo' => $vehiculo->estado_vehiculo,
+                    'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+                    'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+                    'url_fotografia' => $vehiculo->url_fotografia,
+                    'tipo_medicion' => $vehiculo->tipo_medicion,
+                ];
+            });
+
+        // Áreas para sugerir actividades: las que el conductor cubre por sus
+        // asignaciones más las que administra como jefe de área.
+        $areas = collect($conductor ? $conductor->areas()->pluck('id') : [])
+            ->merge($areasACargo->pluck('id'))
+            ->unique()
+            ->values()
+            ->all();
 
         $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
 
@@ -63,11 +87,40 @@ class ParametrosController extends Controller
             'cargas_combustible' => [
                 'tipos_carga' => ['VALE', 'PREPAGO'],
                 'tipos_respaldo_digital' => ['FACTURA', 'NOTA', 'COMPROBANTE', 'OTRO'],
-                'estado_carga' => ['PENDIENTE', 'USADO', 'ANULADO'],
+                'estado_carga' => ['REGISTRADO', 'VERIFICADO', 'ANULADO'],
             ],
             'solicitudes_mantenimiento' => [
                 'tipos_mantenimiento' => ['PREVENTIVO', 'CORRECTIVO'],
                 'estado' => ['PENDIENTE', 'APROBADA', 'RECHAZADA', 'ANULADA'],
+            ],
+            'ordenes_trabajo' => [
+                'estados_orden' => ['PENDIENTE', 'EN_EJECUCION', 'CULMINADO', 'CANCELADO', 'VERIFICADO'],
+                // Colección de estados de la orden de trabajo con su detalle
+                // (etiqueta y descripción) para mostrar en la app.
+                'estados' => [
+                    ['value' => 'PENDIENTE', 'label' => 'Pendiente', 'descripcion' => 'La orden fue emitida y está a la espera de que el técnico inicie el trabajo.'],
+                    ['value' => 'EN_EJECUCION', 'label' => 'En ejecución', 'descripcion' => 'El técnico inició el mantenimiento y está registrando el detalle del trabajo realizado.'],
+                    ['value' => 'CULMINADO', 'label' => 'Culminado', 'descripcion' => 'El técnico terminó el trabajo y registró las lecturas finales. El detalle queda congelado.'],
+                    ['value' => 'VERIFICADO', 'label' => 'Verificado', 'descripcion' => 'El usuario que emitió la orden validó la ejecución. Estado final.'],
+                    ['value' => 'CANCELADO', 'label' => 'Cancelado', 'descripcion' => 'La orden fue anulada y no se ejecutará.'],
+                ],
+                // Acciones que puede realizar el técnico y a qué estado llevan
+                // la orden (desde qué estados están permitidas).
+                'acciones_tecnico' => [
+                    ['accion' => 'iniciar', 'metodo' => 'PATCH', 'ruta' => 'ordenes-trabajo/{orden}/iniciar', 'desde' => ['PENDIENTE'], 'estado_resultante' => 'EN_EJECUCION'],
+                    ['accion' => 'agregar_detalle', 'metodo' => 'POST', 'ruta' => 'ordenes-trabajo/{orden}/detalles', 'desde' => ['PENDIENTE', 'EN_EJECUCION'], 'estado_resultante' => null],
+                    ['accion' => 'eliminar_detalle', 'metodo' => 'DELETE', 'ruta' => 'ordenes-trabajo/{orden}/detalles/{detalle}', 'desde' => ['PENDIENTE', 'EN_EJECUCION'], 'estado_resultante' => null],
+                    ['accion' => 'culminar', 'metodo' => 'POST', 'ruta' => 'ordenes-trabajo/{orden}/culminar', 'desde' => ['EN_EJECUCION'], 'estado_resultante' => 'CULMINADO'],
+                ],
+                // Catálogos para armar cada ítem del detalle de trabajo
+                // (POST /ordenes-trabajo/{orden}/detalles): el tipo de
+                // mantenimiento aplicado y, opcionalmente, el repuesto usado.
+                'tipos_mantenimiento' => TipoMantenimiento::where('estado_tipo_mantenimiento', 'ACTIVO')
+                    ->orderBy('tipo_mantenimiento')
+                    ->get(['id', 'tipo_mantenimiento']),
+                'repuestos' => Repuesto::where('estado_repuesto', 'ACTIVO')
+                    ->orderBy('nombre_repuesto')
+                    ->get(['id', 'nombre_repuesto', 'codigo_repuesto', 'unidad_medida', 'stock_actual']),
             ],
             'operaciones_diarias' => [
                 'actividades_sugeridas' => $actividadesSugeridas,

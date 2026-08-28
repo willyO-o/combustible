@@ -121,6 +121,10 @@ class CargaCombustible extends Model
 
             $model->gestion = $model->calcularGestion();
             $model->nro_carga = self::siguienteNroCarga($model->gestion);
+
+            // Estado inicial cuando el cliente no lo envía (los valores válidos
+            // son REGISTRADO, VERIFICADO y ANULADO; ver CargaCombustibleRequest).
+            $model->estado_carga ??= 'REGISTRADO';
         });
     }
 

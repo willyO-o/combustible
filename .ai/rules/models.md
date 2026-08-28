@@ -2,6 +2,7 @@
 paths:
   - 'app/Models/**'
   - 'app/Models/*.php'
+  - app/Models/CargaCombustible.php
 ---
 
 # Models
@@ -26,3 +27,6 @@ Implement model lifecycle side effects (auto-numbering, defaulting the current u
 
 ## Shape query results with ->get()->map()
 Shape Eloquent query results for Inertia/JSON output with ->get()->map(fn ($x) => [...]) collection pipelines. Reserve foreach for side-effecting operations (file/report building, sync jobs).
+
+## carga_combustible.estado_carga: REGISTRADO/VERIFICADO/ANULADO, default REGISTRADO
+`carga_combustible.estado_carga` es varchar(30) nullable (sin enum en BD). Valores válidos: REGISTRADO, VERIFICADO, ANULADO (así lo valida CargaCombustibleRequest y lo publica GET /parametros/colecciones). NO son PENDIENTE/USADO/ANULADO (eso es estado_vale). El modelo pone `estado_carga ??= 'REGISTRADO'` en creating() cuando el cliente no lo envía.

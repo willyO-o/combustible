@@ -97,6 +97,8 @@ class CargaCombustibleControllerTest extends TestCase
             'id_vehiculo' => $vehiculo->id,
             'nro_factura' => 'F-001',
             'tipo_carga' => 'PREPAGO',
+            // Sin enviar estado_carga, la carga se crea como REGISTRADO.
+            'estado_carga' => 'REGISTRADO',
         ]);
 
         $carga = CargaCombustible::first();
