@@ -349,6 +349,7 @@ class UserSeeder extends Seeder
     private function permisosParaConductor(): array
     {
         return [
+            ...$this->permisosDashboard(),
             'vales.ver',
             'vales.imprimir',
             'cargas-combustible.ver',
@@ -369,6 +370,7 @@ class UserSeeder extends Seeder
     private function permisosParaJefeArea(): array
     {
         return [
+            ...$this->permisosDashboard(),
             ...$this->permisosVales(),
             ...$this->permisosCargasCombustible(),
             ...$this->permisosMantenimiento(),
@@ -388,18 +390,15 @@ class UserSeeder extends Seeder
      * propias órdenes, registra la ejecución/detalle y puede marcarlas
      * EN_EJECUCION/CULMINADO. No crea ni edita órdenes, ni las verifica
      * (la verificación queda reservada al usuario que emitió cada orden).
+     * No tiene acceso a Operación Diaria.
      */
     private function permisosParaTecnicoMantenimiento(): array
     {
         return [
+            ...$this->permisosDashboard(),
             'mantenimiento.ordenes.ver',
             'mantenimiento.ordenes.estado.cambiar',
             'mantenimiento.ordenes.ejecucion.registrar',
-            // Cualquier rol puede registrar operaciones diarias (antes sólo
-            // el conductor); un técnico no tiene conductor/área a cargo, así
-            // que ve el listado completo de vehículos sin filtro (ver
-            // OperacionDiariaController::vehiculosDisponibles()).
-            ...$this->permisosOperacionDiaria(),
         ];
     }
 

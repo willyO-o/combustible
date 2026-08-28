@@ -26,4 +26,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Api/V1/CargaMaterialController.php,app/Http/Controllers/CargaMaterialController.php,app/Http/Requests/ViajeRequest.php,app/Http/Requests/CargaMaterialRequest.php,app/Models/Viaje.php | .ai/rules/requests-models.md |
 | app/Http/Requests/**/*.php, app/Http/Requests/*.php | .ai/rules/requests.md |
 | routes/*.php, routes/web.php | .ai/rules/routes.md |
+| database/seeders/UserSeeder.php | .ai/rules/seeders.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |

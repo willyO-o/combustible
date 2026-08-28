@@ -230,7 +230,12 @@ class OperacionDiariaControllerTest extends TestCase
         );
     }
 
-    public function test_un_tecnico_de_mantenimiento_tambien_puede_registrar_y_ve_todos_los_vehiculos(): void
+    // vehiculosDisponibles() no filtra por área/conductor para roles que no
+    // son "conductor". El técnico de mantenimiento ya NO tiene acceso a
+    // operación diaria (se le quitó el permiso, ver UserSeederTest); el gating
+    // es sólo de frontend (v-can), así que la ruta sigue respondiendo. Se
+    // mantiene el caso para cubrir esa rama con un rol sin área a cargo.
+    public function test_un_rol_sin_conductor_asignado_ve_todos_los_vehiculos_en_el_alta(): void
     {
         $tecnico = User::factory()->create();
         $tecnico->assignRole('tecnico-mantenimiento');
