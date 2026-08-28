@@ -33,26 +33,48 @@ class ParametrosController extends Controller
 
     public function colecciones(Request $request): JsonResponse
     {
-        $conductor = $request->user()->persona->conductor;
+        $persona = $request->user()->persona;
 
-        $vehiculos = $conductor->asignacionesActivas->map(function ($vehiculo) {
-            return [
-                'id' => $vehiculo->id,
-                'uuid' => $vehiculo->uuid,
-                'nro_placa' => $vehiculo->nro_placa,
-                'codigo' => $vehiculo->codigo,
-                'anio' => $vehiculo->anio,
-                'marca' => $vehiculo->marca,
-                'modelo' => $vehiculo->modelo,
-                'estado_vehiculo' => $vehiculo->estado_vehiculo,
-                'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
-                'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
-                'url_fotografia' => $vehiculo->url_fotografia,
-                'tipo_medicion' => $vehiculo->tipo_medicion,
-            ];
-        });
+        // Una persona puede no ser conductor (p. ej. un jefe de área) y puede
+        // tener ambos roles a la vez. Cada fuente de vehículos se deriva de los
+        // registros relacionados, no del rol, tolerando que cualquiera falte.
+        $conductor = $persona?->conductor;
 
-        $areas = $conductor->areas()->pluck('id')->toArray();
+        $areasACargo = $persona
+            ? $persona->encargadoAreas()->with('vehiculosActivos')->get()
+            : collect();
+
+        // Vehículos propios del conductor autenticado (si lo es) unificados con
+        // los de las áreas que administra como jefe de área. unique('id') evita
+        // duplicar el vehículo que un jefe de área también conduce.
+        $vehiculos = ($conductor ? $conductor->asignacionesActivas : collect())
+            ->merge($areasACargo->flatMap(fn ($area) => $area->vehiculosActivos))
+            ->unique('id')
+            ->values()
+            ->map(function ($vehiculo) {
+                return [
+                    'id' => $vehiculo->id,
+                    'uuid' => $vehiculo->uuid,
+                    'nro_placa' => $vehiculo->nro_placa,
+                    'codigo' => $vehiculo->codigo,
+                    'anio' => $vehiculo->anio,
+                    'marca' => $vehiculo->marca,
+                    'modelo' => $vehiculo->modelo,
+                    'estado_vehiculo' => $vehiculo->estado_vehiculo,
+                    'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+                    'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+                    'url_fotografia' => $vehiculo->url_fotografia,
+                    'tipo_medicion' => $vehiculo->tipo_medicion,
+                ];
+            });
+
+        // Áreas para sugerir actividades: las que el conductor cubre por sus
+        // asignaciones más las que administra como jefe de área.
+        $areas = collect($conductor ? $conductor->areas()->pluck('id') : [])
+            ->merge($areasACargo->pluck('id'))
+            ->unique()
+            ->values()
+            ->all();
 
         $actividadesSugeridas = Actividad::select('id', 'nombre_actividad', 'unidad_medida')->whereIn('id_area', $areas)->get();
 

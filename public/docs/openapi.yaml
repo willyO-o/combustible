@@ -398,13 +398,15 @@ paths:
       summary: Colecciones y catálogos de apoyo
       description: |
         Devuelve los catálogos y colecciones necesarios para alimentar formularios del cliente:
-        vehículos actualmente asignados al conductor autenticado, estaciones de servicio activas,
+        vehículos disponibles para el usuario autenticado, estaciones de servicio activas,
         tipos de combustible activos, los catálogos de materiales y vehículos externos de
         control de cargas, y los valores enumerados usados por otros módulos (cargas de
         combustible, solicitudes de mantenimiento, control de cargas).
 
-        Requiere que el usuario autenticado tenga una persona vinculada con un registro de
-        conductor asociado.
+        El listado `vehiculos` unifica, sin duplicados, los vehículos que el usuario tiene
+        asignados como conductor y todos los vehículos activos de las áreas que administra
+        como jefe de área. Un usuario puede tener ambos roles, uno solo o ninguno; si no
+        tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor.
       responses:
         '200':
           description: Colecciones disponibles para el usuario autenticado.
@@ -457,13 +459,6 @@ paths:
                     estados_carga: [ABIERTA, CERRADA, PAGADA]
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '500':
-          description: El usuario autenticado no tiene una persona/conductor asociado.
-          content:
-            application/json:
-              example:
-                message: "Error al obtener colecciones."
-                error: "Detalle técnico interno del error (varía según la causa)."
 
   # ──────────────────────────────────────────────────────────────────────
   # OPERACIÓN DIARIA
