@@ -11,6 +11,7 @@ use App\Models\Actividad;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\OperacionDiaria;
+use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
@@ -87,6 +88,7 @@ class OperacionDiariaController extends Controller
             'vehiculosAsignados' => $this->vehiculosDisponibles($user),
             'operacion' => null,
             'actividadesSugeridas' => $this->actividadesSugeridas($user),
+            'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
         ]);
     }
@@ -145,6 +147,7 @@ class OperacionDiariaController extends Controller
         $user = request()->user();
 
         $operacionDiaria->actividades_realizadas_edit = $operacionDiaria->actividadesRealizadasEdit();
+        $operacionDiaria->mantenimientos_edit = $operacionDiaria->mantenimientosOperacionEdit();
 
         return inertia('Operacion/Create', [
             // Se asegura que el vehículo ya asignado a la operación aparezca en
@@ -153,8 +156,23 @@ class OperacionDiariaController extends Controller
             'vehiculosAsignados' => $this->vehiculosDisponibles($user, $operacionDiaria->vehiculo),
             'operacion' => $operacionDiaria->load(['vehiculo', 'area']),
             'actividadesSugeridas' => $this->actividadesSugeridas($user),
+            'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
         ]);
+    }
+
+    /**
+     * Catálogo de controles de mantenimiento de ámbito operacion_diaria
+     * (activos) para la sección de mantenimiento del formulario. Los tipos
+     * de ámbito taller no se ofrecen aquí (se usan en órdenes de trabajo).
+     */
+    private function tiposMantenimientoOperacionDiaria()
+    {
+        return TipoMantenimiento::query()
+            ->where('ambito', 'operacion_diaria')
+            ->where('estado_tipo_mantenimiento', 'ACTIVO')
+            ->orderBy('tipo_mantenimiento')
+            ->get(['id', 'tipo_mantenimiento', 'tipo_valor', 'unidad_medida']);
     }
 
     /**
@@ -358,6 +376,7 @@ class OperacionDiariaController extends Controller
         try {
 
             $operacionDiaria->actividadesRealizadas()->detach();
+            $operacionDiaria->mantenimientosOperacion()->detach();
 
             $operacionDiaria->delete();
 

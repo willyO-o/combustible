@@ -5,17 +5,15 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\OperacionDiaria\CreateOperacionDiariaAction;
 use App\Actions\OperacionDiaria\ListOperacionesDiariasAction;
 use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
+use App\Exceptions\AreaNoAsignadaException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OperacionStoreRequest;
-
 use App\Models\OperacionDiaria;
 use Illuminate\Http\JsonResponse;
-use App\Exceptions\AreaNoAsignadaException;
 use Illuminate\Http\Request;
 
 class OperacionDiariaController extends Controller
 {
-
     public function index(Request $request, ListOperacionesDiariasAction $listAction): JsonResponse
     {
 
@@ -26,13 +24,8 @@ class OperacionDiariaController extends Controller
         return response()->json($operaciones);
     }
 
-
-
-
     /**
      * Almacena una nueva operación diaria.
-     *
-     * @return JsonResponse
      */
     public function store(OperacionStoreRequest $request, CreateOperacionDiariaAction $action): JsonResponse
     {
@@ -43,7 +36,7 @@ class OperacionDiariaController extends Controller
 
             return response()->json([
                 'message' => 'Operación diaria creada exitosamente.',
-                'data'    => $operacionDiaria,
+                'data' => $operacionDiaria,
             ], 201);
         } catch (AreaNoAsignadaException $e) {
             return response()->json([
@@ -53,12 +46,10 @@ class OperacionDiariaController extends Controller
 
             return response()->json([
                 'message' => 'Error al crear la operación diaria.',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
-
-
 
     /**
      * Display the specified resource.
@@ -66,11 +57,11 @@ class OperacionDiariaController extends Controller
     public function show(OperacionDiaria $operacionDiaria)
     {
         $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas']);
+
         return response()->json([
-            'data'    => $operacion,
+            'data' => $operacion,
         ]);
     }
-
 
     public function update(OperacionStoreRequest $request, OperacionDiaria $operacionDiaria, UpdateOperacionDiariaAction $action)
     {
@@ -79,17 +70,16 @@ class OperacionDiariaController extends Controller
 
             return response()->json([
                 'message' => 'Operación diaria actualizada exitosamente.',
-                'data'    => $operacionDiaria,
+                'data' => $operacionDiaria,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al actualizar la operación diaria.',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
-
 
     public function destroy(OperacionDiaria $operacionDiaria)
     {
@@ -103,9 +93,9 @@ class OperacionDiariaController extends Controller
         try {
 
             $operacionDiaria->actividadesRealizadas()->detach();
+            $operacionDiaria->mantenimientosOperacion()->detach();
 
             $operacionDiaria->delete();
-
 
             return response()->json([
                 'success' => true,
@@ -114,11 +104,10 @@ class OperacionDiariaController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al eliminar la operación diaria: ' . $e->getMessage(),
+                'message' => 'Error al eliminar la operación diaria: '.$e->getMessage(),
             ], 500);
         }
     }
-
 
     public function validarActividad(Request $request)
     {
@@ -138,7 +127,7 @@ class OperacionDiariaController extends Controller
 
         return response()->json([
             'message' => 'Actividad agregada exitosamente.',
-            'data'    => $validated,
+            'data' => $validated,
         ]);
     }
 }

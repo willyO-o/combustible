@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 #[Fillable([
     'nro_operacion',
@@ -112,6 +113,39 @@ class OperacionDiaria extends Model
             'id_actividad'
         )->using(ActividadRealizada::class)
             ->withPivot('id', 'origen', 'destino', 'lugar', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
+    }
+
+    /**
+     * Controles de mantenimiento registrados en la operación diaria
+     * (tipo_mantenimiento de ámbito operacion_diaria). El pivote guarda
+     * `valor` para los de tipo_valor "cantidad" y `realizado` (SI/NO) para
+     * los de tipo "booleano"; ambos pueden ser nulos porque no todos los
+     * controles aplican a cada operación.
+     */
+    public function mantenimientosOperacion()
+    {
+        return $this->belongsToMany(
+            TipoMantenimiento::class,
+            'mantenimiento_operacion_diaria',
+            'id_operacion_diaria',
+            'id_tipo_mantenimiento'
+        )->using(MantenimientoOperacionDiaria::class)
+            ->withPivot('id', 'valor', 'realizado');
+    }
+
+    /**
+     * Valores de mantenimiento ya guardados, en la forma que consume el
+     * formulario (Operacion/Create.vue).
+     *
+     * @return Collection<int, array{id_tipo_mantenimiento: int, valor: string|null, realizado: string|null}>
+     */
+    public function mantenimientosOperacionEdit()
+    {
+        return $this->mantenimientosOperacion()->get()->map(fn ($tipo) => [
+            'id_tipo_mantenimiento' => $tipo->id,
+            'valor' => $tipo->pivot->valor,
+            'realizado' => $tipo->pivot->realizado,
+        ]);
     }
 
     public function actividadesRealizadasEdit()

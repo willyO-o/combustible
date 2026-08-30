@@ -90,6 +90,14 @@ class OperacionStoreRequest extends FormRequest
             'actividades_realizadas.*.hora_inicio' => 'required|date_format:H:i',
             'actividades_realizadas.*.hora_fin' => 'required|date_format:H:i',
 
+            // Controles de mantenimiento de operación diaria: opcionales, no
+            // todos aplican a cada operación. Los tipos deben ser de ámbito
+            // operacion_diaria (los de taller se usan en órdenes de trabajo).
+            'mantenimientos' => 'nullable|array',
+            'mantenimientos.*.id_tipo_mantenimiento' => ['required', 'integer', Rule::exists('tipo_mantenimiento', 'id')->where('ambito', 'operacion_diaria')],
+            'mantenimientos.*.valor' => 'nullable|numeric|min:0',
+            'mantenimientos.*.realizado' => 'nullable|in:SI,NO',
+
         ];
     }
 
@@ -107,6 +115,8 @@ class OperacionStoreRequest extends FormRequest
             'actividades_realizadas.*.hora_inicio.required' => 'La hora de inicio es obligatoria.',
             'actividades_realizadas.*.hora_fin.required' => 'La hora de fin es obligatoria.',
             'actividades_realizadas.*.hora_fin.after' => 'La hora de fin debe ser posterior a la hora de inicio.',
+            'mantenimientos.*.id_tipo_mantenimiento.exists' => 'El control de mantenimiento seleccionado no es válido para operación diaria.',
+            'mantenimientos.*.valor.numeric' => 'El valor del control de mantenimiento debe ser numérico.',
         ];
     }
 }

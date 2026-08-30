@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class UpdateOperacionDiariaAction
 {
-    public function __construct(private SincronizarActividadesRealizadasAction $sincronizarActividadesRealizadasAction) {}
+    public function __construct(
+        private SincronizarActividadesRealizadasAction $sincronizarActividadesRealizadasAction,
+        private SincronizarMantenimientosOperacionAction $sincronizarMantenimientosOperacionAction,
+    ) {}
 
     public function execute(OperacionDiaria $operacionDiaria, array $datos): OperacionDiaria
     {
@@ -33,6 +36,8 @@ class UpdateOperacionDiariaAction
             $operacionDiaria->update($datos);
 
             $this->sincronizarActividadesRealizadasAction->execute($operacionDiaria, $datos['actividades_realizadas'] ?? []);
+
+            $this->sincronizarMantenimientosOperacionAction->execute($operacionDiaria, $datos['mantenimientos'] ?? []);
 
             if (! empty($datos['observaciones']) && ! empty($datos['notificar_observaciones']) && $datos['observaciones'] !== $observacionesOriginales) {
                 event(new ObservacionOperacionEvent($operacionDiaria));

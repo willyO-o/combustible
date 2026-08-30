@@ -2899,6 +2899,34 @@ components:
           description: Hora de fin de la actividad, formato `HH:mm`.
           example: "11:00"
 
+    MantenimientoOperacionInput:
+      type: object
+      description: |
+        Un control de mantenimiento de operación diaria. `id_tipo_mantenimiento` debe existir
+        en `tipo_mantenimiento` y ser de ámbito `operacion_diaria` (los de ámbito `taller` se
+        usan en órdenes de trabajo, no aquí). Sólo se registran los controles que traen algún
+        dato: `valor` para los tipos de `tipo_valor = cantidad`, o `realizado` para los de
+        `tipo_valor = booleano`. Ambos son opcionales y anulables; los que no apliquen a la
+        operación se pueden omitir. Cada envío reemplaza por completo el conjunto guardado.
+      required: [id_tipo_mantenimiento]
+      properties:
+        id_tipo_mantenimiento:
+          type: integer
+          example: 12
+        valor:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          description: Valor medido, para los tipos de `tipo_valor = cantidad`.
+          example: 12.5
+        realizado:
+          type: string
+          enum: [SI, NO]
+          nullable: true
+          description: Marca para los tipos de `tipo_valor = booleano`.
+          example: SI
+
     OperacionDiariaStoreRequest:
       type: object
       description: |
@@ -2965,6 +2993,11 @@ components:
           type: array
           minItems: 1
           items: { $ref: '#/components/schemas/ActividadRealizadaInput' }
+        mantenimientos:
+          type: array
+          nullable: true
+          description: Controles de mantenimiento de operación diaria (opcional). Reemplaza por completo el conjunto guardado.
+          items: { $ref: '#/components/schemas/MantenimientoOperacionInput' }
 
     OperacionDiariaUpdateRequest:
       type: object
@@ -3038,6 +3071,11 @@ components:
           minItems: 1
           description: Sigue siendo obligatorio en la actualización. Reemplaza por completo el conjunto de actividades existente (no se agrega de forma incremental).
           items: { $ref: '#/components/schemas/ActividadRealizadaInput' }
+        mantenimientos:
+          type: array
+          nullable: true
+          description: Controles de mantenimiento de operación diaria (opcional). Reemplaza por completo el conjunto guardado.
+          items: { $ref: '#/components/schemas/MantenimientoOperacionInput' }
         estado:
           type: string
           enum: [PENDIENTE, EN_PROGRESO, FINALIZADO, VERIFICADO, OBSERVADO]

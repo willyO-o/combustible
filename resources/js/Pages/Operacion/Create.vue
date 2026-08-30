@@ -27,6 +27,9 @@ const props = defineProps({
     vehiculosAsignados: Array,
     operacion: Object, // la operación a editar (null en modo creación)
     actividadesSugeridas: Array, // [{ id, nombre_actividad, unidad_medida }] actividades sugeridas según el/las área(s) del usuario
+    // [{ id, tipo_mantenimiento, tipo_valor: 'cantidad'|'booleano'|null, unidad_medida }]
+    // controles de mantenimiento de ámbito operacion_diaria (activos).
+    tiposMantenimiento: { type: Array, default: () => [] },
     // false para el rol conductor (siempre es él mismo, sin ambigüedad); true
     // para cualquier otro rol, que debe elegir entre los conductores
     // realmente asignados al vehículo (titular + provisionales).
@@ -69,6 +72,23 @@ const form = useForm({
     observaciones: (props.operacion ? props.operacion.observaciones : '') ?? '',
     notificar_observaciones: false,
     actividades_realizadas: (props.operacion ? props.operacion.actividades_realizadas_edit : []) ?? [],
+    // Una entrada por tipo de mantenimiento de operación diaria. En edición
+    // se rellenan con lo ya guardado (props.operacion.mantenimientos_edit).
+    // valor -> tipos "cantidad"; realizado (bool) -> tipos "booleano".
+    mantenimientos: (props.tiposMantenimiento || []).map((t) => {
+        const guardado = (props.operacion?.mantenimientos_edit ?? []).find(
+            (m) => m.id_tipo_mantenimiento === t.id,
+        )
+
+        return {
+            id_tipo_mantenimiento: t.id,
+            tipo_mantenimiento: t.tipo_mantenimiento,
+            tipo_valor: t.tipo_valor,
+            unidad_medida: t.unidad_medida,
+            valor: guardado?.valor ?? '',
+            realizado: guardado?.realizado === 'SI',
+        }
+    }),
 })
 
 
@@ -174,6 +194,18 @@ function submit() {
             const out = {
                 ...data,
                 id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
+                // Sólo se mandan los controles con algo cargado; el resto no
+                // aplica a esta operación y no debe registrarse.
+                mantenimientos: data.mantenimientos
+                    .map((m) => ({
+                        id_tipo_mantenimiento: m.id_tipo_mantenimiento,
+                        valor:
+                            m.tipo_valor === 'cantidad' && m.valor !== '' && m.valor !== null
+                                ? m.valor
+                                : null,
+                        realizado: m.tipo_valor === 'booleano' && m.realizado ? 'SI' : null,
+                    }))
+                    .filter((m) => m.valor !== null || m.realizado !== null),
                 _method: props.operacion ? 'PUT' : 'POST', // Agregar el campo _method para PUT si es una actualización
             }
             return out
@@ -553,6 +585,55 @@ onMounted(() => {
                             <div v-if="form.errors.actividades_realizadas" class="text-danger">{{
                                 form.errors.actividades_realizadas }}</div>
 
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====== MANTENIMIENTO (OPERACIÓN DIARIA) ====== -->
+                <div v-if="form.mantenimientos.length" class="col-12">
+                    <div class="custom-card" :class="{ card: !isMobile }">
+                        <div
+                            class="card-header d-flex align-items-center justify-content-between bd-blue-200 p-2 rounded">
+                            <div class="card-title"><i class="ri-tools-line me-2"></i>
+                                Mantenimiento en operación diaria
+                            </div>
+                        </div>
+                        <div class="card-body pt-3">
+                            <p class="text-muted small mb-3">
+                                Registra sólo los controles que correspondan a esta operación. Los que no apliquen
+                                puedes dejarlos en blanco.
+                            </p>
+                            <div class="row g-3">
+                                <div v-for="(m, idx) in form.mantenimientos" :key="m.id_tipo_mantenimiento"
+                                    class="col-md-6 col-xl-4">
+                                    <div class="border rounded-3 p-3 h-100">
+                                        <label class="fw-medium d-block mb-2">{{ m.tipo_mantenimiento }}</label>
+
+                                        <div v-if="m.tipo_valor === 'cantidad'" class="input-group">
+                                            <input v-model="m.valor" type="text" v-decimal="2" class="form-control"
+                                                placeholder="Sin registrar"
+                                                :class="{ 'is-invalid': form.errors[`mantenimientos.${idx}.valor`] }" />
+                                            <span v-if="m.unidad_medida" class="input-group-text">{{ m.unidad_medida
+                                                }}</span>
+                                            <div v-if="form.errors[`mantenimientos.${idx}.valor`]"
+                                                class="invalid-feedback">
+                                                {{ form.errors[`mantenimientos.${idx}.valor`] }}
+                                            </div>
+                                        </div>
+
+                                        <div v-else-if="m.tipo_valor === 'booleano'"
+                                            class="form-check form-check-lg mb-0">
+                                            <input :id="`mant-${m.id_tipo_mantenimiento}`" v-model="m.realizado"
+                                                class="form-check-input" type="checkbox" />
+                                            <label class="form-check-label" :for="`mant-${m.id_tipo_mantenimiento}`">
+                                                Realizado
+                                            </label>
+                                        </div>
+
+                                        <span v-else class="text-muted small">Sin tipo de valor configurado</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

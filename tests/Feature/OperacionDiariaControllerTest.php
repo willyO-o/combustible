@@ -7,6 +7,7 @@ use App\Models\Asignacion;
 use App\Models\Conductor;
 use App\Models\OperacionDiaria;
 use App\Models\Persona;
+use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -422,6 +423,189 @@ class OperacionDiariaControllerTest extends TestCase
             ->where('mostrarSelectorConductor', false)
             ->where('vehiculosAsignados.0.meta.conductoresAsignados', [])
         );
+    }
+
+    private function crearTipoMantenimientoOperacion(string $nombre, string $tipoValor = 'cantidad', ?string $unidad = 'L'): TipoMantenimiento
+    {
+        return TipoMantenimiento::create([
+            'tipo_mantenimiento' => $nombre,
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => $tipoValor,
+            'unidad_medida' => $tipoValor === 'cantidad' ? $unidad : null,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payloadOperacionValida(Vehiculo $vehiculo, array $extra = []): array
+    {
+        return array_merge([
+            'id_vehiculo' => $vehiculo->id,
+            'turno' => 'DIA',
+            'fecha_inicio' => now()->subHours(4)->format('Y-m-d\TH:i'),
+            'fecha_fin' => now()->format('Y-m-d\TH:i'),
+            'kilometraje_inicio' => 1000,
+            'kilometraje_fin' => 1050,
+            'notificar_observaciones' => false,
+            'actividades_realizadas' => [[
+                'actividad' => 'Transporte de material',
+                'lugar' => null,
+                'origen' => 'Cantera',
+                'destino' => 'Planta',
+                'cantidad' => 1,
+                'unidad_medida' => 'viajes',
+                'hora_inicio' => '08:00',
+                'hora_fin' => '09:00',
+            ]],
+        ], $extra);
+    }
+
+    public function test_create_expone_solo_los_tipos_de_mantenimiento_de_operacion_diaria(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+
+        $opDiaria = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+        $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
+        // De taller y/o inactivo: no deben aparecer.
+        TipoMantenimiento::create(['tipo_mantenimiento' => 'Cambio de aceite', 'estado_tipo_mantenimiento' => 'ACTIVO', 'ambito' => 'taller']);
+        TipoMantenimiento::create(['tipo_mantenimiento' => 'Inactivo', 'estado_tipo_mantenimiento' => 'INACTIVO', 'ambito' => 'operacion_diaria', 'tipo_valor' => 'booleano']);
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.create'));
+
+        $response->assertOk();
+        $ids = collect($response->viewData('page')['props']['tiposMantenimiento'])->pluck('tipo_mantenimiento');
+        $this->assertEqualsCanonicalizing(['Nivel de aceite', 'Combustible cargado'], $ids->all());
+        $this->assertNotNull($opDiaria);
+    }
+
+    public function test_store_guarda_solo_los_controles_de_mantenimiento_cargados(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+        $agua = $this->crearTipoMantenimientoOperacion('Nivel de agua', 'booleano');
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null],
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+                // Sin cargar nada: no debe registrarse.
+                ['id_tipo_mantenimiento' => $agua->id, 'valor' => null, 'realizado' => null],
+            ],
+        ]));
+
+        $response->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $this->assertSame(2, $operacion->mantenimientosOperacion()->count());
+        $this->assertDatabaseHas('mantenimiento_operacion_diaria', [
+            'id_operacion_diaria' => $operacion->id,
+            'id_tipo_mantenimiento' => $combustible->id,
+            'valor' => 12.5,
+            'realizado' => null,
+        ]);
+        $this->assertDatabaseHas('mantenimiento_operacion_diaria', [
+            'id_operacion_diaria' => $operacion->id,
+            'id_tipo_mantenimiento' => $aceite->id,
+            'realizado' => 'SI',
+        ]);
+        $this->assertDatabaseMissing('mantenimiento_operacion_diaria', [
+            'id_operacion_diaria' => $operacion->id,
+            'id_tipo_mantenimiento' => $agua->id,
+        ]);
+    }
+
+    public function test_edit_precarga_los_controles_de_mantenimiento_ya_guardados(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 20, 'realizado' => null],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.edit', $operacion));
+
+        $response->assertOk();
+        $guardados = collect($response->viewData('page')['props']['operacion']['mantenimientos_edit']);
+        $this->assertCount(1, $guardados);
+        $this->assertSame($combustible->id, $guardados->first()['id_tipo_mantenimiento']);
+        $this->assertSame('20.00', (string) $guardados->first()['valor']);
+    }
+
+    public function test_store_rechaza_un_control_de_mantenimiento_que_no_es_de_operacion_diaria(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $taller = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'taller',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $taller->id, 'valor' => 5, 'realizado' => null],
+            ],
+        ]));
+
+        $response->assertSessionHasErrors('mantenimientos.0.id_tipo_mantenimiento');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    public function test_update_reemplaza_los_controles_de_mantenimiento(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 10, 'realizado' => null],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+
+        $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+            ],
+        ]));
+
+        $this->assertSame(1, $operacion->mantenimientosOperacion()->count());
+        $this->assertDatabaseMissing('mantenimiento_operacion_diaria', [
+            'id_operacion_diaria' => $operacion->id,
+            'id_tipo_mantenimiento' => $combustible->id,
+        ]);
+        $this->assertDatabaseHas('mantenimiento_operacion_diaria', [
+            'id_operacion_diaria' => $operacion->id,
+            'id_tipo_mantenimiento' => $aceite->id,
+            'realizado' => 'SI',
+        ]);
     }
 
     public function test_un_jefe_de_area_recibe_el_selector_de_conductor_con_los_asignados_al_vehiculo(): void
