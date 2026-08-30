@@ -554,6 +554,28 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertSame($material->id, $actividades->first()['id_material']);
     }
 
+    public function test_update_no_permite_cambiar_el_vehiculo_de_la_operacion(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $otroVehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);
+        $this->asignarVehiculoAConductor($otroVehiculo, $conductor);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+        $operacion = OperacionDiaria::firstOrFail();
+
+        $payload = $this->payloadOperacionValida($vehiculo);
+        $payload['id_vehiculo'] = $otroVehiculo->id;
+
+        $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $payload)
+            ->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertSame($vehiculo->id, $operacion->fresh()->id_vehiculo);
+    }
+
     public function test_show_expone_el_material_de_las_actividades(): void
     {
         [$user, $conductor] = $this->crearConductorConUsuario();

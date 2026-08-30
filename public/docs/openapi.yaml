@@ -710,10 +710,12 @@ paths:
                   area:
                     id: 3
                     nombre_area: Operaciones Mina Norte
-                  actividadesRealizadas:
+                  actividades_realizadas:
                     - id: 1
                       nombre_actividad: Acarreo de material
                       pivot:
+                        id_material: 3
+                        material: { id: 3, material: Concentrado }
                         origen: Cancha de acopio
                         destino: Botadero norte
                         lugar: null
@@ -776,10 +778,10 @@ paths:
                   vehiculo: { id: 8, nro_placa: 1234-ABC, tipo_medicion: kilometraje }
                   area: { id: 3, nombre_area: Operaciones Mina Norte }
                   verificador: null
-                  actividadesRealizadas:
+                  actividades_realizadas:
                     - id: 1
                       nombre_actividad: Acarreo de material
-                      pivot: { origen: Cancha de acopio, destino: Botadero norte, cantidad: "6.00", unidad_medida: viajes, hora_inicio: "07:15", hora_fin: "11:00" }
+                      pivot: { id_material: 3, material: { id: 3, material: Concentrado }, origen: Cancha de acopio, destino: Botadero norte, cantidad: "6.00", unidad_medida: viajes, hora_inicio: "07:15", hora_fin: "11:00" }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -793,11 +795,14 @@ paths:
         Requiere los mismos campos que el registro (`POST /operacion-diaria`), salvo las
         excepciones indicadas abajo.
 
-        - **No es un parche parcial real**: solo `id_vehiculo`, `kilometraje_inicio`,
+        - **No es un parche parcial real**: solo `kilometraje_inicio`,
           `kilometraje_fin`, `horometro_inicio` y `horometro_fin` son opcionales aquí. `turno`,
           `fecha_inicio`, `fecha_fin`, `notificar_observaciones` y `actividades_realizadas`
           **siguen siendo obligatorios**, igual que en el registro. `horas_trabajadas` se
           recalcula automáticamente a partir de `fecha_inicio`/`fecha_fin` y no debe enviarse.
+        - **`id_vehiculo` no se puede cambiar**: cualquier valor enviado se ignora y la
+          operación conserva su vehículo original (sus lecturas y actividades dependen del
+          `tipo_medicion` de ese vehículo).
         - `actividades_realizadas` **reemplaza por completo** el conjunto de actividades
           previamente registradas para esta operación (se resincroniza, no se agrega de forma
           incremental) — y al ser obligatorio, debe reenviarse siempre completo, incluidas las
@@ -805,9 +810,8 @@ paths:
         - Si `observaciones` cambia respecto al valor original y `notificar_observaciones: true`,
           se envía una notificación (a diferencia del registro, aquí solo notifica cuando el
           texto de las observaciones efectivamente cambió).
-        - A diferencia de `POST /operacion-diaria` y `GET /operacion-diaria/{id}`, la operación
-          devuelta en `data` **no incluye las relaciones anidadas** (`conductor`, `vehiculo`,
-          `area`, `actividadesRealizadas`) — solo los campos propios de la operación diaria.
+        - La operación devuelta en `data` incluye las relaciones anidadas `conductor`,
+          `vehiculo`, `area` y `actividades_realizadas` (con `pivot.material` cuando aplica).
       requestBody:
         required: true
         content:
@@ -848,6 +852,23 @@ paths:
                   observaciones: "Se detectó ruido leve en el motor al arrancar."
                   created_at: "13/08/2026 07:05"
                   updated_at: "2026-08-13T17:05:00.000000Z"
+                  conductor: { id: 45, persona: { id: 45, nombres: Juan, paterno: Pérez, materno: Quispe } }
+                  vehiculo: { id: 8, nro_placa: 1234-ABC, codigo: VOLQ-08, tipo_medicion: kilometraje }
+                  area: { id: 3, nombre_area: Operaciones Mina Norte }
+                  actividades_realizadas:
+                    - id: 12
+                      nombre_actividad: Acarreo de material
+                      pivot:
+                        id: 501
+                        id_material: 3
+                        material: { id: 3, material: Concentrado }
+                        origen: Cancha de acopio
+                        destino: Chancado primario
+                        lugar: null
+                        cantidad: "6.00"
+                        unidad_medida: viajes
+                        hora_inicio: "07:15"
+                        hora_fin: "11:00"
         '422':
           description: Error de validación.
           content:
@@ -3014,18 +3035,20 @@ components:
       type: object
       description: |
         Cuerpo esperado por `PUT`/`PATCH /operacion-diaria/{id}`. **No es un parche parcial
-        real**: solo se relajan a opcionales los campos `id_vehiculo`, `kilometraje_inicio`,
+        real**: solo se relajan a opcionales los campos `kilometraje_inicio`,
         `kilometraje_fin`, `horometro_inicio` y `horometro_fin`. El resto — `turno`,
         `fecha_inicio`, `fecha_fin`, `notificar_observaciones` y `actividades_realizadas` —
         sigue siendo **obligatorio**, sin excepción por tratarse de una actualización, y debe
         reenviarse completo en cada petición (incluyendo las actividades que no cambiaron, ya
         que se resincronizan por completo). `horas_trabajadas` se recalcula automáticamente a
-        partir de `fecha_inicio`/`fecha_fin` y no debe enviarse.
+        partir de `fecha_inicio`/`fecha_fin` y no debe enviarse. **`id_vehiculo` no se puede
+        cambiar**: cualquier valor enviado se ignora y se conserva el vehículo original de la
+        operación (sus lecturas y actividades dependen del `tipo_medicion` de ese vehículo).
       required: [turno, fecha_inicio, fecha_fin, notificar_observaciones, actividades_realizadas]
       properties:
         id_vehiculo:
           type: integer
-          description: Opcional en la actualización (a diferencia del registro, donde es obligatorio). Si se envía, debe existir en la tabla `vehiculo`.
+          description: Se ignora en la actualización — la operación conserva su vehículo original. Sólo se documenta porque el cliente puede reenviarlo sin efecto.
           example: 8
         turno:
           type: string
@@ -3174,7 +3197,7 @@ components:
           type: object
           nullable: true
           description: Presente solo en `GET /operacion-diaria/{id}` (no se carga en el listado ni al crear).
-        actividadesRealizadas:
+        actividades_realizadas:
           type: array
           items: { $ref: '#/components/schemas/ActividadRealizada' }
 
@@ -3192,8 +3215,8 @@ components:
           allOf:
             - $ref: '#/components/schemas/OperacionDiaria'
           description: |
-            A diferencia de la respuesta de `store`/`show`, aquí normalmente **no** vienen
-            presentes las claves `conductor`, `vehiculo`, `area` ni `actividadesRealizadas`.
+            Incluye las relaciones anidadas `conductor`, `vehiculo`, `area` y
+            `actividades_realizadas` (igual que `store`/`show`). No trae `verificador`.
 
     ValidarActividadResponse:
       type: object

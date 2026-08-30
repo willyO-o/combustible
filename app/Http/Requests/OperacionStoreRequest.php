@@ -20,6 +20,20 @@ class OperacionStoreRequest extends FormRequest
         return true;
     }
 
+    /**
+     * El vehículo de una operación no se puede cambiar al editar: sus lecturas
+     * (km/horómetro) y actividades dependen de su tipo_medicion. Se descarta
+     * cualquier `id_vehiculo` entrante y se conserva el de la operación.
+     */
+    protected function prepareForValidation(): void
+    {
+        $operacion = $this->route('operacionDiaria');
+
+        if ($operacion) {
+            $this->merge(['id_vehiculo' => $operacion->id_vehiculo]);
+        }
+    }
+
     protected function failedValidation(Validator $validator): void
     {
         if ($this->expectsJson()) {

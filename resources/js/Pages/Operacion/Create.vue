@@ -41,6 +41,11 @@ const props = defineProps({
 
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
 
+// En edición el vehículo queda bloqueado: cambiarlo invalidaría las lecturas
+// (km/horómetro) y las actividades ya registradas, que dependen de su
+// tipo_medicion.
+const esEdicion = computed(() => !!props.operacion)
+
 
 
 
@@ -159,9 +164,22 @@ const conductoresDelVehiculo = computed(() => {
     return vehiculoSelected?.meta?.conductoresAsignados ?? []
 })
 
-watch(() => form.id_vehiculo, async (val) => {
+watch(() => form.id_vehiculo, async (val, oldVal) => {
 
     tipoMedicion.value = ''
+
+    // Al cambiar de vehículo (no en la selección inicial) se vacían las
+    // actividades y los campos que dependen del tipo_medicion: origen/destino
+    // vs lugar, material trasladado y las lecturas de km/horómetro dejan de
+    // corresponder al nuevo vehículo.
+    if (oldVal) {
+        form.actividades_realizadas = []
+        form.kilometraje_inicio = ''
+        form.kilometraje_fin = ''
+        form.horometro_inicio = ''
+        form.horometro_fin = ''
+        form.clearErrors()
+    }
 
     if (!val) {
         form.id_conductor = null
@@ -359,10 +377,15 @@ onMounted(() => {
                                     </label>
                                     <Multiselect v-model="form.id_vehiculo"
                                         :options="vehiculosAsignadosOpt" value-prop="id" label="label"
-                                        :searchable="true" :filter-results="true" placeholder="Buscar vehículo..."
+                                        :searchable="true" :filter-results="true" :disabled="esEdicion"
+                                        :can-clear="!esEdicion" placeholder="Buscar vehículo..."
                                         no-options-text="Sin vehículos disponibles" no-results-text="Sin resultados"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
 
+                                    <div v-if="esEdicion" class="text-muted small mt-1">
+                                        <i class="ri-lock-line me-1"></i>El vehículo no se puede cambiar al editar la
+                                        operación.
+                                    </div>
                                     <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">{{
                                         form.errors.id_vehiculo }}</div>
                                     <div v-if="loadingVehiculo" class="text-muted small mt-1">
@@ -608,10 +631,14 @@ onMounted(() => {
                                 </div>
                             </div>
 
-                            <div class="text-center px-5 py-2 border  border-info mt-4 mb-4  rounded-pill btn-wave btn btn-info-light"
-                                @click="estaAbiertoModal = true">
-                                <i class="ri-add-line  "></i>
+                            <button type="button"
+                                class="text-center px-5 py-2 border border-info mt-4 mb-2 rounded-pill btn-wave btn btn-info-light"
+                                :disabled="!form.id_vehiculo" @click="estaAbiertoModal = true">
+                                <i class="ri-add-line"></i>
                                 <small>Añadir actividad</small>
+                            </button>
+                            <div v-if="!form.id_vehiculo" class="text-muted small mb-2">
+                                Selecciona primero un vehículo para registrar actividades.
                             </div>
                             <div v-if="form.errors.actividades_realizadas" class="text-danger">{{
                                 form.errors.actividades_realizadas }}</div>
