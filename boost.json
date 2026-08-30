@@ -17,6 +17,7 @@
         "laravel-best-practices",
         "inertia-vue-development",
         "tailwindcss-development",
-        "laravel-permission-development"
+        "laravel-permission-development",
+        "impeccable"
     ]
 }
