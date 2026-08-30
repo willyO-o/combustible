@@ -4,6 +4,7 @@ namespace App\Libraries;
 
 use App\Models\CargaCombustible;
 use App\Models\ParametrosEmpresa;
+use App\Models\VehiculoExterno;
 use easyTable;
 use exFPDF;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -1037,6 +1038,387 @@ class Reportes extends exFPDF
         $this->pintarPieDePagina($uw, $gris);
 
         return $this->Output($modo, $nombreArchivo ?? 'reporte_rendimiento_combustible.pdf');
+    }
+
+    /**
+     * Reporte de control de carga de material: cantidad de viajes realizados
+     * por cada vehículo externo dentro del rango, con el reparto entre viajes
+     * al exterior y nacionales. $resumen es lo que devuelve
+     * ControlCargasReportController::obtenerResumen() (una fila por vehículo
+     * externo + totales).
+     *
+     * @param  array{vehiculos: iterable<array<string, mixed>>, totales: array<string, int|float>}  $resumen
+     * @param  string  $ambito  'todos' | 'exterior' | 'nacional' — sólo para dejar constancia del filtro en el PDF.
+     */
+    public function generarReporteControlCargas(array $resumen, $fechaDesde, $fechaHasta, string $ambito = 'todos', string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $vehiculos = collect($resumen['vehiculos'] ?? []);
+        $totales = ($resumen['totales'] ?? []) + [
+            'total_vehiculos' => 0,
+            'total_fletes' => 0,
+            'total_viajes' => 0,
+            'viajes_exterior' => 0,
+            'viajes_nacional' => 0,
+            'monto_total' => 0,
+        ];
+
+        $bs = fn ($valor): string => 'Bs. '.number_format((float) $valor, 2, ',', '.');
+
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $gris = [90, 90, 90];
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 199.9;
+
+        // ════════════════════════════════════════════════════════════════
+        // ENCABEZADO
+        // ════════════════════════════════════════════════════════════════
+        $ambitoLabel = match ($ambito) {
+            'exterior' => 'Sólo viajes al exterior',
+            'nacional' => 'Sólo viajes nacionales',
+            default => 'Todos los viajes',
+        };
+        $h1 = 22;
+
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
+
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
+
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 1.5);
+        $this->Cell($uw - 40, 8, utf8Decode('REPORTE DE CONTROL DE CARGA DE MATERIAL'), 0, 2, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 9.5);
+        $this->Cell($uw - 40, 6, utf8Decode('Fletes abiertos del '.date('d/m/Y', strtotime($fechaDesde)).' al '.date('d/m/Y', strtotime($fechaHasta))), 0, 2, 'L');
+
+        $this->SetFont('Arial', 'BI', 8);
+        $this->SetTextColor($verde[0], $verde[1], $verde[2]);
+        $this->SetXY($sx + 40, $sy + 16);
+        $this->Cell($uw - 40, 5, utf8Decode('Filtro aplicado: '.$ambitoLabel), 0, 2, 'L');
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
+
+        // ════════════════════════════════════════════════════════════════
+        // TARJETAS DE RESUMEN
+        // ════════════════════════════════════════════════════════════════
+        $cardW = 38;
+        $cardH = 14;
+        $cards = [
+            ['VEHÍCULOS EXTERNOS', (string) $totales['total_vehiculos'], [59, 89, 152]],
+            ['TOTAL FLETES', (string) $totales['total_fletes'], [34, 177, 76]],
+            ['TOTAL VIAJES', (string) $totales['total_viajes'], [192, 0, 0]],
+            ['AL EXT. / NAC.', $totales['viajes_exterior'].' / '.$totales['viajes_nacional'], [155, 155, 155]],
+            ['MONTO PAGADO', $bs($totales['monto_total']), [24, 125, 170]],
+        ];
+
+        $cardX = $sx;
+        foreach ($cards as $card) {
+            [$label, $valor, $color] = $card;
+
+            $this->SetLineWidth(0.3);
+            $this->SetDrawColor($color[0], $color[1], $color[2]);
+            $this->SetFillColor($color[0], $color[1], $color[2]);
+            $this->Rect($cardX, $currentY, $cardW, $cardH, 'FD');
+
+            $this->SetFont('Arial', 'B', 6.5);
+            $this->SetTextColor(255, 255, 255);
+            $this->SetXY($cardX, $currentY);
+            $this->Cell($cardW, 5, utf8Decode($label), 0, 1, 'C');
+
+            $this->SetFont('Arial', 'B', 8.5);
+            $this->SetXY($cardX, $currentY + 5);
+            $this->Cell($cardW, 9, utf8Decode($valor), 0, 1, 'C');
+
+            $cardX += $cardW + 2;
+        }
+
+        $currentY += $cardH + 8;
+
+        // ════════════════════════════════════════════════════════════════
+        // TABLA POR VEHÍCULO EXTERNO
+        // ════════════════════════════════════════════════════════════════
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('VIAJES POR VEHÍCULO EXTERNO'), 0, 1, 'C');
+
+        $currentY += 8;
+
+        $this->SetXY($sx, $currentY);
+        $tabla = new easyTable($this, '{9, 27, 56, 17, 17, 18, 18, 37}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.5; min-height:6;");
+
+        $tabla->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7.5; font-color:30,30,30;');
+        foreach (['#', 'PLACA', 'PROPIETARIO', 'FLETES', 'VIAJES', 'AL EXT.', 'NACION.', 'MONTO PAGADO'] as $i => $encabezado) {
+            $tabla->easyCell(utf8Decode($encabezado), 'align:'.($i <= 2 ? 'L' : ($i === 7 ? 'R' : 'C')).';');
+        }
+        $tabla->printRow(true);
+
+        if ($vehiculos->isEmpty()) {
+            $tabla->rowStyle('font-size:8; font-color:90,90,90;');
+            $tabla->easyCell(utf8Decode('No hay fletes en el rango y filtro seleccionados.'), 'align:C; colspan:8;');
+            $tabla->printRow();
+        }
+
+        foreach ($vehiculos as $idx => $veh) {
+            $tabla->rowStyle('font-style:; font-size:7.5; font-color:30,30,30;');
+            $tabla->easyCell((string) ($idx + 1), 'align:C;');
+            $tabla->easyCell(utf8Decode($veh['nro_placa'] ?? '—'), 'align:L;');
+            $tabla->easyCell(utf8Decode($veh['propietario'] ?? '—'), 'align:L;');
+            $tabla->easyCell((string) $veh['total_fletes'], 'align:C;');
+            $tabla->easyCell((string) $veh['total_viajes'], 'align:C;');
+            $tabla->easyCell((string) $veh['viajes_exterior'], 'align:C;');
+            $tabla->easyCell((string) $veh['viajes_nacional'], 'align:C;');
+            $tabla->easyCell(utf8Decode($bs($veh['monto_total'] ?? 0)), 'align:R;');
+            $tabla->printRow();
+        }
+
+        if ($vehiculos->isNotEmpty()) {
+            $tabla->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:8; font-color:255,255,255;");
+            $tabla->easyCell(utf8Decode('TOTALES'), 'align:L; colspan:3;');
+            $tabla->easyCell((string) $totales['total_fletes'], 'align:C;');
+            $tabla->easyCell((string) $totales['total_viajes'], 'align:C;');
+            $tabla->easyCell((string) $totales['viajes_exterior'], 'align:C;');
+            $tabla->easyCell((string) $totales['viajes_nacional'], 'align:C;');
+            $tabla->easyCell(utf8Decode($bs($totales['monto_total'])), 'align:R;');
+            $tabla->printRow();
+        }
+
+        $tabla->endTable();
+
+        $this->pintarPieDePagina($uw, $gris);
+
+        return $this->Output($modo, $nombreArchivo ?? 'reporte_control_cargas_material.pdf');
+    }
+
+    /**
+     * Detalle de un solo vehículo externo: sus fletes abiertos en el rango, el
+     * desglose de viajes por material de cada uno y el resumen por material del
+     * vehículo. $detalle es lo que devuelve
+     * ControlCargasReportController::obtenerDetalleVehiculo().
+     *
+     * @param  VehiculoExterno  $vehiculo
+     * @param  array{fletes: iterable<array<string, mixed>>, materiales: iterable<array<string, mixed>>, totales: array<string, int|float>}  $detalle
+     */
+    public function generarReporteControlCargasDetalle($vehiculo, array $detalle, $fechaDesde, $fechaHasta, string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $fletes = collect($detalle['fletes'] ?? []);
+        $materiales = collect($detalle['materiales'] ?? []);
+        $totales = ($detalle['totales'] ?? []) + [
+            'total_fletes' => 0,
+            'total_viajes' => 0,
+            'total_materiales' => 0,
+            'monto_total' => 0,
+        ];
+
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $gris = [90, 90, 90];
+
+        $bs = fn ($valor): string => 'Bs. '.number_format((float) $valor, 2, ',', '.');
+        $fechaHora = fn ($valor): string => $valor ? date('d/m/Y H:i', strtotime((string) $valor)) : '—';
+        $pct = fn (int $viajes): string => $totales['total_viajes'] > 0
+            ? number_format($viajes / $totales['total_viajes'] * 100, 1, ',', '.').' %'
+            : '0 %';
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 199.9;
+
+        // ── Encabezado ──────────────────────────────────────────────────
+        $h1 = 22;
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
+
+        $this->SetFont('Arial', 'B', 13);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 1.5);
+        $this->Cell($uw - 40, 8, utf8Decode('DETALLE DE CONTROL DE CARGA DE MATERIAL'), 0, 2, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 9.5);
+        $this->Cell($uw - 40, 6, utf8Decode('Fletes abiertos del '.date('d/m/Y', strtotime($fechaDesde)).' al '.date('d/m/Y', strtotime($fechaHasta))), 0, 2, 'L');
+
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 15.5);
+        $placa = $vehiculo->nro_placa ?: 'Sin placa';
+        $propietario = $vehiculo->propietario ? '   |   '.$vehiculo->propietario : '';
+        $this->Cell($uw - 40, 5, utf8Decode('Vehículo externo: '.$placa.$propietario), 0, 2, 'L');
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
+
+        // ── Tarjetas de resumen ─────────────────────────────────────────
+        $cardW = 49;
+        $cardH = 14;
+        $cards = [
+            ['FLETES', (string) $totales['total_fletes'], [59, 89, 152]],
+            ['TOTAL VIAJES', (string) $totales['total_viajes'], [34, 177, 76]],
+            ['TIPOS DE MATERIAL', (string) $totales['total_materiales'], [192, 0, 0]],
+            ['MONTO PAGADO', $bs($totales['monto_total']), [24, 125, 170]],
+        ];
+
+        $cardX = $sx;
+        foreach ($cards as [$label, $valor, $color]) {
+            $this->SetLineWidth(0.3);
+            $this->SetDrawColor($color[0], $color[1], $color[2]);
+            $this->SetFillColor($color[0], $color[1], $color[2]);
+            $this->Rect($cardX, $currentY, $cardW, $cardH, 'FD');
+
+            $this->SetFont('Arial', 'B', 7);
+            $this->SetTextColor(255, 255, 255);
+            $this->SetXY($cardX, $currentY);
+            $this->Cell($cardW, 5, utf8Decode($label), 0, 1, 'C');
+
+            $this->SetFont('Arial', 'B', 9);
+            $this->SetXY($cardX, $currentY + 5);
+            $this->Cell($cardW, 9, utf8Decode($valor), 0, 1, 'C');
+
+            $cardX += $cardW + 2;
+        }
+
+        $currentY += $cardH + 8;
+
+        // ── Resumen por material ────────────────────────────────────────
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('RESUMEN DE TIPOS DE CARGA (VIAJES POR MATERIAL)'), 0, 1, 'C');
+        $currentY += 8;
+
+        $this->SetXY($sx, $currentY);
+        $tablaMat = new easyTable($this, '{119, 40, 40}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.5; min-height:6;");
+
+        $tablaMat->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7.5; font-color:30,30,30;');
+        $tablaMat->easyCell(utf8Decode('MATERIAL'), 'align:L;');
+        $tablaMat->easyCell(utf8Decode('VIAJES'), 'align:C;');
+        $tablaMat->easyCell(utf8Decode('% DEL TOTAL'), 'align:R;');
+        $tablaMat->printRow(true);
+
+        if ($materiales->isEmpty()) {
+            $tablaMat->rowStyle('font-size:8; font-color:90,90,90;');
+            $tablaMat->easyCell(utf8Decode('El vehículo no registró viajes en el rango seleccionado.'), 'align:C; colspan:3;');
+            $tablaMat->printRow();
+        }
+
+        foreach ($materiales as $mat) {
+            $tablaMat->rowStyle('font-style:; font-size:7.5; font-color:30,30,30;');
+            $tablaMat->easyCell(utf8Decode($mat['material'] ?? '—'), 'align:L;');
+            $tablaMat->easyCell((string) ($mat['viajes'] ?? 0), 'align:C;');
+            $tablaMat->easyCell(utf8Decode($pct((int) ($mat['viajes'] ?? 0))), 'align:R;');
+            $tablaMat->printRow();
+        }
+
+        if ($materiales->isNotEmpty()) {
+            $tablaMat->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:8; font-color:255,255,255;");
+            $tablaMat->easyCell(utf8Decode('TOTAL'), 'align:L;');
+            $tablaMat->easyCell((string) $totales['total_viajes'], 'align:C;');
+            $tablaMat->easyCell(utf8Decode('100 %'), 'align:R;');
+            $tablaMat->printRow();
+        }
+
+        $tablaMat->endTable();
+        $currentY = $this->GetY() + 6;
+
+        // ── Fletes del vehículo ─────────────────────────────────────────
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('FLETES DEL VEHÍCULO'), 0, 1, 'C');
+        $currentY += 8;
+
+        $this->SetXY($sx, $currentY);
+        $tablaFle = new easyTable($this, '{21, 25, 25, 17, 23, 14, 45, 29}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.2; min-height:6;");
+
+        $tablaFle->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7; font-color:30,30,30;');
+        foreach (['Nº FLETE', 'APERTURA', 'CIERRE', 'ESTADO', 'ÁMBITO', 'VIAJES', 'VIAJES POR MATERIAL', 'MONTO (Bs.)'] as $i => $encabezado) {
+            $tablaFle->easyCell(utf8Decode($encabezado), 'align:'.($i === 5 ? 'C' : ($i === 7 ? 'R' : 'L')).';');
+        }
+        $tablaFle->printRow(true);
+
+        if ($fletes->isEmpty()) {
+            $tablaFle->rowStyle('font-size:8; font-color:90,90,90;');
+            $tablaFle->easyCell(utf8Decode('Sin fletes abiertos en el rango seleccionado.'), 'align:C; colspan:8;');
+            $tablaFle->printRow();
+        }
+
+        foreach ($fletes as $flete) {
+            $ambito = ($flete['es_al_exterior'] ?? false)
+                ? 'Exterior'.(! empty($flete['pais']) ? ' · '.$flete['pais'] : '')
+                : 'Nacional';
+
+            $desglose = collect($flete['materiales'] ?? [])
+                ->map(fn ($m) => ($m['material'] ?? '—').': '.($m['viajes'] ?? 0))
+                ->implode(', ') ?: '—';
+
+            $tablaFle->rowStyle('font-style:; font-size:7; font-color:30,30,30;');
+            $tablaFle->easyCell(utf8Decode((string) ($flete['nro'] ?? '—')), 'align:L;');
+            $tablaFle->easyCell(utf8Decode($fechaHora($flete['fecha_apertura'] ?? null)), 'align:L;');
+            $tablaFle->easyCell(utf8Decode($fechaHora($flete['fecha_cierre'] ?? null)), 'align:L;');
+            $tablaFle->easyCell(utf8Decode((string) ($flete['estado_carga'] ?? '—')), 'align:L;');
+            $tablaFle->easyCell(utf8Decode($ambito), 'align:L;');
+            $tablaFle->easyCell((string) ($flete['viajes_count'] ?? 0), 'align:C;');
+            $tablaFle->easyCell(utf8Decode($desglose), 'align:L;');
+            $tablaFle->easyCell(utf8Decode(($flete['monto_pago'] ?? null) !== null ? $bs($flete['monto_pago']) : '—'), 'align:R;');
+            $tablaFle->printRow();
+        }
+
+        if ($fletes->isNotEmpty()) {
+            $tablaFle->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:7.5; font-color:255,255,255;");
+            $tablaFle->easyCell(utf8Decode('TOTALES'), 'align:L; colspan:5;');
+            $tablaFle->easyCell((string) $totales['total_viajes'], 'align:C;');
+            $tablaFle->easyCell(utf8Decode(''), 'align:L;');
+            $tablaFle->easyCell(utf8Decode($bs($totales['monto_total'])), 'align:R;');
+            $tablaFle->printRow();
+        }
+
+        $tablaFle->endTable();
+
+        $this->pintarPieDePagina($uw, $gris);
+
+        return $this->Output($modo, $nombreArchivo ?? 'detalle_control_cargas_material.pdf');
     }
 
     /**

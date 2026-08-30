@@ -228,6 +228,8 @@ return [
                 'control-cargas.editar' => 'Editar flete',
                 'control-cargas.viajes.registrar' => 'Registrar viaje',
                 'control-cargas.marcar-pagado' => 'Marcar flete como pagado',
+                'control-cargas.reporte' => 'Ver reporte de carga de material',
+                'control-cargas.reporte.pdf' => 'Generar PDF del reporte de carga de material',
             ],
         ],
 

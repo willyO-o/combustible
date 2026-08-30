@@ -62,13 +62,16 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     ],
   },
   {
-    menutitle: 'REPORTES', permission: ['cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', ]
+    menutitle: 'REPORTES', permission: ['cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', 'control-cargas.reporte', ]
   },
   {
     title: 'Reportes Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
   },
   {
     title: 'Rendimiento Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible/rendimiento', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte.rendimiento',
+  },
+  {
+    title: 'Carga de Material', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/control-cargas', active: false, selected: false, dirchange: false, permission: 'control-cargas.reporte',
   },
   {
     menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver', 'grupos-vehiculo.ver', 'repuestos.ver']

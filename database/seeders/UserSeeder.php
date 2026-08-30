@@ -279,6 +279,21 @@ class UserSeeder extends Seeder
     }
 
     /**
+     * Reporte de control de carga de material (App\Http\Controllers\ControlCargasReportController):
+     * agregado supervisorio de la cantidad de viajes por vehículo externo. Al
+     * igual que permisosControlCargasPago(), NO se otorga al conductor — sólo
+     * a jefe-area (ver permisosParaJefeArea()) y, vía todosLosPermisos(), a
+     * administrador/super-admin.
+     */
+    private function permisosControlCargasReporte(): array
+    {
+        return [
+            'control-cargas.reporte',
+            'control-cargas.reporte.pdf',
+        ];
+    }
+
+    /**
      * Módulo de Roles y Permisos (App\Http\Controllers\RolController): sólo
      * administrador/super-admin lo usan, así que no se agrupa en ningún otro
      * bundle de permisos (no forma parte de permisosCatalogos()).
@@ -358,6 +373,7 @@ class UserSeeder extends Seeder
             ...$this->permisosVehiculosExternos(),
             ...$this->permisosControlCargas(),
             ...$this->permisosControlCargasPago(),
+            ...$this->permisosControlCargasReporte(),
             ...$this->permisosRoles(),
             ...$this->permisosParametrosEmpresa(),
         ];
@@ -408,6 +424,7 @@ class UserSeeder extends Seeder
             ...$this->permisosCatalogos(),
             ...$this->permisosControlCargas(),
             ...$this->permisosControlCargasPago(),
+            ...$this->permisosControlCargasReporte(),
         ];
     }
 

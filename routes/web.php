@@ -5,6 +5,7 @@ use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\CargaMaterialController;
 use App\Http\Controllers\CargasCombustibleReportController;
 use App\Http\Controllers\ConductorController;
+use App\Http\Controllers\ControlCargasReportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GrifoController;
 use App\Http\Controllers\GrupoVehiculoController;
@@ -200,6 +201,14 @@ Route::middleware('auth')->group(function () {
         Route::get('cargas-combustible/rendimiento/detalle', [CargasCombustibleReportController::class, 'detalleRendimientoVehiculo'])->name('rendimiento.detalle');
         Route::get('cargas-combustible/rendimiento/detalle/pdf', [CargasCombustibleReportController::class, 'generarPDFDetalleRendimiento'])->name('rendimiento.detalle.pdf');
 
+    });
+
+    // ── Reportes de Control de Carga de Material (viajes de vehículos externos) ─
+    Route::prefix('reportes')->name('control-cargas.reporte.')->group(function () {
+        Route::get('control-cargas', [ControlCargasReportController::class, 'index'])->name('index');
+        Route::get('control-cargas/pdf', [ControlCargasReportController::class, 'generarPDF'])->name('pdf');
+        Route::get('control-cargas/detalle', [ControlCargasReportController::class, 'detalle'])->name('detalle');
+        Route::get('control-cargas/detalle/pdf', [ControlCargasReportController::class, 'generarPDFDetalle'])->name('detalle.pdf');
     });
 
     Route::get('reportes/operacion-diaria/pdf/{operacionDiaria}', [OperacionDiariaController::class, 'generarPDF'])->name('operacion-diaria.reporte.pdf');
