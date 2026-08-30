@@ -290,6 +290,8 @@ const verificarOperacion =  async () => {
                                         </th>
                                         <th v-if="operacion.actividades_realizadas.some(act => act.pivot.destino)">
                                             Destino</th>
+                                        <th v-if="operacion.actividades_realizadas.some(act => act.pivot.material)">
+                                            Material</th>
                                         <th v-if="operacion.actividades_realizadas.some(act => act.pivot.lugar)"> Lugar
                                         </th>
                                         <th class="text-center">Cantidad</th>
@@ -305,6 +307,7 @@ const verificarOperacion =  async () => {
                                         </td>
                                         <td v-if="act.pivot.origen">{{ act.pivot.origen }}</td>
                                         <td v-if="act.pivot.destino">{{ act.pivot.destino }}</td>
+                                        <td v-if="act.pivot.material">{{ act.pivot.material.material }}</td>
                                         <td v-if="act.pivot.lugar">{{ act.pivot.lugar }}</td>
                                         <td class="text-center">{{ act.pivot.cantidad }}</td>
                                         <td>{{ act.pivot.unidad_medida }}</td>

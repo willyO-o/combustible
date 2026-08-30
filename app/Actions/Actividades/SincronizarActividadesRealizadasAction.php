@@ -1,15 +1,16 @@
 <?php
 
 namespace App\Actions\Actividades;
+
+use App\Models\Actividad;
 use App\Models\OperacionDiaria;
 use Illuminate\Support\Str;
-use App\Models\Actividad;
 
 class SincronizarActividadesRealizadasAction
 {
     public function execute(OperacionDiaria $operacionDiaria, array $actividades): void
     {
-       //se busca primero ver si la actividad ya existe en la base de datos verificando el nombre_normalizado, sino existe se crea una nueva actividad
+        // se busca primero ver si la actividad ya existe en la base de datos verificando el nombre_normalizado, sino existe se crea una nueva actividad
         // se guard en la tabla actividad_realizada, la relacion y los detalles, verificar que no re registre 2 veces la misma actividad contodos los campos iguales
 
         $operacionDiaria->actividadesRealizadas()->detach();
@@ -32,8 +33,8 @@ class SincronizarActividadesRealizadasAction
 
             // eliminar la relación si ya existe para evitar duplicados
 
-
             $operacionDiaria->actividadesRealizadas()->attach($actividad->id, [
+                'id_material' => $actividadData['id_material'] ?? null,
                 'origen' => $actividadData['origen'],
                 'destino' => $actividadData['destino'],
                 'lugar' => $actividadData['lugar'],
@@ -43,7 +44,6 @@ class SincronizarActividadesRealizadasAction
                 'hora_fin' => $actividadData['hora_fin'],
             ]);
         }
-
 
     }
 }

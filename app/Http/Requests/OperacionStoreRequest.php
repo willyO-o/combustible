@@ -85,6 +85,10 @@ class OperacionStoreRequest extends FormRequest
 
                 return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
             }), 'nullable', 'string'],
+            // Material trasladado: sólo se captura para vehículos con medición
+            // por kilometraje (viajes y traslados). Opcional — no todo viaje
+            // mueve material (traslado de personal, retorno en vacío, etc.).
+            'actividades_realizadas.*.id_material' => ['nullable', 'integer', Rule::exists('material', 'id')],
             'actividades_realizadas.*.cantidad' => 'required|numeric|min:1',
             'actividades_realizadas.*.unidad_medida' => 'required|string|min:1',
             'actividades_realizadas.*.hora_inicio' => 'required|date_format:H:i',
@@ -110,6 +114,7 @@ class OperacionStoreRequest extends FormRequest
             'actividades_realizadas.*.lugar.required_without' => 'El lugar es obligatorio.',
             'actividades_realizadas.*.origen.required_without' => 'El origen es obligatorio.',
             'actividades_realizadas.*.destino.required_without' => 'El destino es obligatorio.',
+            'actividades_realizadas.*.id_material.exists' => 'El material seleccionado no es válido.',
             'actividades_realizadas.*.cantidad.required' => 'La cantidad es obligatoria.',
             'actividades_realizadas.*.unidad_medida.required' => 'La unidad de medida es obligatoria.',
             'actividades_realizadas.*.hora_inicio.required' => 'La hora de inicio es obligatoria.',

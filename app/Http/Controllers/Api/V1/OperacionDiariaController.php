@@ -11,6 +11,7 @@ use App\Http\Requests\OperacionStoreRequest;
 use App\Models\OperacionDiaria;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OperacionDiariaController extends Controller
 {
@@ -32,7 +33,8 @@ class OperacionDiariaController extends Controller
         try {
 
             $operacionDiaria = $action->execute($request->validated());
-            $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas']);
+            $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas'])
+                ->cargarMaterialDeActividades();
 
             return response()->json([
                 'message' => 'Operación diaria creada exitosamente.',
@@ -56,7 +58,8 @@ class OperacionDiariaController extends Controller
      */
     public function show(OperacionDiaria $operacionDiaria)
     {
-        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas']);
+        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas'])
+            ->cargarMaterialDeActividades();
 
         return response()->json([
             'data' => $operacion,
@@ -67,6 +70,8 @@ class OperacionDiariaController extends Controller
     {
         try {
             $operacionDiaria = $action->execute($operacionDiaria, $request->validated());
+            $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas'])
+                ->cargarMaterialDeActividades();
 
             return response()->json([
                 'message' => 'Operación diaria actualizada exitosamente.',
@@ -116,6 +121,7 @@ class OperacionDiariaController extends Controller
             'lugar' => 'required_without:origen|nullable|string',
             'origen' => 'required_without:lugar|nullable|string',
             'destino' => 'required_without:lugar|nullable|string',
+            'id_material' => ['nullable', 'integer', Rule::exists('material', 'id')],
             'actividad' => 'required|string|min:3',
             'cantidad' => 'required|numeric|min:1',
             'unidad_medida' => 'required|string',

@@ -10,12 +10,14 @@ use App\Libraries\Reportes;
 use App\Models\Actividad;
 use App\Models\Area;
 use App\Models\Asignacion;
+use App\Models\Material;
 use App\Models\OperacionDiaria;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class OperacionDiariaController extends Controller
@@ -88,9 +90,19 @@ class OperacionDiariaController extends Controller
             'vehiculosAsignados' => $this->vehiculosDisponibles($user),
             'operacion' => null,
             'actividadesSugeridas' => $this->actividadesSugeridas($user),
+            'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
         ]);
+    }
+
+    /**
+     * Catálogo de materiales para el selector de material trasladado de cada
+     * actividad (sólo se usa en vehículos con medición por kilometraje).
+     */
+    private function materiales()
+    {
+        return Material::orderBy('material')->get(['id', 'material']);
     }
 
     /**
@@ -132,7 +144,8 @@ class OperacionDiariaController extends Controller
     public function show(OperacionDiaria $operacionDiaria)
     {
 
-        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas']);
+        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas'])
+            ->cargarMaterialDeActividades();
 
         return inertia('Operacion/Show', [
             'operacion' => $operacion,
@@ -156,6 +169,7 @@ class OperacionDiariaController extends Controller
             'vehiculosAsignados' => $this->vehiculosDisponibles($user, $operacionDiaria->vehiculo),
             'operacion' => $operacionDiaria->load(['vehiculo', 'area']),
             'actividadesSugeridas' => $this->actividadesSugeridas($user),
+            'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
         ]);
@@ -394,6 +408,7 @@ class OperacionDiariaController extends Controller
             'lugar' => 'required_without:origen|nullable|string',
             'origen' => 'required_without:lugar|nullable|string',
             'destino' => 'required_without:lugar|nullable|string',
+            'id_material' => ['nullable', 'integer', Rule::exists('material', 'id')],
             'actividad' => 'required|string|min:3',
             'cantidad' => 'required|numeric|min:1',
             'unidad_medida' => 'required|string',

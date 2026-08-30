@@ -112,7 +112,20 @@ class OperacionDiaria extends Model
             'id_operacion_diaria',
             'id_actividad'
         )->using(ActividadRealizada::class)
-            ->withPivot('id', 'origen', 'destino', 'lugar', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
+            ->withPivot('id', 'id_material', 'origen', 'destino', 'lugar', 'cantidad', 'unidad_medida', 'hora_inicio', 'hora_fin');
+    }
+
+    /**
+     * Carga el material trasladado de cada actividad realizada (relación del
+     * pivote), para exponer su nombre en el detalle y en la API sin un N+1.
+     */
+    public function cargarMaterialDeActividades(): static
+    {
+        $this->actividadesRealizadas->each(
+            fn ($actividad) => $actividad->pivot->load('material:id,material')
+        );
+
+        return $this;
     }
 
     /**
@@ -156,6 +169,7 @@ class OperacionDiaria extends Model
             return [
                 'id' => $actividad->pivot->id,
                 'actividad' => $actividad->nombre_actividad,
+                'id_material' => $actividad->pivot->id_material,
                 'origen' => $actividad->pivot->origen,
                 'destino' => $actividad->pivot->destino,
                 'lugar' => $actividad->pivot->lugar,

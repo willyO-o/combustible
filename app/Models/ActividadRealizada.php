@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
-
-
 class ActividadRealizada extends Pivot
 {
     //
@@ -20,5 +18,12 @@ class ActividadRealizada extends Pivot
         ];
     }
 
-
+    /**
+     * Material trasladado en la actividad (sólo aplica a vehículos con
+     * medición por kilometraje: viajes y traslados). Puede ser nulo.
+     */
+    public function material()
+    {
+        return $this->belongsTo(Material::class, 'id_material');
+    }
 }

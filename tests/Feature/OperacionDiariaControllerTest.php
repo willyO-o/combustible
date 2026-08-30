@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\Conductor;
+use App\Models\Material;
 use App\Models\OperacionDiaria;
 use App\Models\Persona;
 use App\Models\TipoMantenimiento;
@@ -460,6 +461,116 @@ class OperacionDiariaControllerTest extends TestCase
                 'hora_fin' => '09:00',
             ]],
         ], $extra);
+    }
+
+    public function test_create_y_edit_exponen_el_catalogo_de_materiales(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        Material::factory()->create(['material' => 'Concentrado']);
+        Material::factory()->create(['material' => 'Broza']);
+
+        $this->actingAs($user)->get(route('operacion-diaria.create'))
+            ->assertInertia(fn (Assert $page) => $page->component('Operacion/Create')->has('materiales', 2));
+    }
+
+    public function test_store_guarda_el_material_trasladado_de_la_actividad(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $material = Material::factory()->create(['material' => 'Concentrado']);
+
+        $payload = $this->payloadOperacionValida($vehiculo);
+        $payload['actividades_realizadas'][0]['id_material'] = $material->id;
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $payload);
+
+        $response->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $this->assertDatabaseHas('actividad_realizada', [
+            'id_operacion_diaria' => $operacion->id,
+            'id_material' => $material->id,
+        ]);
+    }
+
+    public function test_store_acepta_una_actividad_sin_material(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+
+        $response->assertRedirect(route('operacion-diaria.index'));
+        $this->assertDatabaseHas('actividad_realizada', [
+            'id_operacion_diaria' => OperacionDiaria::firstOrFail()->id,
+            'id_material' => null,
+        ]);
+    }
+
+    public function test_store_rechaza_un_material_inexistente(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $payload = $this->payloadOperacionValida($vehiculo);
+        $payload['actividades_realizadas'][0]['id_material'] = 99999;
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $payload);
+
+        $response->assertSessionHasErrors('actividades_realizadas.0.id_material');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    public function test_edit_precarga_el_material_de_cada_actividad(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $material = Material::factory()->create(['material' => 'Broza']);
+
+        $payload = $this->payloadOperacionValida($vehiculo);
+        $payload['actividades_realizadas'][0]['id_material'] = $material->id;
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $payload);
+
+        $operacion = OperacionDiaria::firstOrFail();
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.edit', $operacion));
+
+        $response->assertOk();
+        $actividades = collect($response->viewData('page')['props']['operacion']['actividades_realizadas_edit']);
+        $this->assertSame($material->id, $actividades->first()['id_material']);
+    }
+
+    public function test_show_expone_el_material_de_las_actividades(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $material = Material::factory()->create(['material' => 'Concentrado']);
+        $payload = $this->payloadOperacionValida($vehiculo);
+        $payload['actividades_realizadas'][0]['id_material'] = $material->id;
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $payload);
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.show', OperacionDiaria::firstOrFail()));
+
+        $response->assertOk();
+        $actividades = collect($response->viewData('page')['props']['operacion']['actividades_realizadas']);
+        $this->assertSame('Concentrado', $actividades->first()['pivot']['material']['material']);
     }
 
     public function test_create_expone_solo_los_tipos_de_mantenimiento_de_operacion_diaria(): void

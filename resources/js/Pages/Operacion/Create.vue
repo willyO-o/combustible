@@ -27,6 +27,9 @@ const props = defineProps({
     vehiculosAsignados: Array,
     operacion: Object, // la operación a editar (null en modo creación)
     actividadesSugeridas: Array, // [{ id, nombre_actividad, unidad_medida }] actividades sugeridas según el/las área(s) del usuario
+    // [{ id, material }] catálogo de materiales trasladados; sólo se usa en el
+    // formulario de actividad cuando el vehículo mide por kilometraje.
+    materiales: { type: Array, default: () => [] },
     // [{ id, tipo_mantenimiento, tipo_valor: 'cantidad'|'booleano'|null, unidad_medida }]
     // controles de mantenimiento de ámbito operacion_diaria (activos).
     tiposMantenimiento: { type: Array, default: () => [] },
@@ -110,6 +113,7 @@ const loadingVehiculo = ref(false)
 const formActividad = useForm({
     actividad: '',
     id_actividad: null,
+    id_material: '',
     lugar: '',
     origen: '',
     destino: '',
@@ -119,6 +123,10 @@ const formActividad = useForm({
     hora_fin: '',
     detalle: '',
 })
+
+// Nombre del material trasladado a partir de su id (para el resumen de
+// actividades ya agregadas).
+const materialNombre = (id) => props.materiales.find((m) => m.id === id)?.material ?? ''
 
 
 const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
@@ -236,6 +244,7 @@ const agregarActividad = () => {
             // Limpiar el formulario de actividad
             formActividad.actividad = '';
             formActividad.id_actividad = null;
+            formActividad.id_material = '';
             formActividad.lugar = '';
             formActividad.origen = '';
             formActividad.destino = '';
@@ -561,6 +570,17 @@ onMounted(() => {
                                         </p>
                                     </div>
 
+                                    <div v-if="r.id_material" class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
+                                        <label class="form-label form-label-sm fw-medium mb-0">
+                                            <i class="ri-stack-line text-info"></i>
+
+                                            Material:
+                                        </label>
+                                        <p class="mb-0">
+                                            {{ materialNombre(r.id_material) }}
+                                        </p>
+                                    </div>
+
                                     <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
                                         <label class="form-label form-label-sm fw-medium mb-0">
                                             <i class="ri-map-pin-line text-info"></i>
@@ -729,6 +749,20 @@ onMounted(() => {
                             <div v-if="formActividad.errors.destino" class="text-danger small mt-1">{{
                                 formActividad.errors.destino }}</div>
 
+                        </div>
+
+                        <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
+                            <label class="form-label fw-medium">
+                                Material trasladado
+                            </label>
+                            <select v-model="formActividad.id_material" class="form-select"
+                                :class="{ 'is-invalid': formActividad.errors.id_material }">
+                                <option value="">Sin material (traslado sin carga)</option>
+                                <option v-for="m in materiales" :key="m.id" :value="m.id">{{ m.material }}</option>
+                            </select>
+                            <div class="form-text">Para controlar los traslados y viajes de material.</div>
+                            <div v-if="formActividad.errors.id_material" class="text-danger small mt-1">{{
+                                formActividad.errors.id_material }}</div>
                         </div>
 
                         <div v-if="tipoMedicion == 'horometro'" class="col-12">

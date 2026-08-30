@@ -2856,7 +2856,8 @@ components:
         Una actividad realizada durante la operación diaria. El campo obligatorio para
         describir el lugar depende del `tipo_medicion` del vehículo (`id_vehiculo`) de la
         operación: `lugar` si es `horometro`, o `origen` **y** `destino` si es `kilometraje`
-        (por ejemplo, para actividades de transporte).
+        (por ejemplo, para actividades de transporte). Para `kilometraje` se acepta además
+        `id_material` (opcional) con el material trasladado.
       required: [actividad, cantidad, unidad_medida, hora_inicio, hora_fin]
       properties:
         actividad:
@@ -2879,6 +2880,16 @@ components:
           nullable: true
           description: Punto de destino (usado junto con `origen` en actividades de transporte). Obligatorio si el vehículo de la operación tiene `tipo_medicion = kilometraje`.
           example: Chancado primario
+        id_material:
+          type: integer
+          nullable: true
+          description: >-
+            Material trasladado en la actividad, para el control de traslados y viajes. Sólo
+            aplica a vehículos con `tipo_medicion = kilometraje` y es opcional (un traslado
+            puede no llevar carga: personal, retorno en vacío, etc.). Si se envía, debe existir
+            en la tabla `material` (catálogo disponible en `GET /parametros/colecciones` →
+            `control_cargas.materiales`).
+          example: 3
         cantidad:
           type: number
           format: float
@@ -3092,6 +3103,14 @@ components:
           type: object
           properties:
             id: { type: integer, example: 501 }
+            id_material: { type: integer, nullable: true, description: "Material trasladado (sólo en actividades de vehículos con `tipo_medicion = kilometraje`).", example: 3 }
+            material:
+              type: object
+              nullable: true
+              description: Datos del material trasladado. Presente sólo cuando `id_material` no es nulo.
+              properties:
+                id: { type: integer, example: 3 }
+                material: { type: string, example: Concentrado }
             origen: { type: string, nullable: true, example: null }
             destino: { type: string, nullable: true, example: null }
             lugar: { type: string, nullable: true, example: Cancha de acopio }
