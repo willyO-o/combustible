@@ -213,6 +213,17 @@ function submit() {
         .post(routeName)
 }
 
+/* ------------------------------------------------------------------ */
+/*  Mantenimiento (operación diaria)                                   */
+/* ------------------------------------------------------------------ */
+const mantenimientoRegistrado = (m) =>
+    (m.tipo_valor === 'cantidad' && m.valor !== '' && m.valor !== null && m.valor !== undefined) ||
+    (m.tipo_valor === 'booleano' && !!m.realizado)
+
+const mantenimientosRegistrados = computed(
+    () => form.mantenimientos.filter(mantenimientoRegistrado).length,
+)
+
 const agregarActividad = () => {
 
 
@@ -595,42 +606,53 @@ onMounted(() => {
                         <div
                             class="card-header d-flex align-items-center justify-content-between bd-blue-200 p-2 rounded">
                             <div class="card-title"><i class="ri-tools-line me-2"></i>
-                                Mantenimiento en operación diaria
+                                Controles de mantenimiento
                             </div>
+                            <span class="badge bg-primary-transparent text-primary mant-count"
+                                :class="{ 'mant-count--active': mantenimientosRegistrados > 0 }">
+                                {{ mantenimientosRegistrados }} / {{ form.mantenimientos.length }} registrados
+                            </span>
                         </div>
                         <div class="card-body pt-3">
-                            <p class="text-muted small mb-3">
-                                Registra sólo los controles que correspondan a esta operación. Los que no apliquen
-                                puedes dejarlos en blanco.
+                            <p class="text-muted fs-12 mb-3">
+                                Anota sólo los controles que correspondan a esta operación. Deja en blanco los que
+                                no apliquen.
                             </p>
-                            <div class="row g-3">
+                            <div class="row g-0 mant-list">
                                 <div v-for="(m, idx) in form.mantenimientos" :key="m.id_tipo_mantenimiento"
-                                    class="col-md-6 col-xl-4">
-                                    <div class="border rounded-3 p-3 h-100">
-                                        <label class="fw-medium d-block mb-2">{{ m.tipo_mantenimiento }}</label>
+                                    class="col-12 mant-item">
+                                    <div class="mant-row" :class="{ 'mant-row--filled': mantenimientoRegistrado(m) }">
+                                        <label class="mant-row__name" :for="`mant-${m.id_tipo_mantenimiento}`">
+                                            <i class="mant-row__tick"
+                                                :class="mantenimientoRegistrado(m) ? 'ri-checkbox-circle-fill' : 'ri-checkbox-blank-circle-line'"></i>
+                                            {{ m.tipo_mantenimiento }}
+                                        </label>
 
-                                        <div v-if="m.tipo_valor === 'cantidad'" class="input-group">
-                                            <input v-model="m.valor" type="text" v-decimal="2" class="form-control"
-                                                placeholder="Sin registrar"
-                                                :class="{ 'is-invalid': form.errors[`mantenimientos.${idx}.valor`] }" />
-                                            <span v-if="m.unidad_medida" class="input-group-text">{{ m.unidad_medida
-                                                }}</span>
-                                            <div v-if="form.errors[`mantenimientos.${idx}.valor`]"
-                                                class="invalid-feedback">
-                                                {{ form.errors[`mantenimientos.${idx}.valor`] }}
+                                        <div v-if="m.tipo_valor === 'cantidad'" class="mant-row__control">
+                                            <div class="input-group input-group-sm mant-input">
+                                                <input :id="`mant-${m.id_tipo_mantenimiento}`" v-model="m.valor"
+                                                    type="text" v-decimal="2" inputmode="decimal" class="form-control"
+                                                    placeholder="—"
+                                                    :class="{ 'is-invalid': form.errors[`mantenimientos.${idx}.valor`] }" />
+                                                <span v-if="m.unidad_medida" class="input-group-text">{{
+                                                    m.unidad_medida }}</span>
                                             </div>
                                         </div>
 
-                                        <div v-else-if="m.tipo_valor === 'booleano'"
-                                            class="form-check form-check-lg mb-0">
-                                            <input :id="`mant-${m.id_tipo_mantenimiento}`" v-model="m.realizado"
-                                                class="form-check-input" type="checkbox" />
-                                            <label class="form-check-label" :for="`mant-${m.id_tipo_mantenimiento}`">
-                                                Realizado
-                                            </label>
+                                        <div v-else-if="m.tipo_valor === 'booleano'" class="mant-row__control">
+                                            <span class="mant-row__state">{{ m.realizado ? 'Sí' : 'No' }}</span>
+                                            <div class="form-check form-switch mb-0">
+                                                <input :id="`mant-${m.id_tipo_mantenimiento}`" v-model="m.realizado"
+                                                    class="form-check-input" type="checkbox" role="switch"
+                                                    :aria-label="`${m.tipo_mantenimiento}: realizado`" />
+                                            </div>
                                         </div>
 
-                                        <span v-else class="text-muted small">Sin tipo de valor configurado</span>
+                                        <span v-else class="mant-row__control text-muted fs-12">Sin configurar</span>
+                                    </div>
+                                    <div v-if="form.errors[`mantenimientos.${idx}.valor`]"
+                                        class="text-danger fs-12 mant-row__error">
+                                        {{ form.errors[`mantenimientos.${idx}.valor`] }}
                                     </div>
                                 </div>
                             </div>

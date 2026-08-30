@@ -55,7 +55,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('id_operacion_diaria')->constrained('operacion_diaria')->onDelete('cascade');
             $table->foreignId('id_actividad')->constrained('actividad')->onDelete('restrict');
-
+            $table->foreignId('id_material')->nullable()->constrained('material')->onDelete('restrict');
             // Campos genéricos que cubren la mayoría de los casos
             $table->string('origen', 150)->nullable();       // 'Cancha de acopio'
             $table->string('destino', 150)->nullable();       // 'Chancado primario'

@@ -174,3 +174,193 @@
 .list-card-mobile:active {
     background-color: var(--primary01);
 }
+
+/* Sección "Controles de mantenimiento" del formulario de operación diaria
+   (resources/js/Pages/Operacion/Create.vue). Checklist de tipo_mantenimiento
+   de ámbito operacion_diaria: una fila por control, con separadores finos en
+   vez de tarjetas anidadas. La fila "registrada" (con valor o interruptor en
+   Sí) se tiñe con --primary01, engrosa el nombre y rellena el punto guía.
+   Todo con tokens del tema -> funciona en claro y oscuro sin reglas aparte. */
+.mant-count:not(.mant-count--active) {
+    background-color: var(--bs-secondary-bg);
+    color: var(--text-muted) !important;
+}
+
+.mant-list {
+    border-top: 1px solid var(--default-border);
+}
+
+.mant-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 2.75rem;
+    padding-block: 0.5rem;
+    border-bottom: 1px solid var(--default-border);
+    transition: background-color 0.15s ease;
+}
+
+.mant-row--filled {
+    background-color: rgba(var(--primary-rgb), 0.05);
+}
+
+@media (hover: hover) {
+    .mant-row:not(.mant-row--filled):hover {
+        background-color: var(--bs-secondary-bg);
+    }
+}
+
+.mant-row__name {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0;
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.3;
+    color: var(--default-text-color);
+    cursor: pointer;
+}
+
+.mant-row__tick {
+    flex: none;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: var(--input-border);
+    transition: color 0.15s ease, transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.mant-row--filled .mant-row__name {
+    font-weight: 600;
+}
+
+.mant-row--filled .mant-row__tick {
+    color: var(--primary-color);
+    transform: scale(1.08);
+}
+
+.mant-row__control {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-width: 8rem;
+}
+
+.mant-input {
+    width: 7.5rem;
+}
+
+.mant-input .form-control {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.mant-input .input-group-text {
+    min-width: 2.5rem;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.mant-row__state {
+    min-width: 1.5rem;
+    font-size: 0.75rem;
+    text-align: right;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    transition: color 0.15s ease;
+}
+
+.mant-row--filled .mant-row__state {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* El interruptor: se redibuja por completo. El tema trae reglas de switch
+   pensadas para la barra lateral oscura (perilla blanca sobre blanco en el
+   estado apagado) y, además, @tailwindcss/forms fuerza `appearance:auto` y
+   `background-size:100% 100%` en `input:checked`, lo que hacía que al activarlo
+   volviera a verse como una casilla nativa deformada. Se sube la
+   especificidad (.mant-row ...) y se define perilla + pista con tokens del
+   tema para que funcione en claro y oscuro. */
+.mant-row .form-switch {
+    display: flex;
+    align-items: center;
+    padding-left: 2.75rem;
+    min-height: auto;
+}
+
+.mant-row .form-switch .form-check-input {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 2.5rem;
+    height: 1.25rem;
+    margin: 0 0 0 -2.75rem;
+    border: 1px solid var(--input-border);
+    border-radius: 999px;
+    background-color: var(--custom-white);
+    background-repeat: no-repeat;
+    background-position: left center;
+    background-size: 1rem 1rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3ccircle cx='4' cy='4' r='3' fill='%239aa0ac'/%3e%3c/svg%3e");
+    cursor: pointer;
+    transition: background-color 0.2s ease, background-position 0.2s ease, border-color 0.2s ease;
+}
+
+.mant-row .form-switch .form-check-input:checked {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    background-position: right center;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3ccircle cx='4' cy='4' r='3' fill='%23fff'/%3e%3c/svg%3e");
+}
+
+.mant-row .form-switch .form-check-input:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mant-row,
+    .mant-row__tick,
+    .mant-row__state,
+    .mant-row .form-switch .form-check-input {
+        transition: none;
+    }
+}
+
+.mant-row__error {
+    padding-block: 0.25rem 0.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .mant-row {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 0.35rem;
+    }
+
+    .mant-row__control {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .mant-input {
+        width: 100%;
+        max-width: 11rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mant-row__tick,
+    .mant-row__name,
+    .mant-row__state {
+        transition: none;
+    }
+}
