@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import { confirm } from '@/Utils/alertUtil.js'
@@ -8,9 +8,20 @@ defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     tipos:   Object,
+    ambito:  { type: String, default: 'taller' },
     filters: Object,
     flash:   Object,
 })
+
+// Un único listado sirve para los dos "tableros" (taller / operación diaria):
+// el tablero de operación diaria muestra además las columnas tipo de valor y
+// unidad de medida. El ámbito viaja como query param.
+const esOpDiaria = computed(() => props.ambito === 'operacion_diaria')
+
+const tableros = [
+    { key: 'taller', label: 'Taller', icon: 'ri-hammer-line' },
+    { key: 'operacion_diaria', label: 'Operación Diaria', icon: 'ri-calendar-check-line' },
+]
 
 // Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
 // listado en tarjetas con scroll infinito en vez de la tabla (ver
@@ -32,6 +43,7 @@ watch(
             router.get(
                 route('tipos-mantenimiento.index'),
                 {
+                    ambito:                    props.ambito,
                     tipo_mantenimiento:        val.tipo_mantenimiento        || undefined,
                     estado_tipo_mantenimiento: val.estado_tipo_mantenimiento || undefined,
                 },
@@ -64,6 +76,11 @@ const estadoBadge = (estado) =>
     estado === 'ACTIVO'
         ? 'bg-success-transparent text-success'
         : 'bg-danger-transparent text-danger'
+
+const tipoValorLabel = (v) => (v === 'cantidad' ? 'Cantidad' : v === 'booleano' ? 'Sí / No' : '—')
+
+// Nº de columnas de la tabla (para el colspan del estado vacío).
+const colSpan = computed(() => (esOpDiaria.value ? 7 : 5))
 </script>
 
 <template>
@@ -82,7 +99,7 @@ const estadoBadge = (estado) =>
                 </nav>
                 <h1 class="page-title fw-medium fs-18 mb-0">Tipos de Mantenimiento</h1>
             </div>
-            <Link v-can="'tipos-mantenimiento.crear'" :href="route('tipos-mantenimiento.create')" class="btn btn-primary btn-wave">
+            <Link v-can="'tipos-mantenimiento.crear'" :href="route('tipos-mantenimiento.create', { ambito })" class="btn btn-primary btn-wave">
                 <i class="ri-add-line me-1"></i> Nuevo Tipo
             </Link>
         </div>
@@ -96,6 +113,20 @@ const estadoBadge = (estado) =>
             <i class="ri-error-warning-line me-2"></i>{{ flash.error }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
+
+        <!-- Tableros (taller / operación diaria) -->
+        <ul class="nav nav-tabs tab-style-8 mb-4" role="tablist">
+            <li v-for="t in tableros" :key="t.key" class="nav-item" role="presentation">
+                <Link
+                    class="nav-link"
+                    :class="{ active: ambito === t.key }"
+                    :href="route('tipos-mantenimiento.index', { ambito: t.key })"
+                    preserve-scroll
+                >
+                    <i :class="t.icon" class="me-1"></i> {{ t.label }}
+                </Link>
+            </li>
+        </ul>
 
         <!-- Filtros -->
         <div class="card custom-card mb-4">
@@ -152,6 +183,8 @@ const estadoBadge = (estado) =>
                             <tr>
                                 <th style="width:60px">#</th>
                                 <th>Tipo de Mantenimiento</th>
+                                <th v-if="esOpDiaria" style="width:130px">Tipo de Valor</th>
+                                <th v-if="esOpDiaria" style="width:150px">Unidad de Medida</th>
                                 <th style="width:160px">Estado</th>
                                 <th style="width:130px">Creado</th>
                                 <th style="width:120px" class="text-center">Acciones</th>
@@ -159,7 +192,7 @@ const estadoBadge = (estado) =>
                         </thead>
                         <tbody>
                             <tr v-if="tipos.data.length === 0">
-                                <td colspan="5" class="text-center py-5 text-muted">
+                                <td :colspan="colSpan" class="text-center py-5 text-muted">
                                     <i class="ri-tools-line fs-3 d-block mb-2"></i>
                                     No se encontraron tipos de mantenimiento
                                 </td>
@@ -175,6 +208,12 @@ const estadoBadge = (estado) =>
                                         </span>
                                         <span class="fw-medium">{{ tipo.tipo_mantenimiento }}</span>
                                     </div>
+                                </td>
+                                <td v-if="esOpDiaria">
+                                    <span class="badge bg-info-transparent text-info">{{ tipoValorLabel(tipo.tipo_valor) }}</span>
+                                </td>
+                                <td v-if="esOpDiaria" class="text-muted">
+                                    {{ tipo.unidad_medida || '—' }}
                                 </td>
                                 <td>
                                     <span class="badge" :class="estadoBadge(tipo.estado_tipo_mantenimiento)">
@@ -232,6 +271,15 @@ const estadoBadge = (estado) =>
                             </div>
                             <span class="badge" :class="estadoBadge(tipo.estado_tipo_mantenimiento)">
                                 {{ tipo.estado_tipo_mantenimiento }}
+                            </span>
+                        </div>
+
+                        <div v-if="esOpDiaria" class="d-flex flex-wrap gap-2 mt-2">
+                            <span class="badge bg-info-transparent text-info">
+                                Valor: {{ tipoValorLabel(tipo.tipo_valor) }}
+                            </span>
+                            <span v-if="tipo.unidad_medida" class="badge bg-light text-dark border">
+                                Unidad: {{ tipo.unidad_medida }}
                             </span>
                         </div>
 

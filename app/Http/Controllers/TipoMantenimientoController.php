@@ -11,9 +11,18 @@ use Inertia\Response;
 
 class TipoMantenimientoController extends Controller
 {
+    /**
+     * Ámbitos válidos. El listado (index) y el formulario (create) comparten
+     * una única vista para los dos "tableros": el ámbito viaja como query
+     * param y sólo cambia qué columnas/campos se muestran.
+     */
+    private const AMBITOS = ['taller', 'operacion_diaria'];
+
     public function index(Request $request): Response
     {
-        $query = TipoMantenimiento::query();
+        $ambito = $this->ambitoDesde($request);
+
+        $query = TipoMantenimiento::where('ambito', $ambito);
 
         if ($request->filled('tipo_mantenimiento')) {
             $query->where('tipo_mantenimiento', 'like', '%'.$request->tipo_mantenimiento.'%');
@@ -30,6 +39,7 @@ class TipoMantenimientoController extends Controller
             // metadata de merge que usa <InfiniteScroll> en el listado de
             // tarjetas (mobile). Ver .ai/rules/pages.md.
             'tipos' => Inertia::scroll($tipos),
+            'ambito' => $ambito,
             'filters' => $request->only(['tipo_mantenimiento', 'estado_tipo_mantenimiento']),
             'flash' => [
                 'success' => session('success'),
@@ -38,16 +48,18 @@ class TipoMantenimientoController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return Inertia::render('TiposMantenimiento/Create');
+        return Inertia::render('TiposMantenimiento/Create', [
+            'ambito' => $this->ambitoDesde($request),
+        ]);
     }
 
     public function store(TipoMantenimientoRequest $request): RedirectResponse
     {
-        TipoMantenimiento::create($request->validated());
+        $tipo = TipoMantenimiento::create($this->normalizarCampos($request->validated()));
 
-        return redirect()->route('tipos-mantenimiento.index')
+        return redirect()->route('tipos-mantenimiento.index', ['ambito' => $tipo->ambito])
             ->with('success', 'Tipo de mantenimiento registrado exitosamente.');
     }
 
@@ -60,22 +72,50 @@ class TipoMantenimientoController extends Controller
 
     public function update(TipoMantenimientoRequest $request, TipoMantenimiento $tipoMantenimiento): RedirectResponse
     {
-        $tipoMantenimiento->update($request->validated());
+        $tipoMantenimiento->update($this->normalizarCampos($request->validated()));
 
-        return redirect()->route('tipos-mantenimiento.index')
+        return redirect()->route('tipos-mantenimiento.index', ['ambito' => $tipoMantenimiento->ambito])
             ->with('success', 'Tipo de mantenimiento actualizado exitosamente.');
     }
 
     public function destroy(TipoMantenimiento $tipoMantenimiento): RedirectResponse
     {
         if ($tipoMantenimiento->mantenimientos()->count() > 0) {
-            return redirect()->route('tipos-mantenimiento.index')
+            return redirect()->route('tipos-mantenimiento.index', ['ambito' => $tipoMantenimiento->ambito])
                 ->with('error', 'No se puede eliminar: existen mantenimientos asignados a este tipo.');
         }
 
+        $ambito = $tipoMantenimiento->ambito;
         $tipoMantenimiento->delete();
 
-        return redirect()->route('tipos-mantenimiento.index')
+        return redirect()->route('tipos-mantenimiento.index', ['ambito' => $ambito])
             ->with('success', 'Tipo de mantenimiento eliminado exitosamente.');
+    }
+
+    private function ambitoDesde(Request $request): string
+    {
+        return in_array($request->input('ambito'), self::AMBITOS, true)
+            ? $request->input('ambito')
+            : 'taller';
+    }
+
+    /**
+     * tipo_valor y unidad_medida sólo tienen sentido en el ámbito operación
+     * diaria; unidad_medida además sólo cuando el valor es una cantidad. En
+     * cualquier otro caso se guardan como null para no dejar datos huérfanos.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizarCampos(array $data): array
+    {
+        if (($data['ambito'] ?? 'taller') !== 'operacion_diaria') {
+            $data['tipo_valor'] = null;
+            $data['unidad_medida'] = null;
+        } elseif (($data['tipo_valor'] ?? null) !== 'cantidad') {
+            $data['unidad_medida'] = null;
+        }
+
+        return $data;
     }
 }

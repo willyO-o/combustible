@@ -28,5 +28,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Requests/**/*.php, app/Http/Requests/*.php | .ai/rules/requests.md |
 | routes/*.php, routes/web.php | .ai/rules/routes.md |
 | database/seeders/UserSeeder.php | .ai/rules/seeders.md |
+| app/Http/Controllers/TipoMantenimientoController.php,app/Http/Requests/TipoMantenimientoRequest.php,resources/js/Pages/TiposMantenimiento/** | .ai/rules/tipos-mantenimiento.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
 | app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php | .ai/rules/v1.md |

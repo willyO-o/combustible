@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable([
     'tipo_mantenimiento',
     'estado_tipo_mantenimiento',
+    'tipo_valor',
+    'ambito',
+    'unidad_medida',
 ])]
 class TipoMantenimiento extends Model
 {

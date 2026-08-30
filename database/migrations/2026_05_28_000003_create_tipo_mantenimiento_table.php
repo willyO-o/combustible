@@ -15,6 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('tipo_mantenimiento', 150);
             $table->enum('estado_tipo_mantenimiento', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
+            $table->enum('tipo_valor', ['cantidad', 'booleano'])->nullable();
+            $table->enum('ambito', ['taller', 'operacion_diaria'])->default('taller');
+            $table->string('unidad_medida', 100)->nullable();
             $table->timestamps();
         });
 
