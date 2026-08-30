@@ -60,7 +60,12 @@ class DetalleMantenimientoRequest extends FormRequest
         $tipoMedicion = $this->route('orden')?->vehiculo?->tipo_medicion;
 
         return [
-            'id_tipo_mantenimiento' => ['required', 'exists:tipo_mantenimiento,id'],
+            // Sólo tipos de mantenimiento de taller (el detalle de la orden de
+            // trabajo es mantenimiento de taller).
+            'id_tipo_mantenimiento' => [
+                'required',
+                Rule::exists('tipo_mantenimiento', 'id')->where('ambito', 'taller'),
+            ],
             'id_repuesto' => ['nullable', 'exists:repuesto,id'],
             'fecha' => ['required', 'date'],
             'horometro' => [

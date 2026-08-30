@@ -24,7 +24,12 @@ class TipoVehiculoRequest extends FormRequest
             // Intervalos de mantenimiento (referencia para futuras alertas): a lo
             // sumo un intervalo por tipo de mantenimiento.
             'intervalos' => ['nullable', 'array'],
-            'intervalos.*.id_tipo_mantenimiento' => ['required', 'distinct', 'exists:tipo_mantenimiento,id'],
+            // Sólo tipos de mantenimiento de taller (los de 'operacion_diaria'
+            // no aplican a intervalos por tipo de vehículo).
+            'intervalos.*.id_tipo_mantenimiento' => [
+                'required', 'distinct',
+                Rule::exists('tipo_mantenimiento', 'id')->where('ambito', 'taller'),
+            ],
             'intervalos.*.tipo_medicion' => ['required', Rule::in(['kilometraje', 'horometro'])],
             'intervalos.*.frecuencia' => ['required', 'integer', 'min:1'],
         ];

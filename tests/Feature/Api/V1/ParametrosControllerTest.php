@@ -6,6 +6,7 @@ use App\Models\Area;
 use App\Models\Conductor;
 use App\Models\Material;
 use App\Models\Persona;
+use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\VehiculoExterno;
@@ -87,6 +88,28 @@ class ParametrosControllerTest extends TestCase
             ['ABIERTA', 'CERRADA', 'PAGADA'],
             $response->json('data.control_cargas.estados_carga')
         );
+    }
+
+    public function test_colecciones_solo_trae_tipos_de_mantenimiento_de_taller(): void
+    {
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'taller',
+        ]);
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Nivel de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => 'booleano',
+        ]);
+
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $tipos = $response->json('data.ordenes_trabajo.tipos_mantenimiento');
+        $this->assertCount(1, $tipos);
+        $this->assertSame('Cambio de aceite', $tipos[0]['tipo_mantenimiento']);
     }
 
     public function test_colecciones_incluye_los_vehiculos_externos(): void

@@ -321,7 +321,10 @@ class OrdenTrabajoController extends Controller
 
         $orden->load(['vehiculo', 'taller', 'detalles.repuesto', 'detalles.tipoMantenimiento']);
 
+        // Las órdenes de trabajo son mantenimiento de taller: sólo se ofrecen
+        // los tipos de ese ámbito (los de 'operacion_diaria' se usan en otro flujo).
         $tiposMantenimiento = TipoMantenimiento::select('id', 'tipo_mantenimiento')
+            ->where('ambito', 'taller')
             ->orderBy('tipo_mantenimiento')
             ->get();
 

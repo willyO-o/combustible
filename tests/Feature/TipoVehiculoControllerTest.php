@@ -30,11 +30,13 @@ class TipoVehiculoControllerTest extends TestCase
         $this->actingAs($this->admin);
     }
 
-    private function crearTipoMantenimiento(string $nombre = 'Cambio de aceite'): TipoMantenimiento
+    private function crearTipoMantenimiento(string $nombre = 'Cambio de aceite', string $ambito = 'taller'): TipoMantenimiento
     {
         return TipoMantenimiento::create([
             'tipo_mantenimiento' => $nombre,
             'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => $ambito,
+            'tipo_valor' => $ambito === 'operacion_diaria' ? 'booleano' : null,
         ]);
     }
 
@@ -112,6 +114,36 @@ class TipoVehiculoControllerTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors(['intervalos.0.id_tipo_mantenimiento', 'intervalos.1.id_tipo_mantenimiento']);
+        $this->assertDatabaseMissing('tipo_vehiculo', ['tipo_vehiculo' => 'Camioneta']);
+    }
+
+    public function test_el_catalogo_de_tipos_de_mantenimiento_solo_trae_los_de_taller(): void
+    {
+        GrupoVehiculo::factory()->create();
+        $taller = $this->crearTipoMantenimiento('Cambio de aceite', 'taller');
+        $this->crearTipoMantenimiento('Nivel de aceite', 'operacion_diaria');
+
+        $response = $this->get(route('tipos-vehiculo.create'));
+
+        $ids = collect($response->viewData('page')['props']['tiposMantenimiento'])->pluck('id');
+        $this->assertEquals([$taller->id], $ids->all());
+    }
+
+    public function test_store_rechaza_un_intervalo_con_tipo_de_mantenimiento_de_operacion_diaria(): void
+    {
+        $opDiaria = $this->crearTipoMantenimiento('Nivel de aceite', 'operacion_diaria');
+        $grupo = GrupoVehiculo::factory()->create();
+
+        $response = $this->post(route('tipos-vehiculo.store'), [
+            'tipo_vehiculo' => 'Camioneta',
+            'estado_tipo_vehiculo' => 'ACTIVO',
+            'id_grupo_vehiculo' => $grupo->id,
+            'intervalos' => [
+                ['id_tipo_mantenimiento' => $opDiaria->id, 'tipo_medicion' => 'kilometraje', 'frecuencia' => 10000],
+            ],
+        ]);
+
+        $response->assertSessionHasErrors('intervalos.0.id_tipo_mantenimiento');
         $this->assertDatabaseMissing('tipo_vehiculo', ['tipo_vehiculo' => 'Camioneta']);
     }
 

@@ -250,6 +250,52 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame('1250.50', (string) $detalle->kilometraje);
     }
 
+    public function test_la_pantalla_de_ejecucion_solo_ofrece_tipos_de_mantenimiento_de_taller(): void
+    {
+        $orden = $this->crearOrden();
+        $taller = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'taller',
+        ]);
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Nivel de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => 'booleano',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('mantenimiento.ordenes.ejecucion.create', $orden));
+
+        $response->assertOk();
+        $ids = collect($response->viewData('page')['props']['tiposMantenimiento'])->pluck('id');
+        $this->assertTrue($ids->contains($taller->id));
+        $this->assertCount(1, $ids);
+    }
+
+    public function test_store_detalle_rechaza_un_tipo_de_mantenimiento_de_operacion_diaria(): void
+    {
+        $orden = $this->crearOrden();
+        $opDiaria = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Nivel de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => 'booleano',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->from(route('mantenimiento.ordenes.ejecucion.create', $orden))
+            ->post(route('mantenimiento.ordenes.ejecucion.detalles.store', $orden), [
+                'id_tipo_mantenimiento' => $opDiaria->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 1000,
+                'cantidad' => 1,
+            ]);
+
+        $response->assertSessionHasErrors('id_tipo_mantenimiento');
+    }
+
     public function test_store_detalle_exige_la_lectura_que_corresponde_al_tipo_de_medicion_del_vehiculo(): void
     {
         $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);

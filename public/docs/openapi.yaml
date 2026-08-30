@@ -2807,7 +2807,7 @@ components:
                       estado_resultante: { type: string, nullable: true, example: EN_EJECUCION }
                 tipos_mantenimiento:
                   type: array
-                  description: Catálogo de tipos de mantenimiento activos (`id_tipo_mantenimiento` de cada ítem de detalle).
+                  description: Catálogo de tipos de mantenimiento activos y de ámbito `taller` (`id_tipo_mantenimiento` de cada ítem de detalle). Los tipos de ámbito `operacion_diaria` no se incluyen.
                   items:
                     type: object
                     properties:
@@ -4165,7 +4165,7 @@ components:
       properties:
         id_tipo_mantenimiento:
           type: integer
-          description: Debe existir en el catálogo `tipo_mantenimiento` (ver `GET /parametros/colecciones` → `ordenes_trabajo.tipos_mantenimiento`).
+          description: Debe existir en el catálogo `tipo_mantenimiento` y ser de ámbito `taller` (ver `GET /parametros/colecciones` → `ordenes_trabajo.tipos_mantenimiento`).
           example: 3
         id_repuesto:
           type: integer

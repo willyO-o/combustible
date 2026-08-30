@@ -115,7 +115,11 @@ class ParametrosController extends Controller
                 // Catálogos para armar cada ítem del detalle de trabajo
                 // (POST /ordenes-trabajo/{orden}/detalles): el tipo de
                 // mantenimiento aplicado y, opcionalmente, el repuesto usado.
+                // Sólo tipos de mantenimiento de taller: el detalle de la orden
+                // de trabajo es mantenimiento de taller (los de 'operacion_diaria'
+                // se registran en otro flujo).
                 'tipos_mantenimiento' => TipoMantenimiento::where('estado_tipo_mantenimiento', 'ACTIVO')
+                    ->where('ambito', 'taller')
                     ->orderBy('tipo_mantenimiento')
                     ->get(['id', 'tipo_mantenimiento']),
                 'repuestos' => Repuesto::where('estado_repuesto', 'ACTIVO')

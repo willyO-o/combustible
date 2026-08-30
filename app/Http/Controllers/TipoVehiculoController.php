@@ -107,11 +107,14 @@ class TipoVehiculoController extends Controller
 
     /**
      * Catálogo de tipos de mantenimiento activos para el selector de
-     * intervalos (lista pequeña, se filtra en el cliente).
+     * intervalos (lista pequeña, se filtra en el cliente). Sólo ámbito
+     * taller: los intervalos de mantenimiento por tipo de vehículo son
+     * mantenimiento de taller, no de operación diaria.
      */
     private function tiposMantenimientoActivos(): Collection
     {
         return TipoMantenimiento::where('estado_tipo_mantenimiento', 'ACTIVO')
+            ->where('ambito', 'taller')
             ->orderBy('tipo_mantenimiento')
             ->get(['id', 'tipo_mantenimiento']);
     }
