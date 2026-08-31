@@ -364,3 +364,29 @@
         transition: none;
     }
 }
+
+/* Bitácora por vehículo (resources/js/Pages/Reportes/OperacionDiariaDetalle.vue):
+   tabla ancha con encabezado agrupado (TRABAJO DE EQUIPO / COMBUSTIBLE /
+   MANTENIMIENTO / MATERIAL / OBSERVACIONES). Columnas dinámicas -> se deja que
+   la tabla scrollee horizontal dentro de su .table-responsive. */
+.bitacora-tabla th,
+.bitacora-tabla td {
+    vertical-align: middle;
+    font-size: 0.8rem;
+}
+
+.bitacora-tabla thead th {
+    border-bottom: 1px solid var(--default-border);
+    background-color: var(--custom-white);
+}
+
+.bitacora-tabla thead tr.grp-row th.grp {
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    font-size: 0.72rem;
+    border-left: 2px solid var(--custom-white);
+}
+
+.bitacora-tabla tfoot td {
+    border-top: 2px solid var(--default-border);
+}

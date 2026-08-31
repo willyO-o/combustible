@@ -2140,4 +2140,456 @@ class Reportes extends exFPDF
 
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
     }
+
+    /**
+     * Reporte de uso de vehículos en operación diaria: una fila por vehículo con
+     * las horas trabajadas y el recorrido (kilometraje u horómetro según su
+     * tipo_medicion) del rango, más una fila de totales. NO desglosa actividades.
+     *
+     * $resumen es lo que devuelve OperacionDiariaReportController::obtenerResumen()
+     * (['vehiculos' => Collection, 'totales' => array]); todo ya viene agregado
+     * de la base de datos, aquí sólo se dibuja.
+     *
+     * @param  array{vehiculos: iterable<array<string, mixed>>, totales: array<string, float|int>}  $resumen
+     * @param  array{tipo_combustible?: string|null, area?: string|null, vehiculo?: string|null}  $filtrosAplicados
+     */
+    public function generarReporteOperacionDiariaUso(array $resumen, $fechaInicio, $fechaFin, string $modo = 'I', ?string $nombreArchivo = null, array $filtrosAplicados = [])
+    {
+        $vehiculos = collect($resumen['vehiculos'] ?? []);
+        $totales = $resumen['totales'] ?? [];
+
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $negro = [30, 30, 30];
+        $gris = [90, 90, 90];
+        $filaAlterna = [244, 246, 250];
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 199.9;
+
+        // ── ENCABEZADO ──────────────────────────────────────────────────
+        $etiquetasFiltro = array_filter([
+            ! empty($filtrosAplicados['tipo_combustible']) ? 'Combustible: '.$filtrosAplicados['tipo_combustible'] : null,
+            ! empty($filtrosAplicados['area']) ? 'Área: '.$filtrosAplicados['area'] : null,
+            ! empty($filtrosAplicados['vehiculo']) ? 'Vehículos: '.$filtrosAplicados['vehiculo'] : null,
+        ]);
+        $h1 = $etiquetasFiltro ? 22 : 16;
+
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
+
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
+
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 1.5);
+        $this->Cell($uw - 40, 8, utf8Decode('REPORTE DE USO DE VEHÍCULOS - OPERACIÓN DIARIA'), 0, 2, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 9.5);
+        $this->Cell($uw - 40, 6, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+
+        if ($etiquetasFiltro) {
+            $this->SetFont('Arial', 'BI', 8);
+            $this->SetTextColor($verde[0], $verde[1], $verde[2]);
+            $this->SetXY($sx + 40, $sy + 16);
+            $this->Cell($uw - 40, 5, utf8Decode('Filtros aplicados: '.implode('   |   ', $etiquetasFiltro)), 0, 2, 'L');
+        }
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
+
+        // ── TARJETAS DE RESUMEN ─────────────────────────────────────────
+        $cardW = 48;
+        $cardH = 14;
+        $cards = [
+            ['VEHÍCULOS OPERADOS', number_format((int) ($totales['total_vehiculos'] ?? 0)), [59, 89, 152]],
+            ['OPERACIONES', number_format((int) ($totales['total_operaciones'] ?? 0)), [34, 177, 76]],
+            ['HORAS TRABAJADAS', number_format((float) ($totales['total_horas'] ?? 0), 2, ',', '.').' h', [192, 0, 0]],
+            ['RECORRIDO (KM / H)', number_format((float) ($totales['total_km'] ?? 0), 2, ',', '.').' / '.number_format((float) ($totales['total_horometro'] ?? 0), 2, ',', '.'), [155, 155, 155]],
+        ];
+
+        $cardX = $sx;
+        foreach ($cards as $card) {
+            $this->SetLineWidth(0.3);
+            $this->SetDrawColor($card[2][0], $card[2][1], $card[2][2]);
+            $this->SetFillColor($card[2][0], $card[2][1], $card[2][2]);
+            $this->Rect($cardX, $currentY, $cardW, $cardH, 'FD');
+
+            $this->SetFont('Arial', 'B', 7);
+            $this->SetTextColor(255, 255, 255);
+            $this->SetXY($cardX, $currentY);
+            $this->Cell($cardW, 5, utf8Decode($card[0]), 0, 1, 'C');
+
+            $this->SetFont('Arial', 'B', 9);
+            $this->SetXY($cardX, $currentY + 5);
+            $this->Cell($cardW, 9, utf8Decode($card[1]), 0, 1, 'C');
+
+            $cardX += $cardW + 2;
+        }
+
+        $currentY += $cardH + 8;
+
+        // ── TABLA DE VEHÍCULOS ──────────────────────────────────────────
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('DETALLE POR VEHÍCULO'), 0, 1, 'C');
+
+        $currentY += 8;
+
+        $cols = [
+            ['label' => 'CÓDIGO', 'w' => 20, 'align' => 'L'],
+            ['label' => 'PLACA', 'w' => 20, 'align' => 'C'],
+            ['label' => 'COMBUSTIBLE', 'w' => 26, 'align' => 'C'],
+            ['label' => 'MEDICIÓN', 'w' => 22, 'align' => 'C'],
+            ['label' => 'OPERAC.', 'w' => 18, 'align' => 'C'],
+            ['label' => 'DÍAS', 'w' => 14, 'align' => 'C'],
+            ['label' => 'HORAS TRAB.', 'w' => 24, 'align' => 'R'],
+            ['label' => 'PROM. H/OP', 'w' => 20, 'align' => 'R'],
+            ['label' => 'RECORRIDO', 'w' => 35.9, 'align' => 'R'],
+        ];
+
+        $this->SetFillColor(240, 240, 240);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.2);
+        $this->SetFont('Arial', 'B', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        $colX = $sx;
+        foreach ($cols as $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX, $currentY);
+            $this->Cell($col['w'], 7, utf8Decode($col['label']), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        $currentY += 7;
+
+        $this->SetFont('Arial', '', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+
+        if ($vehiculos->isEmpty()) {
+            $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
+            $this->SetLineWidth(0.1);
+            $this->Rect($sx, $currentY, $uw, 7);
+            $this->SetXY($sx, $currentY);
+            $this->Cell($uw, 7, utf8Decode('No hay operaciones diarias en el rango seleccionado.'), 0, 0, 'C');
+            $currentY += 7;
+        }
+
+        foreach ($vehiculos->values() as $fila => $v) {
+            $v = (object) $v;
+            $medicionLabel = $v->tipo_medicion === 'kilometraje' ? 'Kilometraje' : 'Horómetro';
+
+            $valores = [
+                $v->codigo,
+                $v->nro_placa,
+                $v->tipo_combustible,
+                $medicionLabel,
+                (string) $v->total_operaciones,
+                (string) $v->dias_operados,
+                number_format((float) $v->total_horas, 2, ',', '.').' h',
+                number_format((float) $v->promedio_horas, 2, ',', '.').' h',
+                number_format((float) $v->total_recorrido, 2, ',', '.').' '.$v->unidad_recorrido,
+            ];
+
+            $conFondo = $fila % 2 === 1;
+            $this->SetFillColor($filaAlterna[0], $filaAlterna[1], $filaAlterna[2]);
+
+            $colX = $sx;
+            foreach ($cols as $idx => $col) {
+                $this->SetDrawColor($gris[0], $gris[1], $gris[2]);
+                $this->SetLineWidth(0.1);
+                $this->Rect($colX, $currentY, $col['w'], 6, $conFondo ? 'FD' : 'D');
+                $this->SetXY($colX + 1, $currentY + 0.5);
+                $this->Cell($col['w'] - 2, 6, utf8Decode($valores[$idx]), 0, 0, $col['align']);
+                $colX += $col['w'];
+            }
+
+            $currentY += 6;
+        }
+
+        // Fila de TOTALES (sólo lo que es sumable entre vehículos: el promedio y
+        // el recorrido de distinta unidad no se totalizan por fila).
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFont('Arial', 'B', 8);
+        $this->SetTextColor(255, 255, 255);
+
+        $totalRecorrido = number_format((float) ($totales['total_km'] ?? 0), 2, ',', '.').' km / '
+            .number_format((float) ($totales['total_horometro'] ?? 0), 2, ',', '.').' h';
+
+        $totalesFila = [
+            'TOTALES', '', '', '',
+            (string) ($totales['total_operaciones'] ?? 0),
+            '',
+            number_format((float) ($totales['total_horas'] ?? 0), 2, ',', '.').' h',
+            '',
+            $totalRecorrido,
+        ];
+
+        $colX = $sx;
+        foreach ($cols as $idx => $col) {
+            $this->Rect($colX, $currentY, $col['w'], 7, 'FD');
+            $this->SetXY($colX + 1, $currentY);
+            $this->Cell($col['w'] - 2, 7, utf8Decode($totalesFila[$idx]), 0, 0, $col['align']);
+            $colX += $col['w'];
+        }
+
+        $this->pintarPieDePagina($uw, $gris);
+
+        return $this->Output($modo, $nombreArchivo ?? 'reporte_operacion_diaria_uso.pdf');
+    }
+
+    /**
+     * Bitácora detallada de UN vehículo (una fila por operación diaria): horas
+     * trabajadas, combustible cargado ese día, controles de mantenimiento y
+     * material trasladado. Las columnas de mantenimiento y de material son
+     * dinámicas (dependen de lo registrado en el rango), por eso la tabla va
+     * en horizontal (Letter apaisado) con anchos proporcionales.
+     *
+     * $datos es lo que devuelve OperacionDiariaReportController::obtenerDetalleVehiculo()
+     * (['tipo_medicion','columnas'=>['mantenimiento','material'],'filas','totales']);
+     * todo llega ya agregado de la base de datos.
+     */
+    public function generarReporteOperacionDiariaDetalle($vehiculo, array $datos, $fechaInicio, $fechaFin, string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $filas = collect($datos['filas'] ?? []);
+        $colsMant = collect($datos['columnas']['mantenimiento'] ?? []);
+        $colsMat = collect($datos['columnas']['material'] ?? []);
+        $totales = ($datos['totales'] ?? []) + [
+            'operaciones' => 0, 'horas_trabajadas' => 0, 'litros' => 0, 'costo' => 0, 'litros_por_hora' => 0,
+        ];
+
+        $esKilometraje = ($datos['tipo_medicion'] ?? $vehiculo->tipo_medicion) === 'kilometraje';
+        $lectura = $esKilometraje ? 'KILOMETRAJE' : 'HORÓMETRO';
+
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $gris = [90, 90, 90];
+
+        $num = fn ($v, int $d = 2): string => $v === null ? '-' : number_format((float) $v, $d, ',', '.');
+        $bs = fn ($v): string => $v === null ? '-' : 'Bs. '.number_format((float) $v, 2, ',', '.');
+        $fecha = fn ($v): string => $v ? date('d/m/Y', strtotime((string) $v)) : '-';
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
+
+        $this->AddPage('L', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 263.4;
+
+        // ── Encabezado ──────────────────────────────────────────────────
+        $h1 = 22;
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 34);
+
+        $this->SetFont('Arial', 'B', 13);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 1.5);
+        $this->Cell($uw - 40, 8, utf8Decode('DETALLE DE HORAS TRABAJADAS Y CONSUMO DE COMBUSTIBLE'), 0, 2, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 9.5);
+        $this->Cell($uw - 40, 6, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
+
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 15.5);
+        $combustible = $vehiculo->tipoCombustible?->tipo_combustible ? '   |   '.$vehiculo->tipoCombustible->tipo_combustible : '';
+        $this->Cell($uw - 40, 5, utf8Decode('Vehículo: '.$vehiculo->codigo.' - '.($vehiculo->nro_placa ?: 'Sin placa').'   |   '.trim($vehiculo->marca.' '.$vehiculo->modelo).$combustible), 0, 2, 'L');
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
+
+        // ── Tabla: anchos proporcionales (se reparten en $uw) ────────────
+        $pesos = [
+            2.0, 4.2, 1.3, 2.2, 2.2, 1.6,   // TRABAJO DE EQUIPO (6)
+            1.8, 1.5, 2.2, 2.2,              // COMBUSTIBLE (4)
+        ];
+        foreach ($colsMant as $c) {
+            $pesos[] = 2.3;
+        }
+        foreach ($colsMat as $c) {
+            $pesos[] = 2.3;
+        }
+        $pesos[] = 3.6;                       // OBSERVACIONES
+
+        $sumaPesos = array_sum($pesos);
+        $anchos = array_map(fn ($p) => round($p / $sumaPesos * $uw, 2), $pesos);
+        // El ancho real de la tabla = suma exacta de columnas (evita que easyTable
+        // reciba un width mayor que la suma y descuadre la última columna).
+        $anchoTabla = round(array_sum($anchos), 2);
+        $anchoStr = '{'.implode(', ', $anchos).'}';
+
+        $this->SetXY($sx, $currentY);
+        $tabla = new easyTable($this, $anchoStr, "width:{$anchoTabla}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1; paddingY:0.6; min-height:5;");
+
+        // Fila de grupos (colspans).
+        $tabla->rowStyle('bgcolor:'.implode(',', $azul).'; font-style:B; font-size:6.5; font-color:255,255,255;');
+        $tabla->easyCell(utf8Decode('TRABAJO DE EQUIPO'), 'align:C; colspan:6;');
+        $tabla->easyCell(utf8Decode('CONSUMO Y COSTO DE COMBUSTIBLE'), 'align:C; colspan:4;');
+        if ($colsMant->isNotEmpty()) {
+            $tabla->easyCell(utf8Decode('MANTENIMIENTO'), 'align:C; colspan:'.$colsMant->count().';');
+        }
+        if ($colsMat->isNotEmpty()) {
+            $tabla->easyCell(utf8Decode('MATERIAL TRASLADADO'), 'align:C; colspan:'.$colsMat->count().';');
+        }
+        $tabla->easyCell(utf8Decode('OBSERVACIONES'), 'align:C;');
+        $tabla->printRow(true);
+
+        // Fila de encabezados de columna.
+        $tabla->rowStyle('bgcolor:235,238,245; font-style:B; font-size:6; font-color:'.implode(',', $azul).';');
+        $encabezados = [
+            ['FECHA', 'L'], ['OPERADOR', 'L'], ['N° PARTE', 'C'],
+            [$lectura.' INICIAL', 'R'], [$lectura.' FINAL', 'R'], ['TOTAL HORAS', 'R'],
+            ['LITROS DIÉSEL', 'R'], ['C / LITRO', 'R'], ['COSTO BS.', 'R'], [$lectura.' DE CARGA', 'R'],
+        ];
+        foreach ($encabezados as [$txt, $al]) {
+            $tabla->easyCell(utf8Decode($txt), "align:{$al};");
+        }
+        foreach ($colsMant as $c) {
+            $u = $c['unidad_medida'] ? ' ('.$c['unidad_medida'].')' : '';
+            $tabla->easyCell(utf8Decode(mb_strtoupper($c['nombre'].$u)), 'align:R;');
+        }
+        foreach ($colsMat as $c) {
+            $tabla->easyCell(utf8Decode(mb_strtoupper($c['nombre'])), 'align:R;');
+        }
+        $tabla->easyCell(utf8Decode(''), 'align:L;');
+        $tabla->printRow(true);
+
+        // Filas de datos.
+        if ($filas->isEmpty()) {
+            $tabla->rowStyle('font-size:7; font-color:'.implode(',', $gris).';');
+            $tabla->easyCell(utf8Decode('El vehículo no tiene operaciones diarias en el rango seleccionado.'), 'align:C; colspan:'.count($anchos).';');
+            $tabla->printRow();
+        }
+
+        foreach ($filas as $fila) {
+            $carga = $fila['carga'] ?? null;
+
+            $tabla->rowStyle('font-style:; font-size:6; font-color:30,30,30;');
+            $tabla->easyCell(utf8Decode($fecha($fila['fecha'] ?? null)), 'align:L;');
+            $tabla->easyCell(utf8Decode($fila['operador'] ?: '-'), 'align:L;');
+            $tabla->easyCell(utf8Decode((string) ($fila['nro_parte'] ?? '-')), 'align:C;');
+            $tabla->easyCell(utf8Decode($num($fila['lectura_inicio'] ?? null)), 'align:R;');
+            $tabla->easyCell(utf8Decode($num($fila['lectura_fin'] ?? null)), 'align:R;');
+            $tabla->easyCell(utf8Decode($num($fila['horas_trabajadas'] ?? 0)), 'align:R;');
+            $tabla->easyCell(utf8Decode($carga ? $num($carga['litros']) : '-'), 'align:R;');
+            $tabla->easyCell(utf8Decode($carga ? $num($carga['precio_unitario']) : '-'), 'align:R;');
+            $tabla->easyCell(utf8Decode($carga ? $bs($carga['costo']) : '-'), 'align:R;');
+            $tabla->easyCell(utf8Decode($carga ? $num($carga['lectura_carga']) : '-'), 'align:R;');
+
+            foreach ($colsMant as $c) {
+                $m = $fila['mantenimientos'][$c['id']] ?? null;
+                if ($m === null) {
+                    $valor = '-';
+                } elseif ($c['tipo_valor'] === 'booleano') {
+                    $valor = ($m['realizado'] ?? null) === 'SI' ? 'Sí' : (($m['realizado'] ?? null) === 'NO' ? 'No' : '-');
+                } else {
+                    $valor = ($m['valor'] ?? null) === null ? '-' : $num($m['valor']);
+                }
+                $tabla->easyCell(utf8Decode($valor), 'align:R;');
+            }
+
+            foreach ($colsMat as $c) {
+                $cant = $fila['materiales'][$c['id']] ?? null;
+                $tabla->easyCell(utf8Decode($cant === null ? '-' : $num($cant)), 'align:R;');
+            }
+
+            $tabla->easyCell(utf8Decode($fila['observaciones'] ?: '-'), 'align:L;');
+            $tabla->printRow();
+        }
+
+        // Fila de TOTALES.
+        if ($filas->isNotEmpty()) {
+            $tabla->rowStyle('bgcolor:'.implode(',', $azul).'; font-style:B; font-size:6; font-color:255,255,255;');
+            $tabla->easyCell(utf8Decode('TOTALES'), 'align:R; colspan:5;');
+            $tabla->easyCell(utf8Decode($num($totales['horas_trabajadas'])), 'align:R;');
+            $tabla->easyCell(utf8Decode($num($totales['litros'])), 'align:R;');
+            $tabla->easyCell(utf8Decode(''), 'align:R;');
+            $tabla->easyCell(utf8Decode($bs($totales['costo'])), 'align:R;');
+            $tabla->easyCell(utf8Decode(''), 'align:R;');
+            foreach ($colsMant as $c) {
+                $tot = ($c['tipo_valor'] ?? null) === 'booleano' ? ($c['total'].' sí') : $num($c['total']);
+                $tabla->easyCell(utf8Decode($tot), 'align:R;');
+            }
+            foreach ($colsMat as $c) {
+                $tabla->easyCell(utf8Decode($num($c['total'])), 'align:R;');
+            }
+            $tabla->easyCell(utf8Decode(''), 'align:L;');
+            $tabla->printRow();
+        }
+
+        $tabla->endTable();
+
+        // ── Recuadro RESUMEN ────────────────────────────────────────────
+        $y = $this->GetY() + 4;
+        if ($y > 165) {
+            $this->AddPage('L', 'Letter');
+            $y = $this->GetY();
+        }
+
+        $boxW = 128;
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->SetFillColor(255, 214, 79);
+        $this->Rect($sx, $y, $boxW, 7, 'FD');
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx, $y);
+        $this->Cell($boxW, 7, utf8Decode('RESUMEN'), 0, 0, 'C');
+
+        $lineas = [
+            ['TOTAL HORAS TRABAJADAS', $num($totales['horas_trabajadas']).' horas'],
+            ['CONSUMO DE COMBUSTIBLE', $num($totales['litros']).' litros de diésel'],
+            ['COSTO COMBUSTIBLE', $bs($totales['costo'])],
+            ['CONSUMO DE COMBUSTIBLE POR HORA DE TRABAJO', $num($totales['litros_por_hora']).' litros/hora'],
+        ];
+
+        $ly = $y + 7;
+        foreach ($lineas as [$et, $val]) {
+            $this->Rect($sx, $ly, $boxW, 7);
+            $this->SetFont('Arial', 'B', 7.5);
+            $this->SetTextColor(30, 30, 30);
+            $this->SetXY($sx + 2, $ly);
+            $this->Cell($boxW * 0.62, 7, utf8Decode($et.' :'), 0, 0, 'L');
+            $this->SetFont('Arial', 'B', 8);
+            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->Cell($boxW * 0.36, 7, utf8Decode($val), 0, 0, 'R');
+            $ly += 7;
+        }
+
+        $this->pintarPieDePagina($uw, $gris);
+
+        return $this->Output($modo, $nombreArchivo ?? 'bitacora_operacion_diaria.pdf');
+    }
 }

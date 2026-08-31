@@ -12,6 +12,7 @@ use App\Http\Controllers\GrupoVehiculoController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\OperacionDiariaController;
+use App\Http\Controllers\OperacionDiariaReportController;
 use App\Http\Controllers\OrdenTrabajoController;
 use App\Http\Controllers\ParametrosEmpresaController;
 use App\Http\Controllers\PersonaController;
@@ -212,6 +213,18 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('reportes/operacion-diaria/pdf/{operacionDiaria}', [OperacionDiariaController::class, 'generarPDF'])->name('operacion-diaria.reporte.pdf');
+
+    // ── Reporte de uso de vehículos en operación diaria (horas + recorrido) ──
+    Route::prefix('reportes')->name('operacion-diaria.reporte.uso.')->group(function () {
+        Route::get('operacion-diaria', [OperacionDiariaReportController::class, 'index'])->name('index');
+        Route::get('operacion-diaria/pdf', [OperacionDiariaReportController::class, 'generarPDF'])->name('pdf');
+    });
+
+    // ── Bitácora detallada de UN vehículo (horas + combustible + mantenimiento + material) ──
+    Route::prefix('reportes')->name('operacion-diaria.reporte.detalle.')->group(function () {
+        Route::get('operacion-diaria/detalle', [OperacionDiariaReportController::class, 'detalle'])->name('index');
+        Route::get('operacion-diaria/detalle/pdf', [OperacionDiariaReportController::class, 'detallePDF'])->name('pdf');
+    });
 
     //  Actividades de los operadores de transporte
     Route::post('operacion-diaria/verificar', [OperacionDiariaController::class, 'verificarOperacion'])->name('operacion-diaria.verificar');

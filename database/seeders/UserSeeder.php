@@ -68,6 +68,17 @@ class UserSeeder extends Seeder
             'operacion-diaria.eliminar',
             'operacion-diaria.informe',
             'operacion-diaria.reporte.pdf',
+            // Reporte agregado de uso de vehículos (horas trabajadas + recorrido
+            // por tipo de combustible). Independiente de su PDF, igual que el
+            // resto de reportes; jefe-area + admin lo reciben vía este bundle,
+            // nunca el conductor (que no recibe el bundle completo).
+            'operacion-diaria.reporte.uso',
+            'operacion-diaria.reporte.uso.pdf',
+            // Bitácora detallada de un vehículo (una fila por operación, con
+            // combustible del día, mantenimiento y material). Independiente de
+            // su PDF, mismo criterio que el resto de reportes.
+            'operacion-diaria.reporte.detalle',
+            'operacion-diaria.reporte.detalle.pdf',
             'operacion-diaria.verificar',
         ];
     }
