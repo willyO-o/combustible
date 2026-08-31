@@ -224,13 +224,57 @@ class TipoMantenimientoSeeder extends Seeder
                 'tipo_mantenimiento' => 'Mantenimiento predictivo (análisis de aceite)',
                 'estado_tipo_mantenimiento' => 'ACTIVO',
             ],
+
+            // ===== Controles de operación diaria (ambito operacion_diaria) =====
+            // Los registra el conductor en el parte diario, no el taller.
+            [
+                'tipo_mantenimiento' => 'Aceite de motor',
+                'estado_tipo_mantenimiento' => 'ACTIVO',
+                'ambito' => 'operacion_diaria',
+                'tipo_valor' => 'cantidad',
+                'unidad_medida' => 'Litros',
+            ],
+            [
+                'tipo_mantenimiento' => 'Aceite de transmisión',
+                'estado_tipo_mantenimiento' => 'ACTIVO',
+                'ambito' => 'operacion_diaria',
+                'tipo_valor' => 'cantidad',
+                'unidad_medida' => 'Litros',
+            ],
+            [
+                'tipo_mantenimiento' => 'Aceite hidráulico',
+                'estado_tipo_mantenimiento' => 'ACTIVO',
+                'ambito' => 'operacion_diaria',
+                'tipo_valor' => 'cantidad',
+                'unidad_medida' => 'Litros',
+            ],
+            [
+                'tipo_mantenimiento' => 'Grasa',
+                'estado_tipo_mantenimiento' => 'ACTIVO',
+                'ambito' => 'operacion_diaria',
+                'tipo_valor' => 'booleano',
+            ],
+            [
+                'tipo_mantenimiento' => 'Soplado de filtro',
+                'estado_tipo_mantenimiento' => 'ACTIVO',
+                'ambito' => 'operacion_diaria',
+                'tipo_valor' => 'booleano',
+            ],
         ];
 
-
         foreach ($tiposMantenimiento as $tipo) {
+            $ambito = $tipo['ambito'] ?? 'taller';
+
             TipoMantenimiento::updateOrCreate(
-                ['tipo_mantenimiento' => $tipo['tipo_mantenimiento']],
-                ['estado_tipo_mantenimiento' => $tipo['estado_tipo_mantenimiento']]
+                [
+                    'tipo_mantenimiento' => $tipo['tipo_mantenimiento'],
+                    'ambito' => $ambito,
+                ],
+                [
+                    'estado_tipo_mantenimiento' => $tipo['estado_tipo_mantenimiento'],
+                    'tipo_valor' => $tipo['tipo_valor'] ?? null,
+                    'unidad_medida' => $tipo['unidad_medida'] ?? null,
+                ]
             );
         }
 

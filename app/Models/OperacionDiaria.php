@@ -47,7 +47,9 @@ class OperacionDiaria extends Model
 
     public function getNroAttribute()
     {
-        return str_pad($this->nro_operacion, 5, '0', STR_PAD_LEFT);
+        $digitos = ParametrosEmpresa::first()->parametros_vale->digitos_serie;
+
+        return str_pad($this->nro_operacion, $digitos, '0', STR_PAD_LEFT);
     }
 
     public function getFechaIFAttribute()

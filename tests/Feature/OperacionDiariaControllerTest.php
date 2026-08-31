@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Libraries\Reportes;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\Conductor;
 use App\Models\Material;
 use App\Models\OperacionDiaria;
+use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
@@ -28,6 +30,17 @@ class OperacionDiariaControllerTest extends TestCase
         Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'tecnico-mantenimiento', 'guard_name' => 'web']);
+
+        // OperacionDiaria::getNroAttribute() lee digitos_serie de este parámetro.
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Plus Metals Ltda.',
+            'direccion_empresa' => 'Calle Principal 123',
+            'telefono_empresa' => '123456789',
+            'correo_empresa' => 'info@miempresa.com',
+            'nit_empresa' => '123456789',
+            'parametros_vale' => ['tiempo_expiracion' => 1],
+            'estado' => 'ACTIVO',
+        ]);
     }
 
     private function crearConductorConUsuario(): array
@@ -552,6 +565,60 @@ class OperacionDiariaControllerTest extends TestCase
         $response->assertOk();
         $actividades = collect($response->viewData('page')['props']['operacion']['actividades_realizadas_edit']);
         $this->assertSame($material->id, $actividades->first()['id_material']);
+    }
+
+    public function test_genera_el_pdf_del_reporte_de_operacion(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $material = Material::factory()->create(['material' => 'Concentrado']);
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Aceite de motor',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => 'cantidad',
+            'unidad_medida' => 'Litros',
+        ]);
+
+        $payload = $this->payloadOperacionValida($vehiculo);
+        $payload['actividades_realizadas'][0]['id_material'] = $material->id;
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $payload);
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.reporte.pdf', OperacionDiaria::firstOrFail()));
+
+        $response->assertOk();
+        $this->assertSame('application/pdf', $response->headers->get('content-type'));
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_el_reporte_lista_los_tipos_de_mantenimiento_de_la_base_aunque_no_se_pasen(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Nivel de refrigerante',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => 'booleano',
+            'unidad_medida' => null,
+        ]);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+
+        $operacion = OperacionDiaria::firstOrFail()->load([
+            'conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas', 'mantenimientosOperacion',
+        ]);
+
+        // Sin pasar el catálogo: el reporte lo consulta directo de la base.
+        $pdf = (new Reportes)->generarReporteOperacionDiaria($operacion, null, 'S');
+
+        $this->assertStringStartsWith('%PDF', $pdf);
     }
 
     public function test_update_no_permite_cambiar_el_vehiculo_de_la_operacion(): void

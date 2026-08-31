@@ -423,12 +423,20 @@ class OperacionDiariaController extends Controller
 
     public function generarPDF(OperacionDiaria $operacionDiaria)
     {
-        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas']);
+        $operacion = $operacionDiaria
+            ->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas', 'mantenimientosOperacion'])
+            ->cargarMaterialDeActividades();
 
-        $reporte = new Reportes;
+        $pdf = (new Reportes)->generarReporteOperacionDiaria(
+            $operacion,
+            $this->tiposMantenimientoOperacionDiaria(),
+            'S'
+        );
 
-        $reporte->generarReporteOperacionDiaria($operacion);
-        exit;
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="reporte_operacion_'.$operacion->nro.'.pdf"',
+        ]);
     }
 
     public function verificarOperacion(Request $request)

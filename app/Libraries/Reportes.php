@@ -3,10 +3,13 @@
 namespace App\Libraries;
 
 use App\Models\CargaCombustible;
+use App\Models\OperacionDiaria;
 use App\Models\ParametrosEmpresa;
+use App\Models\TipoMantenimiento;
 use App\Models\VehiculoExterno;
 use easyTable;
 use exFPDF;
+use Illuminate\Support\Collection;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class Reportes extends exFPDF
@@ -1763,425 +1766,378 @@ class Reportes extends exFPDF
         ));
     }
 
-    public function generarReporteOperacionDiaria($datos = null)
+    /**
+     * "REPORTE DE OPERACIÓN DIARIA": se dibuja sobre el fondo completo tamaño
+     * carta public/images/reportes/fondo-reporte-operacion.png (mismo enfoque
+     * que generarSolicitudMantenimiento() — el fondo trae impresos el
+     * encabezado, la caja de OBSERVACIONES y las líneas de firma; aquí se ubica
+     * el texto dinámico y se dibujan las dos tablas — "DETALLE JORNADA DIARIA DE
+     * TRABAJO" y "MANTENIMIENTO REALIZADO" — que el fondo NO trae).
+     *
+     * Las etiquetas y columnas dependen del tipo_medicion del vehículo:
+     *  - horometro: lecturas "HORÓMETRO INICIAL/FINAL"; la jornada lista LUGAR.
+     *  - kilometraje: lecturas "KILOMETRAJE INICIAL/FINAL"; la jornada lista
+     *    ORIGEN, DESTINO y MATERIAL trasladado.
+     *
+     * Coordenadas medidas sobre un render real del fondo a 215.9x279.4mm (ver
+     * la nota en .ai/rules/libraries-http-controllers.md).
+     *
+     * @param  OperacionDiaria  $operacion  cargado con conductor.persona,
+     *                                      vehiculo, area, verificador, actividadesRealizadas (+ pivot->material)
+     *                                      y mantenimientosOperacion.
+     * @param  Collection|array|null  $tiposMantenimiento  catálogo
+     *                                                     de tipo_mantenimiento de ámbito operacion_diaria activos
+     *                                                     ({id, tipo_mantenimiento, tipo_valor, unidad_medida}); la tabla de
+     *                                                     mantenimiento lista todos, con su valor registrado o "—". Si no se
+     *                                                     pasa, se consultan directamente de la base de datos.
+     * @param  string  $modo  Ver docblock de generarVale().
+     */
+    public function generarReporteOperacionDiaria($operacion, $tiposMantenimiento = null, string $modo = 'I', ?string $nombreArchivo = null)
     {
-        // ── Datos estáticos de ejemplo ──────────────────────────────────────
-        $nroReporte = '01576';
-        $operador = 'JOSÉ GARCÍA MORALES';
-        $horometroInicial = '45000';
-        $horometroFinal = '45150';
-        $descripcionEquipo = 'EXCAVADORA CAT 320 D';
-        $totalHorasTrabajo = '8.5 HRS';
-        $dia = '15';
-        $mes = '08';
-        $anio = '2026';
-        $tipoJornada = 'DÍA'; // 'DÍA' o 'NOCHE'
+        // La tabla de mantenimiento es estática: lista SIEMPRE todos los tipos
+        // de mantenimiento de ámbito operacion_diaria activos registrados en la
+        // base de datos, aunque esta operación no tenga ningún valor cargado.
+        $tiposMantenimiento = collect($tiposMantenimiento ?? []);
+        if ($tiposMantenimiento->isEmpty()) {
+            $tiposMantenimiento = TipoMantenimiento::query()
+                ->where('ambito', 'operacion_diaria')
+                ->where('estado_tipo_mantenimiento', 'ACTIVO')
+                ->orderBy('tipo_mantenimiento')
+                ->get(['id', 'tipo_mantenimiento', 'tipo_valor', 'unidad_medida']);
+        }
 
-        // Datos de mantenimiento realizado
-        $diesel = 'HO 0KM';
-        $aceitesMotor = 'HO 0KM';
-        $aceiteTransm = 'HO 0KM';
-        $aceiteHidraul = 'HO 0KM';
-        $grasa = 'HO 0KM';
-        $sopleteFiltro = 'NO'; // 'SI' o 'NO'
-        $observaciones = 'Operación normal. Equipo en excelente estado operativo.';
+        // ══════════════════════════════════════════════════════════════════
+        // DATOS
+        // ══════════════════════════════════════════════════════════════════
+        $vehiculo = $operacion->vehiculo;
+        $esKm = $vehiculo?->tipo_medicion === 'kilometraje';
 
-        // Datos de actividades (tabla de ejemplo)
-        $actividades = [
-            ['DE' => '06:00', 'A' => '07:30', 'ACTIVIDAD' => 'Inspección pre-operacional'],
-            ['DE' => '07:30', 'A' => '11:00', 'ACTIVIDAD' => 'Excavación zona norte'],
-            ['DE' => '11:00', 'A' => '12:00', 'ACTIVIDAD' => 'Descanso'],
-            ['DE' => '12:00', 'A' => '15:30', 'ACTIVIDAD' => 'Excavación zona sur'],
-            ['DE' => '15:30', 'A' => '16:30', 'ACTIVIDAD' => 'Mantenimiento preventivo'],
-            ['DE' => '16:30', 'A' => '17:00', 'ACTIVIDAD' => 'Inspección post-operacional'],
-        ];
+        $nro = $operacion->nro;
+        $fecha = $operacion->fecha_inicio;
+        $dia = $fecha?->format('d') ?? '';
+        $mes = $fecha?->format('m') ?? '';
+        $anio = $fecha?->format('Y') ?? '';
 
-        // ── Colores consistentes ────────────────────────────────────────────
-        $azul = [39, 42, 84];
-        $rojo = [190, 30, 30];
+        $operador = $operacion->conductor?->persona?->nombre_completo ?? 'N/A';
+        $descripcionEquipo = trim(
+            ($vehiculo?->codigo ?? '').'   '.($vehiculo?->marca ?? '').' '.($vehiculo?->modelo ?? '')
+        ) ?: 'N/A';
+
+        $lecturaInicial = $esKm ? $operacion->kilometraje_inicio : $operacion->horometro_inicio;
+        $lecturaFinal = $esKm ? $operacion->kilometraje_fin : $operacion->horometro_fin;
+        $unidadLectura = $esKm ? 'km' : 'h';
+        $etiquetaLectura = $esKm ? 'KILOMETRAJE' : 'HORÓMETRO';
+
+        $observaciones = (string) ($operacion->observaciones ?? '');
+        $supervisor = $operacion->verificador?->nombre_completo ?? '';
+
+        // Actividades realizadas de la jornada.
+        $actividades = $operacion->actividadesRealizadas->map(fn ($a) => [
+            'de' => $a->pivot->hora_inicio?->format('H:i') ?? '',
+            'a' => $a->pivot->hora_fin?->format('H:i') ?? '',
+            'actividad' => (string) $a->nombre_actividad,
+            'origen' => (string) ($a->pivot->origen ?? ''),
+            'destino' => (string) ($a->pivot->destino ?? ''),
+            'lugar' => (string) ($a->pivot->lugar ?? ''),
+            'material' => (string) ($a->pivot->material?->material ?? ''),
+            'cantidad' => trim($this->formatearCantidadReporte($a->pivot->cantidad).' '.($a->pivot->unidad_medida ?? '')),
+        ])->values()->all();
+
+        // Mantenimiento: SIEMPRE una fila por cada tipo activo de ámbito
+        // operacion_diaria. Sin registro relacionado la fila queda vacía; los
+        // 'cantidad' muestran el número + unidad, los 'booleano' una casilla
+        // SÍ/NO marcada según lo registrado.
+        $registrados = $operacion->mantenimientosOperacion->keyBy('id');
+        $mantenimiento = $tiposMantenimiento->map(function ($tipo) use ($registrados) {
+            $reg = $registrados->get($tipo->id);
+
+            return [
+                'control' => (string) $tipo->tipo_mantenimiento,
+                'tipo_valor' => $tipo->tipo_valor,
+                'cantidad' => ($tipo->tipo_valor === 'cantidad' && $reg && $reg->pivot->valor !== null)
+                    ? trim($this->formatearCantidadReporte($reg->pivot->valor).' '.($tipo->unidad_medida ?? ''))
+                    : '',
+                'realizado' => ($tipo->tipo_valor === 'booleano' && $reg) ? $reg->pivot->realizado : null,
+            ];
+        })->all();
+
+        // ══════════════════════════════════════════════════════════════════
+        // COLORES / PÁGINA
+        // ══════════════════════════════════════════════════════════════════
+        $azul = [0, 75, 145];
+        $celeste = [214, 231, 246]; // celeste claro para las cabeceras (poca tinta)
         $negro = [30, 30, 30];
-        $gris = [90, 90, 90];
-        $blanco = [255, 255, 255];
+        $gris = [110, 110, 110];
+
+        $pageW = 215.9;
+        $pageH = 279.4;
 
         $this->AddPage('P', 'Letter');
         $this->SetMargins(8, 8, 8);
         $this->SetAutoPageBreak(false);
+        $this->Image(public_path('images/reportes/fondo-reporte-operacion.png'), 0, 0, $pageW, $pageH);
 
-        $sx = 8;      // origen X
-        $sy = 8;      // origen Y
-        $uw = 199.9;  // ancho útil (215.9 - 16)
-        $sBottom = 271.4; // límite inferior útil
+        $sx = 4.5;
+        $uw = 207.0;
 
         // ══════════════════════════════════════════════════════════════════
-        // ENCABEZADO: 3 secciones [LOGO | TÍTULO + CHECKBOXES | N° + FECHA]
+        // ENCABEZADO (logo + N° + DÍA/MES/AÑO + casilla DÍA/NOCHE)
         // ══════════════════════════════════════════════════════════════════
-        $h1 = 24;    // altura del bloque encabezado
-        $logoW = 42;    // ancho sección logo
-        $nroW = 50;    // ancho sección derecha
-        $midW = $uw - $logoW - $nroW; // ancho sección central
+        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), 9, 6, 30);
 
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.4);
-
-        // Borde exterior del encabezado
-        $this->Rect($sx, $sy, $uw, $h1);
-
-        // Divisores verticales internos
-        $this->SetLineWidth(0.3);
-        $this->Line($sx + $logoW, $sy, $sx + $logoW, $sy + $h1);
-        $this->Line($sx + $logoW + $midW, $sy, $sx + $logoW + $midW, $sy + $h1);
-
-        // — Sección izquierda: logo + nombre empresa —
-        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), $sx + 1, $sy + 1, 26);
-        $this->SetFont('Arial', 'B', 8);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx, $sy + 14);
-        $this->Cell($logoW, 4, utf8Decode('PLUS METALS LTDA.'), 0, 0, 'C');
-        $this->SetFont('Arial', '', 7);
-        $this->SetXY($sx, $sy + 18);
-        $this->Cell($logoW, 4, utf8Decode('ORURO - BOLIVIA'), 0, 0, 'C');
-
-        // — Sección central: título + checkboxes DÍA / NOCHE —
-        $midX = $sx + $logoW;
         $this->SetFont('Arial', 'B', 13);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($midX, $sy + 2);
-        $this->Cell($midW, 8, utf8Decode('REPORTE DE OPERACION DIARIA'), 0, 0, 'C');
+        $this->SetXY(163.8, 6);
+        $this->Cell(49.1, 6, utf8Decode('N° '.$nro), 0, 0, 'C');
 
-        // Checkboxes centrados horizontalmente
-        $chkY = $sy + 13;
-        $chkSz = 4;
-        $chkMid = $midX + $midW / 2;
+        $this->SetFont('Arial', '', 10);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->SetXY(163.8, 23.6);
+        $this->Cell(16.7, 5, $dia, 0, 0, 'C');
+        $this->SetXY(180.5, 23.6);
+        $this->Cell(16.5, 5, $mes, 0, 0, 'C');
+        $this->SetXY(197.0, 23.6);
+        $this->Cell(15.9, 5, $anio, 0, 0, 'C');
 
-        // Checkbox DIA (izquierda del centro)
-        $chkDiaX = $chkMid - 22;
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.3);
-        $this->Rect($chkDiaX, $chkY, $chkSz, $chkSz);
-        $this->SetFont('Arial', 'B', 8);
+        $this->SetFont('Arial', 'B', 11);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($chkDiaX + $chkSz + 1, $chkY);
-        $this->Cell(10, $chkSz, utf8Decode('DIA'), 0, 0, 'L');
-
-        // Checkbox NOCHE (derecha del centro)
-        $chkNocheX = $chkMid + 2;
-        $this->Rect($chkNocheX, $chkY, $chkSz, $chkSz);
-        $this->SetXY($chkNocheX + $chkSz + 1, $chkY);
-        $this->Cell(14, $chkSz, utf8Decode('NOCHE'), 0, 0, 'L');
-
-        // Marcar el checkbox según $tipoJornada
-        if ($tipoJornada === 'DÍA') {
-            $this->SetFont('Arial', 'B', 8);
-            $this->SetXY($chkDiaX, $chkY - 0.5);
-            $this->Cell($chkSz, $chkSz + 1, 'X', 0, 0, 'C');
+        if ($operacion->turno === 'DIA') {
+            $this->SetXY(83.8, 19.9);
+            $this->Cell(4.6, 5, 'X', 0, 0, 'C');
         } else {
-            $this->SetFont('Arial', 'B', 8);
-            $this->SetXY($chkNocheX, $chkY - 0.5);
-            $this->Cell($chkSz, $chkSz + 1, 'X', 0, 0, 'C');
+            $this->SetXY(113.0, 19.9);
+            $this->Cell(4.7, 5, 'X', 0, 0, 'C');
         }
 
-        // — Sección derecha: N° reporte + tabla DÍA/MES/AÑO —
-        $rx = $sx + $logoW + $midW;
-        $this->SetFont('Arial', 'B', 13);
-        $this->SetTextColor($rojo[0], $rojo[1], $rojo[2]);
-        $this->SetXY($rx, $sy + 1);
-        $this->Cell($nroW, 7, utf8Decode('N° '.$nroReporte), 0, 0, 'C');
+        // ══════════════════════════════════════════════════════════════════
+        // CAMPOS: OPERADOR / EQUIPO / LECTURAS / HORAS
+        // ══════════════════════════════════════════════════════════════════
+        $medio = $sx + $uw / 2;
+        $this->pintarCampoReporte($sx, 35, 30, 'OPERADOR:', mb_strtoupper($operador), $medio - 4, $azul, $negro);
+        $this->pintarCampoReporte($medio, 35, 40, 'DESCRIPCIÓN EQUIPO:', mb_strtoupper($descripcionEquipo), $sx + $uw, $azul, $negro);
 
-        // Tabla de fecha (3 columnas iguales)
-        $dtColW = $nroW / 3;
-        $dtY = $sy + 10;
+        $this->pintarCampoReporte($sx, 43, 44, $etiquetaLectura.' INICIAL:', $this->formatearLecturaReporte($lecturaInicial, $unidadLectura), $medio - 4, $azul, $negro);
+        $this->pintarCampoReporte($medio, 43, 50, 'TOTAL HORAS TRABAJADAS:', $this->formatearLecturaReporte($operacion->horas_trabajadas, 'h'), $sx + $uw, $azul, $negro);
 
-        $dtCols = ['DIA', 'MES', utf8Decode('AÑO')];
-        $dtVals = [$dia, $mes, $anio];
+        $this->pintarCampoReporte($sx, 51, 44, $etiquetaLectura.' FINAL:', $this->formatearLecturaReporte($lecturaFinal, $unidadLectura), $medio - 4, $azul, $negro);
+        $this->pintarCampoReporte($medio, 51, 26, 'SUPERVISOR:', mb_strtoupper($supervisor), $sx + $uw, $azul, $negro);
 
-        foreach ($dtCols as $i => $label) {
-            $cx = $rx + $i * $dtColW;
-            $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        // ══════════════════════════════════════════════════════════════════
+        // TABLA: DETALLE JORNADA DIARIA DE TRABAJO
+        // ══════════════════════════════════════════════════════════════════
+        $jornadaTitleY = 58.0;
+
+        // Filas visibles fijas: 10 (se amplía sólo si la jornada trae más
+        // actividades, para no perder datos).
+        $filaH = 5.6;
+        $maxFilas = max(10, count($actividades));
+        $filasVacias = max(0, $maxFilas - count($actividades));
+
+        $this->SetFillColor($celeste[0], $celeste[1], $celeste[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $jornadaTitleY, $uw, 7, 'FD');
+        $this->SetFont('Arial', 'B', 9.5);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx, $jornadaTitleY);
+        $this->Cell($uw, 7, utf8Decode('DETALLE JORNADA DIARIA DE TRABAJO'), 0, 0, 'C');
+
+        if ($esKm) {
+            $anchos = [12, 12, 47, 37, 37, 34, 28];
+            $columnas = [['de', 'C'], ['a', 'C'], ['actividad', 'L'], ['origen', 'L'], ['destino', 'L'], ['material', 'L'], ['cantidad', 'C']];
+            $encabezados = ['DE', 'A', 'ACTIVIDAD', 'ORIGEN', 'DESTINO', 'MATERIAL', 'CANTIDAD'];
+        } else {
+            $anchos = [14, 14, 105, 46, 28];
+            $columnas = [['de', 'C'], ['a', 'C'], ['actividad', 'L'], ['lugar', 'L'], ['cantidad', 'C']];
+            $encabezados = ['DE', 'A', 'ACTIVIDAD', 'LUGAR', 'CANTIDAD'];
+        }
+
+        $filas = array_merge(
+            $actividades,
+            array_fill(0, $filasVacias, array_fill_keys(array_column($columnas, 0), ''))
+        );
+
+        $this->SetMargins(0, 0, 0);
+        $this->SetXY($sx, $jornadaTitleY + 7);
+        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$uw}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; paddingY:0.3; min-height:{$filaH};");
+        $tabla->rowStyle("bgcolor:{$celeste[0]},{$celeste[1]},{$celeste[2]}; font-color:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:7.5; align:C; min-height:4.6;");
+        foreach ($encabezados as $encabezado) {
+            $tabla->easyCell(utf8Decode($encabezado), 'align:C;');
+        }
+        $tabla->printRow(true);
+
+        $this->SetFont('Arial', '', 7.5);
+        foreach ($filas as $fila) {
+            $tabla->rowStyle("font-color:30,30,30; font-size:7.5; min-height:{$filaH};");
+            foreach ($columnas as [$clave, $align]) {
+                $tabla->easyCell(utf8Decode((string) ($fila[$clave] ?? '')), 'align:'.$align.';');
+            }
+            $tabla->printRow();
+        }
+        $tabla->endTable(2);
+        $this->SetMargins(8, 8, 8);
+
+        // ══════════════════════════════════════════════════════════════════
+        // TABLA: MANTENIMIENTO REALIZADO (angosta y centrada, como el modelo)
+        // ══════════════════════════════════════════════════════════════════
+        $mantTitleY = $this->GetY() + 3;
+        $mantX = $sx + 22;
+        $mantW = $uw - 44;
+
+        $this->SetFillColor($celeste[0], $celeste[1], $celeste[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($mantX, $mantTitleY, $mantW, 7, 'FD');
+        $this->SetFont('Arial', 'B', 9.5);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($mantX, $mantTitleY);
+        $this->Cell($mantW, 7, utf8Decode('MANTENIMIENTO REALIZADO'), 0, 0, 'C');
+
+        $mantBodyY = $mantTitleY + 7;
+
+        if (count($mantenimiento) === 0) {
             $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
             $this->SetLineWidth(0.25);
-            $this->Rect($cx, $dtY, $dtColW, 5, 'FD');
-            $this->SetFont('Arial', 'B', 7);
-            $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-            $this->SetXY($cx, $dtY);
-            $this->Cell($dtColW, 5, $label, 0, 0, 'C');
-            // Valor
-            $this->Rect($cx, $dtY + 5, $dtColW, 5);
-            $this->SetFont('Arial', '', 8);
-            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->SetXY($cx, $dtY + 5);
-            $this->Cell($dtColW, 5, $dtVals[$i], 0, 0, 'C');
-        }
+            $this->Rect($mantX, $mantBodyY, $mantW, 7);
+            $this->SetFont('Arial', 'I', 8);
+            $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+            $this->SetXY($mantX, $mantBodyY);
+            $this->Cell($mantW, 7, utf8Decode('Sin controles de mantenimiento configurados.'), 0, 0, 'C');
+            $this->SetY($mantBodyY + 7);
+        } else {
+            // Alto de fila adaptado para no invadir la caja de OBSERVACIONES.
+            $rowH = max(4.0, min(5.4, (221.0 - $mantBodyY) / count($mantenimiento)));
+            $colValW = 54;
+            $colNameW = $mantW - $colValW;
+            $valX = $mantX + $colNameW;
+            $y = $mantBodyY;
 
-        // ══════════════════════════════════════════════════════════════════
-        // CAMPOS DE DATOS PRINCIPALES
-        // ══════════════════════════════════════════════════════════════════
-        $fieldY = $sy + $h1 + 4;
-        $fieldH = 4;
-        $labelW = 45;
-        $this->SetLineWidth(0.2);
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            foreach ($mantenimiento as $item) {
+                $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+                $this->SetLineWidth(0.25);
+                $this->Rect($mantX, $y, $colNameW, $rowH);
+                $this->Rect($valX, $y, $colValW, $rowH);
 
-        // OPERADOR
-        $this->SetXY($sx, $fieldY);
-        $this->Cell($labelW, $fieldH, utf8Decode('OPERADOR:'), 0, 0, 'L');
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Line($sx + $labelW, $fieldY + $fieldH - 0.5, $sx + $uw / 2, $fieldY + $fieldH - 0.5);
-        $this->SetFont('Arial', '', 8);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($sx + $labelW + 2, $fieldY);
-        $this->Cell($uw / 2 - $labelW - 2, $fieldH, utf8Decode($operador), 0, 0, 'L');
+                $this->SetFont('Arial', 'B', 8);
+                $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+                $this->SetXY($mantX + 2.5, $y);
+                $this->Cell($colNameW - 5, $rowH, utf8Decode($item['control']), 0, 0, 'L');
 
-        // DESCRIPCIÓN EQUIPO (lado derecho)
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx + $uw / 2, $fieldY);
-        $this->Cell(35, $fieldH, utf8Decode('DESCRIPCION EQUIPO:'), 0, 0, 'L');
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Line($sx + $uw / 2 + 35, $fieldY + $fieldH - 0.5, $sx + $uw, $fieldY + $fieldH - 0.5);
-        $this->SetFont('Arial', '', 8);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($sx + $uw / 2 + 35 + 2, $fieldY);
-        $this->Cell($uw / 2 - 35 - 2, $fieldH, utf8Decode($descripcionEquipo), 0, 0, 'L');
+                if ($item['tipo_valor'] === 'booleano') {
+                    $this->dibujarCasillaSiNo($valX, $y, $colValW, $rowH, $item['realizado'], $azul, $negro);
+                } else {
+                    $this->SetFont('Arial', '', 8);
+                    $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+                    $this->SetXY($valX, $y);
+                    $this->Cell($colValW, $rowH, utf8Decode($item['cantidad']), 0, 0, 'C');
+                }
 
-        // HORÓMETRO 0 KM INICIAL
-        $fieldY += 6;
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx, $fieldY);
-        $this->Cell($labelW, $fieldH, utf8Decode('HOROMETRO 0 KM INICIAL:'), 0, 0, 'L');
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Line($sx + $labelW, $fieldY + $fieldH - 0.5, $sx + $uw / 2, $fieldY + $fieldH - 0.5);
-        $this->SetFont('Arial', '', 8);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($sx + $labelW + 2, $fieldY);
-        $this->Cell($uw / 2 - $labelW - 2, $fieldH, utf8Decode($horometroInicial), 0, 0, 'L');
-
-        // TOTAL HORAS TRABAJO (lado derecho)
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx + $uw / 2, $fieldY);
-        $this->Cell(30, $fieldH, utf8Decode('TOTAL HORAS TRABAJO:'), 0, 0, 'L');
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Line($sx + $uw / 2 + 30, $fieldY + $fieldH - 0.5, $sx + $uw, $fieldY + $fieldH - 0.5);
-        $this->SetFont('Arial', '', 8);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($sx + $uw / 2 + 30 + 2, $fieldY);
-        $this->Cell($uw / 2 - 30 - 2, $fieldH, utf8Decode($totalHorasTrabajo), 0, 0, 'L');
-
-        // HORÓMETRO 0 KM FINAL
-        $fieldY += 6;
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx, $fieldY);
-        $this->Cell($labelW, $fieldH, utf8Decode('HOROMETRO 0 KM FINAL:'), 0, 0, 'L');
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Line($sx + $labelW, $fieldY + $fieldH - 0.5, $sx + $uw / 2, $fieldY + $fieldH - 0.5);
-        $this->SetFont('Arial', '', 8);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($sx + $labelW + 2, $fieldY);
-        $this->Cell($uw / 2 - $labelW - 2, $fieldH, utf8Decode($horometroFinal), 0, 0, 'L');
-
-        // ══════════════════════════════════════════════════════════════════
-        // TABLA - DETALLE JORNADA DIARIA DE TRABAJO
-        // ══════════════════════════════════════════════════════════════════
-        $tblY = $fieldY + 8;
-        $tblH = 60;
-
-        // Encabezado de tabla
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.3);
-        $this->Rect($sx, $tblY, $uw, 6, 'FD');
-
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-
-        $this->SetXY($sx, $tblY);
-        $this->Cell(15, 6, utf8Decode('H O R A'), 0, 0, 'C');
-        $this->SetXY($sx + 15, $tblY);
-        $this->Cell($uw - 15, 6, utf8Decode('DETALLE JORNADA DIARIA DE TRABAJO'), 0, 0, 'C');
-
-        // Subtítulos
-        $this->SetXY($sx, $tblY + 6);
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $tblY + 6, $uw, 4, 'FD');
-        $this->SetFont('Arial', 'B', 8);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-
-        $this->Cell(7.5, 4, utf8Decode('DE'), 0, 0, 'C');
-        $this->SetXY($sx + 7.5, $tblY + 6);
-        $this->Cell(7.5, 4, utf8Decode('A'), 0, 0, 'C');
-        $this->SetXY($sx + 15, $tblY + 6);
-        $this->Cell($uw - 15, 4, utf8Decode('A C T I V I D A D'), 0, 0, 'C');
-
-        // Filas de datos
-        $this->SetLineWidth(0.2);
-        $rowH = 8;
-        $rowsCount = 8;
-        $dataRowY = $tblY + 10;
-
-        for ($i = 0; $i < $rowsCount; $i++) {
-            $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-            $this->Rect($sx, $dataRowY, 7.5, $rowH);
-            $this->Rect($sx + 7.5, $dataRowY, 7.5, $rowH);
-            $this->Rect($sx + 15, $dataRowY, $uw - 15, $rowH);
-
-            if (isset($actividades[$i])) {
-                $this->SetFont('Arial', '', 8);
-                $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-
-                // Hora DE
-                $this->SetXY($sx, $dataRowY + 1);
-                $this->Cell(7.5, $rowH - 2, $actividades[$i]['DE'], 0, 0, 'C');
-
-                // Hora A
-                $this->SetXY($sx + 7.5, $dataRowY + 1);
-                $this->Cell(7.5, $rowH - 2, $actividades[$i]['A'], 0, 0, 'C');
-
-                // Actividad
-                $this->SetXY($sx + 15 + 2, $dataRowY + 1);
-                $this->Cell($uw - 15 - 4, $rowH - 2, utf8Decode($actividades[$i]['ACTIVIDAD']), 0, 0, 'L');
+                $y += $rowH;
             }
-
-            $dataRowY += $rowH;
+            $this->SetY($y);
         }
 
         // ══════════════════════════════════════════════════════════════════
-        // MANTENIMIENTO REALIZADO
+        // OBSERVACIONES (caja del fondo; texto dentro de y≈230-249)
         // ══════════════════════════════════════════════════════════════════
-        $mantY = $dataRowY + 4;
+        if ($observaciones !== '') {
+            $this->SetFont('Arial', '', 8.5);
+            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+            $this->SetXY($sx + 2, 231.5);
+            $this->MultiCell($uw - 4, 4.5, utf8Decode($observaciones), 0, 'L');
+        }
 
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        // Las líneas de firma vienen impresas en el fondo (OPERADOR y
+        // SUPERVISOR); los nombres NO se imprimen encima (se firman a mano).
+
+        return $this->Output($modo, $nombreArchivo ?? 'reporte_operacion_'.$nro.'.pdf');
+    }
+
+    /**
+     * Formatea una lectura/cantidad (decimal:2 → string|float|null) para el
+     * reporte de operación diaria. Devuelve '—' cuando no hay valor.
+     */
+    private function formatearLecturaReporte($valor, string $unidad = ''): string
+    {
+        if ($valor === null || $valor === '') {
+            return '—';
+        }
+
+        return number_format((float) $valor, 2, ',', '.').($unidad !== '' ? ' '.$unidad : '');
+    }
+
+    /**
+     * Cantidad sin decimales redundantes (146, 6,50) para las columnas de la
+     * tabla de jornada / mantenimiento.
+     */
+    private function formatearCantidadReporte($valor): string
+    {
+        if ($valor === null || $valor === '') {
+            return '';
+        }
+
+        $n = (float) $valor;
+
+        return $n == (int) $n ? (string) (int) $n : number_format($n, 2, ',', '.');
+    }
+
+    /**
+     * Etiqueta en negrita azul + línea de campo + valor a la derecha (patrón
+     * de los campos superiores del reporte de operación diaria).
+     */
+    private function pintarCampoReporte(float $x, float $y, float $labelW, string $label, string $valor, float $xFin, array $azul, array $negro): void
+    {
+        $h = 5;
+        $this->SetFont('Arial', 'B', 8.5);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($x, $y);
+        $this->Cell($labelW, $h, utf8Decode($label), 0, 0, 'L');
+
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.3);
-        $this->Rect($sx + 20, $mantY, $uw - 40, 8, 'FD');
+        $this->SetLineWidth(0.2);
+        $this->Line($x + $labelW, $y + $h - 0.5, $xFin, $y + $h - 0.5);
 
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->SetXY($sx + 20, $mantY);
-        $this->Cell($uw - 40, 8, utf8Decode('M A N T E N I M I E N T O  R E A L I Z A D O'), 0, 0, 'C');
+        $this->SetFont('Arial', '', 8.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->SetXY($x + $labelW + 1.5, $y);
+        $this->Cell($xFin - $x - $labelW - 2, $h, utf8Decode($valor), 0, 0, 'L');
+    }
 
-        // Ítems de mantenimiento
-        $mantItems = [
-            ['DIESEL:', $diesel],
-            ['ACEITES MOTOR:', $aceitesMotor],
-            ['ACEITE TRANSM.:', $aceiteTransm],
-            ['ACEITE HIDRAULICO', $aceiteHidraul],
-            ['GRASA:', $grasa],
-        ];
+    /**
+     * Casilla "SÍ [ ]  NO [ ]" centrada en la celda de valor de un control de
+     * mantenimiento de tipo booleano. Marca con "X" la opción registrada
+     * ('SI' / 'NO'); si no hay registro deja ambas casillas vacías.
+     */
+    private function dibujarCasillaSiNo(float $x, float $y, float $w, float $h, ?string $realizado, array $azul, array $negro): void
+    {
+        $box = 3.0;
+        $siBoxX = 5.5;
+        $noBoxX = 22.0;
+        $grupoW = $noBoxX + $box;
+        $gx = $x + ($w - $grupoW) / 2;
+        $cy = $y + ($h - $box) / 2;
 
-        $itemY = $mantY + 8;
-        $itemH = 6;
+        $this->SetFont('Arial', 'B', 7.5);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.25);
 
-        foreach ($mantItems as $item) {
-            $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-            $this->Rect($sx + 20, $itemY, $uw - 40, $itemH);
+        $this->SetXY($gx, $y);
+        $this->Cell($siBoxX - 0.5, $h, utf8Decode('SÍ'), 0, 0, 'L');
+        $this->Rect($gx + $siBoxX, $cy, $box, $box);
 
+        $this->SetXY($gx + $siBoxX + $box + 3, $y);
+        $this->Cell($noBoxX - ($siBoxX + $box + 3) - 0.5, $h, 'NO', 0, 0, 'L');
+        $this->Rect($gx + $noBoxX, $cy, $box, $box);
+
+        if ($realizado === 'SI' || $realizado === 'NO') {
+            $marcaX = $realizado === 'SI' ? $gx + $siBoxX : $gx + $noBoxX;
             $this->SetFont('Arial', 'B', 8);
             $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-            $this->SetXY($sx + 20 + 2, $itemY + 1);
-            $this->Cell(45, $itemH - 2, utf8Decode($item[0]), 0, 0, 'L');
-
-            $colW = ($uw - 40 - 47) / 2;
-
-            $this->SetFont('Arial', '', 8);
-            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-            $this->SetXY($sx + 20 + 47 + 10, $itemY + 1);
-            $this->Cell($colW, $itemH - 2, utf8Decode($item[1]), 0, 0, 'L');
-
-            $itemY += $itemH;
+            $this->SetXY($marcaX - 0.4, $y);
+            $this->Cell($box + 0.8, $h, 'X', 0, 0, 'C');
         }
 
-        // ══════════════════════════════════════════════════════════════════
-        // SOPLETE DE FILTROS
-        // ══════════════════════════════════════════════════════════════════
-        $sopY = $itemY + 2;
-
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx, $sopY);
-        $this->Cell(35, 4, utf8Decode('SOPLETE DE FILTROS:'), 0, 0, 'L');
-
-        // Checkbox SI
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.3);
-        $this->Rect($sx + 36, $sopY, 3.5, 3.5);
-        $this->SetFont('Arial', '', 8);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($sx + 40, $sopY);
-        $this->Cell(10, 4, utf8Decode('SI'), 0, 0, 'L');
-
-        // Checkbox NO
-        $this->Rect($sx + 52, $sopY, 3.5, 3.5);
-        $this->SetXY($sx + 56, $sopY);
-        $this->Cell(10, 4, utf8Decode('NO'), 0, 0, 'L');
-
-        // ══════════════════════════════════════════════════════════════════
-        // OBSERVACIONES
-        // ══════════════════════════════════════════════════════════════════
-        $obsY = $sopY + 6;
-
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.3);
-        $this->Rect($sx, $obsY, $uw, 6, 'FD');
-
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->SetXY($sx, $obsY);
-        $this->Cell($uw, 6, utf8Decode('OBSERVACIONES:'), 0, 0, 'L');
-
-        // Área de observaciones con líneas punteadas
-        $obsHeight = 28;
-        $this->SetLineWidth(0.2);
-        $this->Rect($sx, $obsY + 6, $uw, $obsHeight);
-
-        $this->SetFont('Arial', '', 8);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
-        $this->SetXY($sx + 2, $obsY + 7);
-
-        // Dividir observaciones en líneas
-        $maxWidth = $uw - 4;
-        $lineHeight = 4;
-        $obsLines = explode("\n", wordwrap($observaciones, 100, "\n"));
-
-        foreach ($obsLines as $line) {
-            $this->SetXY($sx + 2, $this->GetY());
-            $this->Cell($maxWidth, $lineHeight, utf8Decode($line), 0, 1, 'L');
-        }
-
-        // ══════════════════════════════════════════════════════════════════
-        // FIRMAS
-        // ══════════════════════════════════════════════════════════════════
-        $firmaY = $obsY + $obsHeight + 10;
-        $firmaW = ($uw / 2) - 5;
-
-        // Línea punteada OPERADOR
-        $this->SetFont('Arial', '', 7);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
-        $this->SetXY($sx + 2, $firmaY);
-
-        // Línea punteada
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.2);
-        $this->Line($sx + 2, $firmaY, $sx + 2 + $firmaW - 2, $firmaY);
-
-        $this->SetXY($sx + 2, $firmaY + 2);
-        $this->SetFont('Arial', 'B', 8);
-        $this->Cell($firmaW, 3, utf8Decode('OPERADOR'), 0, 0, 'C');
-
-        // Línea punteada SUPERVISOR
-        $this->SetXY($sx + $uw / 2 + 3, $firmaY);
-        $this->SetLineWidth(0.2);
-        $this->Line($sx + $uw / 2 + 3, $firmaY, $sx + $uw - 2, $firmaY);
-
-        $this->SetXY($sx + $uw / 2 + 3, $firmaY + 2);
-        $this->SetFont('Arial', 'B', 8);
-        $this->Cell($firmaW - 3, 3, utf8Decode('SUPERVISOR'), 0, 0, 'C');
-
-        // Salida del PDF
-        $this->Output('I', 'reporte_operacion_diaria.pdf');
     }
 }
