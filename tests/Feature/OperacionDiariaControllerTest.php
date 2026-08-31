@@ -662,6 +662,33 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertSame('Concentrado', $actividades->first()['pivot']['material']['material']);
     }
 
+    public function test_show_expone_los_controles_de_mantenimiento_registrados(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null],
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+            ],
+        ]));
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.show', OperacionDiaria::firstOrFail()));
+
+        $response->assertOk();
+        $controles = collect($response->viewData('page')['props']['operacion']['mantenimientos_operacion'])
+            ->keyBy('tipo_mantenimiento');
+
+        $this->assertSame('12.50', $controles['Combustible cargado']['pivot']['valor']);
+        $this->assertSame('SI', $controles['Nivel de aceite']['pivot']['realizado']);
+    }
+
     public function test_create_expone_solo_los_tipos_de_mantenimiento_de_operacion_diaria(): void
     {
         [$user, $conductor] = $this->crearConductorConUsuario();

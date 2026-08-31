@@ -144,7 +144,7 @@ class OperacionDiariaController extends Controller
     public function show(OperacionDiaria $operacionDiaria)
     {
 
-        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas'])
+        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas', 'mantenimientosOperacion'])
             ->cargarMaterialDeActividades();
 
         return inertia('Operacion/Show', [

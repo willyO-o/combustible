@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
@@ -20,6 +20,11 @@ const estadoBadge = (estado) => {
     return map[estado] ?? 'bg-secondary-transparent text-secondary'
 }
 const activeTab = ref('actividades')
+
+// Los vehículos medidos por kilometraje registran traslados (origen/destino y
+// material trasladado); los de horómetro registran un lugar de trabajo. Sólo en
+// el primer caso tiene sentido la columna "Material" de la jornada.
+const esKilometraje = computed(() => props.operacion.vehiculo?.tipo_medicion === 'kilometraje')
 
 
 const verificarOperacion =  async () => {
@@ -290,8 +295,7 @@ const verificarOperacion =  async () => {
                                         </th>
                                         <th v-if="operacion.actividades_realizadas.some(act => act.pivot.destino)">
                                             Destino</th>
-                                        <th v-if="operacion.actividades_realizadas.some(act => act.pivot.material)">
-                                            Material</th>
+                                        <th v-if="esKilometraje">Material</th>
                                         <th v-if="operacion.actividades_realizadas.some(act => act.pivot.lugar)"> Lugar
                                         </th>
                                         <th class="text-center">Cantidad</th>
@@ -307,7 +311,10 @@ const verificarOperacion =  async () => {
                                         </td>
                                         <td v-if="act.pivot.origen">{{ act.pivot.origen }}</td>
                                         <td v-if="act.pivot.destino">{{ act.pivot.destino }}</td>
-                                        <td v-if="act.pivot.material">{{ act.pivot.material.material }}</td>
+                                        <td v-if="esKilometraje">
+                                            <span v-if="act.pivot.material">{{ act.pivot.material.material }}</span>
+                                            <span v-else class="text-muted">Sin material</span>
+                                        </td>
                                         <td v-if="act.pivot.lugar">{{ act.pivot.lugar }}</td>
                                         <td class="text-center">{{ act.pivot.cantidad }}</td>
                                         <td>{{ act.pivot.unidad_medida }}</td>
@@ -375,6 +382,56 @@ const verificarOperacion =  async () => {
 
 
 
+                </div>
+
+                <!-- Controles de Mantenimiento (ámbito operación diaria) -->
+                <div class="card custom-card mb-4">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0 fw-bold">
+                            <i class="ri-tools-line me-2"></i> Controles de mantenimiento
+                        </h6>
+                        <span v-if="operacion.mantenimientos_operacion.length"
+                            class="badge bg-primary-transparent text-primary">
+                            {{ operacion.mantenimientos_operacion.length }}
+                            registrado{{ operacion.mantenimientos_operacion.length === 1 ? '' : 's' }}
+                        </span>
+                    </div>
+                    <div class="card-body pt-2">
+                        <p class="text-muted fs-12 mb-2">
+                            Controles anotados por el operador durante esta operación.
+                        </p>
+
+                        <div v-if="operacion.mantenimientos_operacion.length" class="row g-0 mant-list">
+                            <div v-for="m in operacion.mantenimientos_operacion" :key="m.id"
+                                class="col-12 mant-item">
+                                <div class="mant-row mant-row--filled">
+                                    <span class="mant-row__name mant-row__name--static">
+                                        <i class="mant-row__tick ri-checkbox-circle-fill"></i>
+                                        {{ m.tipo_mantenimiento }}
+                                    </span>
+
+                                    <span class="mant-row__control">
+                                        <span v-if="m.tipo_valor === 'cantidad'" class="fw-semibold text-primary">
+                                            {{ m.pivot.valor }}<span v-if="m.unidad_medida"
+                                                class="text-muted fw-normal ms-1">{{ m.unidad_medida }}</span>
+                                        </span>
+                                        <span v-else-if="m.tipo_valor === 'booleano'" class="badge"
+                                            :class="m.pivot.realizado === 'SI'
+                                                ? 'bg-success-transparent text-success'
+                                                : 'bg-secondary-transparent text-secondary'">
+                                            {{ m.pivot.realizado === 'SI' ? 'Sí' : 'No' }}
+                                        </span>
+                                        <span v-else class="text-muted fs-12">—</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-else class="text-center text-muted py-4">
+                            <i class="ri-tools-line d-block fs-2 mb-2 opacity-50"></i>
+                            <small>No se registraron controles de mantenimiento en esta operación.</small>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -515,6 +572,10 @@ const verificarOperacion =  async () => {
     color: #0d6efd;
     border-bottom-color: #0d6efd;
     background-color: transparent;
+}
+
+.mant-row__name--static {
+    cursor: default;
 }
 
 .timeline {
