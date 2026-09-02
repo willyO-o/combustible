@@ -74,7 +74,13 @@ class Vehiculo extends Model
             'id',                  // Llave primaria en la tabla Conductor
             'id',                  // Llave primaria en la tabla Vehiculo
             'id_conductor'         // Llave foránea en la tabla Asignacion que apunta al Conductor
-        )->where('asignacion.estado_asignacion', 'ACTIVO');
+        )->where(function ($query) {
+            $query->where('asignacion.estado_asignacion', 'ACTIVO')
+                ->where(function ($query) {
+                    $query->whereNull('asignacion.fecha_culminacion')
+                        ->orWhere('asignacion.fecha_culminacion', '>', now());
+                });
+        });
     }
 
     public function conductores()

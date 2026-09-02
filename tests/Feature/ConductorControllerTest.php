@@ -271,4 +271,161 @@ class ConductorControllerTest extends TestCase
         $this->assertSoftDeleted('conductor', ['id' => $conductor->id]);
         $this->assertDatabaseHas('persona', ['id' => $conductor->id]);
     }
+
+    /* ------------------------------------------------------------------ *
+     |  Formulario reutilizable (create + edit) y asignación de vehículo
+     * ------------------------------------------------------------------ */
+
+    public function test_create_renderiza_el_formulario_con_los_vehiculos_activos(): void
+    {
+        Vehiculo::factory()->create(['estado_vehiculo' => 'ACTIVO']);
+        Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
+
+        $response = $this->actingAs($this->admin)->get(route('conductores.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Conductores/Form')
+            ->missing('conductor')
+            ->has('vehiculos', 1)
+        );
+    }
+
+    public function test_edit_renderiza_el_formulario_con_el_conductor_y_su_asignacion_actual(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('conductores.edit', $conductor->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Conductores/Form')
+            ->where('conductor.id', $conductor->id)
+            ->where('asignacionActual.estado_asignacion', 'ACTIVO')
+            ->where('asignacionActual.vehiculo.codigo', $vehiculo->codigo)
+            // Al editar no se puede (re)asignar vehículo: no se envía el catálogo.
+            ->missing('vehiculos')
+        );
+    }
+
+    public function test_store_asigna_el_vehiculo_cuando_se_envia_id_vehiculo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+
+        $response = $this->actingAs($this->admin)->post(route('conductores.store'), [
+            'ci' => '12345678',
+            'nombres' => 'Juan',
+            'paterno' => 'Pérez',
+            'estado_conductor' => 'ACTIVO',
+            'id_vehiculo' => $vehiculo->id,
+            'estado_asignacion' => 'ACTIVO',
+            'kilometraje_inicial' => 1200,
+            'detalle' => 'Asignación al registrar',
+        ]);
+
+        $response->assertRedirect(route('conductores.index'));
+
+        $persona = Persona::where('ci', '12345678')->firstOrFail();
+        $this->assertDatabaseHas('asignacion', [
+            'id_conductor' => $persona->id,
+            'id_vehiculo' => $vehiculo->id,
+            'estado_asignacion' => 'ACTIVO',
+            'kilometraje_inicial' => 1200,
+            'id_usuario' => $this->admin->id,
+        ]);
+    }
+
+    public function test_store_sin_id_vehiculo_no_crea_ninguna_asignacion(): void
+    {
+        $this->actingAs($this->admin)->post(route('conductores.store'), [
+            'ci' => '12345678',
+            'nombres' => 'Juan',
+            'paterno' => 'Pérez',
+            'estado_conductor' => 'ACTIVO',
+        ])->assertRedirect(route('conductores.index'));
+
+        $persona = Persona::where('ci', '12345678')->firstOrFail();
+        $this->assertDatabaseCount('asignacion', 0);
+        $this->assertDatabaseMissing('asignacion', ['id_conductor' => $persona->id]);
+    }
+
+    public function test_store_exige_la_lectura_inicial_del_vehiculo_al_asignarlo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);
+
+        $response = $this->actingAs($this->admin)->post(route('conductores.store'), [
+            'ci' => '12345678',
+            'nombres' => 'Juan',
+            'paterno' => 'Pérez',
+            'estado_conductor' => 'ACTIVO',
+            'id_vehiculo' => $vehiculo->id,
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response->assertSessionHasErrors('horometro_inicial');
+        $this->assertDatabaseCount('conductor', 0);
+    }
+
+    public function test_update_ignora_por_completo_los_datos_de_asignacion_de_vehiculo(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $vehiculoActual = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $asignacion = Asignacion::create([
+            'id_vehiculo' => $vehiculoActual->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+            'kilometraje_inicial' => 100,
+        ]);
+        $otroVehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+
+        // Aunque el request traiga id_vehiculo, update() no toca la asignación.
+        $response = $this->actingAs($this->admin)->put(route('conductores.update', $conductor->id), [
+            'ci' => $conductor->persona->ci,
+            'nombres' => 'Nombre Editado',
+            'paterno' => $conductor->persona->paterno,
+            'estado_conductor' => 'INACTIVO',
+            'id_vehiculo' => $otroVehiculo->id,
+            'estado_asignacion' => 'ACTIVO',
+            'kilometraje_inicial' => 999,
+        ]);
+
+        $response->assertRedirect(route('conductores.index'));
+        $response->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('persona', ['id' => $conductor->id, 'nombres' => 'Nombre Editado']);
+        $this->assertDatabaseCount('asignacion', 1);
+        $this->assertSame('ACTIVO', $asignacion->fresh()->estado_asignacion);
+        $this->assertSame($vehiculoActual->id, $asignacion->fresh()->id_vehiculo);
+    }
+
+    public function test_asignar_vehiculo_desde_el_formulario_esta_bloqueado_sin_rol_de_gestion(): void
+    {
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        $usuario = User::factory()->create();
+        $usuario->assignRole('conductor');
+
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+
+        $response = $this->actingAs($usuario)->post(route('conductores.store'), [
+            'ci' => '12345678',
+            'nombres' => 'Juan',
+            'paterno' => 'Pérez',
+            'estado_conductor' => 'ACTIVO',
+            'id_vehiculo' => $vehiculo->id,
+            'estado_asignacion' => 'ACTIVO',
+            'kilometraje_inicial' => 100,
+        ]);
+
+        $response->assertForbidden();
+        $this->assertDatabaseCount('conductor', 0);
+        $this->assertDatabaseCount('asignacion', 0);
+    }
 }
