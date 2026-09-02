@@ -58,7 +58,7 @@ function clearFilters() {
 
 // Confirmación de borrado
 const confirmDelete = async (conductor) => {
-    const confirmar = await confirm(`¿Eliminar al conductor ${conductor.nombres} ${conductor.paterno ?? ''}?`, "Confirmación", "Si, eliminar");
+    const confirmar = await confirm(`¿Eliminar al operario ${conductor.nombres} ${conductor.paterno ?? ''}?`, "Confirmación", "Si, eliminar");
     if (!confirmar) return;
 
     router.delete(route('conductores.destroy', conductor.id),
@@ -89,7 +89,7 @@ const fotoUrl = (foto) =>
 
 
 const cambiarEstado = async (conductorId, nuevoEstado) => {
-    const confirmar = await confirm(`¿Desea cambiar el estado del conductor a <b>${nuevoEstado}</b>?`, "Confirmación", "Si, cambiar");
+    const confirmar = await confirm(`¿Desea cambiar el estado del operario a <b>${nuevoEstado}</b>?`, "Confirmación", "Si, cambiar");
     if (!confirmar) return;
 
     router.put(route('conductores.update', conductorId),
@@ -101,7 +101,7 @@ const cambiarEstado = async (conductorId, nuevoEstado) => {
             //prevenir scroll,
             preserveScroll: true,
             onSuccess: () => {
-                showToast('Estado del conductor cambiado', 'success')
+                showToast('Estado del operario cambiado', 'success')
             },
             onError: (error)  => {
                 showError(error);
@@ -533,7 +533,7 @@ const tipoAsignacionBadge = (tipo) =>
                                         Motivo: {{ asignacionActual.pivot.detalle }}
                                     </small>
                                 </div>
-                                <div v-else class="text-muted small">Este conductor no tiene un vehículo asignado</div>
+                                <div v-else class="text-muted small">Este operario no tiene un vehículo asignado</div>
                             </div>
                         </div>
 

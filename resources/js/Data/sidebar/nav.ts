@@ -61,6 +61,20 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
       { path: '/mantenimiento/ordenes',    icon: Svgicons.OrdenMantenimientoIcon,      type: 'link', active: false, selected: false, dirchange: false, title: 'Órdenes de Trabajo', permission: 'mantenimiento.ordenes.ver' },
     ],
   },
+
+    {
+    menutitle: 'FLETES Y VIAJES', permission: ['control-cargas.ver', 'materiales.ver', 'vehiculos-externos.ver']
+  },
+  {
+    title: 'Fletes y Viajes', icon: Svgicons.ControlCargasIcon, type: 'link', path: '/control-cargas', active: false, selected: false, dirchange: false, permission: 'control-cargas.ver'
+  },
+  {
+    title: 'Materiales', icon: Svgicons.MaterialIcon, type: 'link', path: '/materiales', active: false, selected: false, dirchange: false, permission: 'materiales.ver'
+  },
+  {
+    title: 'Vehículos Externos', icon: Svgicons.Vehiculoicon, type: 'link', path: '/vehiculos-externos', active: false, selected: false, dirchange: false, permission: 'vehiculos-externos.ver'
+  },
+
   {
     menutitle: 'REPORTES', permission: ['cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', 'control-cargas.reporte', 'operacion-diaria.reporte.uso', 'operacion-diaria.reporte.detalle', ]
   },
@@ -83,7 +97,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
     menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver', 'grupos-vehiculo.ver', 'repuestos.ver']
   },
   {
-    title: 'Conductores', icon: Svgicons.Conductoricon, type: 'link', path: '/conductores', active: false, selected: false, dirchange: false, permission: 'conductores.ver'
+    title: 'Operarios', icon: Svgicons.Conductoricon, type: 'link', path: '/conductores', active: false, selected: false, dirchange: false, permission: 'conductores.ver'
   },
 
   {
@@ -107,18 +121,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   {
     title: 'Repuestos', icon: Svgicons.RepuestoIcon, type: 'link', path: '/repuestos', active: false, selected: false, dirchange: false, permission: 'repuestos.ver'
   },
-  {
-    menutitle: 'FLETES Y VIAJES', permission: ['control-cargas.ver', 'materiales.ver', 'vehiculos-externos.ver']
-  },
-  {
-    title: 'Fletes y Viajes', icon: Svgicons.ControlCargasIcon, type: 'link', path: '/control-cargas', active: false, selected: false, dirchange: false, permission: 'control-cargas.ver'
-  },
-  {
-    title: 'Materiales', icon: Svgicons.MaterialIcon, type: 'link', path: '/materiales', active: false, selected: false, dirchange: false, permission: 'materiales.ver'
-  },
-  {
-    title: 'Vehículos Externos', icon: Svgicons.Vehiculoicon, type: 'link', path: '/vehiculos-externos', active: false, selected: false, dirchange: false, permission: 'vehiculos-externos.ver'
-  },
+
   {
     menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'areas.ver', 'roles.ver', 'permisos.ver', 'parametros-empresa.ver']
   },
@@ -137,49 +140,5 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   {
     title: 'Parámetros de la Empresa', icon: Svgicons.Generalicon, type: 'link', path: '/parametros-empresa', active: false, selected: false, dirchange: false, permission: 'parametros-empresa.ver'
   },
-//   {
-//     title: "Dashboards", icon: Svgicons.Dashboardicon, type: "sub", active: false, dirchange: false, children: [
 
-//       { path: "/dashboards/sales", icon: Svgicons.Salesicon, type: "link", active: true, selected: false, dirchange: false, title: "Sales" },
-
-//     ]
-//   },
-
-//   {
-//     menutitle: 'WEB APPS'
-//   },
-
-
-
-//   {
-//     title: "Nested Menu", icon: Svgicons.Nestedmenuicon, selected: false, active: false, dirchange: false, type: "sub", children: [
-
-//       { path: "", title: "Nested-1", icon: Svgicons.Nested1icon, type: "link", active: false, selected: false, dirchange: false },
-//       {
-//         title: "Nested-2", icon: Svgicons.Nested2icon, type: "sub", active: false, selected: false, dirchange: false, children: [
-
-//           { path: "", type: "empty", active: false, selected: false, dirchange: false, title: "Nested-2-1" },
-//           { path: "", type: "empty", ctive: false, selected: false, dirchange: false, title: "Nested-2-2" },
-//           { path: "", type: "empty", active: false, selected: false, dirchange: false, title: "Nested-2-3" },
-
-//         ],
-//       },
-
-//     ],
-//   },
-
-//   {
-//     menutitle: 'PAGES'
-//   },
-
-//   {
-//     icon: Svgicons.Pagesicon, title: "Pages", type: "sub", active: false, dirchange: false, children: [
-
-//       {
-//         icon: Svgicons.Erroricon, title: "Error", type: "sub", active: false, selected: false, dirchange: false, children: [
-//           { path: "/pages/error/404-error", type: "link", active: false, selected: false, dirchange: false, title: "404-Error" },
-//         ]
-//       },
-//     ]
-//   },
 ]

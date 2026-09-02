@@ -272,7 +272,7 @@ class ConductorController extends Controller
                 'detalle' => $request->validated('detalle'),
                 'kilometraje_inicial' => $request->validated('kilometraje_inicial'),
                 'horometro_inicial' => $request->validated('horometro_inicial'),
-                'id_usuario' => auth()->id(),
+                'id_usuario' => $request->user()->id,
             ]);
         });
 

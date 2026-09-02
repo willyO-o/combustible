@@ -61,7 +61,7 @@ function submit() {
 </script>
 
 <template>
-    <Head title="Nuevo Conductor" />
+    <Head title="Nuevo Operario" />
 
         <!-- Breadcrumb -->
         <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -69,11 +69,11 @@ function submit() {
                 <nav>
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
-                        <li class="breadcrumb-item"><Link :href="route('conductores.index')">Conductores</Link></li>
+                        <li class="breadcrumb-item"><Link :href="route('conductores.index')">Operarios</Link></li>
                         <li class="breadcrumb-item active">Nuevo</li>
                     </ol>
                 </nav>
-                <h1 class="page-title fw-medium fs-18 mb-0">Registrar Conductor</h1>
+                <h1 class="page-title fw-medium fs-18 mb-0">Registrar Operario</h1>
             </div>
             <Link :href="route('conductores.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver
@@ -85,7 +85,7 @@ function submit() {
                 <!-- Foto -->
                 <div class="col-xl-3">
                     <div class="card custom-card h-100">
-                        <div class="card-header"><div class="card-title">Foto del Conductor</div></div>
+                        <div class="card-header"><div class="card-title">Foto del Operario</div></div>
                         <div class="card-body d-flex flex-column align-items-center justify-content-center gap-3">
                             <div
                                 class="border rounded-3 overflow-hidden"
@@ -237,7 +237,7 @@ function submit() {
                                         class="form-control"
                                         :class="{ 'is-invalid': form.errors.direccion }"
                                         rows="2"
-                                        placeholder="Dirección del conductor"
+                                        placeholder="Dirección del operario"
                                         maxlength="250"
                                     ></textarea>
                                     <div v-if="form.errors.direccion" class="invalid-feedback">{{ form.errors.direccion }}</div>
@@ -248,10 +248,10 @@ function submit() {
                 </div>
             </div>
 
-            <!-- Documentos del Conductor -->
+            <!-- Documentos del Operario -->
             <div class="card custom-card mt-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <div class="card-title">Documentos del Conductor (opcional)</div>
+                    <div class="card-title">Documentos del Operario (opcional)</div>
                     <button type="button" class="btn btn-sm btn-outline-primary btn-wave" @click="agregarDocumento">
                         <i class="ri-add-line me-1"></i> Agregar Documento
                     </button>
@@ -407,7 +407,7 @@ function submit() {
                 >
                     <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
                     <i v-else class="ri-save-line me-1"></i>
-                    {{ form.processing ? 'Guardando...' : 'Guardar Conductor' }}
+                    {{ form.processing ? 'Guardando...' : 'Guardar Operario' }}
                 </button>
             </div>
         </form>

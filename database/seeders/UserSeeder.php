@@ -365,7 +365,7 @@ class UserSeeder extends Seeder
      * Listado completo de todos los permisos del sistema.
      * Es la única fuente de verdad usada para crear los permisos en BD.
      */
-    private function todosLosPermisos(): array
+    protected function todosLosPermisos(): array
     {
         return [
             ...$this->permisosDashboard(),
@@ -396,7 +396,7 @@ class UserSeeder extends Seeder
      | -----------------------------------------------------------------
      */
 
-    private function permisosParaConductor(): array
+    protected function permisosParaConductor(): array
     {
         return [
             ...$this->permisosDashboard(),
@@ -419,7 +419,7 @@ class UserSeeder extends Seeder
         ];
     }
 
-    private function permisosParaJefeArea(): array
+    protected function permisosParaJefeArea(): array
     {
         return [
             ...$this->permisosDashboard(),
@@ -446,7 +446,7 @@ class UserSeeder extends Seeder
      * (la verificación queda reservada al usuario que emitió cada orden).
      * No tiene acceso a Operación Diaria.
      */
-    private function permisosParaTecnicoMantenimiento(): array
+    protected function permisosParaTecnicoMantenimiento(): array
     {
         return [
             ...$this->permisosDashboard(),
@@ -466,7 +466,7 @@ class UserSeeder extends Seeder
     /**
      * Crea (o recupera) todos los permisos indicados, de forma idempotente.
      */
-    private function crearPermisos(array $permisos): void
+    protected function crearPermisos(array $permisos): void
     {
         foreach ($permisos as $permiso) {
             Permission::firstOrCreate([
@@ -479,7 +479,7 @@ class UserSeeder extends Seeder
     /**
      * Crea (o recupera) un rol y sincroniza su lista de permisos.
      */
-    private function crearRolConPermisos(string $nombre, array $permisos): Role
+    protected function crearRolConPermisos(string $nombre, array $permisos): Role
     {
         $rol = Role::firstOrCreate([
             'name' => $nombre,
@@ -497,7 +497,7 @@ class UserSeeder extends Seeder
      * @param  array  $datosBusqueda  Campos usados para localizar el registro (p.ej. email).
      * @param  array  $datosCreacion  Campos usados solo al crear el registro.
      */
-    private function crearUsuarioConRol(array $datosBusqueda, array $datosCreacion, Role $rol): User
+    protected function crearUsuarioConRol(array $datosBusqueda, array $datosCreacion, Role $rol): User
     {
         $usuario = User::firstOrCreate($datosBusqueda, $datosCreacion);
 

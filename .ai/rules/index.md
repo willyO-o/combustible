@@ -19,8 +19,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/*.php | .ai/rules/migrations.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Models/CargaMaterial.php,app/Models/Viaje.php | .ai/rules/models-models.md |
 | app/Models/**, app/Models/*.php, app/Models/CargaCombustible.php | .ai/rules/models.md |
-| app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/operacion.md |
 | app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaReporte.vue,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php | .ai/rules/operacion-diaria-reporte.md |
+| app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/operacion.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Actions/Actividades/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/OperacionDiaria.php,app/Models/ActividadRealizada.php,resources/js/Pages/Operacion/*.vue | .ai/rules/pages-operacion.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
 | app/Http/Controllers/ControlCargasReportController.php,resources/js/Pages/Reportes/ControlCargasReporte.vue,app/Libraries/Reportes.php | .ai/rules/reportes-libraries.md |
@@ -29,6 +29,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Api/V1/CargaMaterialController.php,app/Http/Controllers/CargaMaterialController.php,app/Http/Requests/ViajeRequest.php,app/Http/Requests/CargaMaterialRequest.php,app/Models/Viaje.php | .ai/rules/requests-models.md |
 | app/Http/Requests/**/*.php, app/Http/Requests/*.php | .ai/rules/requests.md |
 | routes/*.php, routes/web.php | .ai/rules/routes.md |
+| database/seeders/UserSeeder.php,database/seeders/UserSeederInit.php | .ai/rules/seeders-seeders.md |
 | database/seeders/UserSeeder.php | .ai/rules/seeders.md |
 | app/Http/Controllers/TipoMantenimientoController.php,app/Http/Requests/TipoMantenimientoRequest.php,resources/js/Pages/TiposMantenimiento/**,app/Http/Controllers/OrdenTrabajoController.php,app/Http/Controllers/TipoVehiculoController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Http/Requests/DetalleMantenimientoRequest.php,app/Http/Requests/TipoVehiculoRequest.php | .ai/rules/tipos-mantenimiento.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
