@@ -8,11 +8,13 @@ use App\Models\CargaCombustible;
 use App\Models\Conductor;
 use App\Models\EncargadoArea;
 use App\Models\Grifo;
+use App\Models\IntervaloMantenimientoTipo;
 use App\Models\OperacionDiaria;
 use App\Models\OrdenTrabajo;
 use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoCombustible;
+use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
@@ -52,13 +54,14 @@ class DashboardControllerTest extends TestCase
 
         Permission::firstOrCreate(['name' => 'dashboard.grafico-ordenes.ver', 'guard_name' => 'web']);
         Permission::firstOrCreate(['name' => 'dashboard.grafico-horas.ver', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'dashboard.mantenimiento-alertas.ver', 'guard_name' => 'web']);
 
         Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web'])
-            ->givePermissionTo([...$this->permisosWidgets, 'dashboard.grafico-ordenes.ver', 'dashboard.grafico-horas.ver']);
+            ->givePermissionTo([...$this->permisosWidgets, 'dashboard.grafico-ordenes.ver', 'dashboard.grafico-horas.ver', 'dashboard.mantenimiento-alertas.ver']);
         Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web'])
-            ->givePermissionTo($this->permisosWidgets);
+            ->givePermissionTo([...$this->permisosWidgets, 'dashboard.mantenimiento-alertas.ver']);
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web'])
-            ->givePermissionTo('dashboard.grafico-horas.ver');
+            ->givePermissionTo(['dashboard.grafico-horas.ver', 'dashboard.mantenimiento-alertas.ver']);
         Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'tecnico-mantenimiento', 'guard_name' => 'web'])
             ->givePermissionTo('dashboard.grafico-ordenes.ver');
@@ -186,6 +189,39 @@ class DashboardControllerTest extends TestCase
 
         // boot() fuerza estado_orden = PENDIENTE al crear.
         $orden->update(['estado_orden' => $estado]);
+    }
+
+    /**
+     * Configura un intervalo de mantenimiento para el tipo del vehículo y una
+     * carga de combustible cuya lectura deja ese mantenimiento VENCIDO.
+     */
+    private function crearAlertaVencida(Vehiculo $vehiculo, Conductor $conductor): void
+    {
+        $tipoMantenimiento = TipoMantenimiento::firstOrCreate(
+            ['tipo_mantenimiento' => 'Cambio de aceite'],
+            ['estado_tipo_mantenimiento' => 'ACTIVO', 'ambito' => 'taller'],
+        );
+
+        IntervaloMantenimientoTipo::create([
+            'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'tipo_medicion' => 'kilometraje',
+            'frecuencia' => 10000,
+            'estado' => 'ACTIVO',
+        ]);
+
+        CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => 50,
+            'precio' => 7,
+            'kilometraje' => 12000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => $this->grifo->id,
+            'id_tipo_combustible' => $this->tipoCombustible->id,
+            'id_conductor' => $conductor->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+        ]);
     }
 
     private function litrosDelGrafico($response): float
@@ -381,6 +417,94 @@ class DashboardControllerTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->where('ordenesPorEstado.labels', ['Pendiente', 'Verificado'])
             ->where('ordenesPorEstado.series', [1, 1])
+        );
+    }
+
+    public function test_un_rol_sin_permiso_no_recibe_las_alertas_de_mantenimiento(): void
+    {
+        Role::findByName('jefe-area', 'web')->revokePermissionTo('dashboard.mantenimiento-alertas.ver');
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $persona = Persona::factory()->create();
+        $jefe = User::factory()->create(['id_persona' => $persona->id]);
+        $jefe->assignRole('jefe-area');
+
+        $response = $this->actingAs($jefe)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page->missing('alertasMantenimiento'));
+    }
+
+    public function test_el_administrador_ve_las_alertas_de_mantenimiento_de_todos_los_vehiculos(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+
+        $area = Area::factory()->create();
+        $vehiculoA = $this->crearVehiculoEnArea($area);
+        $vehiculoB = $this->crearVehiculoEnArea($area);
+        $this->crearAlertaVencida($vehiculoA, $this->crearConductorAsignado($vehiculoA));
+        $this->crearAlertaVencida($vehiculoB, $this->crearConductorAsignado($vehiculoB));
+
+        $response = $this->actingAs($admin)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page->has('alertasMantenimiento', 2));
+    }
+
+    public function test_el_jefe_de_area_solo_ve_alertas_de_los_vehiculos_de_sus_areas(): void
+    {
+        $persona = Persona::factory()->create();
+        $jefe = User::factory()->create(['id_persona' => $persona->id]);
+        $jefe->assignRole('jefe-area');
+
+        $areaPropia = Area::factory()->create();
+        $areaAjena = Area::factory()->create();
+        EncargadoArea::create([
+            'id_persona' => $persona->id,
+            'id_area' => $areaPropia->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now()->subMonth(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+
+        $vehiculoPropio = $this->crearVehiculoEnArea($areaPropia);
+        $vehiculoAjeno = $this->crearVehiculoEnArea($areaAjena);
+        $this->crearAlertaVencida($vehiculoPropio, $this->crearConductorAsignado($vehiculoPropio));
+        $this->crearAlertaVencida($vehiculoAjeno, $this->crearConductorAsignado($vehiculoAjeno));
+
+        $response = $this->actingAs($jefe)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('alertasMantenimiento', 1)
+            ->where('alertasMantenimiento.0.id_vehiculo', $vehiculoPropio->id)
+        );
+    }
+
+    public function test_un_conductor_solo_ve_alertas_de_los_vehiculos_que_tiene_asignados(): void
+    {
+        [$conductorUser, $conductor] = $this->crearConductorConUsuario();
+
+        $vehiculoAsignado = Vehiculo::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => $vehiculoAsignado->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        $this->crearAlertaVencida($vehiculoAsignado, $conductor);
+
+        $vehiculoAjeno = Vehiculo::factory()->create();
+        $this->crearAlertaVencida($vehiculoAjeno, $this->crearConductorAsignado($vehiculoAjeno));
+
+        $response = $this->actingAs($conductorUser)->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('alertasMantenimiento', 1)
+            ->where('alertasMantenimiento.0.id_vehiculo', $vehiculoAsignado->id)
+            ->where('alertasMantenimiento.0.vencidos', 1)
         );
     }
 }

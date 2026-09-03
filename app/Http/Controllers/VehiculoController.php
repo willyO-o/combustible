@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\VehiculoAreaRequest;
 use App\Http\Requests\VehiculoRequest;
 use App\Models\Area;
+use App\Models\IntervaloMantenimientoTipo;
 use App\Models\TipoCombustible;
 use App\Models\TipoVehiculo;
 use App\Models\Vehiculo;
@@ -121,6 +122,7 @@ class VehiculoController extends Controller
         return Inertia::render('Vehiculos/Show', [
             'vehiculo' => $vehiculo,
             'historialAsignaciones' => $historialAsignaciones,
+            'alertasMantenimiento' => IntervaloMantenimientoTipo::alertasMantenimiento([$vehiculo->id])->values(),
         ]);
     }
 

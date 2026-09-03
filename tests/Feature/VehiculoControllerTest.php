@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\Conductor;
+use App\Models\IntervaloMantenimientoTipo;
 use App\Models\TipoCombustible;
+use App\Models\TipoMantenimiento;
 use App\Models\TipoVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -153,6 +155,37 @@ class VehiculoControllerTest extends TestCase
             ->where('historialAsignaciones.0.estado_asignacion', 'ACTIVO')
             ->where('historialAsignaciones.1.conductor.id', $conductorAnterior->id)
             ->where('historialAsignaciones.1.estado_asignacion', 'INACTIVO')
+        );
+    }
+
+    public function test_show_incluye_las_alertas_de_mantenimiento_del_tipo_de_vehiculo(): void
+    {
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+        $vehiculo = Vehiculo::factory()->create([
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'tipo_medicion' => 'kilometraje',
+        ]);
+        $tipoMantenimiento = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'taller',
+        ]);
+        IntervaloMantenimientoTipo::create([
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'tipo_medicion' => 'kilometraje',
+            'frecuencia' => 10000,
+            'estado' => 'ACTIVO',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('vehiculos.show', $vehiculo->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Vehiculos/Show')
+            ->has('alertasMantenimiento', 1)
+            ->where('alertasMantenimiento.0.tipo_mantenimiento', 'Cambio de aceite')
+            ->where('alertasMantenimiento.0.estado', 'SIN_DATOS')
         );
     }
 

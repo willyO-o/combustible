@@ -375,6 +375,9 @@ class UserSeeder extends Seeder
             // órdenes de trabajo (técnico) y el de horas trabajadas (conductor).
             'dashboard.grafico-ordenes.ver',
             'dashboard.grafico-horas.ver',
+            // Widget de alertas de mantenimiento (lo reciben conductor y
+            // jefe-area con alcance acotado; administrador vía este listado).
+            'dashboard.mantenimiento-alertas.ver',
             ...$this->permisosOperacionVehiculo(),
             ...$this->permisosCatalogos(),
             ...$this->permisosUsuarios(),
@@ -402,6 +405,8 @@ class UserSeeder extends Seeder
             ...$this->permisosDashboard(),
             // Gráfico de sus horas trabajadas por día/semana en el dashboard.
             'dashboard.grafico-horas.ver',
+            // Alertas de mantenimiento de sus vehículos asignados.
+            'dashboard.mantenimiento-alertas.ver',
             'vales.ver',
             'vales.imprimir',
             'cargas-combustible.ver',
@@ -424,6 +429,8 @@ class UserSeeder extends Seeder
         return [
             ...$this->permisosDashboard(),
             ...$this->permisosDashboardWidgets(),
+            // Alertas de mantenimiento de los vehículos de sus áreas.
+            'dashboard.mantenimiento-alertas.ver',
             ...$this->permisosVales(),
             ...$this->permisosCargasCombustible(),
             ...$this->permisosMantenimiento(),

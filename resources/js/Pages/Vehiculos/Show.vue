@@ -7,6 +7,7 @@ defineOptions({ layout: Maindashboard })
 const props = defineProps({
     vehiculo: Object,
     historialAsignaciones: Array,
+    alertasMantenimiento: { type: Array, default: () => [] },
 })
 
 const conductorActual = computed(() => props.vehiculo.conductor_asignado ?? null)
@@ -42,6 +43,49 @@ const estadoAreaBadge = (estado) => {
 }
 
 const tipoMedicionLabel = (tipo) => (tipo === 'horometro' ? 'Horómetro' : 'Kilometraje')
+
+const unidadMedicion = (tipo) => (tipo === 'horometro' ? 'h' : 'km')
+
+const numero = (valor) =>
+    valor === null || valor === undefined
+        ? '—'
+        : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(valor)
+
+const medida = (valor, tipo) => (valor === null || valor === undefined ? '—' : `${numero(valor)} ${unidadMedicion(tipo)}`)
+
+const estadoAlertaMeta = {
+    VENCIDO: { clase: 'bg-danger-transparent text-danger', texto: 'Vencido' },
+    PROXIMO: { clase: 'bg-warning-transparent text-warning', texto: 'Próximo' },
+    AL_DIA: { clase: 'bg-success-transparent text-success', texto: 'Al día' },
+    SIN_DATOS: { clase: 'bg-secondary-transparent text-secondary', texto: 'Sin datos' },
+}
+
+const ordenAlertas = { VENCIDO: 0, PROXIMO: 1, AL_DIA: 2, SIN_DATOS: 3 }
+
+const alertasOrdenadas = computed(() =>
+    [...props.alertasMantenimiento].sort(
+        (a, b) =>
+            (ordenAlertas[a.estado] ?? 9) - (ordenAlertas[b.estado] ?? 9) ||
+            a.tipo_mantenimiento.localeCompare(b.tipo_mantenimiento),
+    ),
+)
+
+const resumenAlertas = computed(() => ({
+    vencidos: props.alertasMantenimiento.filter((a) => a.estado === 'VENCIDO').length,
+    proximos: props.alertasMantenimiento.filter((a) => a.estado === 'PROXIMO').length,
+}))
+
+// Texto de la columna "Falta / Excedido": restante positivo = falta para el
+// objetivo; negativo = ya se pasó del objetivo sugerido.
+const restanteTexto = (alerta) => {
+    if (alerta.restante === null || alerta.restante === undefined) {
+        return '—'
+    }
+    if (alerta.restante < 0) {
+        return `Excedido ${medida(Math.abs(alerta.restante), alerta.tipo_medicion)}`
+    }
+    return `Falta ${medida(alerta.restante, alerta.tipo_medicion)}`
+}
 </script>
 
 <template>
@@ -216,6 +260,66 @@ const tipoMedicionLabel = (tipo) => (tipo === 'horometro' ? 'Horómetro' : 'Kilo
                     <i class="ri-building-line fs-3 d-block mb-2"></i>
                     Este vehículo no tiene un área asignada actualmente.
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas de Mantenimiento -->
+    <div class="card custom-card overflow-hidden mb-4">
+        <div class="card-header justify-content-between flex-wrap gap-2">
+            <div class="card-title">
+                <h6 class="mb-0">Alertas de Mantenimiento</h6>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <span v-if="resumenAlertas.vencidos" class="badge bg-danger-transparent text-danger">
+                    {{ resumenAlertas.vencidos }} vencido(s)
+                </span>
+                <span v-if="resumenAlertas.proximos" class="badge bg-warning-transparent text-warning">
+                    {{ resumenAlertas.proximos }} próximo(s)
+                </span>
+                <span class="badge bg-primary-transparent text-primary">
+                    {{ alertasMantenimiento.length }} intervalo(s)
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover text-nowrap mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Mantenimiento</th>
+                            <th>Medición</th>
+                            <th>Frecuencia</th>
+                            <th>Último realizado</th>
+                            <th>Lectura actual</th>
+                            <th>Próximo sugerido</th>
+                            <th>Falta / Excedido</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="alerta in alertasOrdenadas" :key="alerta.id_tipo_mantenimiento">
+                            <td class="fw-semibold">{{ alerta.tipo_mantenimiento }}</td>
+                            <td>{{ tipoMedicionLabel(alerta.tipo_medicion) }}</td>
+                            <td>{{ medida(alerta.frecuencia, alerta.tipo_medicion) }}</td>
+                            <td>{{ medida(alerta.ultimo_mantenimiento, alerta.tipo_medicion) }}</td>
+                            <td>{{ medida(alerta.lectura_actual, alerta.tipo_medicion) }}</td>
+                            <td>{{ medida(alerta.proximo_objetivo, alerta.tipo_medicion) }}</td>
+                            <td>{{ restanteTexto(alerta) }}</td>
+                            <td>
+                                <span class="badge" :class="estadoAlertaMeta[alerta.estado]?.clase">
+                                    {{ estadoAlertaMeta[alerta.estado]?.texto ?? alerta.estado }}
+                                </span>
+                            </td>
+                        </tr>
+
+                        <tr v-if="alertasMantenimiento.length === 0">
+                            <td colspan="8" class="p-5 text-center text-muted">
+                                Este tipo de vehículo no tiene intervalos de mantenimiento configurados.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

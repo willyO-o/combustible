@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CargaCombustible;
 use App\Models\Conductor;
+use App\Models\IntervaloMantenimientoTipo;
 use App\Models\OperacionDiaria;
 use App\Models\OrdenTrabajo;
 use App\Models\User;
@@ -60,6 +61,12 @@ class DashboardController extends Controller
             $payload['horasTrabajadas'] = $this->metricaHorasTrabajadas($user);
         }
 
+        if ($user->can('dashboard.mantenimiento-alertas.ver')) {
+            $payload['alertasMantenimiento'] = IntervaloMantenimientoTipo::resumenAlertasVehiculos(
+                $this->idsVehiculosParaAlertas($user)?->all()
+            );
+        }
+
         return Inertia::render('Dashboard', $payload);
     }
 
@@ -81,6 +88,38 @@ class DashboardController extends Controller
             'areasAsignadas',
             fn ($query) => $query->whereIn('vehiculo_area.id_area', $idAreas)
         )->pluck('id');
+    }
+
+    /**
+     * Alcance de los vehículos para el widget de alertas de mantenimiento.
+     * A diferencia de idsVehiculosEnAlcance(), el conductor también tiene
+     * alcance acotado (sólo sus vehículos asignados), no ve todo.
+     *
+     * - null => sin filtro (administrador / super-admin).
+     * - Collection<int> => vehículos de las áreas a cargo (jefe-area) o
+     *   asignados al conductor.
+     * - Collection vacía => tiene el permiso pero sin alcance definido.
+     */
+    private function idsVehiculosParaAlertas(User $user): ?Collection
+    {
+        if ($user->hasAnyRole(['administrador', 'super-admin'])) {
+            return null;
+        }
+
+        if ($user->hasRole('jefe-area')) {
+            $idAreas = $user->persona?->encargadoAreas()->pluck('id_area') ?? collect();
+
+            return Vehiculo::whereHas(
+                'areasAsignadas',
+                fn ($query) => $query->whereIn('vehiculo_area.id_area', $idAreas)
+            )->pluck('id');
+        }
+
+        if ($user->hasRole('conductor')) {
+            return $user->persona?->vehiculosAsignados()->pluck('vehiculo.id') ?? collect();
+        }
+
+        return collect();
     }
 
     /**

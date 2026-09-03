@@ -5,7 +5,7 @@ import CardAnalitic from '@/Components/CardAnalitic.vue';
 import BotonDescargarGrafico from '@/Components/BotonDescargarGrafico.vue';
 import { colorTema } from '@/Utils/chartUtil';
 
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -24,6 +24,9 @@ const props = defineProps({
     // { dia: {labels,series}, semana: {labels,series} } — horas trabajadas
     // (sólo para el rol conductor / gestión).
     horasTrabajadas: { type: Object, default: null },
+    // Vehículos con mantenimientos vencidos / próximos, con alcance por rol
+    // (conductor: sus vehículos; jefe-area: su área; admin: todos).
+    alertasMantenimiento: { type: Array, default: null },
 });
 
 const page = usePage();
@@ -138,10 +141,28 @@ const mostrarHoras = computed(() =>
     puede('dashboard.grafico-horas.ver') && (props.horasTrabajadas?.dia?.series?.length ?? 0) > 0
 );
 
+const mostrarAlertas = computed(() =>
+    puede('dashboard.mantenimiento-alertas.ver') && (props.alertasMantenimiento?.length ?? 0) > 0
+);
+
 // El dashboard no muestra nada cuando el usuario no tiene ningún widget.
 const sinWidgets = computed(() =>
-    infoCards.value.length === 0 && !mostrarGrafico.value && !mostrarOrdenes.value && !mostrarHoras.value
+    infoCards.value.length === 0 && !mostrarGrafico.value && !mostrarOrdenes.value
+    && !mostrarHoras.value && !mostrarAlertas.value
 );
+
+const numeroAlerta = (valor) =>
+    valor === null || valor === undefined
+        ? '—'
+        : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(valor);
+
+const unidadAlerta = (tipo) => (tipo === 'horometro' ? 'h' : 'km');
+
+// Resumen corto de los mantenimientos de un vehículo para la celda de detalle.
+const detalleItems = (vehiculo) =>
+    vehiculo.items
+        .map((item) => `${item.tipo_mantenimiento} (${numeroAlerta(item.proximo_objetivo)} ${unidadAlerta(item.tipo_medicion)})`)
+        .join(', ');
 
 // Gráfico de torta: órdenes de trabajo por estado. Un color del tema por estado
 // (colorTema() resuelve la variable CSS -> color usable por ApexCharts).
@@ -389,6 +410,64 @@ onBeforeUnmount(() => {
                     </div>
                     <div class="card-body">
                         <Apexchart ref="horasChart" type="bar" height="330" :options="horasOptions" :series="horasSeries" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" v-if="mostrarAlertas">
+            <div class="col-md-12" v-can="'dashboard.mantenimiento-alertas.ver'">
+                <div class="card custom-card overflow-hidden">
+                    <div class="card-header justify-content-between">
+                        <div class="card-title">
+                            Próximos Mantenimientos
+                        </div>
+                        <span class="badge bg-primary-transparent text-primary">
+                            {{ alertasMantenimiento.length }} vehículo(s)
+                        </span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover text-nowrap mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Vehículo</th>
+                                        <th>Vencidos</th>
+                                        <th>Próximos</th>
+                                        <th>Mantenimientos</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="vehiculo in alertasMantenimiento" :key="vehiculo.id_vehiculo">
+                                        <td class="fw-semibold">
+                                            <i class="ri-car-line me-1"></i>{{ vehiculo.vehiculo }}
+                                        </td>
+                                        <td>
+                                            <span v-if="vehiculo.vencidos" class="badge bg-danger-transparent text-danger">
+                                                {{ vehiculo.vencidos }}
+                                            </span>
+                                            <span v-else class="text-muted">—</span>
+                                        </td>
+                                        <td>
+                                            <span v-if="vehiculo.proximos" class="badge bg-warning-transparent text-warning">
+                                                {{ vehiculo.proximos }}
+                                            </span>
+                                            <span v-else class="text-muted">—</span>
+                                        </td>
+                                        <td class="text-wrap" style="max-width: 360px;">
+                                            {{ detalleItems(vehiculo) }}
+                                        </td>
+                                        <td>
+                                            <Link :href="route('vehiculos.show', vehiculo.id_vehiculo)"
+                                                class="btn btn-sm btn-outline-primary btn-wave">
+                                                Ver
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
