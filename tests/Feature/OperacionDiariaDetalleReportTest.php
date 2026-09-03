@@ -226,6 +226,35 @@ class OperacionDiariaDetalleReportTest extends TestCase
         $this->assertCount(0, $responseHr->viewData('page')['props']['datos']['columnas']['material']);
     }
 
+    public function test_columnas_de_material_traen_movimientos_y_unidad_para_el_grafico(): void
+    {
+        $tierra = Material::create(['material' => 'Tierra']);
+        $ripio = Material::create(['material' => 'Ripio']);
+        $traslado = Actividad::create(['nombre_actividad' => 'Traslado', 'id_area' => $this->area->id]);
+
+        $km = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $c = $this->crearConductor();
+        $op1 = $this->crearOperacion($km, $c, now()->subDays(5)->format('Y-m-d'), ['kilometraje_inicio' => 10, 'kilometraje_fin' => 40]);
+        $op2 = $this->crearOperacion($km, $c, now()->subDays(4)->format('Y-m-d'), ['kilometraje_inicio' => 40, 'kilometraje_fin' => 70]);
+
+        // Tierra: 2 registros de traslado (uno por operación) => 6 + 4 = 10 viajes.
+        $op1->actividadesRealizadas()->attach($traslado->id, ['id_material' => $tierra->id, 'cantidad' => 6, 'unidad_medida' => 'viajes']);
+        $op2->actividadesRealizadas()->attach($traslado->id, ['id_material' => $tierra->id, 'cantidad' => 4, 'unidad_medida' => 'viajes']);
+        // Ripio: 1 registro => 3 viajes.
+        $op1->actividadesRealizadas()->attach($traslado->id, ['id_material' => $ripio->id, 'cantidad' => 3, 'unidad_medida' => 'viajes']);
+
+        $response = $this->get(route('operacion-diaria.reporte.detalle.index', $this->rango(['id_vehiculo' => $km->id])));
+
+        $material = collect($response->viewData('page')['props']['datos']['columnas']['material'])->keyBy('nombre');
+
+        $this->assertEqualsCanonicalizing(['Tierra', 'Ripio'], $material->keys()->all());
+        $this->assertEquals(10, $material['Tierra']['total']);
+        $this->assertSame(2, $material['Tierra']['movimientos']);
+        $this->assertSame('viajes', $material['Tierra']['unidad_medida']);
+        $this->assertEquals(3, $material['Ripio']['total']);
+        $this->assertSame(1, $material['Ripio']['movimientos']);
+    }
+
     public function test_totales_en_sql_no_duplican_el_combustible_por_doble_turno(): void
     {
         $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);

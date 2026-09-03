@@ -2402,12 +2402,14 @@ class Reportes extends exFPDF
         $uw = 263.4;
 
         // ── Encabezado ──────────────────────────────────────────────────
+        // Sin fondos sólidos para ahorrar tinta: filete de acento fino arriba y
+        // el recuadro sólo con borde (sin relleno).
         $h1 = 22;
         $this->SetFillColor($verde[0], $verde[1], $verde[2]);
-        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+        $this->Rect($sx, $sy, $uw, 0.5, 'F');
         $this->SetLineWidth(0.5);
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
+        $this->Rect($sx, $sy, $uw, $h1);
         $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 34);
 
         $this->SetFont('Arial', 'B', 13);
@@ -2453,8 +2455,9 @@ class Reportes extends exFPDF
         $this->SetXY($sx, $currentY);
         $tabla = new easyTable($this, $anchoStr, "width:{$anchoTabla}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1; paddingY:0.6; min-height:5;");
 
-        // Fila de grupos (colspans).
-        $tabla->rowStyle('bgcolor:'.implode(',', $azul).'; font-style:B; font-size:6.5; font-color:255,255,255;');
+        // Fila de grupos (colspans): fondo celeste claro (poca tinta), texto de
+        // acento en negrita.
+        $tabla->rowStyle('bgcolor:205,227,245; font-style:B; font-size:6.5; font-color:'.implode(',', $azul).';');
         $tabla->easyCell(utf8Decode('TRABAJO DE EQUIPO'), 'align:C; colspan:6;');
         $tabla->easyCell(utf8Decode('CONSUMO Y COSTO DE COMBUSTIBLE'), 'align:C; colspan:4;');
         if ($colsMant->isNotEmpty()) {
@@ -2466,8 +2469,8 @@ class Reportes extends exFPDF
         $tabla->easyCell(utf8Decode('OBSERVACIONES'), 'align:C;');
         $tabla->printRow(true);
 
-        // Fila de encabezados de columna.
-        $tabla->rowStyle('bgcolor:235,238,245; font-style:B; font-size:6; font-color:'.implode(',', $azul).';');
+        // Fila de encabezados de columna: celeste un poco más claro.
+        $tabla->rowStyle('bgcolor:224,238,250; font-style:B; font-size:6; font-color:'.implode(',', $azul).';');
         $encabezados = [
             ['FECHA', 'L'], ['OPERADOR', 'L'], ['N° PARTE', 'C'],
             [$lectura.' INICIAL', 'R'], [$lectura.' FINAL', 'R'], ['TOTAL HORAS', 'R'],
@@ -2529,9 +2532,10 @@ class Reportes extends exFPDF
             $tabla->printRow();
         }
 
-        // Fila de TOTALES.
+        // Fila de TOTALES: fondo amarillo claro para destacar el cierre de la
+        // tabla, en la misma línea que el recuadro RESUMEN.
         if ($filas->isNotEmpty()) {
-            $tabla->rowStyle('bgcolor:'.implode(',', $azul).'; font-style:B; font-size:6; font-color:255,255,255;');
+            $tabla->rowStyle('bgcolor:255,240,191; font-style:B; font-size:6; font-color:'.implode(',', $azul).';');
             $tabla->easyCell(utf8Decode('TOTALES'), 'align:R; colspan:5;');
             $tabla->easyCell(utf8Decode($num($totales['horas_trabajadas'])), 'align:R;');
             $tabla->easyCell(utf8Decode($num($totales['litros'])), 'align:R;');
@@ -2561,7 +2565,8 @@ class Reportes extends exFPDF
         $boxW = 128;
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
         $this->SetLineWidth(0.3);
-        $this->SetFillColor(255, 214, 79);
+        // Encabezado del recuadro con fondo amarillo claro (poca tinta).
+        $this->SetFillColor(255, 240, 191);
         $this->Rect($sx, $y, $boxW, 7, 'FD');
         $this->SetFont('Arial', 'B', 9);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);

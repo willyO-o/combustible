@@ -1,6 +1,7 @@
 ---
 paths:
   - 'app/Http/Controllers/ControlCargasReportController.php,resources/js/Pages/Reportes/ControlCargasReporte.vue,app/Libraries/Reportes.php'
+  - 'app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php'
 ---
 
 # Reportes Libraries
@@ -11,3 +12,8 @@ ControlCargasReportController::index() → Inertia 'Reportes/ControlCargasReport
 obtenerResumen(): TODO el agregado (detalle por vehículo + fila de totales) se resuelve en la BD, no en PHP. El conteo de viajes se hace con `->leftJoinSub($viajesPorFlete, 'vf', ...)` donde `$viajesPorFlete = DB::table('viaje')->select('id_carga_material', COUNT(*) as viajes)->groupBy('id_carga_material')` — pre-agregado por flete, así el join a carga_material queda 1:1 y `SUM(cm.monto_pago)` NO se multiplica por la cantidad de viajes (fan-out). El leftJoin incluye fletes abiertos en el rango que aún no tienen viajes (cuentan como flete, 0 viajes). `$base` es un closure `fn () => DB::table('carga_material as cm')->leftJoinSub(...)->when(fecha_apertura/ambito/vehiculo)` reutilizado para las dos consultas (filas por vehículo + totales). PHP sólo castea/redondea escalares. monto_pago se registra una sola vez al pagar el flete (estado PAGADA), no hay tarifa por viaje; fletes sin pagar → 0.
 
 Drill-down por vehículo: ::detalle() / ::generarPDFDetalle() → 'Reportes/ControlCargasReporteDetalle' + Reportes::generarReporteControlCargasDetalle(). Rutas control-cargas.reporte.detalle{,.pdf}. Enlace "ojo" en la tabla del index. obtenerDetalleVehiculo() devuelve fletes (leftJoin viaje para incluir fletes sin viajes; con desglose viajes-por-material embebido, agrupado en la BD por vi.id_carga_material + m.id), materiales (COUNT viajes por material del vehículo → gráfico de pastel + resumen "tipos de carga") y totales. El material sale de viaje.id_material (Viaje belongsTo Material; 1 material por viaje). Filtra por carga_material.fecha_apertura (helper scopeFechaApertura(), las 3 consultas tienen carga_material aliada como "cm"), no por ámbito. El "nro" de flete se formatea en el controlador con digitos_serie de ParametrosEmpresa (query builder, sin hidratar el modelo CargaMaterial para no disparar su accessor `nro` N veces).
+
+## Bitácora por vehículo: sección "Material Trasladado" (lista + donut) para vehículos por kilometraje
+`columnas.material` de `obtenerDetalleVehiculo()` trae, además de `id/nombre/total` (SUM cantidad), `movimientos` (`COUNT(ar.id)` = nº de registros de traslado) y `unidad_medida` (`MAX(ar.unidad_medida)`). Sólo se puebla si `tipo_medicion='kilometraje'` y hay operaciones. Esas claves extra las ignora el PDF (`generarReporteOperacionDiariaDetalle` sólo lee `id/nombre/total` y `filas.materiales[col.id]`).
+
+`OperacionDiariaDetalle.vue` muestra un card "Material Trasladado" (`v-if="hayMaterial"` = esKm && colsMat.length) con un donut ApexCharts + tabla (Material · Cantidad+unidad · Traslados · %). Toggle `metricaMaterial` = 'total' (cantidad) | 'movimientos' (unit-agnostic). Sigue las convenciones de gráficos del proyecto: `useTemaGraficos().paleta`, `<BotonDescargarGrafico>`, valores a 2 decimales, `toolbar:{show:false}`, donut en div con max-width centrado. `unidadMaterialUnica` sólo muestra la unidad en los totales si TODOS los materiales comparten unidad.

@@ -255,7 +255,13 @@ class OperacionDiariaReportController extends Controller
                 ->whereNotNull('ar.id_material')
                 ->groupBy('mat.id', 'mat.material')
                 ->orderBy('mat.material')
-                ->selectRaw('mat.id, mat.material as nombre, ROUND(COALESCE(SUM(ar.cantidad), 0), 2) as total_cantidad')
+                ->selectRaw('
+                    mat.id,
+                    mat.material as nombre,
+                    ROUND(COALESCE(SUM(ar.cantidad), 0), 2) as total_cantidad,
+                    COUNT(ar.id) as movimientos,
+                    MAX(ar.unidad_medida) as unidad_medida
+                ')
                 ->get();
 
             $materialesPorOp = DB::table('actividad_realizada')
@@ -368,6 +374,8 @@ class OperacionDiariaReportController extends Controller
                     'id' => (int) $c->id,
                     'nombre' => $c->nombre,
                     'total' => round((float) $c->total_cantidad, 2),
+                    'movimientos' => (int) $c->movimientos,
+                    'unidad_medida' => $c->unidad_medida,
                 ])->values(),
             ],
             'filas' => $filas,

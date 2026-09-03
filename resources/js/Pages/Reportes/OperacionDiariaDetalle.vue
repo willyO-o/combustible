@@ -4,6 +4,8 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import Multiselect from '@vueform/multiselect'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
+import BotonDescargarGrafico from '@/Components/BotonDescargarGrafico.vue'
+import { useTemaGraficos } from '@/Composables/useTemaGraficos'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -90,6 +92,60 @@ const valorMantenimiento = (fila, col) => {
 }
 
 const totalMantenimiento = (col) => col.tipo_valor === 'booleano' ? `${col.total} sí` : n(col.total)
+
+/* ------------------------------------------------------------------ */
+/*  Material trasladado (sólo vehículos por kilometraje)               */
+/* ------------------------------------------------------------------ */
+const { paleta } = useTemaGraficos()
+const grafMaterial = ref(null)
+
+// Métrica del gráfico/porcentajes: cantidad total movida o nº de traslados
+// registrados (unit-agnostic, útil cuando los materiales usan distinta unidad).
+const metricaMaterial = ref('total')
+
+const hayMaterial = computed(() => esKm.value && colsMat.value.length > 0)
+
+const materialItems = computed(() =>
+    [...colsMat.value].sort((a, b) => Number(b[metricaMaterial.value] ?? 0) - Number(a[metricaMaterial.value] ?? 0)),
+)
+
+const a2Decimales = (v) => Math.round((Number(v) || 0) * 100) / 100
+
+const materialSeries = computed(() => materialItems.value.map((m) => a2Decimales(m[metricaMaterial.value])))
+
+const totalCantidadMaterial = computed(() => colsMat.value.reduce((s, m) => s + Number(m.total ?? 0), 0))
+const totalMovimientosMaterial = computed(() => colsMat.value.reduce((s, m) => s + Number(m.movimientos ?? 0), 0))
+const totalMetricaMaterial = computed(() =>
+    metricaMaterial.value === 'total' ? totalCantidadMaterial.value : totalMovimientosMaterial.value,
+)
+
+// Si todos los materiales comparten unidad, se muestra junto al total.
+const unidadMaterialUnica = computed(() => {
+    const unidades = new Set(colsMat.value.map((m) => m.unidad_medida).filter(Boolean))
+    return unidades.size === 1 ? [...unidades][0] : null
+})
+
+const porcentajeMaterial = (valor) => {
+    const t = totalMetricaMaterial.value
+    return t > 0 ? `${((Number(valor) || 0) / t * 100).toFixed(1)}%` : '—'
+}
+
+const materialDonutOptions = computed(() => ({
+    chart: { type: 'donut', toolbar: { show: false } },
+    labels: materialItems.value.map((m) => m.nombre),
+    colors: paleta.value,
+    legend: { position: 'bottom' },
+    dataLabels: { enabled: true, formatter: (val) => `${Number(val).toFixed(1)}%` },
+    plotOptions: { pie: { donut: { size: '62%' } } },
+    tooltip: {
+        y: {
+            formatter: (v) => metricaMaterial.value === 'total'
+                ? `${n(v)}${unidadMaterialUnica.value ? ' ' + unidadMaterialUnica.value : ''}`
+                : `${n(v, 0)} traslados`,
+        },
+    },
+    stroke: { width: 2 },
+}))
 </script>
 
 <template>
@@ -268,6 +324,71 @@ const totalMantenimiento = (col) => col.tipo_valor === 'booleano' ? `${col.total
                                     </tr>
                                 </tfoot>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Material trasladado (sólo vehículos por kilometraje) -->
+                <div v-if="hayMaterial" class="card custom-card mt-3">
+                    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div class="card-title">
+                            Material Trasladado
+                            <span class="badge bg-success-transparent text-success ms-2">{{ colsMat.length }} tipo(s)</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <select v-model="metricaMaterial" class="form-select form-select-sm" style="width: auto;">
+                                <option value="total">Por cantidad</option>
+                                <option value="movimientos">Por n° de traslados</option>
+                            </select>
+                            <BotonDescargarGrafico :grafico="grafMaterial" nombre="bitacora-material-trasladado"
+                                titulo="Material Trasladado" subtitulo="Bitácora por Vehículo" />
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-lg-5">
+                                <div style="width: 100%; max-width: 320px; margin: 0 auto;">
+                                    <Apexchart ref="grafMaterial" type="donut" height="300"
+                                        :options="materialDonutOptions" :series="materialSeries" />
+                                </div>
+                            </div>
+                            <div class="col-lg-7">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover text-nowrap mb-0 align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Material</th>
+                                                <th class="text-end">Cantidad</th>
+                                                <th class="text-center">Traslados</th>
+                                                <th class="text-end">%</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="m in materialItems" :key="m.id">
+                                                <td class="fw-medium">{{ m.nombre }}</td>
+                                                <td class="text-end">
+                                                    {{ n(m.total) }}<span v-if="m.unidad_medida" class="text-muted"> {{ m.unidad_medida }}</span>
+                                                </td>
+                                                <td class="text-center">{{ m.movimientos }}</td>
+                                                <td class="text-end">{{ porcentajeMaterial(m[metricaMaterial]) }}</td>
+                                            </tr>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-active fw-bold">
+                                                <td>TOTAL</td>
+                                                <td class="text-end">
+                                                    {{ n(totalCantidadMaterial) }}<span v-if="unidadMaterialUnica" class="text-muted"> {{ unidadMaterialUnica }}</span>
+                                                </td>
+                                                <td class="text-center">{{ totalMovimientosMaterial }}</td>
+                                                <td class="text-end">100%</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                <p class="text-muted fs-12 mb-0 mt-2">
+                                    "Traslados" = registros de traslado de material (actividad realizada con material asignado).
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>

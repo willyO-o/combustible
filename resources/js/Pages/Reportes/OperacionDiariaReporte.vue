@@ -442,11 +442,12 @@ const donutTurnoOptions = computed(() => ({
                             <th class="text-end">Prom. h/op</th>
                             <th class="text-end">Recorrido</th>
                             <th class="text-center">Última Op.</th>
+                            <th class="text-center">Bitácora</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-if="!hayDatos">
-                            <td colspan="12" class="text-center py-4 text-muted">
+                            <td colspan="13" class="text-center py-4 text-muted">
                                 <i class="ri-inbox-line fs-3 d-block mb-2"></i>
                                 No hay operaciones diarias en el rango seleccionado
                             </td>
@@ -474,6 +475,18 @@ const donutTurnoOptions = computed(() => ({
                             <td class="text-end">{{ nf(v.promedio_horas) }} h</td>
                             <td class="text-end">{{ nf(v.total_recorrido) }} {{ v.unidad_recorrido }}</td>
                             <td class="text-center">{{ fechaCorta(v.ultima_operacion) }}</td>
+                            <td class="text-center">
+                                <Link v-can="'operacion-diaria.reporte.detalle'"
+                                    :href="route('operacion-diaria.reporte.detalle.index', {
+                                        id_vehiculo: v.id_vehiculo,
+                                        fecha_inicio: filtros.fecha_inicio || undefined,
+                                        fecha_fin: filtros.fecha_fin || undefined,
+                                    })"
+                                    class="btn btn-sm btn-icon btn-primary-light"
+                                    title="Ver bitácora de este vehículo">
+                                    <i class="ri-booklet-line"></i>
+                                </Link>
+                            </td>
                         </tr>
                         <!-- Fila de totales -->
                         <tr v-if="hayDatos" class="table-active fw-bold">
@@ -484,6 +497,7 @@ const donutTurnoOptions = computed(() => ({
                             <td class="text-end">{{ nf(promedioHorasGlobal) }} h</td>
                             <td class="text-end">{{ nf(totales.total_km) }} km · {{ nf(totales.total_horometro) }} h
                             </td>
+                            <td class="text-center">—</td>
                             <td class="text-center">—</td>
                         </tr>
                     </tbody>
