@@ -4,13 +4,48 @@ namespace App\Http\Requests;
 
 use App\Models\VehiculoArea;
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class ValeRequest extends FormRequest
 {
+    /**
+     * En el módulo web el gating de "quién puede emitir un vale" es sólo de
+     * frontend (`v-can="'vales.crear'"`). La API no tiene esa capa, así que al
+     * emitir un vale por la API se exige aquí el permiso `vales.crear`
+     * (jefe-area y administrador lo tienen; super-admin por el bypass global).
+     * Tras `auth:api` el guard por defecto es `api` y los permisos viven en
+     * `web`, por eso se consulta el guard explícitamente.
+     */
     public function authorize(): bool
     {
+        if ($this->isMethod('POST') && $this->is('api/*')) {
+            $user = $this->user();
+
+            return (bool) $user && ($user->hasRole('super-admin') || $user->hasPermissionTo('vales.crear', 'web'));
+        }
+
         return true;
+    }
+
+    protected function failedAuthorization(): never
+    {
+        throw new AuthorizationException('No tiene permiso para emitir vales.');
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        if ($this->expectsJson()) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => 'Los datos enviados no son válidos.',
+                'errors' => $validator->errors(),
+            ], 422));
+        }
+
+        parent::failedValidation($validator);
     }
 
     public function rules(): array

@@ -423,7 +423,9 @@ paths:
         El listado `vehiculos` unifica, sin duplicados, los vehículos que el usuario tiene
         asignados como conductor y todos los vehículos activos de las áreas que administra
         como jefe de área. Un usuario puede tener ambos roles, uno solo o ninguno; si no
-        tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor.
+        tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor. Cada
+        vehículo trae además `id_conductor` / `conductor_asignado` (su conductor titular
+        actual), para autocompletar el conductor al emitir un vale (`POST /vales`).
       responses:
         '200':
           description: Colecciones disponibles para el usuario autenticado.
@@ -446,6 +448,8 @@ paths:
                       id_tipo_vehiculo: 3
                       url_fotografia: http://localhost/storage/vehiculos/volq-08.jpg
                       tipo_medicion: kilometraje
+                      id_conductor: 45
+                      conductor_asignado: { id: 45, nombre_completo: Juan Pérez Quispe, ci: "1234567" }
                   estaciones_servicio:
                     - id: 1
                       razon_social: Grifo Central YPFB S.R.L.
@@ -1354,6 +1358,149 @@ paths:
                 total: 2
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Vales]
+      summary: Emitir un vale de combustible
+      description: |
+        Emite un vale de combustible (mismo comportamiento que el módulo web). Pensado para el
+        **jefe de área** desde la app.
+
+        **Autorización:** requiere el permiso `vales.crear` — lo tienen `jefe-area`,
+        `administrador` y `super-admin`; un `conductor` recibe `403`. (En el sistema web este
+        control es sólo de interfaz; en la API se aplica en el servidor.)
+
+        Se calculan/asignan en el servidor y **no deben enviarse**: `nro_vale`, `gestion`,
+        `fecha_emision`, `fecha_vencimiento` (según los parámetros de la empresa), `id_user`
+        (usuario autenticado), `id_tipo_combustible` (se toma del vehículo) y `estado_vale`
+        (siempre nace `PENDIENTE`).
+
+        **Restricción del jefe de área:** sólo puede emitir vales para vehículos con una
+        asignación de área activa/provisional a alguna de las áreas que tiene a cargo; en caso
+        contrario responde `422` con el error en `id_vehiculo`. Administradores y super-admin
+        no tienen esta restricción.
+
+        El `id_conductor` normalmente es el conductor titular del vehículo — disponible en
+        `GET /parametros/colecciones` → `vehiculos[].id_conductor` — pero se acepta cualquier
+        conductor existente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValeStoreRequest'
+            example:
+              id_vehiculo: 8
+              id_conductor: 45
+              id_grifo: 2
+              litros: 30
+              precio: 6.97
+      responses:
+        '201':
+          description: Vale emitido exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValeStoreResponse'
+              example:
+                message: "Vale #000003/2026 registrado exitosamente."
+                data:
+                  id: 3
+                  nro_vale: 3
+                  gestion: 2026
+                  fecha_emision: "2026-09-03 10:15"
+                  fecha_vencimiento: "2026-09-04 10:15"
+                  litros: "30.00"
+                  precio: "6.97"
+                  id_vehiculo: 8
+                  id_conductor: 45
+                  id_grifo: 2
+                  estado_vale: PENDIENTE
+                  id_tipo_combustible: 1
+                  id_user: 2
+                  nro: "000003/2026"
+                  fecha_emision_f: "03/09/2026 10:15"
+                  fecha_vencimiento_f: "04/09/2026 10:15"
+                  vehiculo: { id: 8, nro_placa: 1234-ABC, codigo: VOLQ-08 }
+                  conductor: { id: 45, persona: { id: 45, nombres: Juan, paterno: Pérez, materno: Quispe } }
+                  grifo: { id: 2, razon_social: Gasolinera Central S.A., ciudad: La Paz }
+                  tipoCombustible: { id: 1, tipo_combustible: Diésel }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El usuario autenticado no tiene el permiso `vales.crear`.
+          content:
+            application/json:
+              example:
+                message: No tiene permiso para emitir vales.
+        '422':
+          description: |
+            Error de validación, o el jefe de área intenta emitir un vale para un vehículo
+            fuera de sus áreas a cargo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                validacion:
+                  summary: Campos faltantes o inválidos
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      litros: ["El campo litros es obligatorio."]
+                      id_grifo: ["El campo estación de servicio es obligatorio."]
+                vehiculo_fuera_de_area:
+                  summary: Vehículo fuera del área del jefe
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      id_vehiculo: ["Sólo puede emitir vales para vehículos asignados a su área."]
+        '500':
+          description: Error inesperado al emitir el vale.
+          content:
+            application/json:
+              example:
+                message: Error al registrar el vale.
+                error: "Detalle técnico interno del error (varía según la causa)."
+
+  /vales/{vale}:
+    get:
+      tags: [Vales]
+      summary: Ver el detalle de un vale
+      description: |
+        Devuelve un vale con sus relaciones (`vehiculo`, `conductor.persona`, `grifo`,
+        `tipoCombustible`, `user`).
+
+        **Restricción de acceso:** un `conductor` sólo puede ver sus propios vales
+        (`id_conductor` = persona del usuario); intentar ver el de otro responde `403`.
+      parameters:
+        - name: vale
+          in: path
+          required: true
+          description: ID del vale.
+          schema: { type: integer }
+          example: 3
+      responses:
+        '200':
+          description: Detalle del vale.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Vale' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Un conductor intenta ver el vale de otro conductor.
+          content:
+            application/json:
+              example:
+                message: No tienes permiso para ver este vale.
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /vales/pendientes:
     get:
@@ -3142,6 +3289,19 @@ components:
           enum: [kilometraje, horometro]
           description: Determina si la operación diaria de este vehículo exige kilometraje u horómetro.
           example: kilometraje
+        id_conductor:
+          type: integer
+          nullable: true
+          description: Conductor titular (`ACTIVO`) actualmente asignado al vehículo. Úsalo para autocompletar `id_conductor` al emitir un vale (`POST /vales`). `null` si el vehículo no tiene conductor asignado.
+          example: 45
+        conductor_asignado:
+          type: object
+          nullable: true
+          description: Datos del conductor titular del vehículo (mismo que `id_conductor`). `null` si no tiene.
+          properties:
+            id: { type: integer, example: 45 }
+            nombre_completo: { type: string, example: Juan Pérez Quispe }
+            ci: { type: string, nullable: true, example: "1234567" }
 
     Grifo:
       type: object
@@ -3776,6 +3936,48 @@ components:
         vehiculo: { $ref: '#/components/schemas/ValeVehiculo' }
         conductor: { $ref: '#/components/schemas/ValeConductor' }
         grifo: { $ref: '#/components/schemas/ValeGrifo' }
+
+    ValeStoreRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `POST /vales`. `nro_vale`, `gestion`, `fecha_emision`,
+        `fecha_vencimiento`, `id_user`, `id_tipo_combustible` y `estado_vale` se resuelven en
+        el servidor y no deben enviarse.
+      required: [id_vehiculo, id_conductor, id_grifo, litros, precio]
+      properties:
+        id_vehiculo:
+          type: integer
+          description: Debe existir en `vehiculo`. Para un `jefe-area`, debe estar asignado a una de sus áreas a cargo.
+          example: 8
+        id_conductor:
+          type: integer
+          description: Debe existir en `conductor`. Normalmente el conductor titular del vehículo (`vehiculos[].id_conductor` de `GET /parametros/colecciones`).
+          example: 45
+        id_grifo:
+          type: integer
+          description: Estación de servicio. Debe existir en `grifo` (ver `GET /parametros/colecciones` → `estaciones_servicio`).
+          example: 2
+        litros:
+          type: number
+          format: float
+          minimum: 0.01
+          maximum: 9999.99
+          example: 30
+        precio:
+          type: number
+          format: float
+          minimum: 0.01
+          maximum: 99999.99
+          description: Precio por litro.
+          example: 6.97
+
+    ValeStoreResponse:
+      type: object
+      properties:
+        message: { type: string, example: "Vale #000003/2026 registrado exitosamente." }
+        data:
+          allOf: [{ $ref: '#/components/schemas/Vale' }]
+          description: El vale creado, con `vehiculo`, `conductor.persona`, `grifo` y `tipoCombustible` anidados.
 
     ValePaginada:
       type: object

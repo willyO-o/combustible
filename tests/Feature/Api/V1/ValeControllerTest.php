@@ -1,0 +1,224 @@
+<?php
+
+namespace Tests\Feature\Api\V1;
+
+use App\Models\Area;
+use App\Models\Conductor;
+use App\Models\EncargadoArea;
+use App\Models\Grifo;
+use App\Models\ParametrosEmpresa;
+use App\Models\Persona;
+use App\Models\TipoCombustible;
+use App\Models\User;
+use App\Models\Vale;
+use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Tests\TestCase;
+
+class ValeControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        // Emitir un vale por la API exige este permiso (ver ValeRequest::authorize()).
+        Permission::firstOrCreate(['name' => 'vales.crear', 'guard_name' => 'web']);
+
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Plus Metals Ltda.',
+            'direccion_empresa' => 'Calle Principal 123',
+            'telefono_empresa' => '123456789',
+            'correo_empresa' => 'info@miempresa.com',
+            'nit_empresa' => '123456789',
+            'parametros_vale' => ['tiempo_expiracion' => 1],
+            'estado' => 'ACTIVO',
+        ]);
+    }
+
+    private function crearJefeDeArea(Area $area): User
+    {
+        $persona = Persona::factory()->create();
+        EncargadoArea::create([
+            'id_persona' => $persona->id,
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+        $user = User::factory()->create(['id_persona' => $persona->id]);
+        $user->assignRole('jefe-area');
+        $user->givePermissionTo('vales.crear');
+
+        return $user;
+    }
+
+    private function asignarVehiculoAArea(Vehiculo $vehiculo, Area $area): void
+    {
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+    }
+
+    private function crearGrifo(): Grifo
+    {
+        return Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+    }
+
+    public function test_un_jefe_de_area_emite_un_vale_para_un_vehiculo_de_su_area(): void
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $vehiculo = Vehiculo::factory()->create(['id_tipo_combustible' => $tipoCombustible->id]);
+        $this->asignarVehiculoAArea($vehiculo, $area);
+        $conductor = Conductor::factory()->create();
+
+        $response = $this->actingAs($jefe, 'api')->postJson(route('api.v1.vales.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.estado_vale', 'PENDIENTE');
+        $response->assertJsonPath('data.id_tipo_combustible', $tipoCombustible->id);
+
+        $vale = Vale::firstOrFail();
+        $this->assertSame($jefe->id, $vale->id_user);
+        $this->assertSame($vehiculo->id, $vale->id_vehiculo);
+        $this->assertNotNull($vale->fecha_vencimiento);
+    }
+
+    public function test_un_jefe_de_area_no_puede_emitir_un_vale_para_un_vehiculo_de_otra_area(): void
+    {
+        $jefe = $this->crearJefeDeArea(Area::factory()->create());
+
+        $vehiculoAjeno = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoAjeno, Area::factory()->create());
+
+        $response = $this->actingAs($jefe, 'api')->postJson(route('api.v1.vales.store'), [
+            'id_vehiculo' => $vehiculoAjeno->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('id_vehiculo');
+        $this->assertSame(0, Vale::count());
+    }
+
+    public function test_un_conductor_no_puede_emitir_vales(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+
+        $area = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        $response = $this->actingAs($user, 'api')->postJson(route('api.v1.vales.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertSame(0, Vale::count());
+    }
+
+    public function test_un_administrador_emite_un_vale_para_cualquier_vehiculo(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+        $admin->givePermissionTo('vales.crear');
+
+        $vehiculo = Vehiculo::factory()->create();
+
+        $response = $this->actingAs($admin, 'api')->postJson(route('api.v1.vales.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'litros' => 15,
+            'precio' => 6.5,
+        ]);
+
+        $response->assertCreated();
+        $this->assertSame(1, Vale::count());
+    }
+
+    public function test_emitir_vale_valida_los_campos_requeridos(): void
+    {
+        $jefe = $this->crearJefeDeArea(Area::factory()->create());
+
+        $response = $this->actingAs($jefe, 'api')->postJson(route('api.v1.vales.store'), []);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['litros', 'precio', 'id_vehiculo', 'id_conductor', 'id_grifo']);
+    }
+
+    public function test_show_devuelve_el_detalle_del_vale(): void
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        $this->actingAs($jefe);
+        $vale = Vale::create([
+            'litros' => 10, 'precio' => 6, 'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'estado_vale' => 'PENDIENTE',
+        ]);
+
+        $response = $this->actingAs($jefe, 'api')->getJson(route('api.v1.vales.show', $vale));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.id', $vale->id);
+        $response->assertJsonStructure(['data' => ['id', 'nro', 'estado_vale', 'vehiculo', 'conductor', 'grifo']]);
+    }
+
+    public function test_un_conductor_no_ve_el_vale_de_otro_en_show(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $vale = Vale::create([
+            'litros' => 10, 'precio' => 6,
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'estado_vale' => 'PENDIENTE',
+        ]);
+
+        $intruso = Conductor::factory()->create();
+        $user = User::factory()->create(['id_persona' => $intruso->id]);
+        $user->assignRole('conductor');
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.vales.show', $vale));
+
+        $response->assertStatus(403);
+    }
+}

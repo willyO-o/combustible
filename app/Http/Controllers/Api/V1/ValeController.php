@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Vale\ListValeAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ValeRequest;
 use App\Libraries\Reportes;
 use App\Models\Vale;
+use App\Models\Vehiculo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 class ValeController extends Controller
 {
@@ -22,6 +25,57 @@ class ValeController extends Controller
         $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10), true);
 
         return response()->json($vales);
+    }
+
+    /**
+     * Emite un vale de combustible desde la app (mismo comportamiento que
+     * ValeController::store() del módulo web). Pensado para el jefe de área:
+     * la autorización por permiso `vales.crear` la hace ValeRequest en las
+     * peticiones de la API (en la web ese gating es sólo de frontend).
+     *
+     * Se autogeneran en el servidor (Vale::boot()) y no deben enviarse:
+     * `nro_vale`, `gestion`, `fecha_emision`, `fecha_vencimiento` e `id_user`.
+     * `id_tipo_combustible` se toma del vehículo y el vale nace `PENDIENTE`.
+     * Un jefe de área sólo puede emitir vales para vehículos asignados a
+     * alguna de sus áreas a cargo (lo valida ValeRequest).
+     */
+    public function store(ValeRequest $request): JsonResponse
+    {
+        try {
+            $vale = DB::transaction(function () use ($request) {
+                $datos = $request->validated();
+                $datos['id_tipo_combustible'] = Vehiculo::findOrFail($datos['id_vehiculo'])->id_tipo_combustible;
+                $datos['estado_vale'] = 'PENDIENTE';
+
+                return Vale::create($datos);
+            });
+
+            $vale->load(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible']);
+
+            return response()->json([
+                'message' => "Vale #{$vale->nro} registrado exitosamente.",
+                'data' => $vale,
+            ], 201);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Error al registrar el vale.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Detalle de un vale. Un conductor sólo puede ver los suyos.
+     */
+    public function show(Request $request, Vale $vale): JsonResponse
+    {
+        if ($request->user()->hasRole('conductor') && $vale->id_conductor !== $request->user()->id_persona) {
+            abort(403, 'No tienes permiso para ver este vale.');
+        }
+
+        $vale->load(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible', 'user']);
+
+        return response()->json(['data' => $vale]);
     }
 
     public function valesPendientes(Request $request, ListValeAction $listValeAction)

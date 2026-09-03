@@ -8,10 +8,11 @@ Módulo **Operación Diaria**: se documenta la funcionalidad de controles de man
 (tabla `mantenimiento_operacion_diaria`) y el material trasladado por actividad
 (`actividad_realizada.id_material`). Además se agregan endpoints para descargar en PDF el
 reporte de operación diaria y el comprobante de egreso de combustible, se completa el
-módulo **Control de Cargas** ("fletes") en la API con los pasos `cerrar` y `pagar`, y el
-detalle de las **Órdenes de Trabajo** gana el endpoint para corregir un ítem. Todos los
-cambios son **retrocompatibles** (endpoints, campos y colecciones nuevos, opcionales; nada se
-quita ni cambia de tipo).
+módulo **Control de Cargas** ("fletes") en la API con los pasos `cerrar` y `pagar`, el
+detalle de las **Órdenes de Trabajo** gana el endpoint para corregir un ítem, y el módulo
+de **Vales** gana la emisión de vales (jefe de área). Todos los cambios son
+**retrocompatibles** (endpoints, campos y colecciones nuevos, opcionales; nada se quita ni
+cambia de tipo).
 
 ### Añadido
 
@@ -57,6 +58,26 @@ mismo patrón que los ya existentes `GET /vales/{vale}/pdf` y
   a la impresión del sistema web.
 - **`GET /cargas/{carga}/pdf`** — comprobante de egreso de combustible. Equivale a la
   impresión del sistema web.
+
+#### Vales — emisión desde la app (jefe de área)
+
+El módulo web permite al jefe de área emitir vales; la API sólo permitía listarlos y
+descargarlos. Se agrega:
+
+- **`POST /vales`** — emite un vale. Requiere el permiso `vales.crear` (`jefe-area`,
+  `administrador`, `super-admin`; `conductor` → `403`). `nro_vale`, `gestion`,
+  `fecha_emision`, `fecha_vencimiento`, `id_user`, `id_tipo_combustible` (del vehículo) y
+  `estado_vale` (`PENDIENTE`) se resuelven en el servidor. Un jefe de área sólo puede emitir
+  para vehículos de sus áreas a cargo (`422` en `id_vehiculo` si no). Nuevos esquemas
+  `ValeStoreRequest` / `ValeStoreResponse`.
+- **`GET /vales/{vale}`** — detalle de un vale con sus relaciones. Un `conductor` sólo ve los
+  suyos (`403` en otro caso). (Antes este path sólo tenía `.../pdf`.)
+- `GET /parametros/colecciones` → cada `vehiculos[]` trae ahora `id_conductor` y
+  `conductor_asignado` (`{id, nombre_completo, ci}`) — el conductor titular del vehículo, para
+  autocompletar `id_conductor` al emitir el vale.
+- Limpieza: `POST/PUT/PATCH/DELETE` sobre `/vales/{vale}` (update/destroy) ya **no** se
+  registran — antes existían como rutas rotas (apuntaban a métodos inexistentes). La
+  edición/anulación de vales sigue siendo sólo web.
 
 #### Órdenes de Trabajo — corregir un ítem del detalle
 
@@ -124,6 +145,11 @@ Para que la documentación reflejara el comportamiento real se ajustó el backen
   `GET /operacion-diaria/{operacionDiaria}/pdf`.
 - `Api\V1\CargaCombustibleController`: nuevo método `pdf()` + ruta
   `GET /cargas/{carga}/pdf` (comprobante de egreso).
+- `Api\V1\ValeController`: nuevos métodos `store()` y `show()`; ruta `vales` pasa a
+  `->only(['index','store','show'])`. `ValeRequest::authorize()` exige `vales.crear` sólo en
+  `POST` de la API (guard `web` explícito) + `failedValidation`/`failedAuthorization` con
+  envelope JSON. `ParametrosController::colecciones()` agrega `id_conductor`/`conductor_asignado`
+  a cada vehículo.
 - `Api\V1\OrdenTrabajoController`: nuevo método `updateDetalle()` + ruta
   `PUT/PATCH /ordenes-trabajo/{orden}/detalles/{detalle}`; `ParametrosController::colecciones()`
   añade la acción `editar_detalle` a `ordenes_trabajo.acciones_tecnico`.
@@ -139,7 +165,8 @@ Para que la documentación reflejara el comportamiento real se ajustó el backen
   `tests/Feature/Api/V1/CargaCombustiblePdfControllerTest.php`,
   `tests/Feature/Api/V1/OperacionDiariaControllerTest.php`,
   `tests/Feature/Api/V1/CargaMaterialControllerTest.php` (cerrar/pagar),
-  `tests/Feature/Api/V1/OrdenTrabajoControllerTest.php` (editar detalle).
+  `tests/Feature/Api/V1/OrdenTrabajoControllerTest.php` (editar detalle),
+  `tests/Feature/Api/V1/ValeControllerTest.php` (emitir vale).
 
 ## 1.0.0
 

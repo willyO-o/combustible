@@ -10,6 +10,7 @@ use App\Models\Repuesto;
 use App\Models\TipoCombustible;
 use App\Models\TipoMantenimiento;
 use App\Models\VehiculoExterno;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,7 +21,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.1.0 tambien',
+            'api_version' => '1.1.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -49,26 +50,46 @@ class ParametrosController extends Controller
         // Vehículos propios del conductor autenticado (si lo es) unificados con
         // los de las áreas que administra como jefe de área. unique('id') evita
         // duplicar el vehículo que un jefe de área también conduce.
-        $vehiculos = ($conductor ? $conductor->asignacionesActivas : collect())
-            ->merge($areasACargo->flatMap(fn ($area) => $area->vehiculosActivos))
-            ->unique('id')
-            ->values()
-            ->map(function ($vehiculo) {
-                return [
-                    'id' => $vehiculo->id,
-                    'uuid' => $vehiculo->uuid,
-                    'nro_placa' => $vehiculo->nro_placa,
-                    'codigo' => $vehiculo->codigo,
-                    'anio' => $vehiculo->anio,
-                    'marca' => $vehiculo->marca,
-                    'modelo' => $vehiculo->modelo,
-                    'estado_vehiculo' => $vehiculo->estado_vehiculo,
-                    'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
-                    'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
-                    'url_fotografia' => $vehiculo->url_fotografia,
-                    'tipo_medicion' => $vehiculo->tipo_medicion,
-                ];
-            });
+        $vehiculos = EloquentCollection::make(
+            ($conductor ? $conductor->asignacionesActivas : collect())
+                ->merge($areasACargo->flatMap(fn ($area) => $area->vehiculosActivos))
+                ->unique('id')
+                ->values()
+                ->all()
+        );
+
+        // Conductor actualmente asignado a cada vehículo (titular ACTIVO), para
+        // que un jefe de área pueda autocompletar `id_conductor` al emitir un
+        // vale desde la app (mismo dato que `meta.id_conductor` del buscador de
+        // vehículos del módulo web). Se carga en bloque para evitar N+1.
+        if ($vehiculos->isNotEmpty()) {
+            $vehiculos->load('conductorAsignado.persona:id,nombres,paterno,materno,ci');
+        }
+
+        $vehiculos = $vehiculos->map(function ($vehiculo) {
+            $conductorAsignado = $vehiculo->conductorAsignado;
+
+            return [
+                'id' => $vehiculo->id,
+                'uuid' => $vehiculo->uuid,
+                'nro_placa' => $vehiculo->nro_placa,
+                'codigo' => $vehiculo->codigo,
+                'anio' => $vehiculo->anio,
+                'marca' => $vehiculo->marca,
+                'modelo' => $vehiculo->modelo,
+                'estado_vehiculo' => $vehiculo->estado_vehiculo,
+                'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+                'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+                'url_fotografia' => $vehiculo->url_fotografia,
+                'tipo_medicion' => $vehiculo->tipo_medicion,
+                'id_conductor' => $conductorAsignado?->id,
+                'conductor_asignado' => $conductorAsignado ? [
+                    'id' => $conductorAsignado->id,
+                    'nombre_completo' => trim("{$conductorAsignado->persona?->nombres} {$conductorAsignado->persona?->paterno} {$conductorAsignado->persona?->materno}"),
+                    'ci' => $conductorAsignado->persona?->ci,
+                ] : null,
+            ];
+        });
 
         // Áreas para sugerir actividades: las que el conductor cubre por sus
         // asignaciones más las que administra como jefe de área.

@@ -57,8 +57,10 @@ Route::middleware('auth:api')->group(function () {
     Route::get('vales/pendientes', [ValeController::class, 'valesPendientes'])->name('api.v1.vales.pendientes');
     Route::get('vales/{vale}/pdf', [ValeController::class, 'pdf'])->name('api.v1.vales.pdf');
 
+    // Vales: listar, emitir (jefe-area) y ver el detalle. La edición/anulación
+    // de un vale sigue siendo sólo web.
     Route::resource('vales', ValeController::class)
-        ->parameters(['vales' => 'vale'])->except(['create', 'edit'])->names('api.v1.vales');
+        ->parameters(['vales' => 'vale'])->only(['index', 'store', 'show'])->names('api.v1.vales');
 
     // Comprobante de egreso de combustible en PDF (mismo formato que el
     // sistema web), para descargarlo/mostrarlo desde la app móvil.
