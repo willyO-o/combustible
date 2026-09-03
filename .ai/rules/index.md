@@ -11,6 +11,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
 | resources/js/Pages/Conductores/**,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-requests.md |
 | app/Http/Controllers/**/*.php, app/Http/Controllers/*.php, app/Http/Controllers/DashboardController.php, app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/controllers.md |
+| resources/css/my-styles.css,resources/js/Pages/**/*.vue | .ai/rules/css-js-pages.md |
 | public/docs/openapi.yaml | .ai/rules/docs.md |
 | tests/Feature/**/*.php | .ai/rules/feature.md |
 | app/Models/OrdenTrabajo.php,app/Models/DetalleMantenimiento.php,app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/http-controllers.md |

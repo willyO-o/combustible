@@ -42,6 +42,17 @@ const estadoAsignacionBadge = (estado) => {
 
 const documentos = computed(() => props.conductor.documentos ?? [])
 
+// Muestra una fecha (llega como 'YYYY-MM-DD' de un pivote o como ISO
+// '2022-05-07T00:00:00.000000Z' de un cast 'date' del modelo) como dd/mm/aaaa.
+// Se toma la parte de fecha del string para no correr el día por zona horaria.
+const fecha = (valor) => {
+    if (!valor) return 'N/A'
+    const m = String(valor).match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`
+    const d = new Date(valor)
+    return isNaN(d) ? 'N/A' : d.toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 const estadoDocumentoBadge = (estado) => {
     const map = {
         VIGENTE: 'bg-success-transparent text-success',
@@ -201,10 +212,10 @@ const tipoDocumentoLabel = (tipo) => {
                                 </div>
 
                                 <div class="text-end">
-                                    <span class="d-block fw-semibold fs-13">{{ vehiculo.pivot.fecha_asignacion }}</span>
+                                    <span class="d-block fw-semibold fs-13">{{ fecha(vehiculo.pivot.fecha_asignacion) }}</span>
                                     <span class="fs-12 d-block text-muted">Desde</span>
                                     <template v-if="vehiculo.pivot.fecha_culminacion">
-                                        <span class="d-block fw-semibold fs-13 mt-1">{{ vehiculo.pivot.fecha_culminacion }}</span>
+                                        <span class="d-block fw-semibold fs-13 mt-1">{{ fecha(vehiculo.pivot.fecha_culminacion) }}</span>
                                         <span class="fs-12 d-block text-muted">Hasta</span>
                                     </template>
                                 </div>
@@ -253,8 +264,8 @@ const tipoDocumentoLabel = (tipo) => {
                             <td>{{ tipoDocumentoLabel(documento.tipo_documento) }}</td>
                             <td>{{ documento.numero_documento ?? 'N/A' }}</td>
                             <td>{{ documento.categoria ?? 'N/A' }}</td>
-                            <td>{{ documento.fecha_emision ?? 'N/A' }}</td>
-                            <td>{{ documento.fecha_vencimiento ?? 'N/A' }}</td>
+                            <td>{{ fecha(documento.fecha_emision) }}</td>
+                            <td>{{ fecha(documento.fecha_vencimiento) }}</td>
                             <td>
                                 <span class="badge" :class="estadoDocumentoBadge(documento.estado_documento)">
                                     {{ documento.estado_documento }}

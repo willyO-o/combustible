@@ -1036,3 +1036,27 @@
         width: 100%;
     }
 }
+
+/* Fix GLOBAL del interruptor (.form-switch de Bootstrap).
+   @tailwindcss/forms (cargado por `@tailwind base` en resources/css/app.css)
+   reestiliza los checkbox/radio nativos de todo el proyecto; en el estado
+   `:checked` aplica `input:where([type=checkbox]):checked { background-size:
+   100% 100% }`. El `:where()` tiene especificidad 0, pero el selector total
+   (0,1,1) igual le gana a `.form-check-input { background-size: contain }` de
+   Bootstrap (0,1,0), así que la perilla del switch se estira hasta ocupar
+   toda la pista: se veía un punto grande al centro en vez de un círculo
+   pequeño deslizado a la derecha al activarlo.
+   Se restauran las reglas de la perilla de Bootstrap con `.form-switch
+   .form-check-input` (0,2,0), que sí le gana al plugin. La perilla la pinta
+   Bootstrap vía `--bs-form-switch-bg` (sigue el tema claro/oscuro); acá sólo
+   se corrigen tamaño y posición. El override específico de `.mant-row`
+   (Operacion/Create.vue) es más específico y sigue mandando en ese contexto. */
+.form-switch .form-check-input {
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: left center;
+}
+
+.form-switch .form-check-input:checked {
+    background-position: right center;
+}

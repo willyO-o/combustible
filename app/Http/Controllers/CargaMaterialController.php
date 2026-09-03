@@ -47,7 +47,7 @@ class CargaMaterialController extends Controller
             });
         }
 
-        $cargas = $query->orderBy('fecha_apertura', 'desc')->paginate(10)->withQueryString();
+        $cargas = $query->orderBy('nro_carga', 'desc')->orderBy('fecha_apertura', 'desc')->paginate(10)->withQueryString();
 
         $cargas->through(fn (CargaMaterial $carga) => [
             'id' => $carga->id,
