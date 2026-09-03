@@ -134,6 +134,34 @@ class OrdenTrabajoController extends Controller
     }
 
     /**
+     * Corrige un ítem del detalle ya registrado (p. ej. una cantidad o lectura
+     * mal cargada), mientras la orden siga PENDIENTE o EN_EJECUCION. El acceso
+     * ya queda restringido a las órdenes asignadas al técnico por
+     * DetalleMantenimientoRequest::authorize().
+     */
+    public function updateDetalle(DetalleMantenimientoRequest $request, OrdenTrabajo $orden, DetalleMantenimiento $detalle): JsonResponse
+    {
+        abort_if($detalle->id_orden_trabajo !== $orden->id, 404);
+
+        if (! $this->detalleEsModificable($orden)) {
+            return response()->json([
+                'message' => 'La orden ya no admite cambios en su detalle de trabajo (sólo mientras está PENDIENTE o EN_EJECUCION).',
+            ], 422);
+        }
+
+        $detalle->update($request->validated());
+        $detalle->load([
+            'repuesto:id,nombre_repuesto,codigo_repuesto,unidad_medida',
+            'tipoMantenimiento:id,tipo_mantenimiento',
+        ]);
+
+        return response()->json([
+            'message' => 'Detalle de mantenimiento actualizado exitosamente.',
+            'data' => $detalle,
+        ]);
+    }
+
+    /**
      * Elimina un ítem del detalle que se registró por error (mientras la orden
      * siga PENDIENTE o EN_EJECUCION).
      */

@@ -6,10 +6,12 @@ use App\Actions\CargaCombustible\CreateCargaCombustibleAction;
 use App\Actions\CargaCombustible\ListCargaCombustibleAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CargaCombustibleRequest;
+use App\Libraries\Reportes;
 use App\Models\CargaCombustible;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class CargaCombustibleController extends Controller
 {
@@ -66,6 +68,27 @@ class CargaCombustibleController extends Controller
     {
         //
         // $carga->load([])
+    }
+
+    /**
+     * Descarga el comprobante de egreso de combustible en PDF (mismo formato
+     * que el sistema web), para verlo/guardarlo desde la app móvil.
+     * Un conductor sólo puede descargar el comprobante de sus propias cargas.
+     */
+    public function pdf(Request $request, CargaCombustible $carga): Response
+    {
+        if ($request->user()->hasRole('conductor') && $carga->id_conductor !== $request->user()->id_persona) {
+            abort(403, 'No tienes permiso para descargar este comprobante.');
+        }
+
+        $carga->load(['vehiculo.tipoVehiculo', 'conductor.persona', 'tipoCombustible']);
+
+        $contenido = (new Reportes)->generarComprobanteEgreso($carga, 'S');
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="comprobante_egreso_'.str_replace('/', '-', (string) $carga->nro).'.pdf"',
+        ]);
     }
 
     /**

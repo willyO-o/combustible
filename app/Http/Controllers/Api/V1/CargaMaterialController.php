@@ -115,6 +115,101 @@ class CargaMaterialController extends Controller
     }
 
     /**
+     * Cierra un flete ABIERTA. Mismo criterio de acceso que registrar viajes
+     * (un conductor sólo el flete que él mismo abrió; jefe-area/administrador/
+     * super-admin cualquiera): no requiere un permiso aparte. Registra
+     * id_usuario_cierre y fecha_cierre.
+     */
+    public function cerrar(Request $request, CargaMaterial $cargaMaterial): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->hasRole('conductor') && ! $user->hasAnyRole(['jefe-area', 'administrador', 'super-admin'])
+            && $cargaMaterial->id_usuario_apertura !== $user->id) {
+            return response()->json([
+                'message' => 'No tienes permiso para gestionar este flete.',
+            ], 403);
+        }
+
+        if ($cargaMaterial->estado_carga !== 'ABIERTA') {
+            return response()->json([
+                'message' => 'Sólo se puede cerrar un flete que esté abierto.',
+            ], 422);
+        }
+
+        $cargaMaterial->update([
+            'estado_carga' => 'CERRADA',
+            'id_usuario_cierre' => $user->id,
+            'fecha_cierre' => now(),
+        ]);
+
+        $cargaMaterial->load(['vehiculoExterno', 'usuarioApertura', 'usuarioCierre', 'viajes.material']);
+
+        return response()->json([
+            'message' => "Flete #{$cargaMaterial->nro} cerrado exitosamente.",
+            'data' => $cargaMaterial,
+        ]);
+    }
+
+    /**
+     * Marca un flete CERRADA como PAGADA. Exige el permiso
+     * `control-cargas.marcar-pagado` (jefe-area/administrador/super-admin;
+     * nunca conductor ni técnico de mantenimiento). `monto_pago` y
+     * `observaciones` son opcionales: si se omiten, no se sobrescribe el
+     * valor ya guardado.
+     */
+    public function pagar(Request $request, CargaMaterial $cargaMaterial): JsonResponse
+    {
+        $user = $request->user();
+
+        // El permiso vive en el guard web (igual que los roles); tras
+        // autenticar con `auth:api` el guard por defecto pasa a ser `api`, así
+        // que se consulta el guard explícitamente. super-admin lo tiene por el
+        // bypass global de AppServiceProvider (Gate::before), no por permiso.
+        $puedeMarcarPagado = $user->hasRole('super-admin')
+            || $user->hasPermissionTo('control-cargas.marcar-pagado', 'web');
+
+        if (! $puedeMarcarPagado) {
+            return response()->json([
+                'message' => 'No tienes permiso para marcar fletes como pagados.',
+            ], 403);
+        }
+
+        if ($cargaMaterial->estado_carga !== 'CERRADA') {
+            return response()->json([
+                'message' => 'Sólo se puede marcar como pagado un flete que ya esté cerrado.',
+            ], 422);
+        }
+
+        $datos = $request->validate([
+            'monto_pago' => ['nullable', 'numeric', 'min:0'],
+            'observaciones' => ['nullable', 'string'],
+        ]);
+
+        $cambios = [
+            'estado_carga' => 'PAGADA',
+            'fecha_pago' => now(),
+        ];
+
+        if ($request->filled('monto_pago')) {
+            $cambios['monto_pago'] = $datos['monto_pago'];
+        }
+
+        if ($request->filled('observaciones')) {
+            $cambios['observaciones'] = $datos['observaciones'];
+        }
+
+        $cargaMaterial->update($cambios);
+
+        $cargaMaterial->load(['vehiculoExterno', 'usuarioApertura', 'usuarioCierre', 'viajes.material']);
+
+        return response()->json([
+            'message' => "Flete #{$cargaMaterial->nro} marcado como pagado.",
+            'data' => $cargaMaterial,
+        ]);
+    }
+
+    /**
      * Registra un viaje separado dentro de una carga ya abierta (mismo
      * comportamiento que CargaMaterialController::registrarViaje() en el
      * módulo web): cada viaje exige su propia foto de evidencia.

@@ -20,7 +20,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.0',
+            'api_version' => '1.1.0 tambien',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -109,6 +109,7 @@ class ParametrosController extends Controller
                 'acciones_tecnico' => [
                     ['accion' => 'iniciar', 'metodo' => 'PATCH', 'ruta' => 'ordenes-trabajo/{orden}/iniciar', 'desde' => ['PENDIENTE'], 'estado_resultante' => 'EN_EJECUCION'],
                     ['accion' => 'agregar_detalle', 'metodo' => 'POST', 'ruta' => 'ordenes-trabajo/{orden}/detalles', 'desde' => ['PENDIENTE', 'EN_EJECUCION'], 'estado_resultante' => null],
+                    ['accion' => 'editar_detalle', 'metodo' => 'PATCH', 'ruta' => 'ordenes-trabajo/{orden}/detalles/{detalle}', 'desde' => ['PENDIENTE', 'EN_EJECUCION'], 'estado_resultante' => null],
                     ['accion' => 'eliminar_detalle', 'metodo' => 'DELETE', 'ruta' => 'ordenes-trabajo/{orden}/detalles/{detalle}', 'desde' => ['PENDIENTE', 'EN_EJECUCION'], 'estado_resultante' => null],
                     ['accion' => 'culminar', 'metodo' => 'POST', 'ruta' => 'ordenes-trabajo/{orden}/culminar', 'desde' => ['EN_EJECUCION'], 'estado_resultante' => 'CULMINADO'],
                 ],
@@ -128,6 +129,15 @@ class ParametrosController extends Controller
             ],
             'operaciones_diarias' => [
                 'actividades_sugeridas' => $actividadesSugeridas,
+                // Controles de mantenimiento que se pueden registrar en una
+                // operación diaria (ámbito operacion_diaria, activos). Según
+                // `tipo_valor`: `cantidad` -> se envía `valor` (en `unidad_medida`),
+                // `booleano` -> se envía `realizado` (SI/NO). Los tipos de ámbito
+                // taller no aplican aquí (se usan en órdenes de trabajo).
+                'tipos_mantenimiento' => TipoMantenimiento::where('estado_tipo_mantenimiento', 'ACTIVO')
+                    ->where('ambito', 'operacion_diaria')
+                    ->orderBy('tipo_mantenimiento')
+                    ->get(['id', 'tipo_mantenimiento', 'tipo_valor', 'unidad_medida']),
             ],
             'control_cargas' => [
                 // Catálogo de materiales transportados en cada viaje (cola,

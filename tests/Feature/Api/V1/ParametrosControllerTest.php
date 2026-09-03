@@ -112,6 +112,39 @@ class ParametrosControllerTest extends TestCase
         $this->assertSame('Cambio de aceite', $tipos[0]['tipo_mantenimiento']);
     }
 
+    public function test_colecciones_incluye_los_tipos_de_mantenimiento_de_operacion_diaria(): void
+    {
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'taller',
+        ]);
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Combustible cargado',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => 'cantidad',
+            'unidad_medida' => 'L',
+        ]);
+        TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Nivel de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+            'ambito' => 'operacion_diaria',
+            'tipo_valor' => 'booleano',
+        ]);
+
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $tipos = $response->json('data.operaciones_diarias.tipos_mantenimiento');
+        $this->assertCount(2, $tipos);
+        $this->assertEqualsCanonicalizing(
+            ['Combustible cargado', 'Nivel de aceite'],
+            array_column($tipos, 'tipo_mantenimiento')
+        );
+        $this->assertSame('L', collect($tipos)->firstWhere('tipo_mantenimiento', 'Combustible cargado')['unidad_medida']);
+    }
+
     public function test_colecciones_incluye_los_vehiculos_externos(): void
     {
         VehiculoExterno::factory()->create(['nro_placa' => '148-JLK']);

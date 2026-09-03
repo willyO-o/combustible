@@ -5,6 +5,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/**/*.php | .ai/rules/actions.md |
+| app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Actions/Actividades/SincronizarActividadesRealizadasAction.php | .ai/rules/actividades.md |
 | app/**/*.php | .ai/rules/app.md |
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
 | resources/js/Pages/Conductores/**,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-requests.md |
@@ -34,4 +35,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/seeders/UserSeeder.php | .ai/rules/seeders.md |
 | app/Http/Controllers/TipoMantenimientoController.php,app/Http/Requests/TipoMantenimientoRequest.php,resources/js/Pages/TiposMantenimiento/**,app/Http/Controllers/OrdenTrabajoController.php,app/Http/Controllers/TipoVehiculoController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Http/Requests/DetalleMantenimientoRequest.php,app/Http/Requests/TipoVehiculoRequest.php | .ai/rules/tipos-mantenimiento.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
-| app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php | .ai/rules/v1.md |
+| app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php, app/Http/Controllers/Api/V1/*.php,routes/api.php, app/Http/Controllers/Api/V1/*.php | .ai/rules/v1.md |

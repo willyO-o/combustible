@@ -35,9 +35,12 @@ class SincronizarActividadesRealizadasAction
 
             $operacionDiaria->actividadesRealizadas()->attach($actividad->id, [
                 'id_material' => $actividadData['id_material'] ?? null,
-                'origen' => $actividadData['origen'],
-                'destino' => $actividadData['destino'],
-                'lugar' => $actividadData['lugar'],
+                // origen/destino (medición por kilometraje) y lugar (por
+                // horómetro) son mutuamente excluyentes: el cliente sólo envía
+                // el par que aplica a su vehículo, así que el otro puede faltar.
+                'origen' => $actividadData['origen'] ?? null,
+                'destino' => $actividadData['destino'] ?? null,
+                'lugar' => $actividadData['lugar'] ?? null,
                 'cantidad' => $actividadData['cantidad'],
                 'unidad_medida' => $actividadData['unidad_medida'],
                 'hora_inicio' => $actividadData['hora_inicio'],

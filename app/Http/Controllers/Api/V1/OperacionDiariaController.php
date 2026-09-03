@@ -8,9 +8,11 @@ use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
 use App\Exceptions\AreaNoAsignadaException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OperacionStoreRequest;
+use App\Libraries\Reportes;
 use App\Models\OperacionDiaria;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 
 class OperacionDiariaController extends Controller
@@ -33,7 +35,7 @@ class OperacionDiariaController extends Controller
         try {
 
             $operacionDiaria = $action->execute($request->validated());
-            $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas'])
+            $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas', 'mantenimientosOperacion'])
                 ->cargarMaterialDeActividades();
 
             return response()->json([
@@ -58,7 +60,7 @@ class OperacionDiariaController extends Controller
      */
     public function show(OperacionDiaria $operacionDiaria)
     {
-        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas'])
+        $operacion = $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas', 'mantenimientosOperacion'])
             ->cargarMaterialDeActividades();
 
         return response()->json([
@@ -70,7 +72,7 @@ class OperacionDiariaController extends Controller
     {
         try {
             $operacionDiaria = $action->execute($operacionDiaria, $request->validated());
-            $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas'])
+            $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas', 'mantenimientosOperacion'])
                 ->cargarMaterialDeActividades();
 
             return response()->json([
@@ -112,6 +114,31 @@ class OperacionDiariaController extends Controller
                 'message' => 'Error al eliminar la operación diaria: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Descarga el reporte de la operación diaria en PDF (mismo formato que el
+     * sistema web), pensado para que la app móvil lo guarde y lo muestre.
+     * Un conductor sólo puede descargar el reporte de sus propias operaciones.
+     */
+    public function pdf(Request $request, OperacionDiaria $operacionDiaria): Response
+    {
+        if ($request->user()->hasRole('conductor') && $operacionDiaria->id_conductor !== $request->user()->id_persona) {
+            abort(403, 'No tienes permiso para descargar este reporte.');
+        }
+
+        $operacion = $operacionDiaria
+            ->load(['conductor.persona', 'vehiculo', 'area', 'verificador', 'actividadesRealizadas', 'mantenimientosOperacion'])
+            ->cargarMaterialDeActividades();
+
+        // El catálogo de tipos de mantenimiento lo resuelve el propio reporte
+        // desde la base cuando no se le pasa (ver Reportes::generarReporteOperacionDiaria).
+        $contenido = (new Reportes)->generarReporteOperacionDiaria($operacion, null, 'S');
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="reporte_operacion_'.str_replace('/', '-', (string) $operacion->nro).'.pdf"',
+        ]);
     }
 
     public function validarActividad(Request $request)

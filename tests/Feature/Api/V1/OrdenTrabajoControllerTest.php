@@ -228,6 +228,87 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame(0, DetalleMantenimiento::count());
     }
 
+    public function test_el_tecnico_corrige_un_item_del_detalle(): void
+    {
+        $tecnico = $this->crearTecnico();
+        $orden = $this->crearOrden($tecnico, ['estado_orden' => 'EN_EJECUCION']);
+        $tipo = $this->crearTipoMantenimiento();
+        $detalle = $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipo->id,
+            'fecha' => now()->toDateString(),
+            'kilometraje' => 100,
+            'cantidad' => 1,
+        ]);
+
+        $response = $this->actingAs($tecnico, 'api')->patchJson(
+            route('api.v1.ordenes-trabajo.detalles.update', [$orden, $detalle]),
+            [
+                'id_tipo_mantenimiento' => $tipo->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 150,
+                'cantidad' => 4,
+            ]
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.cantidad', 4);
+        $detalle->refresh();
+        $this->assertSame(4, $detalle->cantidad);
+        $this->assertSame('150.00', (string) $detalle->kilometraje);
+    }
+
+    public function test_un_tecnico_no_puede_corregir_el_detalle_de_una_orden_ajena(): void
+    {
+        $orden = $this->crearOrden($this->crearTecnico(), ['estado_orden' => 'EN_EJECUCION']);
+        $tipo = $this->crearTipoMantenimiento();
+        $detalle = $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipo->id,
+            'fecha' => now()->toDateString(),
+            'kilometraje' => 100,
+            'cantidad' => 1,
+        ]);
+
+        $response = $this->actingAs($this->crearTecnico(), 'api')->patchJson(
+            route('api.v1.ordenes-trabajo.detalles.update', [$orden, $detalle]),
+            [
+                'id_tipo_mantenimiento' => $tipo->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 150,
+                'cantidad' => 2,
+            ]
+        );
+
+        $response->assertForbidden();
+        $this->assertSame(1, $detalle->refresh()->cantidad);
+    }
+
+    public function test_no_se_puede_corregir_el_detalle_de_una_orden_culminada(): void
+    {
+        $tecnico = $this->crearTecnico();
+        $orden = $this->crearOrden($tecnico, ['estado_orden' => 'EN_EJECUCION']);
+        $tipo = $this->crearTipoMantenimiento();
+        $detalle = $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipo->id,
+            'fecha' => now()->toDateString(),
+            'kilometraje' => 100,
+            'cantidad' => 1,
+        ]);
+        $orden->update(['estado_orden' => 'CULMINADO']);
+
+        $response = $this->actingAs($tecnico, 'api')->patchJson(
+            route('api.v1.ordenes-trabajo.detalles.update', [$orden, $detalle]),
+            [
+                'id_tipo_mantenimiento' => $tipo->id,
+                'fecha' => now()->toDateString(),
+                'kilometraje' => 150,
+                'cantidad' => 2,
+            ]
+        );
+
+        $response->assertStatus(422);
+        $this->assertSame(1, $detalle->refresh()->cantidad);
+    }
+
     public function test_el_tecnico_inicia_el_mantenimiento(): void
     {
         $tecnico = $this->crearTecnico();
@@ -360,7 +441,7 @@ class OrdenTrabajoControllerTest extends TestCase
         // Colección de estados con detalle + acciones del técnico.
         $this->assertContains('EN_EJECUCION', $response->json('data.ordenes_trabajo.estados.*.value'));
         $this->assertSame(
-            ['iniciar', 'agregar_detalle', 'eliminar_detalle', 'culminar'],
+            ['iniciar', 'agregar_detalle', 'editar_detalle', 'eliminar_detalle', 'culminar'],
             $response->json('data.ordenes_trabajo.acciones_tecnico.*.accion')
         );
     }

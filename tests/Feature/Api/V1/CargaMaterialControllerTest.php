@@ -10,6 +10,7 @@ use App\Models\VehiculoExterno;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -28,6 +29,8 @@ class CargaMaterialControllerTest extends TestCase
         Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+        // Marcar un flete como PAGADA exige este permiso (ver CargaMaterialController::pagar()).
+        Permission::firstOrCreate(['name' => 'control-cargas.marcar-pagado', 'guard_name' => 'web']);
 
         $this->conductor = User::factory()->create();
         $this->conductor->assignRole('conductor');
@@ -380,6 +383,94 @@ class CargaMaterialControllerTest extends TestCase
 
         $response->assertCreated();
         $this->assertSame('Nota del jefe de área', CargaMaterial::first()->observaciones);
+    }
+
+    public function test_cerrar_cierra_un_flete_abierto_del_propio_conductor(): void
+    {
+        $this->actingAs($this->conductor);
+        $carga = CargaMaterial::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')
+            ->postJson(route('api.v1.cargas-material.cerrar', $carga->id));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.estado_carga', 'CERRADA');
+        $carga->refresh();
+        $this->assertSame('CERRADA', $carga->estado_carga);
+        $this->assertSame($this->conductor->id, $carga->id_usuario_cierre);
+        $this->assertNotNull($carga->fecha_cierre);
+    }
+
+    public function test_cerrar_rechaza_a_un_conductor_que_no_abrio_el_flete(): void
+    {
+        $this->actingAs($this->jefeArea);
+        $carga = CargaMaterial::factory()->create();
+
+        $response = $this->actingAs($this->conductor, 'api')
+            ->postJson(route('api.v1.cargas-material.cerrar', $carga->id));
+
+        $response->assertStatus(403);
+        $this->assertSame('ABIERTA', $carga->refresh()->estado_carga);
+    }
+
+    public function test_cerrar_falla_si_el_flete_no_esta_abierto(): void
+    {
+        $this->actingAs($this->conductor);
+        $carga = CargaMaterial::factory()->create();
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $response = $this->actingAs($this->conductor, 'api')
+            ->postJson(route('api.v1.cargas-material.cerrar', $carga->id));
+
+        $response->assertStatus(422);
+    }
+
+    public function test_pagar_marca_como_pagado_un_flete_cerrado(): void
+    {
+        $this->jefeArea->givePermissionTo('control-cargas.marcar-pagado');
+
+        $this->actingAs($this->jefeArea);
+        $carga = CargaMaterial::factory()->create();
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $response = $this->actingAs($this->jefeArea, 'api')->postJson(
+            route('api.v1.cargas-material.pagar', $carga->id),
+            ['monto_pago' => 1500.50, 'observaciones' => 'Pago por transferencia']
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.estado_carga', 'PAGADA');
+        $carga->refresh();
+        $this->assertSame('PAGADA', $carga->estado_carga);
+        $this->assertEquals(1500.50, $carga->monto_pago);
+        $this->assertSame('Pago por transferencia', $carga->observaciones);
+        $this->assertNotNull($carga->fecha_pago);
+    }
+
+    public function test_pagar_requiere_el_permiso_marcar_pagado(): void
+    {
+        $this->actingAs($this->conductor);
+        $carga = CargaMaterial::factory()->create();
+        $carga->update(['estado_carga' => 'CERRADA']);
+
+        $response = $this->actingAs($this->conductor, 'api')
+            ->postJson(route('api.v1.cargas-material.pagar', $carga->id));
+
+        $response->assertStatus(403);
+        $this->assertSame('CERRADA', $carga->refresh()->estado_carga);
+    }
+
+    public function test_pagar_falla_si_el_flete_no_esta_cerrado(): void
+    {
+        $this->jefeArea->givePermissionTo('control-cargas.marcar-pagado');
+
+        $this->actingAs($this->jefeArea);
+        $carga = CargaMaterial::factory()->create(); // ABIERTA
+
+        $response = $this->actingAs($this->jefeArea, 'api')
+            ->postJson(route('api.v1.cargas-material.pagar', $carga->id));
+
+        $response->assertStatus(422);
     }
 
     public function test_registrar_viaje_falla_si_la_carga_esta_cerrada(): void

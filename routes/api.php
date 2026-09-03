@@ -37,6 +37,11 @@ Route::prefix('auth')->group(function () {
 // ── Operación Diaria ───────────────────────────────────────────────────────
 
 Route::middleware('auth:api')->group(function () {
+    // Reporte de una operación diaria en PDF (mismo formato que el sistema
+    // web), para que la app móvil lo descargue y lo muestre en el dispositivo.
+    Route::get('operacion-diaria/{operacionDiaria}/pdf', [OperacionDiariaController::class, 'pdf'])
+        ->name('api.v1.operacion-diaria.pdf');
+
     Route::resource('operacion-diaria', OperacionDiariaController::class)
         ->parameters(['operacion-diaria' => 'operacionDiaria'])->except(['create', 'edit'])->names('api.v1.operacion-diaria');
 
@@ -55,13 +60,23 @@ Route::middleware('auth:api')->group(function () {
     Route::resource('vales', ValeController::class)
         ->parameters(['vales' => 'vale'])->except(['create', 'edit'])->names('api.v1.vales');
 
+    // Comprobante de egreso de combustible en PDF (mismo formato que el
+    // sistema web), para descargarlo/mostrarlo desde la app móvil.
+    Route::get('cargas/{carga}/pdf', [CargaCombustibleController::class, 'pdf'])
+        ->name('api.v1.cargas.pdf');
+
     Route::resource('cargas', CargaCombustibleController::class)
         ->parameters(['cargas' => 'carga'])->except(['create', 'edit'])->names('api.v1.cargas');
 
-    // Control de cargas de material: abrir una carga (opcionalmente con su
-    // primer viaje) y registrar viajes adicionales por separado.
+    // Control de cargas de material: abrir un flete (opcionalmente con su
+    // primer viaje), registrar viajes adicionales por separado y avanzar el
+    // flujo ABIERTA -> CERRADA -> PAGADA.
     Route::post('cargas-material/{cargaMaterial}/viajes', [CargaMaterialController::class, 'registrarViaje'])
         ->name('api.v1.cargas-material.viajes.registrar');
+    Route::post('cargas-material/{cargaMaterial}/cerrar', [CargaMaterialController::class, 'cerrar'])
+        ->name('api.v1.cargas-material.cerrar');
+    Route::post('cargas-material/{cargaMaterial}/pagar', [CargaMaterialController::class, 'pagar'])
+        ->name('api.v1.cargas-material.pagar');
 
     Route::resource('cargas-material', CargaMaterialController::class)
         ->parameters(['cargas-material' => 'cargaMaterial'])
@@ -100,6 +115,8 @@ Route::middleware('auth:api')->group(function () {
         ->name('api.v1.ordenes-trabajo.culminar');
     Route::post('ordenes-trabajo/{orden}/detalles', [OrdenTrabajoController::class, 'storeDetalle'])
         ->name('api.v1.ordenes-trabajo.detalles.store');
+    Route::match(['put', 'patch'], 'ordenes-trabajo/{orden}/detalles/{detalle}', [OrdenTrabajoController::class, 'updateDetalle'])
+        ->name('api.v1.ordenes-trabajo.detalles.update');
     Route::delete('ordenes-trabajo/{orden}/detalles/{detalle}', [OrdenTrabajoController::class, 'destroyDetalle'])
         ->name('api.v1.ordenes-trabajo.detalles.destroy');
 });

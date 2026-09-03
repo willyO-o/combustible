@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.0.0"
+  version: "1.1.0"
   contact:
     name: Equipo de Desarrollo — Combustible
   license:
@@ -397,7 +397,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.0"
+                api_version: "1.1.0"
                 app_name: Combustible
                 app_env: production
                 app_debug: false
@@ -416,7 +416,8 @@ paths:
         Devuelve los catálogos y colecciones necesarios para alimentar formularios del cliente:
         vehículos disponibles para el usuario autenticado, estaciones de servicio activas,
         tipos de combustible activos, los catálogos de materiales y vehículos externos de
-        control de cargas, y los valores enumerados usados por otros módulos (cargas de
+        control de cargas, las actividades sugeridas y los controles de mantenimiento de
+        operación diaria, y los valores enumerados usados por otros módulos (cargas de
         combustible, solicitudes de mantenimiento, control de cargas).
 
         El listado `vehiculos` unifica, sin duplicados, los vehículos que el usuario tiene
@@ -494,6 +495,11 @@ paths:
                         ruta: "ordenes-trabajo/{orden}/detalles"
                         desde: [PENDIENTE, EN_EJECUCION]
                         estado_resultante: null
+                      - accion: editar_detalle
+                        metodo: PATCH
+                        ruta: "ordenes-trabajo/{orden}/detalles/{detalle}"
+                        desde: [PENDIENTE, EN_EJECUCION]
+                        estado_resultante: null
                       - accion: eliminar_detalle
                         metodo: DELETE
                         ruta: "ordenes-trabajo/{orden}/detalles/{detalle}"
@@ -513,6 +519,20 @@ paths:
                         codigo_repuesto: FIL-001
                         unidad_medida: UNIDAD
                         stock_actual: 10
+                  operaciones_diarias:
+                    actividades_sugeridas:
+                      - id: 5
+                        nombre_actividad: Acarreo de material
+                        unidad_medida: viajes
+                    tipos_mantenimiento:
+                      - id: 12
+                        tipo_mantenimiento: Combustible cargado
+                        tipo_valor: cantidad
+                        unidad_medida: Litros
+                      - id: 13
+                        tipo_mantenimiento: Nivel de aceite
+                        tipo_valor: booleano
+                        unidad_medida: null
                   control_cargas:
                     materiales:
                       - id: 1
@@ -614,6 +634,16 @@ paths:
           `lugar`. Si tiene `tipo_medicion = kilometraje`, cada actividad debe indicar `origen`
           **y** `destino` (p. ej. actividades de transporte).
         - Si se envían `observaciones` y `notificar_observaciones: true`, se envía una notificación.
+        - `actividades_realizadas[].id_material` (opcional, sólo para vehículos con
+          `tipo_medicion = kilometraje`) registra el material trasladado en esa actividad; si
+          se envía, debe existir en el catálogo `control_cargas.materiales` de
+          `GET /parametros/colecciones`. Un traslado puede no llevar carga (personal, retorno
+          en vacío), por eso es opcional.
+        - `mantenimientos` (opcional) registra los controles de mantenimiento de la jornada
+          (combustible cargado, niveles de aceite/refrigerante, etc.). Cada envío **reemplaza
+          por completo** el conjunto guardado y sólo se persisten los controles que traen
+          `valor` o `realizado`. El catálogo de tipos disponibles está en
+          `GET /parametros/colecciones` → `operaciones_diarias.tipos_mantenimiento`.
       requestBody:
         required: true
         content:
@@ -636,6 +666,7 @@ paths:
                     - actividad: Acarreo de material
                       origen: Cancha de acopio
                       destino: Botadero norte
+                      id_material: 3
                       cantidad: 6
                       unidad_medida: viajes
                       hora_inicio: "07:15"
@@ -647,6 +678,11 @@ paths:
                       unidad_medida: m3
                       hora_inicio: "11:30"
                       hora_fin: "16:45"
+                  mantenimientos:
+                    - id_tipo_mantenimiento: 12
+                      valor: 45.5
+                    - id_tipo_mantenimiento: 13
+                      realizado: SI
               con_horometro:
                 summary: Vehículo medido por horómetro (p.ej. maquinaria pesada), con lugar
                 value:
@@ -723,6 +759,17 @@ paths:
                         unidad_medida: viajes
                         hora_inicio: "07:15"
                         hora_fin: "11:00"
+                  mantenimientos_operacion:
+                    - id: 12
+                      tipo_mantenimiento: Combustible cargado
+                      tipo_valor: cantidad
+                      unidad_medida: Litros
+                      pivot: { id: 88, valor: "45.50", realizado: null }
+                    - id: 13
+                      tipo_mantenimiento: Nivel de aceite
+                      tipo_valor: booleano
+                      unidad_medida: null
+                      pivot: { id: 89, valor: null, realizado: SI }
         '422':
           description: Error de validación, o el vehículo no tiene un área asignada.
           content:
@@ -762,7 +809,10 @@ paths:
     get:
       tags: [Operación Diaria]
       summary: Obtener el detalle de una operación diaria
-      description: Devuelve la operación diaria con sus relaciones (conductor, vehículo, área, verificador y actividades realizadas).
+      description: |
+        Devuelve la operación diaria con sus relaciones: conductor, vehículo, área,
+        verificador, actividades realizadas (con el material trasladado de cada una) y los
+        controles de mantenimiento registrados (`mantenimientos_operacion`).
       responses:
         '200':
           description: Detalle de la operación diaria.
@@ -782,6 +832,17 @@ paths:
                     - id: 1
                       nombre_actividad: Acarreo de material
                       pivot: { id_material: 3, material: { id: 3, material: Concentrado }, origen: Cancha de acopio, destino: Botadero norte, cantidad: "6.00", unidad_medida: viajes, hora_inicio: "07:15", hora_fin: "11:00" }
+                  mantenimientos_operacion:
+                    - id: 12
+                      tipo_mantenimiento: Combustible cargado
+                      tipo_valor: cantidad
+                      unidad_medida: Litros
+                      pivot: { id: 88, valor: "45.50", realizado: null }
+                    - id: 13
+                      tipo_mantenimiento: Nivel de aceite
+                      tipo_valor: booleano
+                      unidad_medida: null
+                      pivot: { id: 89, valor: null, realizado: SI }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -807,11 +868,15 @@ paths:
           previamente registradas para esta operación (se resincroniza, no se agrega de forma
           incremental) — y al ser obligatorio, debe reenviarse siempre completo, incluidas las
           actividades que no cambiaron.
+        - `mantenimientos` (opcional) también **reemplaza por completo** los controles de
+          mantenimiento guardados: los que no se reenvíen se eliminan. Omitirlo por completo
+          deja el conjunto sin controles.
         - Si `observaciones` cambia respecto al valor original y `notificar_observaciones: true`,
           se envía una notificación (a diferencia del registro, aquí solo notifica cuando el
           texto de las observaciones efectivamente cambió).
         - La operación devuelta en `data` incluye las relaciones anidadas `conductor`,
-          `vehiculo`, `area` y `actividades_realizadas` (con `pivot.material` cuando aplica).
+          `vehiculo`, `area`, `actividades_realizadas` (con `pivot.material` cuando aplica) y
+          `mantenimientos_operacion`.
       requestBody:
         required: true
         content:
@@ -819,8 +884,24 @@ paths:
             schema:
               $ref: '#/components/schemas/OperacionDiariaUpdateRequest'
             example:
+              turno: DIA
+              fecha_inicio: "2026-08-13 07:00"
+              fecha_fin: "2026-08-13 17:00"
               kilometraje_fin: 15525.00
+              notificar_observaciones: false
               estado: FINALIZADO
+              actividades_realizadas:
+                - actividad: Acarreo de material
+                  origen: Cancha de acopio
+                  destino: Chancado primario
+                  id_material: 3
+                  cantidad: 6
+                  unidad_medida: viajes
+                  hora_inicio: "07:15"
+                  hora_fin: "11:00"
+              mantenimientos:
+                - id_tipo_mantenimiento: 13
+                  realizado: SI
       responses:
         '200':
           description: Operación diaria actualizada exitosamente.
@@ -869,6 +950,12 @@ paths:
                         unidad_medida: viajes
                         hora_inicio: "07:15"
                         hora_fin: "11:00"
+                  mantenimientos_operacion:
+                    - id: 13
+                      tipo_mantenimiento: Nivel de aceite
+                      tipo_valor: booleano
+                      unidad_medida: null
+                      pivot: { id: 90, valor: null, realizado: SI }
         '422':
           description: Error de validación.
           content:
@@ -963,6 +1050,58 @@ paths:
               example:
                 success: false
                 message: "Error al eliminar la operación diaria: ..."
+
+  /operacion-diaria/{operacionDiaria}/pdf:
+    get:
+      tags: [Operación Diaria]
+      summary: Descargar el reporte de la operación diaria en PDF
+      description: |
+        Genera y descarga el reporte de la operación diaria (el mismo formato que se imprime
+        desde el sistema web: lecturas, jornada de actividades con su material y controles de
+        mantenimiento), pensado para que la app móvil (Flutter) lo descargue y lo muestre en
+        el dispositivo del usuario.
+
+        La respuesta es el archivo binario directo (no JSON): `Content-Type: application/pdf`
+        y `Content-Disposition: attachment; filename="reporte_operacion_NNNNN.pdf"` — el número
+        de operación (`nro`, correlativo con ceros a la izquierda).
+
+        **Cómo consumirlo desde Flutter:** igual que `GET /vales/{vale}/pdf` (ver esa
+        descripción): `GET` autenticado con `Authorization: Bearer {access_token}`, leer la
+        respuesta como bytes crudos (no JSON), guardarla en un archivo local y abrirla con un
+        visor de PDF nativo o embebido.
+
+        **Restricción de acceso:**
+        - **conductor**: sólo puede descargar el reporte de sus propias operaciones
+          (`id_conductor` = persona del usuario autenticado); intentar descargar la de otro
+          conductor responde `403`.
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: operacionDiaria
+          in: path
+          required: true
+          description: Identificador (`id`) de la operación diaria.
+          schema: { type: integer }
+          example: 101
+      responses:
+        '200':
+          description: PDF del reporte de la operación diaria generado exitosamente.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+          headers:
+            Content-Disposition:
+              description: 'Ej: `attachment; filename="reporte_operacion_00101.pdf"`'
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El conductor autenticado intenta descargar el reporte de otra operación.
+          content:
+            application/json:
+              example:
+                message: No tienes permiso para descargar este reporte.
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /operacion-actividad/validar:
     post:
@@ -1495,6 +1634,58 @@ paths:
                 message: Error al crear la carga de combustible.
                 error: "Detalle técnico interno del error (varía según la causa)."
 
+  /cargas/{carga}/pdf:
+    get:
+      tags: [Carga de Combustible]
+      summary: Descargar el comprobante de egreso de combustible en PDF
+      description: |
+        Genera y descarga el comprobante de egreso de la carga de combustible (el mismo
+        formato que se imprime desde el sistema web), pensado para que la app móvil (Flutter)
+        lo descargue y lo muestre en el dispositivo del usuario.
+
+        La respuesta es el archivo binario directo (no JSON): `Content-Type: application/pdf`
+        y `Content-Disposition: attachment; filename="comprobante_egreso_NNNNNN.pdf"` — el
+        número de comprobante (`nro`; si tuviera un `/`, se cambia por `-` para que sea un
+        nombre de archivo válido).
+
+        **Cómo consumirlo desde Flutter:** igual que `GET /vales/{vale}/pdf` (ver esa
+        descripción): `GET` autenticado con `Authorization: Bearer {access_token}`, leer la
+        respuesta como bytes crudos (no JSON), guardarla en un archivo local y abrirla con un
+        visor de PDF nativo o embebido.
+
+        **Restricción de acceso:**
+        - **conductor**: sólo puede descargar el comprobante de sus propias cargas
+          (`id_conductor` = persona del usuario autenticado); intentar descargar la de otro
+          conductor responde `403`.
+        - Otros roles: sin restricción adicional.
+      parameters:
+        - name: carga
+          in: path
+          required: true
+          description: ID de la carga de combustible.
+          schema: { type: integer }
+          example: 1
+      responses:
+        '200':
+          description: PDF del comprobante de egreso generado exitosamente.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+          headers:
+            Content-Disposition:
+              description: 'Ej: `attachment; filename="comprobante_egreso_000123.pdf"`'
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El conductor autenticado intenta descargar el comprobante de otra carga.
+          content:
+            application/json:
+              example:
+                message: No tienes permiso para descargar este comprobante.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ──────────────────────────────────────────────────────────────────────
   # CONTROL DE CARGAS
   # ──────────────────────────────────────────────────────────────────────
@@ -1539,15 +1730,16 @@ paths:
 
     post:
       tags: [Control de Cargas]
-      summary: Abrir una nueva carga de material (opcionalmente con su primer viaje)
+      summary: Abrir un flete (carga de material), opcionalmente con su primer viaje
       description: |
-        Abre una carga de material para un vehículo externo. La mayoría de los datos se
-        asignan automáticamente en el servidor a partir del usuario autenticado y **no deben
-        enviarse**:
+        Abre una carga de material (en el sistema web y la app, "flete") para un vehículo
+        externo. La mayoría de los datos se asignan automáticamente en el servidor a partir
+        del usuario autenticado y **no deben enviarse**:
         - `nro_carga` y `gestion`: correlativo autogenerado dentro de la gestión actual
           (configurable en los parámetros de la empresa; por defecto la gestión avanza en
           diciembre).
-        - `estado_carga`: siempre queda en `ABIERTA` al registrar.
+        - `estado_carga`: siempre queda en `ABIERTA` al registrar. El flete avanza luego por
+          `ABIERTA → CERRADA → PAGADA` con `POST .../cerrar` y `POST .../pagar`.
         - `id_usuario_apertura`: el usuario autenticado.
 
         **Debe enviarse como `multipart/form-data`** cuando se registra el primer viaje junto
@@ -1594,7 +1786,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CargaMaterialStoreResponse'
               example:
-                message: "Carga #000001/2026 registrada exitosamente."
+                message: "Flete #000001/2026 registrado exitosamente."
                 data:
                   id: 1
                   uuid: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90"
@@ -1644,8 +1836,8 @@ paths:
               example:
                 message: The given data was invalid.
                 errors:
-                  id_vehiculo_externo: ["Debe seleccionar un vehículo."]
-                  pais: ["El país es obligatorio cuando la carga es al exterior."]
+                  id_vehiculo_externo: ["Seleccione un vehículo válido."]
+                  pais: ["El país es obligatorio cuando el flete es al exterior."]
                   viaje.foto: ["La foto de evidencia del viaje es obligatoria."]
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1755,7 +1947,7 @@ paths:
                 carga_cerrada:
                   summary: La carga ya no está ABIERTA
                   value:
-                    message: "No se pueden registrar viajes: esta carga ya está cerrada."
+                    message: "No se pueden registrar viajes: este flete ya está cerrado."
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1767,6 +1959,134 @@ paths:
               example:
                 message: Error al registrar el viaje.
                 error: "Detalle técnico interno del error (varía según la causa)."
+
+  /cargas-material/{cargaMaterial}/cerrar:
+    post:
+      tags: [Control de Cargas]
+      summary: Cerrar un flete (carga de material)
+      description: |
+        Cierra un flete que está `ABIERTA`, pasándolo a `CERRADA` (segundo paso del flujo
+        `ABIERTA → CERRADA → PAGADA`). Registra el usuario y la fecha/hora de cierre
+        (`id_usuario_cierre`, `fecha_cierre`). Una vez cerrado ya no se pueden registrar más
+        viajes en él.
+
+        No requiere un permiso aparte: puede cerrarlo cualquier usuario que ya podía
+        gestionar el flete — un `conductor` sólo los que él mismo abrió; `jefe-area`,
+        `administrador` y `super-admin`, cualquiera.
+
+        No lleva cuerpo.
+      parameters:
+        - name: cargaMaterial
+          in: path
+          required: true
+          schema: { type: integer }
+          example: 1
+      responses:
+        '200':
+          description: Flete cerrado exitosamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: "Flete #000001/2026 cerrado exitosamente." }
+                  data: { $ref: '#/components/schemas/CargaMaterial' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Un `conductor` intenta cerrar un flete que no abrió él mismo.
+          content:
+            application/json:
+              example:
+                message: No tienes permiso para gestionar este flete.
+        '404':
+          description: El flete indicado no existe.
+        '422':
+          description: El flete no está `ABIERTA` (ya fue cerrado o pagado).
+          content:
+            application/json:
+              example:
+                message: Sólo se puede cerrar un flete que esté abierto.
+
+  /cargas-material/{cargaMaterial}/pagar:
+    post:
+      tags: [Control de Cargas]
+      summary: Marcar un flete como pagado
+      description: |
+        Marca un flete que está `CERRADA` como `PAGADA` (último paso del flujo). Registra la
+        fecha/hora de pago (`fecha_pago`) y, opcionalmente, el monto y una observación.
+
+        **Requiere el permiso `control-cargas.marcar-pagado`**, otorgado a `jefe-area`,
+        `administrador` y `super-admin` — **nunca** a `conductor` ni a
+        `tecnico-mantenimiento`.
+
+        `monto_pago` y `observaciones` son opcionales; si se omiten, **no** se sobrescribe el
+        valor que el flete ya tuviera.
+      parameters:
+        - name: cargaMaterial
+          in: path
+          required: true
+          schema: { type: integer }
+          example: 1
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                monto_pago:
+                  type: number
+                  format: float
+                  nullable: true
+                  minimum: 0
+                  description: Monto pagado por el flete. Opcional.
+                  example: 1500.50
+                observaciones:
+                  type: string
+                  nullable: true
+                  description: Observación del pago. Opcional.
+                  example: "Pago por transferencia bancaria."
+            example:
+              monto_pago: 1500.50
+              observaciones: "Pago por transferencia bancaria."
+      responses:
+        '200':
+          description: Flete marcado como pagado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: "Flete #000001/2026 marcado como pagado." }
+                  data: { $ref: '#/components/schemas/CargaMaterial' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El usuario autenticado no tiene el permiso `control-cargas.marcar-pagado`.
+          content:
+            application/json:
+              example:
+                message: No tienes permiso para marcar fletes como pagados.
+        '404':
+          description: El flete indicado no existe.
+        '422':
+          description: |
+            El flete no está `CERRADA` (todavía está abierto, o ya fue pagado), **o** error de
+            validación de `monto_pago` / `observaciones`.
+          content:
+            application/json:
+              examples:
+                estado_invalido:
+                  summary: El flete no está cerrado
+                  value:
+                    message: Sólo se puede marcar como pagado un flete que ya esté cerrado.
+                validacion:
+                  summary: Error de validación
+                  value:
+                    message: The given data was invalid.
+                    errors:
+                      monto_pago: ["El campo monto pago debe ser un número."]
 
   /materiales:
     get:
@@ -2457,25 +2777,102 @@ paths:
                     message: "La orden ya no admite cambios en su detalle de trabajo (sólo mientras está PENDIENTE o EN_EJECUCION)."
 
   /ordenes-trabajo/{orden}/detalles/{detalle}:
+    parameters:
+      - name: orden
+        in: path
+        required: true
+        description: ID de la orden de trabajo.
+        schema: { type: integer }
+        example: 1
+      - name: detalle
+        in: path
+        required: true
+        description: ID del ítem de detalle (debe pertenecer a la orden).
+        schema: { type: integer }
+        example: 15
+
+    put:
+      tags: [Órdenes de Trabajo]
+      summary: Corregir un ítem del detalle de trabajo
+      description: |
+        Corrige un ítem del detalle ya registrado (p. ej. una `cantidad` o una lectura mal
+        cargada). Acepta `PUT` o `PATCH`, pero **no es un parche parcial**: el cuerpo tiene los
+        mismos campos y las mismas reglas que `POST /ordenes-trabajo/{orden}/detalles` y debe
+        reenviarse completo.
+
+        Sólo mientras la orden está `PENDIENTE` o `EN_EJECUCION`; misma restricción de acceso
+        que el registro de detalle (un técnico, sólo el de sus órdenes asignadas).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetalleMantenimientoStoreRequest'
+            example:
+              id_tipo_mantenimiento: 3
+              id_repuesto: 8
+              fecha: "2026-08-27"
+              kilometraje: 85235
+              cantidad: 3
+      responses:
+        '200':
+          description: Ítem de detalle actualizado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetalleMantenimientoStoreResponse'
+              example:
+                message: Detalle de mantenimiento actualizado exitosamente.
+                data:
+                  id: 15
+                  id_orden_trabajo: 1
+                  id_repuesto: 8
+                  id_tipo_mantenimiento: 3
+                  fecha: "2026-08-27"
+                  horometro: null
+                  kilometraje: "85235.00"
+                  cantidad: 3
+                  created_at: "2026-08-27T14:30:00.000000Z"
+                  updated_at: "2026-08-27T15:10:00.000000Z"
+                  repuesto: { id: 8, nombre_repuesto: Filtro de aceite, codigo_repuesto: FIL-001, unidad_medida: UNIDAD }
+                  tipo_mantenimiento: { id: 3, tipo_mantenimiento: Cambio de aceite }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El técnico autenticado intenta editar el detalle de una orden que no tiene asignada.
+          content:
+            application/json:
+              example:
+                message: Sólo puede registrar el detalle de las órdenes que tiene asignadas.
+        '404':
+          description: La orden o el ítem de detalle no existen, o el ítem no pertenece a esa orden.
+        '422':
+          description: |
+            Error de validación, o la orden ya no admite cambios en su detalle (estado distinto
+            de `PENDIENTE`/`EN_EJECUCION`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              examples:
+                validacion:
+                  summary: Error de validación
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      cantidad: ["La cantidad es obligatoria."]
+                orden_congelada:
+                  summary: La orden ya fue culminada
+                  value:
+                    message: "La orden ya no admite cambios en su detalle de trabajo (sólo mientras está PENDIENTE o EN_EJECUCION)."
+
     delete:
       tags: [Órdenes de Trabajo]
       summary: Eliminar un ítem del detalle de trabajo
       description: |
         Elimina un ítem del detalle registrado por error. Sólo mientras la orden está
         `PENDIENTE` o `EN_EJECUCION`; misma restricción de acceso que el registro de detalle.
-      parameters:
-        - name: orden
-          in: path
-          required: true
-          description: ID de la orden de trabajo.
-          schema: { type: integer }
-          example: 1
-        - name: detalle
-          in: path
-          required: true
-          description: ID del ítem de detalle a eliminar (debe pertenecer a la orden).
-          schema: { type: integer }
-          example: 15
       responses:
         '200':
           description: Ítem de detalle eliminado exitosamente.
@@ -2717,7 +3114,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.0" }
+        api_version: { type: string, example: "1.1.0" }
         app_name: { type: string, example: Combustible }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -2845,6 +3242,41 @@ components:
                       codigo_repuesto: { type: string, nullable: true, example: FIL-001 }
                       unidad_medida: { type: string, example: UNIDAD }
                       stock_actual: { type: integer, example: 10 }
+            operaciones_diarias:
+              type: object
+              description: |
+                Catálogos de apoyo para registrar una operación diaria (ver `POST /operacion-diaria`).
+              properties:
+                actividades_sugeridas:
+                  type: array
+                  description: |
+                    Actividades ya registradas en las áreas que cubre el usuario (por sus
+                    asignaciones como conductor y/o las áreas que administra como jefe de área),
+                    para autocompletar el nombre y la unidad de medida de cada actividad de la
+                    jornada. El campo `actividad` del `POST` acepta cualquier texto, no sólo
+                    estos valores.
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 5 }
+                      nombre_actividad: { type: string, example: Acarreo de material }
+                      unidad_medida: { type: string, nullable: true, example: viajes }
+                tipos_mantenimiento:
+                  type: array
+                  description: |
+                    Controles de mantenimiento que se pueden registrar en la operación diaria
+                    (tipos activos de ámbito `operacion_diaria`; los de ámbito `taller` van en
+                    `ordenes_trabajo.tipos_mantenimiento`). Alimenta el arreglo `mantenimientos`
+                    del `POST`/`PUT /operacion-diaria`. Según `tipo_valor`: `cantidad` → el
+                    control lleva un `valor` numérico en `unidad_medida`; `booleano` → lleva
+                    `realizado` (`SI`/`NO`).
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 12 }
+                      tipo_mantenimiento: { type: string, example: Combustible cargado }
+                      tipo_valor: { type: string, enum: [cantidad, booleano], nullable: true, example: cantidad }
+                      unidad_medida: { type: string, nullable: true, description: "Sólo para `tipo_valor = cantidad`.", example: Litros }
             control_cargas:
               type: object
               description: |
@@ -3142,6 +3574,24 @@ components:
             hora_inicio: { type: string, example: "07:15" }
             hora_fin: { type: string, example: "11:00" }
 
+    MantenimientoOperacionRegistrado:
+      type: object
+      description: |
+        Control de mantenimiento registrado en la operación diaria, tal como se devuelve en
+        las respuestas (tipo del catálogo `tipo_mantenimiento` + valores capturados en
+        `pivot`). Sólo llegan los controles que efectivamente se registraron.
+      properties:
+        id: { type: integer, description: "`id` del tipo de mantenimiento.", example: 12 }
+        tipo_mantenimiento: { type: string, example: Combustible cargado }
+        tipo_valor: { type: string, enum: [cantidad, booleano], nullable: true, example: cantidad }
+        unidad_medida: { type: string, nullable: true, example: Litros }
+        pivot:
+          type: object
+          properties:
+            id: { type: integer, example: 88 }
+            valor: { type: string, nullable: true, description: "Presente para `tipo_valor = cantidad`.", example: "45.50" }
+            realizado: { type: string, enum: [SI, NO], nullable: true, description: "Presente para `tipo_valor = booleano`.", example: null }
+
     OperacionDiaria:
       type: object
       properties:
@@ -3200,6 +3650,12 @@ components:
         actividades_realizadas:
           type: array
           items: { $ref: '#/components/schemas/ActividadRealizada' }
+        mantenimientos_operacion:
+          type: array
+          description: |
+            Controles de mantenimiento registrados en la jornada. Presente en `store`, `show`
+            y `update` (no en el listado). Vacío si no se registró ninguno.
+          items: { $ref: '#/components/schemas/MantenimientoOperacionRegistrado' }
 
     OperacionDiariaCreateResponse:
       type: object
@@ -3215,8 +3671,9 @@ components:
           allOf:
             - $ref: '#/components/schemas/OperacionDiaria'
           description: |
-            Incluye las relaciones anidadas `conductor`, `vehiculo`, `area` y
-            `actividades_realizadas` (igual que `store`/`show`). No trae `verificador`.
+            Incluye las relaciones anidadas `conductor`, `vehiculo`, `area`,
+            `actividades_realizadas` y `mantenimientos_operacion` (igual que `store`/`show`).
+            No trae `verificador`.
 
     ValidarActividadResponse:
       type: object
@@ -3897,7 +4354,7 @@ components:
     CargaMaterialStoreResponse:
       type: object
       properties:
-        message: { type: string, example: "Carga #000001/2026 registrada exitosamente." }
+        message: { type: string, example: "Flete #000001/2026 registrado exitosamente." }
         data: { $ref: '#/components/schemas/CargaMaterial' }
 
     ViajeStoreRequest:
