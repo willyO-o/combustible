@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.1.0"
+  version: "1.2.0"
   contact:
     name: Equipo de Desarrollo — Combustible
   license:
@@ -99,6 +99,14 @@ tags:
       `VERIFICADO` y `CANCELADO` quedan para el emisor de la orden desde el panel web, igual
       que la emisión de la orden (Paso 2). La misma colección de estados y acciones se expone
       en `GET /parametros/colecciones` → `ordenes_trabajo`.
+  - name: Vehículos
+    description: |
+      Consultas por vehículo. Por ahora sólo el **mantenimiento preventivo sugerido**: para
+      cada intervalo configurado en el tipo de vehículo, el servidor compara la última lectura
+      del vehículo (kilometraje/horómetro tomado de sus cargas de combustible) contra la última
+      vez que se registró ese mantenimiento y calcula el siguiente múltiplo de la frecuencia con
+      una tolerancia del 5% (±). La respuesta ya trae el estado, su etiqueta y una frase lista
+      para mostrar: la app no necesita hacer ninguna cuenta.
   - name: Notificaciones
     description: |
       Notificaciones de base de datos (`illuminate/notifications`) del usuario autenticado
@@ -397,7 +405,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.1.0"
+                api_version: "1.2.0"
                 app_name: Combustible
                 app_env: production
                 app_debug: false
@@ -3047,6 +3055,144 @@ paths:
   # ──────────────────────────────────────────────────────────────────────
   # NOTIFICACIONES
   # ──────────────────────────────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────
+  # VEHÍCULOS
+  # ──────────────────────────────────────────────────────────────────────
+  /vehiculos/{vehiculo}/mantenimiento-sugerido:
+    get:
+      tags: [Vehículos]
+      summary: Mantenimiento preventivo sugerido de un vehículo
+      description: |
+        Devuelve, para el vehículo indicado, la lista de mantenimientos preventivos con su
+        estado sugerido. **Todo el cálculo se hace en el servidor**; cada elemento ya viene con
+        `estado`, `estado_label` y `descripcion` (una frase lista para mostrar), además de los
+        números crudos por si la app quiere pintar una barra de progreso.
+
+        **Cómo se calcula cada mantenimiento** (uno por intervalo configurado en el tipo de
+        vehículo):
+        - `lectura_actual` = mayor kilometraje/horómetro registrado en las cargas de combustible
+          del vehículo (según su `tipo_medicion`). Si no hay ninguna, el estado es `SIN_DATOS`.
+        - `ultimo_mantenimiento` = mayor lectura a la que se registró ese mantenimiento en una
+          orden de trabajo (o `null` si nunca se hizo).
+        - `proximo_objetivo` = siguiente múltiplo de `frecuencia` después del último
+          mantenimiento.
+        - `restante` = `proximo_objetivo − lectura_actual` (negativo = ya se pasó).
+        - `tolerancia` = 5% de `frecuencia`.
+
+        **Estados** (`estado` / `estado_label`):
+        | `estado`    | Significado |
+        |-------------|-------------|
+        | `VENCIDO`   | `restante` < −`tolerancia`: ya se pasó del objetivo. |
+        | `PROXIMO`   | `restante` dentro de ±`tolerancia`: toca ahora. |
+        | `AL_DIA`    | Falta bastante para el próximo. |
+        | `SIN_DATOS` | No hay lecturas de combustible para calcularlo. |
+
+        `resumen` trae los conteos por estado y `requiere_atencion` (`true` si hay algún
+        `VENCIDO` o `PROXIMO`). Los elementos vienen ordenados por urgencia
+        (`VENCIDO` → `PROXIMO` → `AL_DIA` → `SIN_DATOS`).
+
+        **Restricción de acceso:**
+        - **conductor**: sólo los vehículos que tiene asignados actualmente; otro vehículo
+          responde `403`.
+        - Otros roles (jefe-area, técnico, administrador, super-admin): sin restricción.
+
+        Si el tipo de vehículo no tiene intervalos configurados, `alertas` es `[]` y `resumen`
+        queda en cero (no es un error).
+      parameters:
+        - name: vehiculo
+          in: path
+          required: true
+          description: Identificador (`id`) del vehículo.
+          schema: { type: integer }
+          example: 12
+      responses:
+        '200':
+          description: Detalle del mantenimiento sugerido del vehículo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MantenimientoSugeridoResponse'
+              example:
+                data:
+                  vehiculo:
+                    id: 12
+                    uuid: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90"
+                    codigo: PM-TRA-0007
+                    nro_placa: "1234-ABC"
+                    marca: Volvo
+                    modelo: FH
+                    tipo_medicion: kilometraje
+                  resumen:
+                    total: 4
+                    vencidos: 1
+                    proximos: 1
+                    al_dia: 1
+                    sin_datos: 1
+                    requiere_atencion: true
+                  alertas:
+                    - id_tipo_mantenimiento: 3
+                      tipo_mantenimiento: Cambio de aceite
+                      tipo_medicion: kilometraje
+                      unidad: km
+                      frecuencia: 10000
+                      tolerancia: 500
+                      lectura_actual: 42000
+                      ultimo_mantenimiento: 28000
+                      proximo_objetivo: 40000
+                      restante: -2000
+                      estado: VENCIDO
+                      estado_label: Vencido
+                      descripcion: "Vencido por 2.000 km. Programar cuanto antes."
+                    - id_tipo_mantenimiento: 5
+                      tipo_mantenimiento: Revisión de frenos
+                      tipo_medicion: kilometraje
+                      unidad: km
+                      frecuencia: 20000
+                      tolerancia: 1000
+                      lectura_actual: 42000
+                      ultimo_mantenimiento: null
+                      proximo_objetivo: 40000
+                      restante: -2000
+                      estado: PROXIMO
+                      estado_label: Próximo
+                      descripcion: "Debería realizarse ahora (pasado por 2.000 km, dentro de la tolerancia)."
+                    - id_tipo_mantenimiento: 8
+                      tipo_mantenimiento: Cambio de neumáticos
+                      tipo_medicion: kilometraje
+                      unidad: km
+                      frecuencia: 60000
+                      tolerancia: 3000
+                      lectura_actual: 42000
+                      ultimo_mantenimiento: null
+                      proximo_objetivo: 60000
+                      restante: 18000
+                      estado: AL_DIA
+                      estado_label: Al día
+                      descripcion: "Al día: faltan 18.000 km para el próximo mantenimiento."
+                    - id_tipo_mantenimiento: 9
+                      tipo_mantenimiento: Cambio de aceite de transmisión
+                      tipo_medicion: horometro
+                      unidad: h
+                      frecuencia: 2000
+                      tolerancia: 100
+                      lectura_actual: null
+                      ultimo_mantenimiento: null
+                      proximo_objetivo: 2000
+                      restante: null
+                      estado: SIN_DATOS
+                      estado_label: Sin datos
+                      descripcion: "Sin lecturas de combustible registradas para calcular este mantenimiento."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El conductor autenticado consulta un vehículo que no tiene asignado.
+          content:
+            application/json:
+              example:
+                message: No tiene acceso al mantenimiento de este vehículo.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /notificaciones:
     get:
       tags: [Notificaciones]
@@ -3261,7 +3407,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.1.0" }
+        api_version: { type: string, example: "1.2.0" }
         app_name: { type: string, example: Combustible }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4990,3 +5136,89 @@ components:
       properties:
         message: { type: string, example: Notificación marcada como leída. }
         data: { $ref: '#/components/schemas/Notificacion' }
+
+    # ── Vehículos ─────────────────────────────────────────────────────
+    MantenimientoSugeridoResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            vehiculo:
+              type: object
+              properties:
+                id: { type: integer, example: 12 }
+                uuid: { type: string, format: uuid, example: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90" }
+                codigo: { type: string, nullable: true, example: PM-TRA-0007 }
+                nro_placa: { type: string, nullable: true, example: "1234-ABC" }
+                marca: { type: string, nullable: true, example: Volvo }
+                modelo: { type: string, nullable: true, example: FH }
+                tipo_medicion: { type: string, enum: [kilometraje, horometro], example: kilometraje }
+            resumen:
+              type: object
+              description: Conteo de mantenimientos por estado.
+              properties:
+                total: { type: integer, example: 4 }
+                vencidos: { type: integer, example: 1 }
+                proximos: { type: integer, example: 1 }
+                al_dia: { type: integer, example: 1 }
+                sin_datos: { type: integer, example: 1 }
+                requiere_atencion:
+                  type: boolean
+                  description: "`true` si hay al menos un mantenimiento `VENCIDO` o `PROXIMO`."
+                  example: true
+            alertas:
+              type: array
+              description: Ordenada por urgencia (`VENCIDO` → `PROXIMO` → `AL_DIA` → `SIN_DATOS`).
+              items: { $ref: '#/components/schemas/MantenimientoSugerido' }
+
+    MantenimientoSugerido:
+      type: object
+      description: |
+        Un mantenimiento preventivo del vehículo, ya evaluado por el servidor. Los campos
+        numéricos comparten la unidad indicada en `unidad` (`km` u `h`). `descripcion` es una
+        frase lista para mostrar y depende del `estado`.
+      properties:
+        id_tipo_mantenimiento: { type: integer, example: 3 }
+        tipo_mantenimiento: { type: string, example: Cambio de aceite }
+        tipo_medicion: { type: string, enum: [kilometraje, horometro], example: kilometraje }
+        unidad: { type: string, enum: [km, h], description: Unidad de todos los valores numéricos de este objeto., example: km }
+        frecuencia:
+          type: number
+          description: Cada cuánto corresponde el mantenimiento (múltiplo base).
+          example: 10000
+        tolerancia:
+          type: number
+          description: Margen de holgura (± 5% de `frecuencia`) usado para clasificar el estado.
+          example: 500
+        lectura_actual:
+          type: number
+          nullable: true
+          description: Última lectura del vehículo (mayor kilometraje/horómetro de sus cargas de combustible). `null` si no hay cargas.
+          example: 42000
+        ultimo_mantenimiento:
+          type: number
+          nullable: true
+          description: Lectura a la que se registró por última vez este mantenimiento. `null` si nunca se hizo.
+          example: 28000
+        proximo_objetivo:
+          type: number
+          description: Lectura a la que se sugiere el siguiente mantenimiento (siguiente múltiplo de `frecuencia`).
+          example: 40000
+        restante:
+          type: number
+          nullable: true
+          description: "`proximo_objetivo − lectura_actual`. Negativo = ya se pasó. `null` si `estado` es `SIN_DATOS`."
+          example: -2000
+        estado:
+          type: string
+          enum: [VENCIDO, PROXIMO, AL_DIA, SIN_DATOS]
+          example: VENCIDO
+        estado_label:
+          type: string
+          description: Etiqueta legible del estado (Vencido / Próximo / Al día / Sin datos).
+          example: Vencido
+        descripcion:
+          type: string
+          description: Frase lista para mostrar en la app, ya redactada según el estado.
+          example: "Vencido por 2.000 km. Programar cuanto antes."

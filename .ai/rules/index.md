@@ -37,5 +37,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/seeders/UserSeeder.php,database/seeders/UserSeederInit.php | .ai/rules/seeders-seeders.md |
 | database/seeders/UserSeeder.php | .ai/rules/seeders.md |
 | app/Http/Controllers/TipoMantenimientoController.php,app/Http/Requests/TipoMantenimientoRequest.php,resources/js/Pages/TiposMantenimiento/**,app/Http/Controllers/OrdenTrabajoController.php,app/Http/Controllers/TipoVehiculoController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Http/Requests/DetalleMantenimientoRequest.php,app/Http/Requests/TipoVehiculoRequest.php | .ai/rules/tipos-mantenimiento.md |
-| app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
+| app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml, app/Http/Controllers/Api/V1/VehiculoController.php,routes/api.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
 | app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php, app/Http/Controllers/Api/V1/*.php,routes/api.php, app/Http/Controllers/Api/V1/*.php | .ai/rules/v1.md |

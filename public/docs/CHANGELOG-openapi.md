@@ -2,6 +2,35 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.2.0 — 2026-09-03
+
+Nuevo módulo **Vehículos** con un único endpoint: el **mantenimiento preventivo sugerido**
+de un vehículo. El cálculo (última lectura del vehículo vs. último mantenimiento registrado,
+siguiente múltiplo de la frecuencia con tolerancia del 5%) se resuelve **en el servidor**; la
+respuesta ya trae `estado`, `estado_label` y una `descripcion` lista para mostrar, más los
+números crudos. Cambio **retrocompatible** (endpoint, tag y esquemas nuevos; nada se quita ni
+cambia de tipo).
+
+### Añadido
+
+#### `GET /vehiculos/{vehiculo}/mantenimiento-sugerido` — **nuevo**
+
+- Tag nuevo **`Vehículos`**.
+- Devuelve `data.vehiculo` (datos básicos), `data.resumen` (conteos por estado +
+  `requiere_atencion`) y `data.alertas[]` (una por intervalo de mantenimiento del tipo de
+  vehículo), ordenadas por urgencia `VENCIDO` → `PROXIMO` → `AL_DIA` → `SIN_DATOS`.
+- Cada alerta: `frecuencia`, `tolerancia`, `lectura_actual`, `ultimo_mantenimiento`,
+  `proximo_objetivo`, `restante`, `estado`, `estado_label`, `descripcion`, `unidad` (`km`/`h`).
+- Nuevos esquemas **`MantenimientoSugeridoResponse`** y **`MantenimientoSugerido`**.
+- Acceso: el **conductor** sólo puede consultar vehículos que tiene asignados (otro → `403`);
+  jefe-area / técnico / administrador / super-admin sin restricción.
+
+#### Varios
+
+- `info.version`: `1.1.0` → `1.2.0`; el ejemplo de `GET /parametros` (`api_version`) y el
+  esquema `ParametrosGenerales` pasan a `"1.2.0"`. `ParametrosController::index()` devuelve
+  `api_version` `"1.2.0"`.
+
 ## 1.1.0 — 2026-09-02
 
 Módulo **Operación Diaria**: se documenta la funcionalidad de controles de mantenimiento

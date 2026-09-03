@@ -374,7 +374,7 @@ onBeforeUnmount(() => {
                 <div class="card custom-card">
                     <div class="card-header justify-content-between">
                         <div class="card-title">
-                            Órdenes de Trabajo por Estado
+                            Órdenes de Mantenimiento por Estado
                         </div>
                         <BotonDescargarGrafico :grafico="ordenesChart" nombre="ordenes-por-estado"
                             titulo="Órdenes de Trabajo por Estado" subtitulo="Dashboard" />

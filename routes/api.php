@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\OrdenTrabajoController;
 use App\Http\Controllers\Api\V1\ParametrosController;
 use App\Http\Controllers\Api\V1\SolicitudMantenimientoController;
 use App\Http\Controllers\Api\V1\ValeController;
+use App\Http\Controllers\Api\V1\VehiculoController;
 use App\Http\Controllers\Api\V1\VehiculoExternoController;
 use Illuminate\Support\Facades\Route;
 
@@ -96,6 +97,12 @@ Route::middleware('auth:api')->group(function () {
     Route::resource('vehiculos-externos', VehiculoExternoController::class)
         ->only(['index', 'store'])
         ->names('api.v1.vehiculos-externos');
+
+    // Vehículos: detalle del mantenimiento preventivo sugerido de un vehículo
+    // (todo el cálculo ya viene resuelto desde el servidor; ver
+    // Api\V1\VehiculoController::mantenimientoSugerido).
+    Route::get('vehiculos/{vehiculo}/mantenimiento-sugerido', [VehiculoController::class, 'mantenimientoSugerido'])
+        ->name('api.v1.vehiculos.mantenimiento-sugerido');
 
     Route::get('solicitudes-mantenimiento/{solicitud}/pdf', [SolicitudMantenimientoController::class, 'pdf'])->name('api.v1.solicitudes-mantenimiento.pdf');
 
