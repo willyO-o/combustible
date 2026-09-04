@@ -99,7 +99,16 @@ class SolicitudMantenimiento extends Model
             $solicitudMantenimiento->nro_solicitud = self::siguienteNroSolicitud($solicitudMantenimiento->gestion);
 
             $solicitudMantenimiento->estado = 'PENDIENTE';
-            $solicitudMantenimiento->id_conductor = Auth::user()->id_persona;
+
+            // Sólo se completa aquí si el creador (Action/seeder/test) no lo
+            // trajo ya resuelto: desde que un jefe de área o administrador
+            // puede elegir explícitamente el conductor de la solicitud (ver
+            // CreateSolicitudMantenimientoAction), forzar siempre el usuario
+            // autenticado rompería esa selección.
+            if (empty($solicitudMantenimiento->id_conductor)) {
+                $solicitudMantenimiento->id_conductor = Auth::user()?->id_persona;
+            }
+
             $solicitudMantenimiento->id_usuario_registra = Auth::id();
         });
     }

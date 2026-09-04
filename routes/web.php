@@ -143,6 +143,7 @@ Route::middleware('auth')->group(function () {
         ->parameters(['vehiculos' => 'vehiculo']);
     Route::post('vehiculos/{vehiculo}/areas', [VehiculoController::class, 'asignarArea'])->name('vehiculos.areas.asignar');
     Route::patch('vehiculos/{vehiculo}/areas/{asignacion}/finalizar', [VehiculoController::class, 'finalizarAsignacionArea'])->name('vehiculos.areas.finalizar');
+    Route::patch('vehiculos/{vehiculo}/asignaciones/{asignacion}/finalizar', [VehiculoController::class, 'finalizarAsignacionConductor'])->name('vehiculos.asignaciones.finalizar');
 
     // Notificaciones (dropdown del header)
     Route::post('notificaciones/{notificacion}/marcar-leida', [NotificacionController::class, 'marcarLeida'])->name('notificaciones.marcar-leida');

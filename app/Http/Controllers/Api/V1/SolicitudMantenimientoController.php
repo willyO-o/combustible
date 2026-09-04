@@ -30,7 +30,8 @@ class SolicitudMantenimientoController extends Controller
     /**
      * Registra una nueva solicitud de mantenimiento.
      *
-     * El acceso ya queda restringido a conductores por SolicitudMantenimientoRequest::authorize().
+     * El acceso ya queda restringido por SolicitudMantenimientoRequest::authorize()
+     * (conductor, jefe-area, administrador o super-admin).
      */
     public function store(SolicitudMantenimientoRequest $request, CreateSolicitudMantenimientoAction $action): JsonResponse
     {

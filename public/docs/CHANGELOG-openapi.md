@@ -2,6 +2,34 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.3.0 — 2026-09-04
+
+`POST /solicitudes-mantenimiento` ahora también lo pueden usar `jefe-area`, `administrador` y
+`super-admin` (antes sólo `conductor`). Cambio **retrocompatible** para clientes existentes: un
+conductor "puro" sigue registrando exactamente igual (nada nuevo que enviar, mismo
+comportamiento). `PUT /solicitudes-mantenimiento/{solicitud}` (editar) no cambia — sigue siendo
+sólo del conductor autor.
+
+### Cambiado
+
+#### `POST /solicitudes-mantenimiento`
+
+- Descripción del endpoint actualizada: ya no dice "sólo disponible para el rol `conductor`".
+- `SolicitudMantenimientoStoreRequest.id_conductor`: descripción actualizada — ahora es
+  **obligatorio** (y debe ser uno de los conductores `ACTIVO`/`PROVISIONAL` realmente
+  asignados a `id_vehiculo`) cuando el usuario autenticado es `jefe-area` (aunque además tenga
+  el rol `conductor`, ese prevalece), `administrador` o `super-admin`. Para un `conductor` sin
+  ningún rol de gestión no cambia: se ignora cualquier valor recibido y se asigna siempre su
+  propia persona.
+- `id_vehiculo` para esos mismos roles ya no exige una asignación propia del usuario — acepta
+  cualquier vehículo activo.
+
+#### Varios
+
+- `info.version`: `1.2.0` → `1.3.0`; el ejemplo de `GET /parametros` (`api_version`) y el
+  esquema `ParametrosGenerales` pasan a `"1.3.0"`. `ParametrosController::index()` devuelve
+  `api_version` `"1.3.0"`.
+
 ## 1.2.0 — 2026-09-03
 
 Nuevo módulo **Vehículos** con un único endpoint: el **mantenimiento preventivo sugerido**

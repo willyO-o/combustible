@@ -1,7 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { confirm } from '@/Utils/alertUtil.js'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -52,6 +53,36 @@ const numero = (valor) =>
         : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(valor)
 
 const medida = (valor, tipo) => (valor === null || valor === undefined ? '—' : `${numero(valor)} ${unidadMedicion(tipo)}`)
+
+// La lectura inicial de la asignación depende del tipo de medición del
+// vehículo (1 vehículo = 1 tipo de medición): kilometraje_inicial u
+// horometro_inicial, nunca ambos.
+const lecturaInicialAsignacion = (asignacion) =>
+    medida(
+        props.vehiculo.tipo_medicion === 'horometro' ? asignacion.horometro_inicial : asignacion.kilometraje_inicial,
+        props.vehiculo.tipo_medicion,
+    )
+
+// Finaliza la asignación (activa, o provisional vigente) sin reemplazarla de
+// inmediato — el vehículo queda sin conductor asignado. `puede_finalizar` ya
+// llega calculado desde el backend (ver VehiculoController::show()).
+async function finalizarAsignacionConductor(asignacion) {
+    const confirmado = await confirm(
+        `¿Finalizar la asignación del conductor <strong>${asignacion.conductor?.nombre_completo ?? ''}</strong>?`,
+        'Finalizar Asignación',
+        'Sí, finalizar',
+    )
+
+    if (!confirmado) {
+        return
+    }
+
+    router.patch(
+        route('vehiculos.asignaciones.finalizar', [props.vehiculo.id, asignacion.id]),
+        {},
+        { preserveScroll: true },
+    )
+}
 
 const estadoAlertaMeta = {
     VENCIDO: { clase: 'bg-danger-transparent text-danger', texto: 'Vencido' },
@@ -344,7 +375,9 @@ const restanteTexto = (alerta) => {
                             <th>Tipo de Asignación</th>
                             <th>Fecha de Asignación</th>
                             <th>Fecha de Culminación</th>
+                            <th>{{ tipoMedicionLabel(vehiculo.tipo_medicion) }} Inicial</th>
                             <th>Detalle</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -365,11 +398,25 @@ const restanteTexto = (alerta) => {
                             </td>
                             <td>{{ asignacion.fecha_asignacion ?? 'N/A' }}</td>
                             <td>{{ asignacion.fecha_culminacion ?? 'Indefinida' }}</td>
+                            <td>{{ lecturaInicialAsignacion(asignacion) }}</td>
                             <td class="text-wrap" style="max-width: 220px;">{{ asignacion.detalle ?? '—' }}</td>
+                            <td>
+                                <button
+                                    v-if="asignacion.puede_finalizar"
+                                    v-can="'conductores.asignar-vehiculo'"
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    title="Finalizar asignación"
+                                    @click="finalizarAsignacionConductor(asignacion)"
+                                >
+                                    <i class="ri-close-circle-line"></i>
+                                </button>
+                                <span v-else>—</span>
+                            </td>
                         </tr>
 
                         <tr v-if="historialAsignaciones.length === 0">
-                            <td colspan="8" class="p-5 text-center text-muted">
+                            <td colspan="10" class="p-5 text-center text-muted">
                                 No hay historial de asignaciones para este vehículo.
                             </td>
                         </tr>

@@ -5,18 +5,22 @@ namespace App\Http\Controllers;
 use App\Actions\SolicitudMantenimiento\CreateSolicitudMantenimientoAction;
 use App\Http\Requests\SolicitudMantenimientoRequest;
 use App\Libraries\Reportes;
-use App\Models\Conductor;
+use App\Models\Asignacion;
 use App\Models\SolicitudMantenimiento;
+use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Paso 1 del flujo de mantenimiento: el CHOFER registra una solicitud
- * o alarma de mantenimiento con los datos del vehículo y la posible
- * falla o mantenimiento preventivo.
+ * Paso 1 del flujo de mantenimiento: se registra una solicitud o alarma de
+ * mantenimiento con los datos del vehículo y la posible falla o
+ * mantenimiento preventivo. Antes sólo el conductor podía registrarla (sobre
+ * su propio vehículo); ahora un jefe de área o administrador también puede,
+ * eligiendo vehículo y conductor (ver create()/esConductorFinal()).
  */
 class SolicitudMantenimientoController extends Controller
 {
@@ -66,40 +70,144 @@ class SolicitudMantenimientoController extends Controller
     }
 
     /**
-     * Formulario para crear una solicitud (Paso 1).
-     *
-     * Sólo los conductores registran solicitudes de mantenimiento: el
-     * vehículo y el conductor se determinan a partir de su propia persona.
+     * Formulario para crear una solicitud (Paso 1), según el rol:
+     * - conductor "puro" (sin rol de gestión): sólo sus propios vehículos
+     *   asignados, sin elegir conductor (siempre es él mismo).
+     * - jefe-area (incluso si además es conductor: ese rol prevalece, a
+     *   diferencia de Operación Diaria, ver .ai/rules/operacion.md): sólo los
+     *   vehículos de las áreas que tiene a cargo, y debe elegir el conductor
+     *   entre los realmente asignados al vehículo.
+     * - cualquier otro rol (administrador, super-admin, etc.): todos los
+     *   vehículos activos, y también elige el conductor.
      */
     public function create(Request $request): Response
     {
-
-
-        $conductores = Conductor::join('persona', 'conductor.id', '=', 'persona.id')
-            ->orderBy('persona.nombres')
-            ->get();
-
-        $conductor = null;
-        if ($request->user()->hasRole('conductor')) {
-            $conductor = Conductor::with('persona')->where('id', $request->user()->id_persona)->first();
-            $vehiculos = $conductor->asignacionesActivas;
-        } else {
-            $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
-                ->where('estado_vehiculo', 'ACTIVO')
-                ->orderBy('nro_placa')->get();
-        }
+        $user = $request->user();
 
         return Inertia::render('SolicitudMantenimiento/Create', [
-            'vehiculos' => $vehiculos,
-            'conductores' => $conductores,
-            'conductor' => $conductor,
+            'vehiculos' => $this->vehiculosDisponibles($user),
+            // El combo de conductor sólo se muestra a quien no es "conductor
+            // final" (ver esConductorFinal()).
+            'mostrarSelectorConductor' => ! $this->esConductorFinal($user),
         ]);
+    }
+
+    /**
+     * Mismo criterio que SolicitudMantenimientoRequest::esConductorFinal() y
+     * CreateSolicitudMantenimientoAction::execute(): un conductor que además
+     * tiene un rol de gestión (jefe-area, administrador, super-admin) deja de
+     * operar "sobre sí mismo" — ese otro rol prevalece.
+     */
+    private function esConductorFinal(User $user): bool
+    {
+        return $user->hasRole('conductor') && ! $user->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
+    }
+
+    /**
+     * @return array<int, array{id: int, label: string, meta: array}>
+     */
+    private function vehiculosDisponibles(User $user): array
+    {
+        $persona = $user->persona;
+
+        if ($this->esConductorFinal($user) && $persona?->conductor) {
+            $vehiculos = $persona->conductor->asignacionesActivas;
+        } elseif ($user->hasRole('jefe-area') && $persona) {
+            $idsArea = $persona->encargadoAreas()->pluck('id_area');
+
+            $vehiculos = $idsArea->isEmpty()
+                ? collect()
+                : Vehiculo::select($this->columnasVehiculoOpt())
+                    ->where('estado_vehiculo', 'ACTIVO')
+                    ->whereHas('areasAsignadas', fn ($q) => $q->whereIn('area.id', $idsArea))
+                    ->get();
+        } else {
+            $vehiculos = Vehiculo::select($this->columnasVehiculoOpt())
+                ->where('estado_vehiculo', 'ACTIVO')
+                ->get();
+        }
+
+        $vehiculos = $vehiculos->sortBy('nro_placa')->values();
+
+        // El combo de conductor sólo se muestra a quien no es "conductor
+        // final": sólo en ese caso vale la pena resolver, en una única
+        // consulta agrupada por vehículo, los conductores realmente
+        // asignados (evita el N+1 de un conductoresAsignados() por vehículo).
+        $conductoresPorVehiculo = $this->esConductorFinal($user)
+            ? collect()
+            : $this->conductoresAsignadosPorVehiculo($vehiculos->pluck('id'));
+
+        return $vehiculos
+            ->map(fn (Vehiculo $vehiculo) => $this->vehiculoOpt($vehiculo, $conductoresPorVehiculo->get($vehiculo->id, collect())))
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function columnasVehiculoOpt(): array
+    {
+        return ['id', 'codigo', 'nro_placa', 'marca', 'anio'];
+    }
+
+    /**
+     * Conductores actualmente asignados (ACTIVO o PROVISIONAL, ver
+     * Vehiculo::conductoresAsignados()) de cada vehículo de $idsVehiculo, en
+     * una sola consulta agrupada por id_vehiculo.
+     *
+     * @param  Collection<int, int>  $idsVehiculo
+     * @return Collection<int, Collection>
+     */
+    private function conductoresAsignadosPorVehiculo($idsVehiculo)
+    {
+        if ($idsVehiculo->isEmpty()) {
+            return collect();
+        }
+
+        return Asignacion::with('conductor.persona:id,nombres,paterno,materno,ci')
+            ->whereIn('id_vehiculo', $idsVehiculo)
+            ->where(function ($query) {
+                $query->where('estado_asignacion', 'ACTIVO')
+                    ->orWhere('estado_asignacion', 'PROVISIONAL');
+            })
+            ->where(function ($query) {
+                $query->whereNull('fecha_culminacion')
+                    ->orWhere('fecha_culminacion', '>', now());
+            })
+            ->get()
+            ->groupBy('id_vehiculo');
+    }
+
+    /**
+     * @param  Collection<int, Asignacion>  $conductoresAsignados
+     * @return array{id: int, label: string, meta: array}
+     */
+    private function vehiculoOpt(Vehiculo $vehiculo, $conductoresAsignados = null): array
+    {
+        return [
+            'id' => $vehiculo->id,
+            'label' => "{$vehiculo->codigo} — {$vehiculo->nro_placa} — {$vehiculo->marca}",
+            'meta' => [
+                // Conductores activos/provisionales asignados a este vehículo
+                // (titular + eventuales reemplazos) para el combo "Conductor"
+                // del formulario.
+                'conductoresAsignados' => collect($conductoresAsignados)
+                    ->unique('id_conductor')
+                    ->map(fn ($asignacion) => [
+                        'id' => $asignacion->id_conductor,
+                        'label' => "{$asignacion->conductor->persona->nombre_completo} (CI: {$asignacion->conductor->persona->ci})",
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+        ];
     }
 
     /**
      * Guarda la solicitud de mantenimiento.
      *
-     * El acceso ya queda restringido a conductores por SolicitudMantenimientoRequest::authorize().
+     * El acceso ya queda restringido por SolicitudMantenimientoRequest::authorize()
+     * (conductor, jefe-area, administrador o super-admin).
      */
     public function store(SolicitudMantenimientoRequest $request, CreateSolicitudMantenimientoAction $createSolicitudMantenimientoAction): RedirectResponse
     {

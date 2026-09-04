@@ -2,13 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Area;
+use App\Models\Asignacion;
 use App\Models\Conductor;
+use App\Models\EncargadoArea;
 use App\Models\OrdenTrabajo;
 use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\SolicitudMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -65,6 +69,44 @@ class SolicitudMantenimientoControllerTest extends TestCase
         return $user;
     }
 
+    private function crearJefeDeArea(Area $area): User
+    {
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+
+        $persona = Persona::factory()->create();
+        EncargadoArea::create([
+            'id_persona' => $persona->id,
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+        $user = User::factory()->create(['id_persona' => $persona->id]);
+        $user->assignRole('jefe-area');
+
+        return $user;
+    }
+
+    private function asignarVehiculoAArea(Vehiculo $vehiculo, Area $area): void
+    {
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+    }
+
+    private function asignarConductorAVehiculo(Conductor $conductor, Vehiculo $vehiculo): Asignacion
+    {
+        return Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+    }
+
     public function test_index_lista_las_solicitudes(): void
     {
         $this->crearSolicitud();
@@ -112,24 +154,65 @@ class SolicitudMantenimientoControllerTest extends TestCase
         );
     }
 
-    public function test_create_esta_bloqueado_para_usuarios_que_no_son_conductor(): void
-    {
-        $response = $this->get(route('mantenimiento.solicitudes.create'));
-
-        $response->assertForbidden();
-    }
-
-    public function test_store_esta_bloqueado_para_usuarios_que_no_son_conductor(): void
+    /**
+     * Un administrador (o super-admin) ahora también puede registrar una
+     * solicitud: ve todos los vehículos activos, sin restricción, y debe
+     * elegir el conductor desde el combo (mostrarSelectorConductor=true).
+     */
+    public function test_create_lista_todos_los_vehiculos_activos_para_administrador(): void
     {
         $vehiculo = Vehiculo::factory()->create();
 
+        $response = $this->get(route('mantenimiento.solicitudes.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('SolicitudMantenimiento/Create')
+            ->where('mostrarSelectorConductor', true)
+            ->has('vehiculos', 1)
+            ->where('vehiculos.0.id', $vehiculo->id)
+        );
+    }
+
+    public function test_administrador_puede_registrar_una_solicitud_eligiendo_vehiculo_y_conductor(): void
+    {
+        $conductorUser = $this->crearUsuarioConductor();
+        $conductor = Conductor::find($conductorUser->id_persona);
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarConductorAVehiculo($conductor, $vehiculo);
+
         $response = $this->post(route('mantenimiento.solicitudes.store'), [
             'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
             'tipo_mantenimiento' => 'PREVENTIVO',
             'descripcion_problema' => 'Cambio de aceite',
+            'kilometraje_actual' => 1000,
         ]);
 
-        $response->assertForbidden();
+        $response->assertRedirect(route('mantenimiento.solicitudes.index'));
+        $this->assertDatabaseHas('solicitud_mantenimiento', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_usuario_registra' => $this->admin->id,
+        ]);
+    }
+
+    public function test_store_exige_un_conductor_asignado_al_vehiculo_para_administrador(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        // Conductor registrado pero SIN asignación a este vehículo.
+        $conductorUser = $this->crearUsuarioConductor();
+        $conductor = Conductor::find($conductorUser->id_persona);
+
+        $response = $this->post(route('mantenimiento.solicitudes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'descripcion_problema' => 'Cambio de aceite',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        $response->assertSessionHasErrors('id_conductor');
         $this->assertDatabaseCount('solicitud_mantenimiento', 0);
     }
 
@@ -142,6 +225,124 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('SolicitudMantenimiento/Create')
+        );
+    }
+
+    /**
+     * Un conductor "puro" no elige conductor (siempre es él mismo, ver
+     * esConductorFinal()): el combo va oculto y sólo ve sus propios
+     * vehículos asignados.
+     */
+    public function test_create_solo_lista_los_vehiculos_asignados_al_conductor_y_oculta_el_selector(): void
+    {
+        $conductorUser = $this->crearUsuarioConductor();
+        $conductor = Conductor::find($conductorUser->id_persona);
+        $vehiculoAsignado = Vehiculo::factory()->create();
+        $this->asignarConductorAVehiculo($conductor, $vehiculoAsignado);
+        Vehiculo::factory()->create(); // otro vehículo, no asignado a este conductor
+
+        $response = $this->actingAs($conductorUser)->get(route('mantenimiento.solicitudes.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('SolicitudMantenimiento/Create')
+            ->where('mostrarSelectorConductor', false)
+            ->has('vehiculos', 1)
+            ->where('vehiculos.0.id', $vehiculoAsignado->id)
+        );
+    }
+
+    /**
+     * Un conductor no puede suplantar a otro: aunque envíe un id_conductor
+     * ajeno, la solicitud se registra siempre a su propio nombre (ver
+     * CreateSolicitudMantenimientoAction::execute()).
+     */
+    public function test_conductor_no_puede_suplantar_a_otro_conductor_al_registrar(): void
+    {
+        $conductorUser = $this->crearUsuarioConductor();
+        $conductor = Conductor::find($conductorUser->id_persona);
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarConductorAVehiculo($conductor, $vehiculo);
+
+        $otroConductorUser = $this->crearUsuarioConductor();
+
+        $response = $this->actingAs($conductorUser)->post(route('mantenimiento.solicitudes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $otroConductorUser->id_persona,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'descripcion_problema' => 'Cambio de aceite',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        $response->assertRedirect(route('mantenimiento.solicitudes.index'));
+        $this->assertDatabaseHas('solicitud_mantenimiento', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+        ]);
+    }
+
+    /**
+     * jefe-area sólo ve los vehículos de las áreas que tiene a cargo, y debe
+     * elegir el conductor (mostrarSelectorConductor=true).
+     */
+    public function test_create_lista_solo_los_vehiculos_del_area_del_jefe(): void
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+
+        $vehiculoDelArea = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoDelArea, $area);
+        Vehiculo::factory()->create(); // de otra área / sin área
+
+        $response = $this->actingAs($jefe)->get(route('mantenimiento.solicitudes.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('SolicitudMantenimiento/Create')
+            ->where('mostrarSelectorConductor', true)
+            ->has('vehiculos', 1)
+            ->where('vehiculos.0.id', $vehiculoDelArea->id)
+        );
+    }
+
+    /**
+     * Un usuario con ambos roles (conductor y jefe-area) es tratado como
+     * jefe-area: ve los vehículos de su área (no sólo el suyo propio) y debe
+     * elegir el conductor, en vez de operar automáticamente sobre sí mismo.
+     */
+    public function test_jefe_area_prevalece_sobre_conductor_cuando_el_usuario_tiene_ambos_roles(): void
+    {
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+
+        $area = Area::factory()->create();
+        $jefeYConductor = $this->crearUsuarioConductor();
+        $jefeYConductor->assignRole('jefe-area');
+        EncargadoArea::create([
+            'id_persona' => $jefeYConductor->id_persona,
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+
+        // Vehículo del área a su cargo (NO asignado a él como conductor).
+        $vehiculoDelArea = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoDelArea, $area);
+
+        // Vehículo asignado a él como conductor, pero fuera de su área: no
+        // debería aparecer (jefe-area prevalece, no se usa el criterio de
+        // conductor).
+        $vehiculoPropio = Vehiculo::factory()->create();
+        $this->asignarConductorAVehiculo(Conductor::find($jefeYConductor->id_persona), $vehiculoPropio);
+
+        $response = $this->actingAs($jefeYConductor)->get(route('mantenimiento.solicitudes.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('SolicitudMantenimiento/Create')
+            ->where('mostrarSelectorConductor', true)
+            ->has('vehiculos', 1)
+            ->where('vehiculos.0.id', $vehiculoDelArea->id)
         );
     }
 }

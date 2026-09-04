@@ -9,11 +9,18 @@ class CreateSolicitudMantenimientoAction
 {
     public function execute(array $datos, User $user): SolicitudMantenimiento
     {
-        if (empty($datos['id_conductor']) && $user->hasRole('conductor')) {
+        // Un conductor que además es jefe de área elige explícitamente el
+        // vehículo (de sus áreas a cargo) y el conductor de la solicitud —
+        // el rol jefe-area prevalece sobre conductor (a diferencia de
+        // Operación Diaria, ver .ai/rules/operacion.md). Sólo un conductor
+        // "puro" queda siempre atado a sí mismo, ignorando cualquier
+        // id_conductor que llegue en el payload (evita que se pueda
+        // suplantar a otro conductor).
+        if (! $user->hasRole('jefe-area') && $user->hasRole('conductor') && $user->persona?->conductor) {
             $datos['id_conductor'] = $user->id_persona;
         }
 
-        if(empty($datos['is_offline'])) {
+        if (empty($datos['is_offline'])) {
             $datos['fecha_solicitud'] = now();
         }
 

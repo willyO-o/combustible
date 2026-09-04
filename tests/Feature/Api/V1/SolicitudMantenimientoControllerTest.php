@@ -138,13 +138,61 @@ class SolicitudMantenimientoControllerTest extends TestCase
         ]);
     }
 
-    public function test_store_rechaza_a_usuarios_que_no_son_conductor(): void
+    /**
+     * Un administrador (o jefe-area) ahora también puede registrar una
+     * solicitud vía API, siempre que elija explícitamente id_conductor y que
+     * ese conductor esté realmente asignado al vehículo (ver
+     * SolicitudMantenimientoRequest::rules()).
+     */
+    public function test_administrador_puede_registrar_una_solicitud_eligiendo_conductor(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+
+        $conductor = $this->crearConductor();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->crearAsignacion($conductor, $vehiculo);
+
+        $response = $this->actingAs($admin, 'api')
+            ->postJson(route('api.v1.solicitudes-mantenimiento.store'), [
+                'id_vehiculo' => $vehiculo->id,
+                'id_conductor' => $conductor->id,
+                'tipo_mantenimiento' => 'CORRECTIVO',
+                'descripcion_problema' => 'Falla en el motor',
+                'kilometraje_actual' => 15000,
+                'fecha_solicitud' => now()->toDateString(),
+            ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.id_conductor', $conductor->id);
+        $response->assertJsonPath('data.id_usuario_registra', $admin->id);
+    }
+
+    public function test_store_rechaza_a_un_administrador_que_no_elige_conductor(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('administrador');
         $vehiculo = Vehiculo::factory()->create();
 
         $response = $this->actingAs($admin, 'api')
+            ->postJson(route('api.v1.solicitudes-mantenimiento.store'), [
+                'id_vehiculo' => $vehiculo->id,
+                'tipo_mantenimiento' => 'CORRECTIVO',
+                'descripcion_problema' => 'Falla en el motor',
+                'fecha_solicitud' => now()->toDateString(),
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['id_conductor']);
+        $this->assertDatabaseCount('solicitud_mantenimiento', 0);
+    }
+
+    public function test_store_rechaza_a_usuarios_sin_ningun_rol_habilitado(): void
+    {
+        $sinRol = User::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+
+        $response = $this->actingAs($sinRol, 'api')
             ->postJson(route('api.v1.solicitudes-mantenimiento.store'), [
                 'id_vehiculo' => $vehiculo->id,
                 'tipo_mantenimiento' => 'CORRECTIVO',

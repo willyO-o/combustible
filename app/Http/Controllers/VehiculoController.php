@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\VehiculoAreaRequest;
 use App\Http\Requests\VehiculoRequest;
 use App\Models\Area;
+use App\Models\Asignacion;
 use App\Models\IntervaloMantenimientoTipo;
 use App\Models\TipoCombustible;
 use App\Models\TipoVehiculo;
@@ -110,6 +111,12 @@ class VehiculoController extends Controller
                 'detalle' => $asignacion->detalle,
                 'kilometraje_inicial' => $asignacion->kilometraje_inicial,
                 'horometro_inicial' => $asignacion->horometro_inicial,
+                // Habilita el botón "Finalizar" en el historial: activa, o
+                // provisional todavía dentro de (o sin) su fecha de
+                // culminación (mismo criterio de "vigente" que
+                // ConductorController::asignacionActual()).
+                'puede_finalizar' => in_array($asignacion->estado_asignacion, ['ACTIVO', 'PROVISIONAL'], true)
+                    && ($asignacion->fecha_culminacion === null || $asignacion->fecha_culminacion->greaterThanOrEqualTo(today())),
                 'conductor' => $asignacion->conductor ? [
                     'id' => $asignacion->conductor->id,
                     'nombre_completo' => $asignacion->conductor->persona?->nombre_completo,
@@ -224,5 +231,33 @@ class VehiculoController extends Controller
 
         return redirect()->route('vehiculos.index')
             ->with('success', 'Asignación de área finalizada exitosamente.');
+    }
+
+    /**
+     * Finaliza manualmente la asignación de conductor activa/provisional de
+     * este vehículo, sin reemplazarla de inmediato (el vehículo queda sin
+     * conductor asignado). Se dispara desde el historial de asignaciones de
+     * Vehiculos/Show.vue; a diferencia de
+     * ConductorController::finalizarAsignacion() (misma acción, mismo
+     * criterio de permisos, pero redirige a conductores.index) esta redirige
+     * de vuelta a la ficha del vehículo.
+     */
+    public function finalizarAsignacionConductor(Request $request, Vehiculo $vehiculo, Asignacion $asignacion): RedirectResponse
+    {
+        if (! $request->user()->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
+            abort(403, 'Sólo un jefe de área o administrador puede finalizar asignaciones.');
+        }
+
+        if ((int) $asignacion->id_vehiculo !== $vehiculo->id) {
+            abort(404);
+        }
+
+        $asignacion->update([
+            'estado_asignacion' => 'INACTIVO',
+            'fecha_culminacion' => now(),
+        ]);
+
+        return redirect()->route('vehiculos.show', $vehiculo)
+            ->with('success', 'Asignación finalizada exitosamente.');
     }
 }

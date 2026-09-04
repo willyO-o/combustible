@@ -1,31 +1,66 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import Multiselect from '@vueform/multiselect'
 
 const props = defineProps({
+    // [{ id, label, meta }] vehículos que el usuario puede elegir: ya viene
+    // filtrado por rol desde el backend (conductor "puro" -> sus vehículos
+    // asignados; jefe-area -> los de sus áreas a cargo, incluso si además es
+    // conductor, ese rol prevalece; cualquier otro rol -> todos los activos).
+    // Ver SolicitudMantenimientoController::vehiculosDisponibles().
     vehiculos: Array,
+    // false para un conductor "puro" (la solicitud siempre es sobre sí
+    // mismo, sin ambigüedad); true para jefe-area/administrador/etc., que
+    // deben elegir entre los conductores realmente asignados al vehículo.
+    mostrarSelectorConductor: Boolean,
 })
 
 // El combo nativo se reemplaza por un Multiselect con filtrado local (sin
 // búsqueda remota, ver SearchSelect.vue) para no volverse impracticable
-// cuando hay muchos vehículos registrados.
-const vehiculosOpt = computed(() => props.vehiculos.map((v) => ({
-    id: v.id,
-    label: `${v.codigo} – ${v.nro_placa ?? ''} – ${v.marca}`,
-})))
+// cuando hay muchos vehículos registrados. props.vehiculos ya llega en
+// formato {id, label, meta} desde el backend.
 
-// El conductor y la fecha/hora de la solicitud se asignan automáticamente
-// en el modelo (a partir del usuario autenticado y del momento del registro),
-// por lo que no se piden en el formulario.
+// El conductor sólo se pide cuando mostrarSelectorConductor es true; si no,
+// el modelo lo asigna automáticamente a partir del usuario autenticado (ver
+// CreateSolicitudMantenimientoAction). La fecha/hora de la solicitud
+// también se asigna en el servidor, así que tampoco se pide aquí.
 const form = useForm({
     id_vehiculo:          '',
+    id_conductor:         '',
     tipo_mantenimiento:   'PREVENTIVO',
     descripcion_problema: '',
     kilometraje_actual:   '',
     observacion:          '',
+})
+
+// Conductores activos/provisionales del vehículo seleccionado (sólo viene
+// poblado desde el backend cuando mostrarSelectorConductor es true).
+const conductoresDelVehiculo = computed(() => {
+    const vehiculoSeleccionado = props.vehiculos.find((v) => v.id === form.id_vehiculo)
+    return vehiculoSeleccionado?.meta?.conductoresAsignados ?? []
+})
+
+watch(() => form.id_vehiculo, (val) => {
+    if (!props.mostrarSelectorConductor) {
+        return
+    }
+
+    if (!val) {
+        form.id_conductor = ''
+        return
+    }
+
+    const vehiculoSeleccionado = props.vehiculos.find((v) => v.id === val)
+    const conductores = vehiculoSeleccionado?.meta?.conductoresAsignados ?? []
+
+    // Si el conductor ya elegido no pertenece al nuevo vehículo, se limpia;
+    // si sólo queda una opción, se autoselecciona.
+    if (!conductores.some((c) => c.id === form.id_conductor)) {
+        form.id_conductor = conductores.length === 1 ? conductores[0].id : ''
+    }
 })
 
 function submit() {
@@ -69,12 +104,30 @@ function submit() {
                             <label class="form-label fw-medium">
                                 Vehículo <span class="text-danger">*</span>
                             </label>
-                            <Multiselect v-model="form.id_vehiculo" :options="vehiculosOpt" value-prop="id" label="label"
+                            <Multiselect v-model="form.id_vehiculo" :options="vehiculos" value-prop="id" label="label"
                                 :searchable="true" :filter-results="true" placeholder="Buscar vehículo..."
                                 no-options-text="Sin vehículos activos" no-results-text="Sin resultados"
                                 :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
                             <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">
                                 {{ form.errors.id_vehiculo }}
+                            </div>
+                        </div>
+
+                        <!-- Conductor: sólo se muestra a quien no es conductor "puro"
+                             (jefe-area/administrador/etc.), ya que un vehículo puede
+                             tener varios conductores asignados. -->
+                        <div v-if="mostrarSelectorConductor" class="col-md-6">
+                            <label class="form-label fw-medium">
+                                Conductor <span class="text-danger">*</span>
+                            </label>
+                            <Multiselect v-model="form.id_conductor" :options="conductoresDelVehiculo"
+                                value-prop="id" label="label" :searchable="true" :filter-results="true"
+                                :disabled="!form.id_vehiculo" placeholder="Selecciona un conductor..."
+                                no-options-text="Este vehículo no tiene conductores asignados"
+                                no-results-text="Sin resultados"
+                                :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
+                            <div v-if="form.errors.id_conductor" class="text-danger small mt-1">
+                                {{ form.errors.id_conductor }}
                             </div>
                         </div>
 

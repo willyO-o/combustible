@@ -177,6 +177,80 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame(50000, $orden->kilometraje_actual);
     }
 
+    /**
+     * Caso límite: por defecto store() deja la solicitud origen en APROBADA
+     * (ver test_store_emite_una_orden_interna_y_aprueba_la_solicitud_origen),
+     * lo que ya la saca del listado por el filtro estado=PENDIENTE. Este test
+     * fuerza el estado PENDIENTE con una orden ya enganchada para blindar
+     * también ese escenario (whereDoesntHave('ordenTrabajo')).
+     */
+    public function test_create_no_lista_una_solicitud_que_ya_tiene_orden_de_trabajo(): void
+    {
+        $solicitud = $this->crearSolicitud();
+        $this->crearOrden(['id_solicitud_mantenimiento' => $solicitud->id]);
+
+        $response = $this->get(route('mantenimiento.ordenes.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('OrdenTrabajo/Create')
+            ->has('solicitudesPendientes', 0)
+        );
+    }
+
+    public function test_create_no_preselecciona_una_solicitud_que_ya_tiene_orden(): void
+    {
+        $solicitud = $this->crearSolicitud();
+        $this->crearOrden(['id_solicitud_mantenimiento' => $solicitud->id]);
+
+        $response = $this->get(route('mantenimiento.ordenes.create', ['solicitud' => $solicitud->id]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('OrdenTrabajo/Create')
+            ->where('solicitudPreseleccionada', null)
+        );
+    }
+
+    public function test_store_rechaza_una_solicitud_que_ya_tiene_una_orden_de_trabajo(): void
+    {
+        $solicitud = $this->crearSolicitud();
+        $this->crearOrden(['id_solicitud_mantenimiento' => $solicitud->id]);
+
+        $response = $this->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_solicitud_mantenimiento' => $solicitud->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        $response->assertSessionHasErrors('id_solicitud_mantenimiento');
+        $this->assertSame(1, OrdenTrabajo::where('id_solicitud_mantenimiento', $solicitud->id)->count());
+    }
+
+    /**
+     * Regresión: la validación nueva de id_solicitud_mantenimiento no debe
+     * bloquear editar una orden que ya trae enganchada su propia solicitud
+     * origen (que, por definición, ya tiene esta misma orden asignada).
+     */
+    public function test_update_no_falla_por_la_propia_solicitud_ya_asignada_a_la_orden(): void
+    {
+        $solicitud = $this->crearSolicitud();
+        $orden = $this->crearOrden(['id_solicitud_mantenimiento' => $solicitud->id]);
+
+        $response = $this->put(route('mantenimiento.ordenes.update', $orden), [
+            'id_vehiculo' => $orden->id_vehiculo,
+            'id_solicitud_mantenimiento' => $solicitud->id,
+            'id_usuario_ejecuta' => $orden->id_usuario_ejecuta,
+            'tipo_mantenimiento' => 'CORRECTIVO',
+            'kilometraje_actual' => 1500,
+        ]);
+
+        $response->assertRedirect(route('mantenimiento.ordenes.show', $orden));
+        $this->assertSame('CORRECTIVO', $orden->fresh()->tipo_mantenimiento);
+    }
+
     public function test_store_orden_externa_cuando_se_asigna_taller(): void
     {
         $taller = Taller::create([

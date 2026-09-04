@@ -119,10 +119,16 @@ class OrdenTrabajoController extends Controller
             ->orderBy('fecha_solicitud', 'desc')
             ->get();
 
-        // Pre-selección si viene desde una solicitud
+        // Pre-selección si viene desde una solicitud: mismo filtro que
+        // $solicitudesPendientes (PENDIENTE y sin orden ya asignada), para no
+        // preseleccionar una solicitud que ya no está disponible (p. ej. el
+        // enlace "generar orden" de una solicitud que otro usuario ya
+        // procesó mientras tanto).
         $solicitudPreseleccionada = null;
         if ($request->filled('solicitud')) {
             $solicitudPreseleccionada = SolicitudMantenimiento::with('vehiculo', 'conductor')
+                ->where('estado', 'PENDIENTE')
+                ->whereDoesntHave('ordenTrabajo')
                 ->find($request->solicitud);
         }
 

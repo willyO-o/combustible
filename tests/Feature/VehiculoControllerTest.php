@@ -28,6 +28,8 @@ class VehiculoControllerTest extends TestCase
         parent::setUp();
 
         Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('administrador');
@@ -153,9 +155,53 @@ class VehiculoControllerTest extends TestCase
             ->has('historialAsignaciones', 2)
             ->where('historialAsignaciones.0.conductor.id', $conductorActual->id)
             ->where('historialAsignaciones.0.estado_asignacion', 'ACTIVO')
+            ->where('historialAsignaciones.0.puede_finalizar', true)
             ->where('historialAsignaciones.1.conductor.id', $conductorAnterior->id)
             ->where('historialAsignaciones.1.estado_asignacion', 'INACTIVO')
+            ->where('historialAsignaciones.1.puede_finalizar', false)
         );
+    }
+
+    /**
+     * puede_finalizar habilita el botón "Finalizar" del historial: activa, o
+     * provisional todavía dentro de (o sin) su fecha de culminación. Una
+     * PROVISIONAL cuya fecha ya pasó no debe habilitarlo (ya está vencida).
+     */
+    public function test_show_marca_puede_finalizar_segun_estado_y_fecha_de_culminacion(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+
+        $activa = Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $provisionalVigente = Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'fecha_asignacion' => now(),
+            'fecha_culminacion' => now()->addWeek(),
+            'estado_asignacion' => 'PROVISIONAL',
+        ]);
+
+        $provisionalVencida = Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'fecha_culminacion' => now()->subDay(),
+            'estado_asignacion' => 'PROVISIONAL',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('vehiculos.show', $vehiculo->id));
+
+        $response->assertOk();
+        $historial = collect($response->viewData('page')['props']['historialAsignaciones'])->keyBy('id');
+
+        $this->assertTrue($historial[$activa->id]['puede_finalizar']);
+        $this->assertTrue($historial[$provisionalVigente->id]['puede_finalizar']);
+        $this->assertFalse($historial[$provisionalVencida->id]['puede_finalizar']);
     }
 
     public function test_show_incluye_las_alertas_de_mantenimiento_del_tipo_de_vehiculo(): void
@@ -227,5 +273,67 @@ class VehiculoControllerTest extends TestCase
             'codigo' => 'ACT-0011',
             'modelo' => 'Hilux',
         ]);
+    }
+
+    /**
+     * Botón "Finalizar" del historial de asignaciones (Vehiculos/Show.vue):
+     * misma acción que ConductorController::finalizarAsignacion(), pero
+     * redirige de vuelta a la ficha del vehículo en vez de a conductores.index.
+     */
+    public function test_finalizar_asignacion_de_conductor_la_marca_inactiva_sin_reemplazarla(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $asignacion = Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->patch(route('vehiculos.asignaciones.finalizar', [$vehiculo->id, $asignacion->id]));
+
+        $response->assertRedirect(route('vehiculos.show', $vehiculo->id));
+        $asignacion->refresh();
+        $this->assertSame('INACTIVO', $asignacion->estado_asignacion);
+        $this->assertNotNull($asignacion->fecha_culminacion);
+    }
+
+    public function test_finalizar_asignacion_de_conductor_esta_bloqueado_para_quien_no_es_administrador_ni_jefe_de_area(): void
+    {
+        $conductorUser = User::factory()->create();
+        $conductorUser->assignRole('conductor');
+
+        $vehiculo = Vehiculo::factory()->create();
+        $asignacion = Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response = $this->actingAs($conductorUser)
+            ->patch(route('vehiculos.asignaciones.finalizar', [$vehiculo->id, $asignacion->id]));
+
+        $response->assertForbidden();
+        $this->assertSame('ACTIVO', $asignacion->fresh()->estado_asignacion);
+    }
+
+    public function test_finalizar_asignacion_de_conductor_de_otro_vehiculo_devuelve_404(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $otroVehiculo = Vehiculo::factory()->create();
+        $asignacion = Asignacion::create([
+            'id_vehiculo' => $otroVehiculo->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->patch(route('vehiculos.asignaciones.finalizar', [$vehiculo->id, $asignacion->id]));
+
+        $response->assertNotFound();
+        $this->assertSame('ACTIVO', $asignacion->fresh()->estado_asignacion);
     }
 }

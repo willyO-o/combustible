@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\SolicitudMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -29,7 +30,35 @@ class OrdenTrabajoRequest extends FormRequest
         return [
             'id_vehiculo' => ['required', 'exists:vehiculo,id'],
             'id_conductor' => ['nullable', 'exists:conductor,id'],
-            'id_solicitud_mantenimiento' => ['nullable', 'exists:solicitud_mantenimiento,id'],
+            'id_solicitud_mantenimiento' => [
+                'nullable',
+                function ($attribute, $value, $fail) {
+                    if (! $value) {
+                        return;
+                    }
+
+                    $ordenActual = $this->route('orden');
+
+                    // Al editar, la propia orden ya trae esta solicitud enganchada
+                    // (estado APROBADA y con esta misma orden) — no se re-valida
+                    // en ese caso, sólo si se intenta enganchar OTRA solicitud.
+                    if ($ordenActual && (int) $ordenActual->id_solicitud_mantenimiento === (int) $value) {
+                        return;
+                    }
+
+                    // Existencia + estado + "sin orden ya asignada" en UNA sola
+                    // consulta (whereDoesntHave -> NOT EXISTS), resuelta en la
+                    // BD en vez de 3 idas y vueltas (exists + find + exists).
+                    $disponible = SolicitudMantenimiento::where('id', $value)
+                        ->where('estado', 'PENDIENTE')
+                        ->whereDoesntHave('ordenTrabajo')
+                        ->exists();
+
+                    if (! $disponible) {
+                        $fail('Esta solicitud de mantenimiento ya no está disponible: no existe, no está pendiente o ya tiene una orden de trabajo asignada.');
+                    }
+                },
+            ],
             'id_taller' => ['nullable', 'exists:taller,id'],
             'id_usuario_ejecuta' => [
                 'required',
