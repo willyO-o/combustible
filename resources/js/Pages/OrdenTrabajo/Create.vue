@@ -144,7 +144,7 @@ function submit() {
                         <!-- Responsable de ejecución -->
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">
-                                Responsable de Ejecución <span class="text-danger">*</span>
+                                Tecnico asignado <span class="text-danger">*</span>
                             </label>
                             <select v-model="form.id_usuario_ejecuta" class="form-select"
                                 :class="{ 'is-invalid': form.errors.id_usuario_ejecuta }">

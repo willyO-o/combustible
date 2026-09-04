@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use App\Notifications\OrdenTrabajoAsignadaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -249,6 +250,43 @@ class OrdenTrabajoControllerTest extends TestCase
 
         $response->assertRedirect(route('mantenimiento.ordenes.show', $orden));
         $this->assertSame('CORRECTIVO', $orden->fresh()->tipo_mantenimiento);
+    }
+
+    /**
+     * Guarda de regresión de eficiencia: validar id_solicitud_mantenimiento
+     * (estado + "sin orden ya asignada") debe resolverse en UNA sola
+     * consulta (whereDoesntHave -> NOT EXISTS en la BD), no con
+     * exists()+find()+exists() por separado. Ver .ai/rules sobre eficiencia
+     * de consultas/condicionales.
+     */
+    public function test_valida_la_solicitud_de_origen_en_una_sola_consulta(): void
+    {
+        $solicitud = $this->crearSolicitud();
+
+        DB::enableQueryLog();
+
+        $this->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_solicitud_mantenimiento' => $solicitud->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        // Sólo cuenta lecturas (SELECT) a la tabla solicitud_mantenimiento:
+        // el INSERT de orden_trabajo menciona la columna id_solicitud_mantenimiento
+        // (falso positivo por substring) y el UPDATE final que la aprueba es
+        // una escritura de negocio, no una lectura de filtrado/validación.
+        $consultasSolicitud = collect(DB::getQueryLog())
+            ->filter(fn ($q) => str_starts_with(strtolower($q['query']), 'select')
+                && str_contains($q['query'], 'solicitud_mantenimiento'))
+            ->count();
+
+        DB::disableQueryLog();
+
+        // 1 consulta en la validación (whereDoesntHave) + 1 en store() al
+        // copiar los datos de la solicitud origen (findOrFail) = 2, nunca más.
+        $this->assertLessThanOrEqual(2, $consultasSolicitud);
     }
 
     public function test_store_orden_externa_cuando_se_asigna_taller(): void
