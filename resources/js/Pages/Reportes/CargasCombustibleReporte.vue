@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import Multiselect from '@vueform/multiselect'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 import BotonDescargarGrafico from '@/Components/BotonDescargarGrafico.vue'
 import { useTemaGraficos } from '@/Composables/useTemaGraficos'
@@ -10,6 +11,7 @@ defineOptions({ layout: Maindashboard })
 const props = defineProps({
     vehiculos: Array,
     tiposCombustible: Array,
+    tiposVehiculo: Array,
     areas: Array,
     datosResumen: Object,
     filtros: Object,
@@ -21,7 +23,15 @@ const filtros = ref({
     id_vehiculo: props.filtros?.id_vehiculo ?? '',
     id_tipo_combustible: props.filtros?.id_tipo_combustible ?? '',
     id_area: props.filtros?.id_area ?? '',
+    id_tipo_vehiculo: props.filtros?.id_tipo_vehiculo ?? '',
 })
+
+const vehiculoOptions = computed(() =>
+    props.vehiculos.map((v) => ({
+        id: v.id,
+        label: `${v.codigo}   ${v.nro_placa ?? ''} – ${v.marca}`,
+    })),
+)
 
 let debounceTimer = null
 watch(filtros, (val) => {
@@ -36,14 +46,16 @@ watch(filtros, (val) => {
             id_vehiculo: val.id_vehiculo || undefined,
             id_tipo_combustible: val.id_tipo_combustible || undefined,
             id_area: val.id_area || undefined,
+            id_tipo_vehiculo: val.id_tipo_vehiculo || undefined,
         }, { preserveState: true, replace: true })
     }, 500)
 }, { deep: true })
 
-// El tipo de combustible y el área acotan el select de vehículo (1 vehículo =
-// 1 tipo de combustible; el área depende de su asignación vigente en
-// vehiculo_area). Si el vehículo elegido ya no aparece en el nuevo listado, se
-// limpia la selección en vez de dejar un id "fantasma" filtrando el reporte.
+// El tipo de combustible, el área y el tipo de vehículo acotan el select de
+// vehículo (1 vehículo = 1 tipo de combustible y 1 tipo de vehículo; el área
+// depende de su asignación vigente en vehiculo_area). Si el vehículo elegido
+// ya no aparece en el nuevo listado, se limpia la selección en vez de dejar
+// un id "fantasma" filtrando el reporte.
 watch(() => props.vehiculos, (nuevos) => {
     if (filtros.value.id_vehiculo && ! nuevos.some((v) => v.id === Number(filtros.value.id_vehiculo))) {
         filtros.value.id_vehiculo = ''
@@ -57,6 +69,7 @@ function clearFilters() {
         id_vehiculo: '',
         id_tipo_combustible: '',
         id_area: '',
+        id_tipo_vehiculo: '',
     }
 }
 
@@ -71,6 +84,7 @@ function generarReporte() {
         fecha_inicio: filtros.value.fecha_inicio,
         fecha_fin: filtros.value.fecha_fin,
         id_vehiculo: filtros.value.id_vehiculo || null,
+        id_tipo_vehiculo: filtros.value.id_tipo_vehiculo || null,
     })
 
     // Abre la URL en una nueva pestaña
@@ -240,14 +254,26 @@ const donutOptions = computed(() => ({
                             <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre_area }}</option>
                         </select>
                     </div>
+                    <div class="col-sm-6 col-lg-3">
+                        <label class="form-label">Tipo de Vehículo</label>
+                        <select v-model="filtros.id_tipo_vehiculo" class="form-select">
+                            <option value="">Todos</option>
+                            <option v-for="tv in tiposVehiculo" :key="tv.id" :value="tv.id">{{ tv.tipo_vehiculo }}</option>
+                        </select>
+                    </div>
                     <div class="col-lg-9">
                         <label class="form-label">Vehículo (Opcional)</label>
-                        <select v-model="filtros.id_vehiculo" class="form-select">
-                            <option value="">Todos los vehículos</option>
-                            <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                             {{ v.codigo }}   {{ v.nro_placa ?? "" }} – {{ v.marca }}
-                            </option>
-                        </select>
+                        <Multiselect
+                            v-model="filtros.id_vehiculo"
+                            :options="vehiculoOptions"
+                            value-prop="id"
+                            label="label"
+                            :searchable="true"
+                            :filter-results="true"
+                            placeholder="Todos los vehículos"
+                            no-options-text="Sin vehículos"
+                            no-results-text="Sin resultados"
+                        />
                     </div>
                     <div class="col-lg-3 d-flex align-items-end gap-2">
                         <button type="button" class="btn btn-outline-secondary btn-wave flex-grow-1" @click="clearFilters">

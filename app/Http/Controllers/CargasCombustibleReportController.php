@@ -6,6 +6,7 @@ use App\Libraries\Reportes;
 use App\Models\Area;
 use App\Models\CargaCombustible;
 use App\Models\TipoCombustible;
+use App\Models\TipoVehiculo;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,15 +16,16 @@ class CargasCombustibleReportController extends Controller
 {
     /**
      * Mostrar la vista de reportes de cargas de combustible. Admite los
-     * mismos filtros de tipo de combustible y área que el reporte de
-     * rendimiento (ver vehiculosParaFiltro()).
+     * mismos filtros de tipo de combustible, área y tipo de vehículo que el
+     * reporte de rendimiento (ver vehiculosParaFiltro()).
      */
     public function index(Request $request): Response
     {
         $idTipoCombustible = $request->integer('id_tipo_combustible') ?: null;
         $idArea = $request->integer('id_area') ?: null;
+        $idTipoVehiculo = $request->integer('id_tipo_vehiculo') ?: null;
 
-        $vehiculos = $this->vehiculosParaFiltro($idTipoCombustible, $idArea);
+        $vehiculos = $this->vehiculosParaFiltro($idTipoCombustible, $idArea, $idTipoVehiculo);
 
         // Obtener filtros del request
         $fechaInicio = $request->input('fecha_inicio', now()->startOfMonth()->format('Y-m-d'));
@@ -31,11 +33,12 @@ class CargasCombustibleReportController extends Controller
         $idVehiculo = $request->input('id_vehiculo', null);
 
         // Obtener datos para mostrar en la vista
-        $datosResumen = $this->obtenerResumen($fechaInicio, $fechaFin, $idVehiculo, $idTipoCombustible, $idArea);
+        $datosResumen = $this->obtenerResumen($fechaInicio, $fechaFin, $idVehiculo, $idTipoCombustible, $idArea, $idTipoVehiculo);
 
         return inertia('Reportes/CargasCombustibleReporte', [
             'vehiculos' => $vehiculos,
             'tiposCombustible' => $this->tiposCombustibleActivos(),
+            'tiposVehiculo' => $this->tiposVehiculoActivos(),
             'areas' => $this->areasActivas(),
             'datosResumen' => $datosResumen,
             'filtros' => [
@@ -44,6 +47,7 @@ class CargasCombustibleReportController extends Controller
                 'id_vehiculo' => $idVehiculo,
                 'id_tipo_combustible' => $idTipoCombustible,
                 'id_area' => $idArea,
+                'id_tipo_vehiculo' => $idTipoVehiculo,
             ],
         ]);
     }
@@ -61,9 +65,15 @@ class CargasCombustibleReportController extends Controller
         $fechaInicio = $request->input('fecha_inicio');
         $fechaFin = $request->input('fecha_fin');
         $idVehiculo = $request->input('id_vehiculo', null);
+        $idTipoVehiculo = $request->integer('id_tipo_vehiculo') ?: null;
+
+        // Se resuelve a texto legible aquí (no en Reportes.php) para que el
+        // PDF deje constancia de qué filtro se aplicó, igual que se ve en
+        // pantalla (mismo criterio que generarPDFRendimiento()).
+        $tipoVehiculoLabel = $idTipoVehiculo ? TipoVehiculo::find($idTipoVehiculo)?->tipo_vehiculo : null;
 
         $reporte = new Reportes;
-        $reporte->generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo);
+        $reporte->generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo, $idTipoVehiculo, $tipoVehiculoLabel);
     }
 
     /**
@@ -136,8 +146,9 @@ class CargasCombustibleReportController extends Controller
     /**
      * @param  int|null  $idTipoCombustible  Campo propio de vehiculo (1 vehículo = 1 tipo de combustible).
      * @param  int|null  $idArea  Asignación vigente en vehiculo_area (estado ACTIVO y fecha_culminacion nula o futura).
+     * @param  int|null  $idTipoVehiculo  Campo propio de vehiculo (1 vehículo = 1 tipo de vehículo).
      */
-    private function obtenerResumen($fechaInicio, $fechaFin, $idVehiculo = null, ?int $idTipoCombustible = null, ?int $idArea = null)
+    private function obtenerResumen($fechaInicio, $fechaFin, $idVehiculo = null, ?int $idTipoCombustible = null, ?int $idArea = null, ?int $idTipoVehiculo = null)
     {
         $query = CargaCombustible::join(
             'vehiculo as v',
@@ -150,6 +161,7 @@ class CargasCombustibleReportController extends Controller
                 return $query->where('carga_combustible.id_vehiculo', $idVehiculo);
             })
             ->when($idTipoCombustible, fn ($q) => $q->where('v.id_tipo_combustible', $idTipoCombustible))
+            ->when($idTipoVehiculo, fn ($q) => $q->where('v.id_tipo_vehiculo', $idTipoVehiculo))
             ->when($idArea, fn ($q) => $q->whereExists(function ($sub) use ($idArea) {
                 $sub->select(DB::raw(1))
                     ->from('vehiculo_area')
@@ -272,16 +284,18 @@ class CargasCombustibleReportController extends Controller
     /**
      * Vehículos disponibles para los selects de filtro. Sólo el resumen
      * (generarReporteRendimiento) acota por tipo de combustible (campo propio
-     * de vehiculo, 1:1) y/o área (asignación vigente en vehiculo_area: estado
-     * ACTIVO y fecha_culminacion nula o futura); el detalle de un solo
-     * vehículo llama a esto sin filtros. Siempre incluye el tipo de
-     * combustible como relación (para mostrarlo como etiqueta en la UI).
+     * de vehiculo, 1:1), tipo de vehículo (campo propio de vehiculo, 1:1) y/o
+     * área (asignación vigente en vehiculo_area: estado ACTIVO y
+     * fecha_culminacion nula o futura); el detalle de un solo vehículo llama
+     * a esto sin filtros. Siempre incluye el tipo de combustible como
+     * relación (para mostrarlo como etiqueta en la UI).
      */
-    private function vehiculosParaFiltro(?int $idTipoCombustible = null, ?int $idArea = null)
+    private function vehiculosParaFiltro(?int $idTipoCombustible = null, ?int $idArea = null, ?int $idTipoVehiculo = null)
     {
         return Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
             ->with('tipoCombustible:id,tipo_combustible')
             ->when($idTipoCombustible, fn ($q) => $q->where('id_tipo_combustible', $idTipoCombustible))
+            ->when($idTipoVehiculo, fn ($q) => $q->where('id_tipo_vehiculo', $idTipoVehiculo))
             ->when($idArea, fn ($q) => $q->whereExists(function ($sub) use ($idArea) {
                 $sub->select(DB::raw(1))
                     ->from('vehiculo_area')
@@ -302,6 +316,14 @@ class CargasCombustibleReportController extends Controller
         return TipoCombustible::select('id', 'tipo_combustible')
             ->where('estado_tipo_combustible', 'ACTIVO')
             ->orderBy('tipo_combustible')
+            ->get();
+    }
+
+    private function tiposVehiculoActivos()
+    {
+        return TipoVehiculo::select('id', 'tipo_vehiculo')
+            ->where('estado_tipo_vehiculo', 'ACTIVO')
+            ->orderBy('tipo_vehiculo')
             ->get();
     }
 

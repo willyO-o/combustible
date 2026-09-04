@@ -590,7 +590,13 @@ class Reportes extends exFPDF
         return $valor !== null ? number_format((float) $valor, 2, ',', ' ') : '';
     }
 
-    public function generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo = null)
+    /**
+     * @param  string|null  $tipoVehiculoLabel  Etiqueta ya resuelta a texto (no el id) del
+     *                                          tipo de vehículo filtrado, para dejar constancia
+     *                                          de ese filtro en el PDF (mismo criterio que
+     *                                          generarReporteRendimiento()).
+     */
+    public function generarReporteCargasCombustible($fechaInicio, $fechaFin, $idVehiculo = null, $idTipoVehiculo = null, ?string $tipoVehiculoLabel = null)
     {
         // Importar modelo
         $cargasCombustibleQuery = CargaCombustible::whereBetween('fecha_carga', [$fechaInicio, $fechaFin])
@@ -598,6 +604,10 @@ class Reportes extends exFPDF
 
         if ($idVehiculo) {
             $cargasCombustibleQuery->where('id_vehiculo', $idVehiculo);
+        }
+
+        if ($idTipoVehiculo) {
+            $cargasCombustibleQuery->whereHas('vehiculo', fn ($q) => $q->where('id_tipo_vehiculo', $idTipoVehiculo));
         }
 
         $cargas = $cargasCombustibleQuery->orderBy('fecha_carga')->get();
@@ -644,9 +654,13 @@ class Reportes extends exFPDF
         // ════════════════════════════════════════════════════════════════
         // ENCABEZADO
         // ════════════════════════════════════════════════════════════════
+        // Alto dinámico: si hay un filtro aplicado se agrega una línea extra
+        // debajo del rango de fechas (mismo criterio que generarReporteRendimiento()).
+        $h1 = $tipoVehiculoLabel ? 22 : 16;
+
         $this->SetLineWidth(0.5);
         $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->Rect($sx, $sy, $uw, 16);
+        $this->Rect($sx, $sy, $uw, $h1);
 
         // Logo (el configurado en Parámetros de la Empresa, o el de respaldo)
         $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 1.5, 35);
@@ -663,7 +677,14 @@ class Reportes extends exFPDF
         $this->SetXY($sx + 40, $sy + 8);
         $this->Cell($uw - 40, 8, utf8Decode('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
 
-        $currentY = $sy + 16 + 2;
+        if ($tipoVehiculoLabel) {
+            $this->SetFont('Arial', 'BI', 8);
+            $this->SetTextColor($verde[0], $verde[1], $verde[2]);
+            $this->SetXY($sx + 40, $sy + 16);
+            $this->Cell($uw - 40, 5, utf8Decode('Filtro aplicado: Tipo de vehículo: '.$tipoVehiculoLabel), 0, 2, 'L');
+        }
+
+        $currentY = $sy + $h1 + 2;
         $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
         $currentY += 3;
 

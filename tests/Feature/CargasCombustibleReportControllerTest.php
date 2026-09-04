@@ -9,6 +9,7 @@ use App\Models\Grifo;
 use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoCombustible;
+use App\Models\TipoVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
@@ -138,6 +139,36 @@ class CargasCombustibleReportControllerTest extends TestCase
         $this->assertCount(1, $vehiculosResumen);
         $this->assertSame($vehiculoDiesel->id, $vehiculosResumen->first()['id_vehiculo']);
         $this->assertTrue($vehiculosProp->pluck('id')->contains($vehiculoDiesel->id));
+        $this->assertFalse($vehiculosProp->pluck('id')->contains($vehiculoOtroTipo->id));
+    }
+
+    public function test_index_filtra_por_tipo_de_vehiculo(): void
+    {
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+        $vehiculoDelTipo = Vehiculo::factory()->create(['id_tipo_vehiculo' => $tipoVehiculo->id]);
+        $vehiculoOtroTipo = Vehiculo::factory()->create();
+        $this->crearCarga($vehiculoDelTipo);
+        $this->crearCarga($vehiculoOtroTipo);
+
+        $response = $this->get(route('cargas-combustible.reporte.index', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->addDay()->format('Y-m-d'),
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Reportes/CargasCombustibleReporte')
+            ->has('tiposVehiculo')
+            ->where('filtros.id_tipo_vehiculo', $tipoVehiculo->id)
+        );
+
+        $vehiculosResumen = collect($response->viewData('page')['props']['datosResumen']['vehiculos']);
+        $vehiculosProp = collect($response->viewData('page')['props']['vehiculos']);
+
+        $this->assertCount(1, $vehiculosResumen);
+        $this->assertSame($vehiculoDelTipo->id, $vehiculosResumen->first()['id_vehiculo']);
+        $this->assertTrue($vehiculosProp->pluck('id')->contains($vehiculoDelTipo->id));
         $this->assertFalse($vehiculosProp->pluck('id')->contains($vehiculoOtroTipo->id));
     }
 
