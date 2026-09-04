@@ -27,7 +27,9 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/**, app/Models/*.php, app/Models/CargaCombustible.php | .ai/rules/models.md |
 | app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaReporte.vue,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php | .ai/rules/operacion-diaria-reporte.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/operacion.md |
+| app/Http/Controllers/OrdenTrabajoController.php,app/Http/Requests/OrdenTrabajoRequest.php,app/Models/SolicitudMantenimiento.php,resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/orden-trabajo.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Actions/Actividades/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/OperacionDiaria.php,app/Models/ActividadRealizada.php,resources/js/Pages/Operacion/*.vue | .ai/rules/pages-operacion.md |
+| resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/pages-orden-trabajo.md |
 | app/Http/Controllers/CargasCombustibleReportController.php,app/Libraries/Reportes.php,resources/js/Pages/Reportes/CargasCombustibleReporte.vue | .ai/rules/pages-reportes.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
 | app/Http/Controllers/ControlCargasReportController.php,resources/js/Pages/Reportes/ControlCargasReporte.vue,app/Libraries/Reportes.php, app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php | .ai/rules/reportes-libraries.md |

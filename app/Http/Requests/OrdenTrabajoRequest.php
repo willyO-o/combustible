@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Asignacion;
 use App\Models\SolicitudMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -29,7 +30,39 @@ class OrdenTrabajoRequest extends FormRequest
     {
         return [
             'id_vehiculo' => ['required', 'exists:vehiculo,id'],
-            'id_conductor' => ['nullable', 'exists:conductor,id'],
+            'id_conductor' => [
+                'nullable',
+                'exists:conductor,id',
+                function ($attribute, $value, $fail) {
+                    // Cuando la orden nace de una solicitud de origen, el
+                    // conductor llega heredado de esa solicitud (ver
+                    // store()) y no se re-valida aquí: podría haber cambiado
+                    // de asignación desde que se generó la solicitud, y esa
+                    // no es razón para bloquear la orden.
+                    if (! $value || $this->filled('id_solicitud_mantenimiento')) {
+                        return;
+                    }
+
+                    // Elegido manualmente junto al vehículo (sin solicitud de
+                    // origen): debe ser un conductor realmente asignado a ese
+                    // vehículo, resuelto en una sola consulta (exists).
+                    $asignado = Asignacion::where('id_vehiculo', $this->input('id_vehiculo'))
+                        ->where('id_conductor', $value)
+                        ->where(function ($query) {
+                            $query->where('estado_asignacion', 'ACTIVO')
+                                ->orWhere('estado_asignacion', 'PROVISIONAL');
+                        })
+                        ->where(function ($query) {
+                            $query->whereNull('fecha_culminacion')
+                                ->orWhere('fecha_culminacion', '>', now());
+                        })
+                        ->exists();
+
+                    if (! $asignado) {
+                        $fail('El conductor seleccionado no está asignado actualmente a este vehículo.');
+                    }
+                },
+            ],
             'id_solicitud_mantenimiento' => [
                 'nullable',
                 function ($attribute, $value, $fail) {

@@ -6,6 +6,7 @@ use App\Events\OrdenTrabajoAsignada;
 use App\Http\Requests\DetalleMantenimientoRequest;
 use App\Http\Requests\EjecucionOrdenTrabajoRequest;
 use App\Http\Requests\OrdenTrabajoRequest;
+use App\Models\Asignacion;
 use App\Models\DetalleMantenimiento;
 use App\Models\OrdenTrabajo;
 use App\Models\Repuesto;
@@ -16,6 +17,8 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -94,10 +97,7 @@ class OrdenTrabajoController extends Controller
             abort(403, 'Sólo un jefe de área o administrador puede generar una orden de trabajo.');
         }
 
-        $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
-            ->where('estado_vehiculo', 'ACTIVO')
-            ->orderBy('nro_placa')
-            ->get();
+        $vehiculos = $this->vehiculosConConductores();
 
         $talleres = Taller::select('id', 'razon_social', 'nit')
             ->where('estado_taller', 'ACTIVO')
@@ -145,32 +145,57 @@ class OrdenTrabajoController extends Controller
      * Guarda la orden de trabajo.
      *
      * El acceso ya queda restringido a jefes de área/administradores por
-     * OrdenTrabajoRequest::authorize().
+     * OrdenTrabajoRequest::authorize(). Toca 2 tablas (solicitud_mantenimiento
+     * + orden_trabajo, ver abajo), por eso corre dentro de una transacción.
      */
     public function store(OrdenTrabajoRequest $request): RedirectResponse
     {
         $data = $request->validated();
 
-        // Si la orden nace de una solicitud, el vehículo/conductor y la
-        // clasificación del mantenimiento se toman siempre de la solicitud de
-        // origen: se fuerzan aquí para que no puedan alterarse manipulando el
-        // formulario (que ya los muestra bloqueados como información).
-        if (! empty($data['id_solicitud_mantenimiento'])) {
-            $solicitud = SolicitudMantenimiento::findOrFail($data['id_solicitud_mantenimiento']);
-            $data['id_vehiculo'] = $solicitud->id_vehiculo;
-            $data['id_conductor'] = $solicitud->id_conductor;
-            $data['tipo_mantenimiento'] = $solicitud->tipo_mantenimiento;
-            $data['kilometraje_actual'] = $solicitud->kilometraje_actual;
-            $data['horometro_actual'] = $solicitud->horometro_actual;
-        }
+        $orden = DB::transaction(function () use ($data) {
+            $huboSolicitudOrigen = ! empty($data['id_solicitud_mantenimiento']);
 
-        $orden = OrdenTrabajo::create($data);
+            if ($huboSolicitudOrigen) {
+                // Si la orden nace de una solicitud, el vehículo/conductor y la
+                // clasificación del mantenimiento se toman siempre de la
+                // solicitud de origen: se fuerzan aquí para que no puedan
+                // alterarse manipulando el formulario (que ya los muestra
+                // bloqueados como información).
+                $solicitud = SolicitudMantenimiento::findOrFail($data['id_solicitud_mantenimiento']);
+                $data['id_vehiculo'] = $solicitud->id_vehiculo;
+                $data['id_conductor'] = $solicitud->id_conductor;
+                $data['tipo_mantenimiento'] = $solicitud->tipo_mantenimiento;
+                $data['kilometraje_actual'] = $solicitud->kilometraje_actual;
+                $data['horometro_actual'] = $solicitud->horometro_actual;
+            } else {
+                // Sin solicitud de origen: se genera una automáticamente, ya
+                // APROBADA (nace junto con una orden ya emitida), con los
+                // mismos datos del formulario — el reporte de mantenimiento
+                // requiere que toda orden quede vinculada a una solicitud.
+                $solicitud = SolicitudMantenimiento::create([
+                    'id_vehiculo' => $data['id_vehiculo'],
+                    'id_conductor' => $data['id_conductor'] ?? null,
+                    'tipo_mantenimiento' => $data['tipo_mantenimiento'],
+                    'descripcion_problema' => ($data['nota_emisor'] ?? null)
+                        ?: 'Generado automáticamente al emitir la orden de trabajo, sin solicitud de origen.',
+                    'kilometraje_actual' => $data['kilometraje_actual'] ?? null,
+                    'horometro_actual' => $data['horometro_actual'] ?? null,
+                    'fecha_solicitud' => now(),
+                    'estado' => 'APROBADA',
+                ]);
+                $data['id_solicitud_mantenimiento'] = $solicitud->id;
+            }
 
-        // Marcar la solicitud origen como aprobada
-        if ($orden->id_solicitud_mantenimiento) {
-            SolicitudMantenimiento::where('id', $orden->id_solicitud_mantenimiento)
-                ->update(['estado' => 'APROBADA']);
-        }
+            $orden = OrdenTrabajo::create($data);
+
+            // Marcar la solicitud origen como aprobada (la recién generada ya
+            // nace así; sólo aplica cuando venía de una solicitud existente).
+            if ($huboSolicitudOrigen) {
+                $solicitud->update(['estado' => 'APROBADA']);
+            }
+
+            return $orden;
+        });
 
         OrdenTrabajoAsignada::dispatch($orden);
 
@@ -439,6 +464,69 @@ class OrdenTrabajoController extends Controller
         if (! in_array($orden->estado_orden, ['PENDIENTE', 'EN_EJECUCION'], true)) {
             abort(403, 'La orden ya fue culminada: no se puede modificar su detalle de trabajo.');
         }
+    }
+
+    /**
+     * Vehículos activos disponibles para emitir la orden, cada uno con sus
+     * conductores actualmente asignados en 'conductoresAsignados': cuando no
+     * se elige una solicitud de origen, Create.vue usa esa lista para ofrecer
+     * un combo de conductor (se resuelve en una sola consulta agrupada, ver
+     * conductoresAsignadosPorVehiculo(), para no incurrir en un N+1).
+     *
+     * @return array<int, array{id: int, codigo: string, nro_placa: string, marca: string, conductoresAsignados: array}>
+     */
+    private function vehiculosConConductores(): array
+    {
+        $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
+            ->where('estado_vehiculo', 'ACTIVO')
+            ->orderBy('nro_placa')
+            ->get();
+
+        $conductoresPorVehiculo = $this->conductoresAsignadosPorVehiculo($vehiculos->pluck('id'));
+
+        return $vehiculos->map(fn (Vehiculo $vehiculo) => [
+            'id' => $vehiculo->id,
+            'codigo' => $vehiculo->codigo,
+            'nro_placa' => $vehiculo->nro_placa,
+            'marca' => $vehiculo->marca,
+            'conductoresAsignados' => $conductoresPorVehiculo->get($vehiculo->id, collect())
+                ->unique('id_conductor')
+                ->map(fn ($asignacion) => [
+                    'id' => $asignacion->id_conductor,
+                    'label' => "{$asignacion->conductor->persona->nombre_completo} (CI: {$asignacion->conductor->persona->ci})",
+                ])
+                ->values()
+                ->all(),
+        ])->all();
+    }
+
+    /**
+     * Conductores actualmente asignados (ACTIVO o PROVISIONAL, ver
+     * Vehiculo::conductoresAsignados()) de cada vehículo de $idsVehiculo, en
+     * una sola consulta agrupada por id_vehiculo. Mismo patrón que
+     * SolicitudMantenimientoController::conductoresAsignadosPorVehiculo().
+     *
+     * @param  Collection<int, int>  $idsVehiculo
+     * @return Collection<int, Collection>
+     */
+    private function conductoresAsignadosPorVehiculo($idsVehiculo)
+    {
+        if ($idsVehiculo->isEmpty()) {
+            return collect();
+        }
+
+        return Asignacion::with('conductor.persona:id,nombres,paterno,materno,ci')
+            ->whereIn('id_vehiculo', $idsVehiculo)
+            ->where(function ($query) {
+                $query->where('estado_asignacion', 'ACTIVO')
+                    ->orWhere('estado_asignacion', 'PROVISIONAL');
+            })
+            ->where(function ($query) {
+                $query->whereNull('fecha_culminacion')
+                    ->orWhere('fecha_culminacion', '>', now());
+            })
+            ->get()
+            ->groupBy('id_vehiculo');
     }
 
     /**

@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Asignacion;
+use App\Models\Conductor;
 use App\Models\DetalleMantenimiento;
 use App\Models\OrdenTrabajo;
 use App\Models\ParametrosEmpresa;
+use App\Models\Persona;
 use App\Models\SolicitudMantenimiento;
 use App\Models\Taller;
 use App\Models\TipoMantenimiento;
@@ -78,6 +81,21 @@ class OrdenTrabajoControllerTest extends TestCase
             'id_usuario_ejecuta' => $this->crearTecnico()->id,
             'tipo_mantenimiento' => 'PREVENTIVO',
         ], $overrides));
+    }
+
+    private function asignarConductorAVehiculo(Vehiculo $vehiculo): Conductor
+    {
+        $persona = Persona::factory()->create();
+        $conductor = Conductor::create(['id' => $persona->id, 'estado_conductor' => 'ACTIVO']);
+
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        return $conductor;
     }
 
     public function test_store_emite_una_orden_interna_y_aprueba_la_solicitud_origen(): void
@@ -176,6 +194,157 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame($vehiculoSolicitud->id, $orden->id_vehiculo);
         $this->assertSame('PREVENTIVO', $orden->tipo_mantenimiento);
         $this->assertSame(50000, $orden->kilometraje_actual);
+    }
+
+    /**
+     * Sin solicitud de origen, store() genera una automáticamente (ya
+     * APROBADA) con los datos del propio formulario, para que la orden
+     * siempre quede vinculada a una solicitud (lo exige el reporte de
+     * mantenimiento). Toca 2 tablas -> corre en transacción.
+     */
+    public function test_store_sin_solicitud_de_origen_genera_una_solicitud_aprobada_automaticamente(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'CORRECTIVO',
+            'nota_emisor' => 'Fuga de aceite detectada',
+            'kilometraje_actual' => 12345,
+        ]);
+
+        $response->assertRedirect();
+        $orden = OrdenTrabajo::first();
+        $this->assertNotNull($orden->id_solicitud_mantenimiento);
+
+        $solicitud = SolicitudMantenimiento::find($orden->id_solicitud_mantenimiento);
+        $this->assertNotNull($solicitud);
+        $this->assertSame('APROBADA', $solicitud->estado);
+        $this->assertSame($vehiculo->id, $solicitud->id_vehiculo);
+        $this->assertSame('CORRECTIVO', $solicitud->tipo_mantenimiento);
+        $this->assertSame('Fuga de aceite detectada', $solicitud->descripcion_problema);
+        $this->assertSame(12345, $solicitud->kilometraje_actual);
+        $this->assertNull($solicitud->id_conductor);
+    }
+
+    /**
+     * Sin nota del emisor, la solicitud generada automáticamente igual
+     * necesita una descripcion_problema (NOT NULL en la BD): se completa con
+     * un texto por defecto en vez de fallar.
+     */
+    public function test_store_sin_solicitud_de_origen_ni_nota_completa_la_descripcion_por_defecto(): void
+    {
+        $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ])->assertRedirect();
+
+        $solicitud = SolicitudMantenimiento::first();
+        $this->assertNotEmpty($solicitud->descripcion_problema);
+    }
+
+    /**
+     * Al emitir una orden sin solicitud de origen, el select de Conductor
+     * (junto al de vehículo) permite elegir uno de los realmente asignados;
+     * ese conductor pasa tanto a la orden como a la solicitud generada.
+     */
+    public function test_store_sin_solicitud_de_origen_usa_el_conductor_elegido_para_la_solicitud_generada(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->asignarConductorAVehiculo($vehiculo);
+
+        $response = $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        $response->assertRedirect();
+        $orden = OrdenTrabajo::first();
+        $this->assertSame($conductor->id, $orden->id_conductor);
+
+        $solicitud = SolicitudMantenimiento::find($orden->id_solicitud_mantenimiento);
+        $this->assertSame($conductor->id, $solicitud->id_conductor);
+    }
+
+    /**
+     * El conductor elegido junto al vehículo (sin solicitud de origen) debe
+     * estar realmente asignado a ese vehículo; uno de otro vehículo se
+     * rechaza en la validación (una sola consulta exists, ver
+     * OrdenTrabajoRequest::rules()).
+     */
+    public function test_store_rechaza_un_conductor_no_asignado_al_vehiculo_sin_solicitud_de_origen(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $otroVehiculo = Vehiculo::factory()->create();
+        $conductorDeOtroVehiculo = $this->asignarConductorAVehiculo($otroVehiculo);
+
+        $response = $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorDeOtroVehiculo->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        $response->assertSessionHasErrors('id_conductor');
+        $this->assertDatabaseCount('orden_trabajo', 0);
+        $this->assertDatabaseCount('solicitud_mantenimiento', 0);
+    }
+
+    /**
+     * El conductor de una solicitud de origen no se re-valida contra la
+     * asignación actual del vehículo (pudo reasignarse desde que se generó
+     * la solicitud): no debe bloquear la emisión de la orden.
+     */
+    public function test_store_con_solicitud_de_origen_no_revalida_la_asignacion_del_conductor(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        // El conductor de la solicitud ya NO está asignado a este vehículo.
+        $otroVehiculo = Vehiculo::factory()->create();
+        $conductorReasignado = $this->asignarConductorAVehiculo($otroVehiculo);
+        $solicitud = $this->crearSolicitud([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorReasignado->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorReasignado->id,
+            'id_solicitud_mantenimiento' => $solicitud->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame(1, OrdenTrabajo::count());
+    }
+
+    /**
+     * Create.vue ofrece un combo de "Conductor" (visible cuando no se elige
+     * solicitud de origen) poblado desde los conductores realmente asignados
+     * a cada vehículo, resueltos en una sola consulta agrupada.
+     */
+    public function test_create_incluye_los_conductores_asignados_de_cada_vehiculo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->asignarConductorAVehiculo($vehiculo);
+        Vehiculo::factory()->create(); // sin conductor asignado
+
+        $response = $this->get(route('mantenimiento.ordenes.create'));
+
+        $response->assertOk();
+        $vehiculos = collect($response->viewData('page')['props']['vehiculos']);
+        $opcion = $vehiculos->firstWhere('id', $vehiculo->id);
+
+        $this->assertNotNull($opcion);
+        $this->assertSame([$conductor->id], collect($opcion['conductoresAsignados'])->pluck('id')->all());
     }
 
     /**

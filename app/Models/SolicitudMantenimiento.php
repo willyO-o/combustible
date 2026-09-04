@@ -98,7 +98,14 @@ class SolicitudMantenimiento extends Model
             $solicitudMantenimiento->gestion = $solicitudMantenimiento->calcularGestion();
             $solicitudMantenimiento->nro_solicitud = self::siguienteNroSolicitud($solicitudMantenimiento->gestion);
 
-            $solicitudMantenimiento->estado = 'PENDIENTE';
+            // Sólo se completa aquí si el creador no lo trajo ya resuelto:
+            // OrdenTrabajoController::store() genera una solicitud ya
+            // APROBADA cuando la orden se emite sin solicitud de origen (ver
+            // .ai/rules/http-controllers-http-requests.md), así que forzar
+            // siempre PENDIENTE rompería ese caso.
+            if (empty($solicitudMantenimiento->estado)) {
+                $solicitudMantenimiento->estado = 'PENDIENTE';
+            }
 
             // Sólo se completa aquí si el creador (Action/seeder/test) no lo
             // trajo ya resuelto: desde que un jefe de área o administrador

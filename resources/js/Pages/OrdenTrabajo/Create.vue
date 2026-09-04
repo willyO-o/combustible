@@ -1,10 +1,15 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
+import Multiselect from '@vueform/multiselect'
 
 const props = defineProps({
+    // Cada vehículo trae 'conductoresAsignados' (ACTIVO/PROVISIONAL
+    // vigentes) para el combo "Conductor" que sólo se muestra cuando no hay
+    // solicitud de origen seleccionada. Ver
+    // OrdenTrabajoController::vehiculosConConductores().
     vehiculos: Array,
     talleres: Array,
     usuarios: Array,
@@ -26,9 +31,23 @@ const form = useForm({
     observacion:                '',
 })
 
-// Al seleccionar solicitud origen, copiar datos
-function onSolicitudChange() {
-    const s = props.solicitudesPendientes.find(x => x.id == form.id_solicitud_mantenimiento)
+// Multiselect necesita un campo 'label' en cada opción (ver
+// .ai/rules/pages.md); como el prop no lo trae, se sintetiza aquí en vez de
+// tocar el controller.
+const solicitudesOpt = computed(() => props.solicitudesPendientes.map(s => ({
+    ...s,
+    label: `#${s.nro} – ${s.vehiculo?.codigo} – ${s.vehiculo?.nro_placa} – ${s.tipo_mantenimiento}`,
+})))
+
+const vehiculosOpt = computed(() => props.vehiculos.map(v => ({
+    ...v,
+    label: `${v.codigo} – ${v.nro_placa} – ${v.marca}`,
+})))
+
+// Al elegir (o quitar) la solicitud de origen, copiar o liberar los datos
+// que dependen de ella (vehículo, conductor, categoría, kilometraje/horómetro).
+watch(() => form.id_solicitud_mantenimiento, (val) => {
+    const s = props.solicitudesPendientes.find(x => x.id == val)
     if (s) {
         form.id_vehiculo          = s.id_vehiculo
         form.id_conductor         = s.id_conductor ?? ''
@@ -43,7 +62,7 @@ function onSolicitudChange() {
         form.kilometraje_actual = ''
         form.horometro_actual   = ''
     }
-}
+})
 
 // Si la solicitud llegó preseleccionada por la URL, queda fija (no se puede quitar).
 // Si se seleccionó manualmente del combo, sus datos (vehículo, conductor, categoría,
@@ -55,6 +74,36 @@ const solicitudSeleccionada = computed(() => {
     return props.solicitudesPendientes.find(s => s.id == form.id_solicitud_mantenimiento) ?? null
 })
 const datosLocked = computed(() => !!solicitudSeleccionada.value)
+
+// Conductores actualmente asignados al vehículo elegido, sólo usados cuando
+// no hay solicitud de origen (si la hay, el conductor viene de esa
+// solicitud, ver el watch de id_solicitud_mantenimiento más arriba).
+const conductoresDelVehiculo = computed(() => {
+    const vehiculoSeleccionado = props.vehiculos.find((v) => v.id === form.id_vehiculo)
+    return vehiculoSeleccionado?.conductoresAsignados ?? []
+})
+
+// Al elegir vehículo manualmente (sin solicitud de origen), se limpia el
+// conductor si ya no pertenece al nuevo vehículo, y se autoselecciona si sólo
+// queda una opción. Cuando SÍ hay solicitud de origen, el watch de arriba ya
+// controla id_vehiculo/id_conductor directamente, así que este watch no debe
+// interferir.
+watch(() => form.id_vehiculo, (val) => {
+    if (form.id_solicitud_mantenimiento) {
+        return
+    }
+
+    if (!val) {
+        form.id_conductor = ''
+        return
+    }
+
+    const conductores = props.vehiculos.find((v) => v.id === val)?.conductoresAsignados ?? []
+
+    if (!conductores.some((c) => c.id === form.id_conductor)) {
+        form.id_conductor = conductores.length === 1 ? conductores[0].id : ''
+    }
+})
 
 const esExterno = computed(() => !!form.id_taller)
 
@@ -109,13 +158,14 @@ function submit() {
                         <!-- Solicitud origen -->
                         <div class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">Solicitud de Origen (opcional)</label>
-                            <select v-model="form.id_solicitud_mantenimiento" class="form-select"
-                                :disabled="modoUrl" @change="onSolicitudChange">
-                                <option value="">— Sin solicitud previa —</option>
-                                <option v-for="s in solicitudesPendientes" :key="s.id" :value="s.id">
-                                    #{{ s.nro }} – {{ s.vehiculo?.codigo }} – {{ s.vehiculo?.nro_placa }} – {{ s.tipo_mantenimiento }}
-                                </option>
-                            </select>
+                            <Multiselect v-model="form.id_solicitud_mantenimiento" :options="solicitudesOpt"
+                                value-prop="id" label="label" :searchable="true" :filter-results="true"
+                                :disabled="modoUrl" :can-clear="!modoUrl" placeholder="Buscar solicitud..."
+                                no-options-text="Sin solicitudes pendientes" no-results-text="Sin resultados"
+                                :class="{ 'is-invalid-multiselect': form.errors.id_solicitud_mantenimiento }" />
+                            <div v-if="form.errors.id_solicitud_mantenimiento" class="text-danger small mt-1">
+                                {{ form.errors.id_solicitud_mantenimiento }}
+                            </div>
                             <small v-if="modoUrl" class="text-muted">
                                 Fijada desde la solicitud de origen, no se puede cambiar.
                             </small>
@@ -126,18 +176,36 @@ function submit() {
                             <label class="form-label fw-medium">
                                 Vehículo <span class="text-danger">*</span>
                             </label>
-                            <select v-model="form.id_vehiculo" class="form-select" :disabled="datosLocked"
-                                :class="{ 'is-invalid': form.errors.id_vehiculo }">
-                                <option value="">— Seleccione —</option>
-                                <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                                    {{ v.codigo }} – {{ v.nro_placa }} – {{ v.marca }}
-                                </option>
-                            </select>
-                            <div v-if="form.errors.id_vehiculo" class="invalid-feedback">
+                            <Multiselect v-model="form.id_vehiculo" :options="vehiculosOpt" value-prop="id"
+                                label="label" :searchable="true" :filter-results="true" :disabled="datosLocked"
+                                placeholder="Buscar vehículo..." no-options-text="Sin vehículos activos"
+                                no-results-text="Sin resultados"
+                                :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                            <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">
                                 {{ form.errors.id_vehiculo }}
                             </div>
                             <small v-if="datosLocked" class="text-muted">
                                 Viene de la solicitud de origen.
+                            </small>
+                        </div>
+
+                        <!-- Conductor: sólo se pide cuando no hay solicitud de origen
+                             (si la hay, el conductor viene de ella). No es obligatorio:
+                             si el vehículo no tiene conductor asignado, la orden se
+                             emite igual y la solicitud que se genera queda sin conductor. -->
+                        <div v-if="!datosLocked" class="col-sm-6 col-xl-4">
+                            <label class="form-label fw-medium">Conductor</label>
+                            <Multiselect v-model="form.id_conductor" :options="conductoresDelVehiculo"
+                                value-prop="id" label="label" :searchable="true" :filter-results="true"
+                                :disabled="!form.id_vehiculo" placeholder="Buscar conductor..."
+                                no-options-text="Este vehículo no tiene conductores asignados"
+                                no-results-text="Sin resultados"
+                                :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
+                            <div v-if="form.errors.id_conductor" class="text-danger small mt-1">
+                                {{ form.errors.id_conductor }}
+                            </div>
+                            <small v-else-if="form.id_vehiculo && conductoresDelVehiculo.length === 0" class="text-muted">
+                                Este vehículo no tiene conductores asignados actualmente.
                             </small>
                         </div>
 
