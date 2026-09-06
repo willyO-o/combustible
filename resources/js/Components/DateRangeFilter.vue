@@ -12,23 +12,26 @@
  *   <DateRangeFilter v-model:fecha-desde="filters.fecha_desde"
  *       v-model:fecha-hasta="filters.fecha_hasta" />
  */
-import { ref, computed, watch, onMounted } from 'vue'
-import * as DateRangePickerPkg from 'daterange-picker-vue3'
+import { ref, computed, watch, onMounted, markRaw } from 'vue'
+import DateRangePickerImport from 'daterange-picker-vue3'
 
-// El paquete es un build UMD (module.exports = { default, __esModule: true })
-// y según el bundler/entorno el interop de "import X from 'pkg'" puede quedar
-// mal resuelto (X termina siendo el namespace del módulo, sin render/template,
-// en vez del propio componente) — se desenvuelve ".default" manualmente hasta
-// encontrar el componente real.
-function resolverComponente(mod) {
+// El paquete sólo publica un build UMD (sin campo "module" en package.json).
+// Según el bundler, "import X from 'daterange-picker-vue3'" entrega el propio
+// componente o un wrapper { default: Componente } — se desenvuelve ".default".
+// NO usar "import * as" aquí: en el build de producción (Rollup) eso entrega el
+// namespace del módulo, que viene CONGELADO, y Vue no puede escribirle
+// `inheritAttrs` al normalizar el componente -> "TypeError: Cannot assign to
+// property 'inheritAttrs' of [object Module]" (rompe sólo en producción, nunca
+// en `npm run dev`). markRaw() evita además que Vue intente volverlo reactivo.
+function desenvolverComponente(mod) {
     let actual = mod
-    while (actual && !actual.render && !actual.template && actual.default) {
+    while (actual && actual.default && actual.default !== actual && !actual.render && !actual.setup) {
         actual = actual.default
     }
     return actual
 }
 
-const DateRangePicker = resolverComponente(DateRangePickerPkg)
+const DateRangePicker = markRaw(desenvolverComponente(DateRangePickerImport))
 
 const props = defineProps({
     fechaDesde: { type: String, default: '' }, // 'YYYY-MM-DD' o ''

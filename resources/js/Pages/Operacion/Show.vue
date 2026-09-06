@@ -123,8 +123,8 @@ const verificarOperacion =  async () => {
                         </div>
                         <div>
                             <span class="text-muted fw-medium">Operador</span>
-                            <h6 class="mb-1 fw-bold">{{ operacion.conductor.persona.nombre_completo }}</h6>
-                            <small class="text-muted">C.I. {{ operacion.conductor.persona.ci }}</small>
+                            <h6 class="mb-1 fw-bold">{{ operacion.conductor?.persona?.nombre_completo ?? '—' }}</h6>
+                            <small class="text-muted">C.I. {{ operacion.conductor?.persona?.ci ?? '—' }}</small>
                         </div>
 
                     </div>
@@ -477,7 +477,7 @@ const verificarOperacion =  async () => {
                                     </div>
                                     <div>
                                         <small class="fw-bold d-block mb-1">Operación iniciada</small>
-                                        <small class="text-muted d-block">{{ operacion.fecha_inicio }} - {{ operacion.conductor.persona.nombre_completo }}</small>
+                                        <small class="text-muted d-block">{{ operacion.fecha_inicio }} - {{ operacion.conductor?.persona?.nombre_completo ?? '—' }}</small>
                                     </div>
                                 </div>
                             </div>
