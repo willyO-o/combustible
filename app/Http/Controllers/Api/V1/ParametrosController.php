@@ -88,7 +88,7 @@ class ParametrosController extends Controller
                     'nombre_completo' => trim("{$conductorAsignado->persona?->nombres} {$conductorAsignado->persona?->paterno} {$conductorAsignado->persona?->materno}"),
                     'ci' => $conductorAsignado->persona?->ci,
                 ] : null,
-                'conductores_asignados' => $vehiculo->conductoresAsignados ?? [],
+                'conductores_asignados' => $vehiculo->conductoresAsignadosOpt() ?? [],
             ];
         });
 
