@@ -24,6 +24,8 @@ class ParametrosControllerTest extends TestCase
 
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
     }
 
     private function crearUsuario(): User
@@ -229,6 +231,45 @@ class ParametrosControllerTest extends TestCase
         $this->assertSame([$vehiculoCompartido->id, $vehiculoSoloArea->id], $ids);
     }
 
+    public function test_colecciones_devuelve_todos_los_vehiculos_activos_para_un_administrador(): void
+    {
+        $user = $this->crearUsuario();
+        $user->assignRole('administrador');
+
+        $vehiculos = Vehiculo::factory()->count(3)->create();
+        Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $ids = $response->json('data.vehiculos.*.id');
+        sort($ids);
+        $this->assertSame($vehiculos->pluck('id')->sort()->values()->all(), $ids);
+    }
+
+    public function test_colecciones_no_repite_vehiculos_para_un_administrador_que_tambien_es_conductor_y_jefe_de_area(): void
+    {
+        $user = $this->crearUsuarioConductor();
+        $user->assignRole('administrador');
+        $user->assignRole('jefe-area');
+
+        $area = Area::factory()->create();
+        $this->ponerPersonaACargoDeArea($user->persona, $area);
+
+        $vehiculoPropio = Vehiculo::factory()->create();
+        $this->asignarVehiculoAConductor($user->persona->conductor, $vehiculoPropio);
+        $this->ponerVehiculoEnArea($vehiculoPropio, $area);
+
+        $vehiculoSuelto = Vehiculo::factory()->create();
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $ids = $response->json('data.vehiculos.*.id');
+        sort($ids);
+        $this->assertSame([$vehiculoPropio->id, $vehiculoSuelto->id], $ids);
+    }
+
     public function test_colecciones_devuelve_vehiculos_vacios_para_un_usuario_sin_conductor_ni_area(): void
     {
         $user = $this->crearUsuario();
@@ -237,5 +278,46 @@ class ParametrosControllerTest extends TestCase
 
         $response->assertOk();
         $this->assertSame([], $response->json('data.vehiculos'));
+    }
+
+    public function test_colecciones_sin_incluir_devuelve_todas_las_secciones(): void
+    {
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $this->assertEqualsCanonicalizing(
+            ['vehiculos', 'estaciones_servicio', 'tipos_combustible', 'cargas_combustible', 'solicitudes_mantenimiento', 'ordenes_trabajo', 'operaciones_diarias', 'control_cargas'],
+            array_keys($response->json('data'))
+        );
+    }
+
+    public function test_colecciones_devuelve_solo_las_secciones_pedidas_en_incluir(): void
+    {
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(
+            route('api.v1.parametros.colecciones', ['incluir' => ['vehiculos', 'estaciones_servicio']])
+        );
+
+        $response->assertOk();
+        $this->assertSame(['vehiculos', 'estaciones_servicio'], array_keys($response->json('data')));
+    }
+
+    public function test_colecciones_acepta_incluir_como_lista_separada_por_comas(): void
+    {
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(
+            route('api.v1.parametros.colecciones', ['incluir' => 'tipos_combustible, vehiculos'])
+        );
+
+        $response->assertOk();
+        $this->assertSame(['tipos_combustible', 'vehiculos'], array_keys($response->json('data')));
+    }
+
+    public function test_colecciones_rechaza_una_seccion_desconocida_en_incluir(): void
+    {
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(
+            route('api.v1.parametros.colecciones', ['incluir' => ['vehiculos', 'inexistente']])
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('incluir.1');
     }
 }

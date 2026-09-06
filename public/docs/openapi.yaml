@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.4.0"
+  version: "1.5.0"
   contact:
     name: Equipo de Desarrollo — Combustible
   license:
@@ -405,7 +405,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.4.0"
+                api_version: "1.5.0"
                 app_name: Combustible
                 app_env: production
                 app_debug: false
@@ -431,11 +431,44 @@ paths:
         El listado `vehiculos` unifica, sin duplicados, los vehículos que el usuario tiene
         asignados como conductor y todos los vehículos activos de las áreas que administra
         como jefe de área. Un usuario puede tener ambos roles, uno solo o ninguno; si no
-        tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor. Cada
+        tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor.
+        Excepción: un usuario `administrador` o `super-admin` (roles que se pueden combinar
+        con los anteriores) recibe todos los vehículos activos del sistema, sin repetir
+        ninguno. Cada
         vehículo trae además `id_conductor` / `conductor_asignado` (su conductor titular
         actual), para autocompletar el conductor al emitir un vale (`POST /vales`), y
         `conductores_asignados` con todos los conductores asignados al vehículo (titular más
         reemplazos) para ofrecer un selector cuando hay más de uno.
+
+        **Respuesta parcial.** El payload completo es grande. Con el parámetro `incluir` el
+        cliente pide sólo las secciones que necesita y `data` trae únicamente esas claves
+        (en el orden solicitado). Sin `incluir` se devuelven todas. Las secciones no
+        solicitadas ni siquiera se calculan.
+      parameters:
+        - name: incluir
+          in: query
+          required: false
+          description: |
+            Secciones de `data` a devolver. Se puede enviar como arreglo
+            (`?incluir[]=vehiculos&incluir[]=estaciones_servicio`) o como lista separada por
+            comas (`?incluir=vehiculos,estaciones_servicio`). Un valor fuera de la lista
+            permitida devuelve `422`. Omitir el parámetro devuelve todas las secciones.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - vehiculos
+                - estaciones_servicio
+                - tipos_combustible
+                - cargas_combustible
+                - solicitudes_mantenimiento
+                - ordenes_trabajo
+                - operaciones_diarias
+                - control_cargas
+          example: [vehiculos, estaciones_servicio, tipos_combustible]
       responses:
         '200':
           description: Colecciones disponibles para el usuario autenticado.
@@ -3420,7 +3453,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.4.0" }
+        api_version: { type: string, example: "1.5.0" }
         app_name: { type: string, example: Combustible }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }

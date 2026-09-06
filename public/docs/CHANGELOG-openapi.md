@@ -2,6 +2,44 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.5.0 — 2026-09-06
+
+Dos cambios en `GET /parametros/colecciones`, ambos **retrocompatibles** (un cliente que no
+cambie su petición recibe exactamente lo mismo que antes):
+
+1. Devuelve **todos** los vehículos activos del sistema cuando el usuario autenticado es
+   `administrador` o `super-admin` (roles que se pueden combinar con `conductor` o `jefe-area`).
+2. Nuevo parámetro `incluir` para pedir sólo algunas secciones y aligerar la respuesta.
+
+### Cambiado
+
+#### `GET /parametros/colecciones`
+
+- Para un `administrador` / `super-admin`, `vehiculos` lista todos los vehículos con
+  `estado_vehiculo = ACTIVO`, sin repetir ninguno (aunque el mismo usuario también sea
+  conductor o jefe de área de alguno de ellos). El resto de los usuarios ve, como hasta ahora,
+  sólo los que conduce más los de las áreas que administra.
+
+### Agregado
+
+#### `GET /parametros/colecciones`
+
+- Parámetro de consulta opcional `incluir`: lista de secciones de `data` a devolver, como
+  arreglo (`?incluir[]=vehiculos&incluir[]=estaciones_servicio`) o separada por comas
+  (`?incluir=vehiculos,estaciones_servicio`). Valores permitidos: `vehiculos`,
+  `estaciones_servicio`, `tipos_combustible`, `cargas_combustible`,
+  `solicitudes_mantenimiento`, `ordenes_trabajo`, `operaciones_diarias`, `control_cargas`.
+  `data` trae sólo las claves pedidas, en el orden solicitado; las secciones omitidas no se
+  calculan. Sin el parámetro se devuelven todas (comportamiento anterior). Un valor
+  desconocido devuelve `422`.
+- Descripción y ejemplos del endpoint actualizados.
+
+#### Varios
+
+- `info.version`: `1.4.0` → `1.5.0`; el ejemplo de `GET /parametros` (`api_version`) y el
+  esquema `ParametrosGenerales` pasan a `"1.5.0"`. `ParametrosController::index()` devuelve
+  `api_version` `"1.5.0"`.
+
 ## 1.4.0 — 2026-09-06
 
 `GET /parametros/colecciones` ahora expone, además del conductor titular, la lista completa de
