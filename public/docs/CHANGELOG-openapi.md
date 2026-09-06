@@ -2,6 +2,30 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.4.0 — 2026-09-06
+
+`GET /parametros/colecciones` ahora expone, además del conductor titular, la lista completa de
+conductores asignados a cada vehículo. Cambio **retrocompatible**: sólo se agrega un campo a
+`vehiculos[]`; nada se quita ni cambia de tipo.
+
+### Cambiado
+
+#### `GET /parametros/colecciones`
+
+- Cada `vehiculos[]` trae ahora `conductores_asignados`: un arreglo con todos los conductores
+  actualmente asignados al vehículo (`ACTIVO` o `PROVISIONAL`) — el titular más eventuales
+  reemplazos por permiso o vacaciones. Cada elemento es `{ id, label, meta }` (`label` listo
+  para un selector; `meta` reservado, hoy siempre `[]`). Lista vacía si el vehículo no tiene
+  conductores. `id_conductor` / `conductor_asignado` (el titular) siguen igual y son un
+  subconjunto de esta lista.
+- Esquema `VehiculoAsignado` y descripción del endpoint actualizados.
+
+#### Varios
+
+- `info.version`: `1.3.0` → `1.4.0`; el ejemplo de `GET /parametros` (`api_version`) y el
+  esquema `ParametrosGenerales` pasan a `"1.4.0"`. `ParametrosController::index()` devuelve
+  `api_version` `"1.4.0"`.
+
 ## 1.3.0 — 2026-09-04
 
 `POST /solicitudes-mantenimiento` ahora también lo pueden usar `jefe-area`, `administrador` y

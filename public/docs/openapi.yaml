@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.3.0"
+  version: "1.4.0"
   contact:
     name: Equipo de Desarrollo — Combustible
   license:
@@ -405,7 +405,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.3.0"
+                api_version: "1.4.0"
                 app_name: Combustible
                 app_env: production
                 app_debug: false
@@ -433,7 +433,9 @@ paths:
         como jefe de área. Un usuario puede tener ambos roles, uno solo o ninguno; si no
         tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor. Cada
         vehículo trae además `id_conductor` / `conductor_asignado` (su conductor titular
-        actual), para autocompletar el conductor al emitir un vale (`POST /vales`).
+        actual), para autocompletar el conductor al emitir un vale (`POST /vales`), y
+        `conductores_asignados` con todos los conductores asignados al vehículo (titular más
+        reemplazos) para ofrecer un selector cuando hay más de uno.
       responses:
         '200':
           description: Colecciones disponibles para el usuario autenticado.
@@ -458,6 +460,9 @@ paths:
                       tipo_medicion: kilometraje
                       id_conductor: 45
                       conductor_asignado: { id: 45, nombre_completo: Juan Pérez Quispe, ci: "1234567" }
+                      conductores_asignados:
+                        - { id: 45, label: "Juan Pérez Quispe (CI: 1234567)", meta: [] }
+                        - { id: 52, label: "María Rodríguez Alba (CI: 7654321)", meta: [] }
                   estaciones_servicio:
                     - id: 1
                       razon_social: Grifo Central YPFB S.R.L.
@@ -3415,7 +3420,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.3.0" }
+        api_version: { type: string, example: "1.4.0" }
         app_name: { type: string, example: Combustible }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -3456,6 +3461,27 @@ components:
             id: { type: integer, example: 45 }
             nombre_completo: { type: string, example: Juan Pérez Quispe }
             ci: { type: string, nullable: true, example: "1234567" }
+        conductores_asignados:
+          type: array
+          description: >-
+            Todos los conductores actualmente asignados al vehículo (`ACTIVO` o `PROVISIONAL`):
+            el titular más eventuales reemplazos por permiso o vacaciones. Sirve para ofrecer
+            un selector de conductor cuando el vehículo tiene más de uno. Lista vacía si no
+            tiene ninguno. `conductor_asignado` / `id_conductor` corresponden al titular y son
+            un subconjunto de esta lista.
+          items:
+            type: object
+            properties:
+              id: { type: integer, example: 45 }
+              label:
+                type: string
+                description: Etiqueta lista para mostrar en un selector.
+                example: "Juan Pérez Quispe (CI: 1234567)"
+              meta:
+                type: array
+                description: Reservado para datos adicionales; actualmente siempre vacío.
+                items: {}
+                example: []
 
     Grifo:
       type: object

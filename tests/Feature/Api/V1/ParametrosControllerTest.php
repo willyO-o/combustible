@@ -168,6 +168,24 @@ class ParametrosControllerTest extends TestCase
         $this->assertSame([$vehiculo->id], $response->json('data.vehiculos.*.id'));
     }
 
+    public function test_colecciones_incluye_los_conductores_asignados_de_cada_vehiculo(): void
+    {
+        $user = $this->crearUsuarioConductor();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAConductor($user->persona->conductor, $vehiculo);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones'));
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'data' => ['vehiculos' => [['conductores_asignados' => [['id', 'label', 'meta']]]]],
+        ]);
+        $this->assertSame(
+            [$user->id_persona],
+            $response->json('data.vehiculos.0.conductores_asignados.*.id')
+        );
+    }
+
     public function test_colecciones_no_falla_para_un_jefe_de_area_sin_registro_de_conductor(): void
     {
         $user = $this->crearUsuario();
