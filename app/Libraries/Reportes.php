@@ -1455,9 +1455,17 @@ class Reportes extends exFPDF
     {
         $viajes = collect($viajes);
 
-        $azul = [39, 42, 84];
-        $verde = [24, 125, 170];
         $gris = [90, 90, 90];
+        // Ya no queda azul ni celeste en este reporte (a pedido del usuario,
+        // sólo aplica a este método, no al resto de Reportes.php): los
+        // fondos de relleno de encabezado (franja superior + barra "DETALLE
+        // DE VIAJES" + fila de cabecera de la tabla) usan $grisEncabezado
+        // #c9c9c9; TODO el texto (títulos, etiquetas, badge de N°) es
+        // $negro; las líneas/bordes también son $negro (lo más delgadas
+        // posible), salvo el borde de los encabezados con fondo gris, que
+        // es blanco (ver más abajo).
+        $grisEncabezado = [201, 201, 201];
+        $negro = [0, 0, 0];
 
         $coloresEstado = [
             'ABIERTA' => [34, 177, 76],
@@ -1480,11 +1488,13 @@ class Reportes extends exFPDF
         $uw = 199.9;
 
         // ── Encabezado ──────────────────────────────────────────────────
+        // Franja de acento superior en gris (antes celeste/$verde) y borde
+        // del recuadro lo más delgado posible, a pedido del usuario.
         $h1 = 22;
-        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->Rect($sx, $sy, $uw, 1.2, 'F');
-        $this->SetLineWidth(0.5);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.1);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
         $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
 
@@ -1492,7 +1502,7 @@ class Reportes extends exFPDF
         $tituloW = $uw - 40 - $badgeW - 3;
 
         $this->SetFont('Arial', 'B', 13);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($sx + 40, $sy + 1.5);
         $this->Cell($tituloW, 8, utf8Decode('DETALLE DE FLETE'), 0, 2, 'L');
 
@@ -1506,7 +1516,7 @@ class Reportes extends exFPDF
         $placa = $carga->vehiculoExterno?->nro_placa ?: 'Sin placa';
         $propietario = $carga->vehiculoExterno?->propietario ? '   |   '.$carga->vehiculoExterno->propietario : '';
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetX($sx + 40);
         $this->Cell($tituloW, 5, utf8Decode('Vehículo externo: '.$placa.$propietario), 0, 2, 'L');
 
@@ -1520,7 +1530,7 @@ class Reportes extends exFPDF
         $this->Cell($badgeW, 7, utf8Decode($carga->estado_carga), 0, 0, 'C');
 
         $this->SetFont('Arial', 'B', 11);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($badgeX, $sy + 12);
         $this->Cell($badgeW, 6, utf8Decode('N° '.$carga->nro), 0, 0, 'C');
 
@@ -1545,11 +1555,11 @@ class Reportes extends exFPDF
         $colW = $uw / 2;
         $rowH = 6.5;
 
-        $this->SetLineWidth(0.15);
-        $this->SetDrawColor(220, 220, 220);
+        $this->SetLineWidth(0.1);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         foreach ($filas as [$label1, $valor1, $label2, $valor2]) {
             $this->SetFont('Arial', 'B', 8);
-            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx, $currentY);
             $this->Cell($labelW, $rowH, utf8Decode($label1.':'), 0, 0, 'L');
 
@@ -1559,7 +1569,7 @@ class Reportes extends exFPDF
             $this->Cell($colW - $labelW - 2, $rowH, utf8Decode(mb_strtoupper($valor1)), 0, 0, 'L');
 
             $this->SetFont('Arial', 'B', 8);
-            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx + $colW, $currentY);
             $this->Cell($labelW, $rowH, utf8Decode($label2.':'), 0, 0, 'L');
 
@@ -1576,7 +1586,7 @@ class Reportes extends exFPDF
 
         if ($carga->detalle) {
             $this->SetFont('Arial', 'B', 8);
-            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx, $currentY);
             $this->Cell($uw, 5, utf8Decode('DETALLE DEL FLETE:'), 0, 1, 'L');
 
@@ -1589,7 +1599,7 @@ class Reportes extends exFPDF
 
         if ($carga->observaciones) {
             $this->SetFont('Arial', 'B', 8);
-            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx, $currentY);
             $this->Cell($uw, 5, utf8Decode('OBSERVACIONES:'), 0, 1, 'L');
 
@@ -1601,20 +1611,27 @@ class Reportes extends exFPDF
         }
 
         // ── Detalle de viajes ─────────────────────────────────────────────
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
-        $this->SetLineWidth(0.3);
+        // Encabezados (esta barra + la fila de cabecera de la tabla) en gris
+        // #c9c9c9 en vez de azul, con texto negro para mantener el contraste
+        // y borde BLANCO (sin línea negra visible sobre el fondo gris); el
+        // resto de la tabla (filas de datos) sigue con líneas negras.
+        $blanco = [255, 255, 255];
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($blanco[0], $blanco[1], $blanco[2]);
+        $this->SetLineWidth(0.1);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('DETALLE DE VIAJES'), 0, 1, 'C');
         $currentY += 8;
 
         $this->SetXY($sx, $currentY);
-        $tablaViajes = new easyTable($this, '{10, 30, 32, 32, 38, 32, 25}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.2; min-height:6;");
+        $tablaViajes = new easyTable($this, '{10, 30, 32, 32, 38, 32, 25}', "width:199; border:1; border-color:{$negro[0]},{$negro[1]},{$negro[2]}; border-width:0.1; font-family:Arial; valign:M; paddingX:1.2; min-height:6;");
 
-        $tablaViajes->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7; font-color:30,30,30;');
+        // border-color:255,255,255 sólo en esta fila (celda gana sobre tabla):
+        // header con fondo gris y borde blanco, sin línea negra encima.
+        $tablaViajes->rowStyle("bgcolor:{$grisEncabezado[0]},{$grisEncabezado[1]},{$grisEncabezado[2]}; border-color:{$blanco[0]},{$blanco[1]},{$blanco[2]}; font-style:B; font-size:7; font-color:0,0,0;");
         foreach (['N°', 'MATERIAL', 'ORIGEN', 'DESTINO', 'DETALLE', 'REGISTRADO POR', 'FECHA'] as $i => $encabezado) {
             $tablaViajes->easyCell(utf8Decode($encabezado), 'align:'.($i === 0 ? 'C' : 'L').';');
         }
