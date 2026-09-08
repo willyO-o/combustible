@@ -32,11 +32,14 @@ const submit = () => {
     <div class="auth-split">
         <aside class="auth-split__brand">
             <div class="auth-split__brandTop">
-                <div class="auth-split__mark">
-                    <svg class="auth-split__markIcon" viewBox="0 0 64 40" aria-hidden="true">
-                        <path d="M2 34 L14 20 L20 25 L31 6 L41 22 L49 14 L62 30" />
-                    </svg>
-                    <span class="auth-split__markText">Plus Metals<small>Ltda</small></span>
+                <div class="auth-split__logoCard">
+                    <img
+                        src="/images/logo/logo-plus-metals.png"
+                        alt="Plus Metals Ltda"
+                        class="auth-split__logoImg"
+                        width="1280"
+                        height="423"
+                    />
                 </div>
             </div>
 
@@ -59,12 +62,13 @@ const submit = () => {
 
         <main class="auth-split__panel">
             <div class="auth-split__form">
-                <div class="auth-split__mark auth-split__mark--ink">
-                    <svg class="auth-split__markIcon" viewBox="0 0 64 40" aria-hidden="true">
-                        <path d="M2 34 L14 20 L20 25 L31 6 L41 22 L49 14 L62 30" />
-                    </svg>
-                    <span class="auth-split__markText">Plus Metals<small>Ltda</small></span>
-                </div>
+                <img
+                    src="/images/logo/logo-plus-metals.png"
+                    alt="Plus Metals Ltda"
+                    class="auth-split__logoImg auth-split__logoImg--ink"
+                    width="1280"
+                    height="423"
+                />
 
                 <header class="auth-split__head">
                     <h2>Iniciar sesión</h2>

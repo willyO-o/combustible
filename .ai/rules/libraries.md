@@ -17,3 +17,8 @@ Si $vale->estado_vale === 'ANULADO', generarVale() dibuja public/images/reportes
 
 ## PDF bitácora operación diaria: sin fondos sólidos (ahorro de tinta)
 ACTUALIZADO: `generarReporteOperacionDiariaDetalle()` usa fondos sólidos pero CLAROS (poca tinta), no oscuros: fila de grupos `bgcolor:205,227,245` y encabezados de columna `bgcolor:224,238,250` (celeste claro); fila de TOTALES `bgcolor:255,240,191` y encabezado del recuadro RESUMEN `SetFillColor(255,240,191)` + `Rect(...,'FD')` (amarillo claro). Texto siempre en `$azul` negrita. Nada de `bgcolor:$azul`/blanco ni amarillo saturado (255,214,79). Filete de acento superior 0.5 mm. Resto de PDFs de `Reportes.php` sin cambiar.
+
+## Logo de todos los PDF = logo-plus-metals.png
+Todos los encabezados de PDF (Vale, Comprobante Egreso, Solicitud Mantenimiento, Reporte Operación Diaria, y los reportes que llaman logoEmpresa(): combustible, rendimiento, control de cargas, uso de vehículos) usan public/images/logo/logo-plus-metals.png. Ya NO se usan logo-min.png ni logo-plus-metals-azul.png.
+logoEmpresa() sigue respetando el logo subido en Parámetros de la Empresa si existe; sólo cambió su $logoRespaldo a logo-plus-metals.png (pedido del usuario 2026-09, "todos los reportes deben usar este logo" pero manteniendo el logo configurable).
+El PNG tiene fondo transparente y texto negro; todas las zonas de logo de los fondos son blancas, así que hay buen contraste. Las llamadas a Image() pasan sólo ancho (sin alto forzado) para no distorsionar el aspect ratio 1280x423 (~3:1).

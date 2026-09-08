@@ -68,7 +68,7 @@ class Reportes extends exFPDF
         // ----------------------------------------------------------
         // ENCABEZADO: logo, título "VALE" + correlativo, datos del grifo
         // ----------------------------------------------------------
-        $this->Image(public_path('images/logo/logo-min.png'), 8, 10, 40, 20);
+        $this->Image(public_path('images/logo/logo-plus-metals.png'), 8, 12, 42);
 
         $this->SetXY(52, 10);
         $this->SetFont('Arial', 'BI', 40);
@@ -254,7 +254,7 @@ class Reportes extends exFPDF
         // ----------------------------------------------------------
         // ENCABEZADO: logo, título, correlativo y fecha
         // ----------------------------------------------------------
-        $this->Image(public_path('images/logo/logo-min.png'), 8, 8, 40);
+        $this->Image(public_path('images/logo/logo-plus-metals.png'), 8, 8, 40);
 
         $this->SetXY(50, 8);
         $this->SetFont('Arial', 'B', 18);
@@ -437,7 +437,7 @@ class Reportes extends exFPDF
         // ══════════════════════════════════════════════════════════════════
         // ENCABEZADO: logo (zona x 2.29-48.98) y N° de solicitud (zona x 170.98-212.85)
         // ══════════════════════════════════════════════════════════════════
-        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), 6, 6, 40);
+        $this->Image(public_path('images/logo/logo-plus-metals.png'), 6, 8, 42);
 
         $this->SetFont('Arial', 'B', 14);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
@@ -1698,7 +1698,7 @@ class Reportes extends exFPDF
      */
     private function logoEmpresa(?ParametrosEmpresa $parametrosEmpresa): string
     {
-        $logoRespaldo = public_path('images/logo/logo-plus-metals-azul.png');
+        $logoRespaldo = public_path('images/logo/logo-plus-metals.png');
 
         if (! $parametrosEmpresa?->logo_empresa) {
             return $logoRespaldo;
@@ -1904,7 +1904,7 @@ class Reportes extends exFPDF
         // ══════════════════════════════════════════════════════════════════
         // ENCABEZADO (logo + N° + DÍA/MES/AÑO + casilla DÍA/NOCHE)
         // ══════════════════════════════════════════════════════════════════
-        $this->Image(public_path('images/logo/logo-plus-metals-azul.png'), 9, 6, 30);
+        $this->Image(public_path('images/logo/logo-plus-metals.png'), 9, 7, 34);
 
         $this->SetFont('Arial', 'B', 13);
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);

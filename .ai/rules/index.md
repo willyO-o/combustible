@@ -8,6 +8,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Actions/Actividades/SincronizarActividadesRealizadasAction.php | .ai/rules/actividades.md |
 | app/Http/Controllers/Api/V1/ValeController.php,app/Http/Requests/ValeRequest.php,app/Http/Controllers/Api/V1/ParametrosController.php | .ai/rules/api-v1.md |
 | app/**/*.php | .ai/rules/app.md |
+| resources/js/Components/PageLoader.vue | .ai/rules/components.md |
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
 | resources/js/Pages/Conductores/**,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-requests.md |
 | app/Http/Controllers/**/*.php, app/Http/Controllers/*.php, app/Http/Controllers/DashboardController.php, app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/controllers.md |

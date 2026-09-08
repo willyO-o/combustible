@@ -105,12 +105,18 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+    <!-- v-show (no v-if): el overlay se monta una sola vez y queda en el DOM
+         oculto con display:none. Así el <img> del logo se descarga y decodifica
+         al montar la app, y cada vez que el loader aparece ya está pintado (con
+         v-if el subárbol se recreaba en cada navegación y el logo parpadeaba /
+         "no cargaba" el primer frame). Oculto no tiene costo de render ni
+         ejecuta las animaciones CSS. -->
     <Transition name="page-loader-fade">
-        <div v-if="visible" class="page-loader-overlay" role="status" aria-live="polite" aria-label="Cargando">
+        <div v-show="visible" class="page-loader-overlay" role="status" aria-live="polite" aria-label="Cargando">
             <div class="page-loader-box">
-                <span class="page-loader-icon">
-                    <i class="ri-gas-station-line page-loader-icon-base"></i>
-                    <i class="ri-gas-station-fill page-loader-icon-fill"></i>
+                <span class="page-loader-logo">
+                    <img class="page-loader-logo-ghost" src="/images/logo/logo-plus-metals.svg" alt="" aria-hidden="true" />
+                    <img class="page-loader-logo-active" src="/images/logo/logo-plus-metals.svg" alt="" aria-hidden="true" />
                 </span>
                 <span class="page-loader-text">Cargando<span class="page-loader-dots"><span>.</span><span>.</span><span>.</span></span></span>
             </div>
@@ -118,122 +124,5 @@ onBeforeUnmount(() => {
     </Transition>
 </template>
 
-<style scoped lang="scss">
-.page-loader-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 100000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(var(--body-bg-rgb), 0.85);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-}
+<!-- Estilos en resources/css/my-styles.css (sección "PageLoader.vue"). -->
 
-.page-loader-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.page-loader-icon {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 4rem;
-    height: 4rem;
-}
-
-.page-loader-icon-base,
-.page-loader-icon-fill {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    line-height: 1;
-}
-
-.page-loader-icon-base {
-    color: var(--text-muted);
-    opacity: 0.3;
-}
-
-.page-loader-icon-fill {
-    color: var(--primary-color);
-    animation: page-loader-fill 1.6s ease-in-out infinite;
-}
-
-.page-loader-text {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    letter-spacing: 0.02em;
-}
-
-.page-loader-dots span {
-    animation: page-loader-blink 1.4s infinite;
-    animation-fill-mode: both;
-}
-
-.page-loader-dots span:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.page-loader-dots span:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
-@keyframes page-loader-fill {
-    0% {
-        clip-path: inset(100% 0 0 0);
-    }
-
-    45% {
-        clip-path: inset(0 0 0 0);
-    }
-
-    60% {
-        clip-path: inset(0 0 0 0);
-    }
-
-    100% {
-        clip-path: inset(100% 0 0 0);
-    }
-}
-
-@keyframes page-loader-blink {
-
-    0%,
-    80%,
-    100% {
-        opacity: 0.2;
-    }
-
-    40% {
-        opacity: 1;
-    }
-}
-
-.page-loader-fade-enter-active,
-.page-loader-fade-leave-active {
-    transition: opacity 0.2s ease;
-}
-
-.page-loader-fade-enter-from,
-.page-loader-fade-leave-to {
-    opacity: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-
-    .page-loader-icon-fill,
-    .page-loader-dots span {
-        animation: none;
-    }
-}
-</style>
