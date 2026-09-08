@@ -1048,6 +1048,8 @@
 /* ==========================================================================
    PageLoader.vue (resources/js/Components/PageLoader.vue)
    Loader global de transición de página (Inertia router start/finish).
+   Logo estático + "Cargando…" + barra "lingote": una veta de metal fundido
+   (naranja óxido del logo) recorre la barra de lado a lado. Tema claro/oscuro.
    ========================================================================== */
 .page-loader-overlay {
     position: fixed;
@@ -1068,36 +1070,16 @@
     gap: 0.9rem;
 }
 
-/* El logo se rellena de color de abajo a arriba en bucle (misma metáfora de
-   "llenado" que tenía el ícono del surtidor): una copia tenue de fondo y una
-   copia a color recortada por la animación page-loader-fill. */
 .page-loader-logo {
-    position: relative;
     display: block;
     width: 12rem;
     max-width: 60vw;
-}
-
-.page-loader-logo img {
-    display: block;
-    width: 100%;
     height: auto;
-}
-
-.page-loader-logo-ghost {
-    opacity: 0.14;
-}
-
-.page-loader-logo-active {
-    position: absolute;
-    inset: 0;
-    animation: page-loader-fill 1.6s ease-in-out infinite;
-    will-change: clip-path;
 }
 
 /* En tema oscuro el logo trae texto negro que no se leería sobre el overlay:
    se pasa a blanco (mismo criterio que .btn-close en styles.css). */
-[data-theme-mode=dark] .page-loader-logo img {
+[data-theme-mode=dark] .page-loader-logo {
     filter: brightness(0) invert(1);
 }
 
@@ -1105,7 +1087,8 @@
     font-size: 0.8125rem;
     font-weight: 500;
     color: var(--text-muted);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .page-loader-dots span {
@@ -1121,21 +1104,45 @@
     animation-delay: 0.4s;
 }
 
-@keyframes page-loader-fill {
+/* --- Barra "lingote" ----------------------------------------------- */
+.page-loader-bar {
+    position: relative;
+    width: 12rem;
+    max-width: 60vw;
+    height: 5px;
+    margin-top: 0.15rem;
+    border-radius: 999px;
+    overflow: hidden;
+    /* pista tenue: sigue el tema (claro/oscuro) con los tokens del proyecto */
+    background: var(--bs-secondary-bg, rgba(128, 128, 128, 0.16));
+    box-shadow: inset 0 0 0 1px var(--default-border, rgba(128, 128, 128, 0.25));
+}
+
+.page-loader-bar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -45%;
+    width: 45%;
+    border-radius: inherit;
+    background: linear-gradient(90deg,
+            transparent,
+            #cb5d00 30%,
+            #ff8a3d 50%,
+            #cb5d00 70%,
+            transparent);
+    box-shadow: 0 0 8px 1px rgba(255, 138, 61, 0.45);
+    animation: page-loader-sweep 1.5s ease-in-out infinite;
+}
+
+@keyframes page-loader-sweep {
     0% {
-        clip-path: inset(100% 0 0 0);
-    }
-
-    45% {
-        clip-path: inset(0 0 0 0);
-    }
-
-    60% {
-        clip-path: inset(0 0 0 0);
+        left: -45%;
     }
 
     100% {
-        clip-path: inset(100% 0 0 0);
+        left: 100%;
     }
 }
 
@@ -1164,8 +1171,15 @@
 
 @media (prefers-reduced-motion: reduce) {
 
-    .page-loader-logo-active,
     .page-loader-dots span {
+        animation: none;
+    }
+
+    /* estado estático: la barra queda con la veta al centro, tenue */
+    .page-loader-bar::before {
+        left: 0;
+        width: 100%;
+        opacity: 0.5;
         animation: none;
     }
 }

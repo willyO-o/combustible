@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
+import { APP_NAME, APP_LONG_NAME } from '@/Data/app'
 
 const props = defineProps({
     vale: Object,
@@ -58,7 +59,7 @@ const numero = (v) => Number(v ?? 0).toLocaleString('es-BO', { minimumFractionDi
             <div class="vale-publico-brand">
                 <img v-if="empresa?.logo_url" :src="empresa.logo_url" :alt="empresa?.nombre" class="vale-publico-logo" />
                 <i v-else class="ri-gas-station-fill vale-publico-logo-fallback"></i>
-                <span class="vale-publico-brand-name">{{ empresa?.nombre ?? 'Sistema de Control de Combustible' }}</span>
+                <span class="vale-publico-brand-name">{{ empresa?.nombre ?? APP_LONG_NAME }}</span>
             </div>
 
             <!-- Estado del vale -->
@@ -198,7 +199,7 @@ const numero = (v) => Number(v ?? 0).toLocaleString('es-BO', { minimumFractionDi
 
             <p class="vale-publico-footer">
                 <i class="ri-shield-check-line me-1"></i>
-                Verificación pública de vale — Sistema de Control de Combustible
+                Verificación pública de vale — {{ APP_NAME }}
             </p>
         </div>
     </div>

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { APP_NAME, APP_LONG_NAME } from '@/Data/app';
 
 defineProps({
     canResetPassword: {
@@ -44,10 +45,10 @@ const submit = () => {
             </div>
 
             <div class="auth-split__brandBody">
-                <h1 class="auth-split__title">Sistema de Control<br />de Combustible</h1>
+                <h1 class="auth-split__title">{{ APP_NAME }}</h1>
                 <p class="auth-split__lead">
-                    Cargas, operación diaria y rendimiento de la flota,
-                    reunidos en un solo lugar.
+                    {{ APP_LONG_NAME }}. Cargas, operación diaria y
+                    rendimiento de la flota, reunidos en un solo lugar.
                 </p>
             </div>
 

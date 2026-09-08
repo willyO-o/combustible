@@ -35,7 +35,6 @@ const filters = ref({
     estado_carga: props.filters?.estado_carga ?? '',
 })
 
-console.log('cargas', props.cargas);
 
 
 let debounceTimer = null

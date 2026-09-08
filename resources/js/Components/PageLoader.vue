@@ -114,11 +114,10 @@ onBeforeUnmount(() => {
     <Transition name="page-loader-fade">
         <div v-show="visible" class="page-loader-overlay" role="status" aria-live="polite" aria-label="Cargando">
             <div class="page-loader-box">
-                <span class="page-loader-logo">
-                    <img class="page-loader-logo-ghost" src="/images/logo/logo-plus-metals.svg" alt="" aria-hidden="true" />
-                    <img class="page-loader-logo-active" src="/images/logo/logo-plus-metals.svg" alt="" aria-hidden="true" />
-                </span>
+                <img class="page-loader-logo" src="/images/logo/logo-plus-metals.svg" alt="" aria-hidden="true" />
+                <span class="page-loader-bar" aria-hidden="true"></span>
                 <span class="page-loader-text">Cargando<span class="page-loader-dots"><span>.</span><span>.</span><span>.</span></span></span>
+
             </div>
         </div>
     </Transition>

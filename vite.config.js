@@ -34,9 +34,9 @@ export default defineConfig({
             ],
             manifest: {
                 id: '/',
-                name: 'Sistema de Control de Combustible',
-                short_name: 'Combustible',
-                description: 'Gestión de combustible, vehículos, conductores y mantenimiento.',
+                name: 'SIGET · Sistema Integral de Gestión de Maquinaria y Operaciones',
+                short_name: 'SIGET',
+                description: 'Gestión integral de maquinaria y operaciones: vehículos, conductores, combustible y mantenimiento.',
                 lang: 'es',
                 theme_color: '#162450',
                 background_color: '#162450',

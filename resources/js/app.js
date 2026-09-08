@@ -30,10 +30,11 @@ import PageLoader from '@/Components/PageLoader.vue';
 import InstallPwaPrompt from '@/Components/InstallPwaPrompt.vue';
 import { registerSW } from 'virtual:pwa-register';
 import { showToast } from '@/Utils/alertUtil';
+import { APP_NAME } from '@/Data/app';
 
 
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = APP_NAME;
 
 
 // registerType: 'autoUpdate' ya activa la versión nueva del Service Worker sin

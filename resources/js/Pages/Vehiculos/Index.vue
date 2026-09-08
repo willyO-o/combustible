@@ -84,9 +84,6 @@ const estadoBadge = (estado) => {
 const fotoUrl = (foto) => foto ? `/storage/${foto}` : null
 
 
-onMounted(() => {
-    console.log(props.vehiculos);
-})
 
 /* ------------------------------------------------------------------ *
  * Modal: reasignar área

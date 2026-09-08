@@ -1,7 +1,7 @@
 openapi: 3.0.3
 
 info:
-  title: API Gestión de Combustible y Flota
+  title: SIGET — API de Gestión de Maquinaria y Operaciones
   description: |
     API REST para la gestión de operaciones diarias de la flota vehicular, autenticación de usuarios
     y parámetros generales del sistema.
@@ -42,7 +42,7 @@ info:
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
   version: "1.5.0"
   contact:
-    name: Equipo de Desarrollo — Combustible
+    name: Equipo de Desarrollo — SIGET
   license:
     name: Uso interno
 
@@ -406,7 +406,7 @@ paths:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
                 api_version: "1.5.0"
-                app_name: Combustible
+                app_name: SIGET
                 app_env: production
                 app_debug: false
                 app_url: http://localhost
@@ -3454,7 +3454,7 @@ components:
       type: object
       properties:
         api_version: { type: string, example: "1.5.0" }
-        app_name: { type: string, example: Combustible }
+        app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
         app_url: { type: string, example: http://localhost }

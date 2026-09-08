@@ -13,7 +13,20 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'SIGET'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Application Long Name
+    |--------------------------------------------------------------------------
+    |
+    | Nombre completo / descriptivo del sistema (el acrónimo va en "name").
+    | Se usa en pantallas de marca como el Login y la verificación pública
+    | de vales.
+    |
+    */
+
+    'long_name' => env('APP_LONG_NAME', 'Sistema Integral de Gestión de Maquinaria y Operaciones'),
 
     /*
     |--------------------------------------------------------------------------

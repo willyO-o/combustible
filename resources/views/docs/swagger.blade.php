@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Documentación API · Combustible</title>
+    <title>Documentación API · {{ config('app.name') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="{{ asset('vendor/swagger-ui/favicon-32x32.png') }}" sizes="32x32">
     <link rel="icon" type="image/png" href="{{ asset('vendor/swagger-ui/favicon-16x16.png') }}" sizes="16x16">
@@ -35,7 +35,7 @@
 </head>
 <body>
     <div class="doc-topbar">
-        <h1>API Gestión de Combustible y Flota</h1>
+        <h1>{{ config('app.name') }} — API de Gestión de Maquinaria y Operaciones</h1>
         <span>Especificación: <a href="{{ asset('docs/openapi.yaml') }}" style="color:#9aa4b2;">openapi.yaml</a></span>
     </div>
 
