@@ -119,6 +119,8 @@ Route::middleware('auth')->group(function () {
         ->name('control-cargas.cerrar');
     Route::post('control-cargas/{cargaMaterial}/pagar', [CargaMaterialController::class, 'pagar'])
         ->name('control-cargas.pagar');
+    Route::get('control-cargas/{cargaMaterial}/imprimir', [CargaMaterialController::class, 'generarPDF'])
+        ->name('control-cargas.imprimir');
 
     Route::resource('roles', RolController::class)
         ->except(['show', 'destroy']);

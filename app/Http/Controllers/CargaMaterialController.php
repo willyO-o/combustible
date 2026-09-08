@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CargaMaterialRequest;
 use App\Http\Requests\ViajeRequest;
+use App\Libraries\Reportes;
 use App\Models\CargaMaterial;
 use App\Models\Material;
 use App\Models\User;
@@ -26,6 +27,15 @@ class CargaMaterialController extends Controller
     {
         $user = $request->user();
 
+        $filters = $request->only(['estado_carga', 'q', 'id_vehiculo_externo']);
+        // Por defecto "Este mes" (1º del mes actual -> hoy), igual que el preset
+        // seleccionado por defecto en DateRangeFilter.vue: así la primera carga
+        // de la página ya llega filtrada del servidor y se evita la doble
+        // petición que causaba el propio componente al autoseleccionar el
+        // rango en el cliente después del primer render.
+        $filters['fecha_desde'] = $request->input('fecha_desde', now()->startOfMonth()->format('Y-m-d'));
+        $filters['fecha_hasta'] = $request->input('fecha_hasta', now()->format('Y-m-d'));
+
         $query = CargaMaterial::with(['vehiculoExterno', 'usuarioApertura'])
             ->withCount('viajes');
 
@@ -33,12 +43,24 @@ class CargaMaterialController extends Controller
             $query->where('id_usuario_apertura', $user->id);
         }
 
-        if ($request->filled('estado_carga')) {
-            $query->where('estado_carga', $request->estado_carga);
+        if (! empty($filters['estado_carga'])) {
+            $query->where('estado_carga', $filters['estado_carga']);
         }
 
-        if ($request->filled('q')) {
-            $texto = $request->q;
+        if (! empty($filters['id_vehiculo_externo'])) {
+            $query->where('id_vehiculo_externo', $filters['id_vehiculo_externo']);
+        }
+
+        if (! empty($filters['fecha_desde'])) {
+            $query->whereDate('fecha_apertura', '>=', $filters['fecha_desde']);
+        }
+
+        if (! empty($filters['fecha_hasta'])) {
+            $query->whereDate('fecha_apertura', '<=', $filters['fecha_hasta']);
+        }
+
+        if (! empty($filters['q'])) {
+            $texto = $filters['q'];
             $query->where(function ($query) use ($texto) {
                 $query->where('nro_carga', 'like', "%{$texto}%")
                     ->orWhereHas('vehiculoExterno', function ($query) use ($texto) {
@@ -71,7 +93,8 @@ class CargaMaterialController extends Controller
 
         return Inertia::render('ControlCargas/Index', [
             'cargas' => $cargas,
-            'filters' => $request->only(['estado_carga', 'q']),
+            'vehiculosExternos' => VehiculoExterno::orderBy('nro_placa')->get(['id', 'nro_placa', 'propietario']),
+            'filters' => $filters,
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),
@@ -196,6 +219,29 @@ class CargaMaterialController extends Controller
                 'success' => session('success'),
                 'error' => session('error'),
             ],
+        ]);
+    }
+
+    /**
+     * Genera el informe individual (PDF) de un flete: sus datos generales y
+     * el detalle completo de los viajes registrados. Mismo nivel de acceso
+     * que show() (sin restricción de dueño) — cualquier usuario autenticado
+     * con acceso al módulo puede imprimirlo.
+     */
+    public function generarPDF(CargaMaterial $cargaMaterial)
+    {
+        $cargaMaterial->load(['vehiculoExterno', 'usuarioApertura', 'usuarioCierre']);
+
+        $viajes = $cargaMaterial->viajes()
+            ->with(['material:id,material', 'usuarioRegistro:id,name'])
+            ->orderBy('created_at')
+            ->get();
+
+        $pdf = (new Reportes)->generarReporteFlete($cargaMaterial, $viajes, 'S');
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="flete_'.str_replace('/', '-', (string) $cargaMaterial->nro).'.pdf"',
         ]);
     }
 

@@ -20,6 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/OrdenTrabajo.php,app/Models/DetalleMantenimiento.php,app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/http-controllers.md |
 | app/Http/Controllers/ConductorController.php,app/Models/Conductor.php,app/Http/Requests/ConductorRequest.php | .ai/rules/http-requests.md |
 | app/Http/**/*.php | .ai/rules/http.md |
+| app/Http/Controllers/CargaMaterialController.php,app/Libraries/Reportes.php,resources/js/Pages/ControlCargas/*.vue | .ai/rules/js-pages-control-cargas.md |
 | app/Models/IntervaloMantenimientoTipo.php,app/Http/Controllers/DashboardController.php,app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/Show.vue,resources/js/Pages/Dashboard.vue | .ai/rules/js-pages.md |
 | resources/js/**/*.vue | .ai/rules/js.md |
 | app/Libraries/Reportes.php,app/Http/Controllers/CargaCombustibleController.php | .ai/rules/libraries-http-controllers.md |
@@ -30,6 +31,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaReporte.vue,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php | .ai/rules/operacion-diaria-reporte.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/operacion.md |
 | app/Http/Controllers/OrdenTrabajoController.php,app/Http/Requests/OrdenTrabajoRequest.php,app/Models/SolicitudMantenimiento.php,resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/orden-trabajo.md |
+| app/Http/Controllers/CargaMaterialController.php,resources/js/Pages/ControlCargas/Index.vue | .ai/rules/pages-control-cargas.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Actions/Actividades/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/OperacionDiaria.php,app/Models/ActividadRealizada.php,resources/js/Pages/Operacion/*.vue | .ai/rules/pages-operacion.md |
 | resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/pages-orden-trabajo.md |
 | app/Http/Controllers/CargasCombustibleReportController.php,app/Libraries/Reportes.php,resources/js/Pages/Reportes/CargasCombustibleReporte.vue | .ai/rules/pages-reportes.md |

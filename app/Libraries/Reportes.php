@@ -1446,6 +1446,206 @@ class Reportes extends exFPDF
     }
 
     /**
+     * Informe individual de UN flete: datos generales (vehículo externo,
+     * conductor, ámbito, fechas de apertura/cierre/pago) + el detalle
+     * completo de sus viajes. $viajes es la colección de Viaje ya cargada
+     * con material y usuarioRegistro (ver CargaMaterialController::generarPDF()).
+     */
+    public function generarReporteFlete($carga, $viajes, string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $viajes = collect($viajes);
+
+        $azul = [39, 42, 84];
+        $verde = [24, 125, 170];
+        $gris = [90, 90, 90];
+
+        $coloresEstado = [
+            'ABIERTA' => [34, 177, 76],
+            'CERRADA' => [90, 90, 90],
+            'PAGADA' => [24, 125, 170],
+        ];
+        $colorEstado = $coloresEstado[$carga->estado_carga] ?? [90, 90, 90];
+
+        $fechaHora = fn ($valor): string => $valor ? $valor->format('d/m/Y H:i') : '—';
+        $bs = fn ($valor): string => $valor !== null ? 'Bs. '.number_format((float) $valor, 2, ',', '.') : '—';
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
+
+        $this->AddPage('P', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 199.9;
+
+        // ── Encabezado ──────────────────────────────────────────────────
+        $h1 = 22;
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
+
+        $badgeW = 32;
+        $tituloW = $uw - 40 - $badgeW - 3;
+
+        $this->SetFont('Arial', 'B', 13);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 1.5);
+        $this->Cell($tituloW, 8, utf8Decode('DETALLE DE FLETE'), 0, 2, 'L');
+
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetX($sx + 40);
+        $this->Cell($tituloW, 6, utf8Decode('Control de carga de material — vehículos externos'), 0, 2, 'L');
+
+        // Placa + propietario, bajo el título (identifica el flete de un
+        // vistazo, igual que en generarReporteControlCargasDetalle()).
+        $placa = $carga->vehiculoExterno?->nro_placa ?: 'Sin placa';
+        $propietario = $carga->vehiculoExterno?->propietario ? '   |   '.$carga->vehiculoExterno->propietario : '';
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetX($sx + 40);
+        $this->Cell($tituloW, 5, utf8Decode('Vehículo externo: '.$placa.$propietario), 0, 2, 'L');
+
+        // Badge de estado + N° de flete, arriba a la derecha.
+        $badgeX = $sx + $uw - $badgeW - 3;
+        $this->SetFillColor($colorEstado[0], $colorEstado[1], $colorEstado[2]);
+        $this->Rect($badgeX, $sy + 3, $badgeW, 7, 'F');
+        $this->SetFont('Arial', 'B', 8.5);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($badgeX, $sy + 3);
+        $this->Cell($badgeW, 7, utf8Decode($carga->estado_carga), 0, 0, 'C');
+
+        $this->SetFont('Arial', 'B', 11);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($badgeX, $sy + 12);
+        $this->Cell($badgeW, 6, utf8Decode('N° '.$carga->nro), 0, 0, 'C');
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
+
+        // ── Datos generales (grilla de 2 columnas) ───────────────────────
+        $ambito = $carga->es_al_exterior
+            ? 'Al exterior'.($carga->pais ? ' — '.$carga->pais : '')
+            : 'Nacional';
+
+        $filas = [
+            ['Conductor', $carga->nombre_conductor ?: '—', 'Teléfono', $carga->telefono ?: '—'],
+            ['Ámbito', $ambito, 'N° de viajes', (string) $viajes->count()],
+            ['Fecha de apertura', $fechaHora($carga->fecha_apertura), 'Abierto por', $carga->usuarioApertura?->name ?? '—'],
+            ['Fecha de cierre', $fechaHora($carga->fecha_cierre), 'Cerrado por', $carga->usuarioCierre?->name ?? '—'],
+            ['Fecha de pago', $fechaHora($carga->fecha_pago), 'Monto pagado', $bs($carga->monto_pago)],
+        ];
+
+        $labelW = 32;
+        $colW = $uw / 2;
+        $rowH = 6.5;
+
+        $this->SetLineWidth(0.15);
+        $this->SetDrawColor(220, 220, 220);
+        foreach ($filas as [$label1, $valor1, $label2, $valor2]) {
+            $this->SetFont('Arial', 'B', 8);
+            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetXY($sx, $currentY);
+            $this->Cell($labelW, $rowH, utf8Decode($label1.':'), 0, 0, 'L');
+
+            $this->SetFont('Arial', '', 8.5);
+            $this->SetTextColor(30, 30, 30);
+            $this->SetXY($sx + $labelW, $currentY);
+            $this->Cell($colW - $labelW - 2, $rowH, utf8Decode(mb_strtoupper($valor1)), 0, 0, 'L');
+
+            $this->SetFont('Arial', 'B', 8);
+            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetXY($sx + $colW, $currentY);
+            $this->Cell($labelW, $rowH, utf8Decode($label2.':'), 0, 0, 'L');
+
+            $this->SetFont('Arial', '', 8.5);
+            $this->SetTextColor(30, 30, 30);
+            $this->SetXY($sx + $colW + $labelW, $currentY);
+            $this->Cell($colW - $labelW - 2, $rowH, utf8Decode(mb_strtoupper($valor2)), 0, 0, 'L');
+
+            $this->Line($sx, $currentY + $rowH, $sx + $uw, $currentY + $rowH);
+            $currentY += $rowH;
+        }
+
+        $currentY += 4;
+
+        if ($carga->detalle) {
+            $this->SetFont('Arial', 'B', 8);
+            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetXY($sx, $currentY);
+            $this->Cell($uw, 5, utf8Decode('DETALLE DEL FLETE:'), 0, 1, 'L');
+
+            $this->SetFont('Arial', '', 8.5);
+            $this->SetTextColor(30, 30, 30);
+            $this->SetX($sx);
+            $this->MultiCell($uw, 4.5, utf8Decode($carga->detalle), 0, 'L');
+            $currentY = $this->GetY() + 3;
+        }
+
+        if ($carga->observaciones) {
+            $this->SetFont('Arial', 'B', 8);
+            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetXY($sx, $currentY);
+            $this->Cell($uw, 5, utf8Decode('OBSERVACIONES:'), 0, 1, 'L');
+
+            $this->SetFont('Arial', '', 8.5);
+            $this->SetTextColor(30, 30, 30);
+            $this->SetX($sx);
+            $this->MultiCell($uw, 4.5, utf8Decode($carga->observaciones), 0, 'L');
+            $currentY = $this->GetY() + 3;
+        }
+
+        // ── Detalle de viajes ─────────────────────────────────────────────
+        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, utf8Decode('DETALLE DE VIAJES'), 0, 1, 'C');
+        $currentY += 8;
+
+        $this->SetXY($sx, $currentY);
+        $tablaViajes = new easyTable($this, '{10, 30, 32, 32, 38, 32, 25}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.2; min-height:6;");
+
+        $tablaViajes->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7; font-color:30,30,30;');
+        foreach (['N°', 'MATERIAL', 'ORIGEN', 'DESTINO', 'DETALLE', 'REGISTRADO POR', 'FECHA'] as $i => $encabezado) {
+            $tablaViajes->easyCell(utf8Decode($encabezado), 'align:'.($i === 0 ? 'C' : 'L').';');
+        }
+        $tablaViajes->printRow(true);
+
+        if ($viajes->isEmpty()) {
+            $tablaViajes->rowStyle('font-size:8; font-color:90,90,90;');
+            $tablaViajes->easyCell(utf8Decode('Este flete todavía no registra viajes.'), 'align:C; colspan:7;');
+            $tablaViajes->printRow();
+        }
+
+        foreach ($viajes as $i => $viaje) {
+            $tablaViajes->rowStyle('font-style:; font-size:7.5; font-color:30,30,30;');
+            $tablaViajes->easyCell((string) ($i + 1), 'align:C;');
+            $tablaViajes->easyCell(utf8Decode($viaje->material?->material ?? '—'), 'align:L;');
+            $tablaViajes->easyCell(utf8Decode($viaje->origen ?: '—'), 'align:L;');
+            $tablaViajes->easyCell(utf8Decode($viaje->destino ?: '—'), 'align:L;');
+            $tablaViajes->easyCell(utf8Decode($viaje->detalle ?: '—'), 'align:L;');
+            $tablaViajes->easyCell(utf8Decode($viaje->usuarioRegistro?->name ?? '—'), 'align:L;');
+            $tablaViajes->easyCell(utf8Decode($fechaHora($viaje->fecha_hora_carga ?? $viaje->created_at)), 'align:L;');
+            $tablaViajes->printRow();
+        }
+
+        $tablaViajes->endTable();
+
+        $this->pintarPieDePagina($uw, $gris);
+
+        return $this->Output($modo, $nombreArchivo ?? 'flete_'.str_replace('/', '-', (string) $carga->nro).'.pdf');
+    }
+
+    /**
      * Detalle carga por carga del rendimiento de UN solo vehículo (drill-down
      * del reporte general). $detalle es la colección que devuelve
      * obtenerResumenRendimiento() con $soloResumen = false, ya filtrada a un

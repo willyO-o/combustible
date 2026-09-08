@@ -126,6 +126,52 @@ class CargaMaterialControllerTest extends TestCase
         );
     }
 
+    public function test_index_filtra_por_vehiculo_externo(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $carga->update(['id_vehiculo_externo' => $vehiculoExterno->id]);
+        $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->conductor)
+            ->get(route('control-cargas.index', ['id_vehiculo_externo' => $vehiculoExterno->id]));
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('cargas.data', fn ($cargas) => count($cargas) === 1 && $cargas[0]['id'] === $carga->id)
+        );
+    }
+
+    public function test_index_filtra_por_rango_de_fechas_de_apertura(): void
+    {
+        $dentroDelRango = $this->crearCargaAbiertaPor($this->conductor);
+        $dentroDelRango->update(['fecha_apertura' => now()->subDays(2)]);
+
+        $fueraDelRango = $this->crearCargaAbiertaPor($this->conductor);
+        $fueraDelRango->update(['fecha_apertura' => now()->subMonths(2)]);
+
+        $response = $this->actingAs($this->conductor)->get(route('control-cargas.index', [
+            'fecha_desde' => now()->subDays(5)->format('Y-m-d'),
+            'fecha_hasta' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('cargas.data', fn ($cargas) => count($cargas) === 1 && $cargas[0]['id'] === $dentroDelRango->id)
+        );
+    }
+
+    public function test_index_por_defecto_solo_muestra_las_cargas_del_mes_actual(): void
+    {
+        $delMesActual = $this->crearCargaAbiertaPor($this->conductor);
+        $delMesPasado = $this->crearCargaAbiertaPor($this->conductor);
+        $delMesPasado->update(['fecha_apertura' => now()->subMonths(2)]);
+
+        $response = $this->actingAs($this->conductor)->get(route('control-cargas.index'));
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('cargas.data', fn ($cargas) => count($cargas) === 1 && $cargas[0]['id'] === $delMesActual->id)
+        );
+    }
+
     public function test_store_abre_una_nueva_carga_y_redirige_al_detalle(): void
     {
         $vehiculoExterno = VehiculoExterno::factory()->create();
@@ -425,6 +471,32 @@ class CargaMaterialControllerTest extends TestCase
             ->has('materiales')
             ->where('viajes.0.material', fn ($material) => $material !== null)
         );
+    }
+
+    public function test_generar_pdf_devuelve_el_informe_individual_del_flete(): void
+    {
+        $vehiculoExterno = VehiculoExterno::factory()->create(['nro_placa' => '1234-ABC']);
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+        $carga->update(['id_vehiculo_externo' => $vehiculoExterno->id]);
+
+        $material = Material::factory()->create(['material' => 'Arena']);
+        Viaje::factory()->create(['id_carga_material' => $carga->id, 'id_material' => $material->id]);
+
+        $response = $this->actingAs($this->conductor)->get(route('control-cargas.imprimir', $carga->id));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_generar_pdf_funciona_aun_sin_viajes_registrados(): void
+    {
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->conductor)->get(route('control-cargas.imprimir', $carga->id));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
     }
 
     public function test_registrar_viaje_guarda_la_foto_y_el_material_seleccionado(): void

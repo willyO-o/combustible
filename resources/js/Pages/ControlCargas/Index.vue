@@ -1,11 +1,14 @@
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, computed, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import Multiselect from '@vueform/multiselect'
+import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     cargas: Object,
+    vehiculosExternos: Array,
     filters: Object,
     flash: Object,
 })
@@ -13,19 +16,46 @@ const props = defineProps({
 const filtros = reactive({
     estado_carga: props.filters?.estado_carga ?? '',
     q: props.filters?.q ?? '',
+    id_vehiculo_externo: props.filters?.id_vehiculo_externo ?? '',
+    fecha_desde: props.filters?.fecha_desde ?? '',
+    fecha_hasta: props.filters?.fecha_hasta ?? '',
 })
+
+const vehiculoOptions = computed(() =>
+    props.vehiculosExternos.map((v) => ({
+        id: v.id,
+        label: `${v.nro_placa ?? 'Sin placa'}${v.propietario ? ' — ' + v.propietario : ''}`,
+    })),
+)
 
 let debounce = null
 watch(filtros, () => {
     clearTimeout(debounce)
     debounce = setTimeout(() => {
-        router.get(route('control-cargas.index'), filtros, {
+        router.get(route('control-cargas.index'), {
+            estado_carga: filtros.estado_carga || undefined,
+            q: filtros.q || undefined,
+            id_vehiculo_externo: filtros.id_vehiculo_externo || undefined,
+            // Sin "|| undefined": si el usuario limpia el rango debe viajar
+            // como '' explícito (no ausente), o el backend reaplicaría el
+            // default ("Este mes") al no encontrar la clave en el request.
+            fecha_desde: filtros.fecha_desde,
+            fecha_hasta: filtros.fecha_hasta,
+        }, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
         })
     }, 300)
 })
+
+function limpiarFiltros() {
+    filtros.estado_carga = ''
+    filtros.q = ''
+    filtros.id_vehiculo_externo = ''
+    filtros.fecha_desde = ''
+    filtros.fecha_hasta = ''
+}
 
 const estadoBadge = (estado) => ({
     ABIERTA: 'bg-success-transparent text-success',
@@ -69,7 +99,8 @@ const estadoBadge = (estado) => ({
     <div class="card custom-card mb-3">
         <div class="card-body py-3">
             <div class="row g-2">
-                <div class="col-sm-7 col-lg-8">
+                <div class="col-sm-6 col-lg-4">
+                    <label class="form-label">Buscar</label>
                     <input
                         v-model="filtros.q"
                         type="text"
@@ -77,13 +108,41 @@ const estadoBadge = (estado) => ({
                         placeholder="Buscar por N° de flete o placa..."
                     />
                 </div>
-                <div class="col-sm-5 col-lg-4">
+                <div class="col-sm-6 col-lg-3">
+                    <DateRangeFilter
+                        v-model:fecha-desde="filtros.fecha_desde"
+                        v-model:fecha-hasta="filtros.fecha_hasta"
+                        label="Fecha de apertura"
+                        default-range="Este mes"
+                    />
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <label class="form-label">Placa</label>
+                    <Multiselect
+                        v-model="filtros.id_vehiculo_externo"
+                        :options="vehiculoOptions"
+                        value-prop="id"
+                        label="label"
+                        :searchable="true"
+                        :filter-results="true"
+                        placeholder="Todas las placas"
+                        no-options-text="Sin vehículos externos"
+                        no-results-text="Sin resultados"
+                    />
+                </div>
+                <div class="col-sm-6 col-lg-2">
+                    <label class="form-label">Estado</label>
                     <select v-model="filtros.estado_carga" class="form-select">
                         <option value="">Todos los estados</option>
                         <option value="ABIERTA">Abierta</option>
                         <option value="CERRADA">Cerrada</option>
                         <option value="PAGADA">Pagada</option>
                     </select>
+                </div>
+                <div class="col-12 d-flex justify-content-end">
+                    <button type="button" class="btn btn-outline-secondary btn-wave" @click="limpiarFiltros">
+                        <i class="ri-refresh-line me-1"></i> Limpiar filtros
+                    </button>
                 </div>
             </div>
         </div>
@@ -141,6 +200,15 @@ const estadoBadge = (estado) => ({
                                 title="Editar"
                             >
                                 <i class="ri-edit-line"></i>
+                            </Link>
+                            <Link
+                                v-can="'control-cargas.ver'"
+                                :href="route('control-cargas.imprimir', carga.id)"
+                                target="_blank"
+                                class="btn btn-sm btn-icon btn-warning-light"
+                                title="Imprimir informe del flete"
+                            >
+                                <i class="ri-printer-line"></i>
                             </Link>
                             <Link :href="route('control-cargas.show', carga.id)" class="btn btn-sm btn-primary btn-wave">
                                 Ver <i class="ri-arrow-right-line ms-1"></i>

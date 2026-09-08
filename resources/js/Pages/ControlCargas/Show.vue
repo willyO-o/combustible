@@ -205,9 +205,19 @@ function submitPago() {
             </nav>
             <h1 class="page-title fw-medium fs-18 mb-0">Flete #{{ carga.nro }}</h1>
         </div>
-        <Link :href="route('control-cargas.index')" class="btn btn-outline-secondary btn-wave">
-            <i class="ri-arrow-left-line me-1"></i> Volver
-        </Link>
+        <div class="d-flex gap-2">
+            <Link
+                v-can="'control-cargas.ver'"
+                :href="route('control-cargas.imprimir', carga.id)"
+                target="_blank"
+                class="btn btn-outline-warning btn-wave"
+            >
+                <i class="ri-printer-line me-1"></i> Imprimir informe
+            </Link>
+            <Link :href="route('control-cargas.index')" class="btn btn-outline-secondary btn-wave">
+                <i class="ri-arrow-left-line me-1"></i> Volver
+            </Link>
+        </div>
     </div>
 
     <!-- Flash messages -->
