@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Libraries\Reportes;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\Conductor;
@@ -344,5 +345,22 @@ class SolicitudMantenimientoControllerTest extends TestCase
             ->has('vehiculos', 1)
             ->where('vehiculos.0.id', $vehiculoDelArea->id)
         );
+    }
+
+    /**
+     * SolicitudMantenimientoController::imprimir() llama a
+     * Reportes::generarSolicitudMantenimiento() con el modo por defecto ('I',
+     * salida directa + exit;), lo que no se puede probar vía HTTP dentro de
+     * PHPUnit (el exit; terminaría el proceso de test). Se prueba llamando a
+     * la librería directamente con modo 'S' (devuelve el PDF como string),
+     * igual que hace la API para el resto de reportes.
+     */
+    public function test_generar_solicitud_mantenimiento_produce_un_pdf_valido(): void
+    {
+        $solicitud = $this->crearSolicitud();
+
+        $pdf = (new Reportes)->generarSolicitudMantenimiento($solicitud, 'S');
+
+        $this->assertStringStartsWith('%PDF', $pdf);
     }
 }

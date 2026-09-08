@@ -499,6 +499,26 @@ class CargaMaterialControllerTest extends TestCase
         $response->assertHeader('Content-Type', 'application/pdf');
     }
 
+    /**
+     * Reportes::logoEmpresa() debe caer al logo estático (logo-plus-metals.png)
+     * sin tumbar el reporte cuando parametros_empresa.logo_empresa apunta a un
+     * archivo que ya no existe en storage/ (borrado, o un registro viejo tras
+     * limpiar el disco) — FPDF::Image() lanza una Exception ante un archivo
+     * inválido, así que antes de esta validación esto habría sido un 500.
+     */
+    public function test_generar_pdf_no_falla_si_el_logo_configurado_ya_no_existe_en_el_servidor(): void
+    {
+        ParametrosEmpresa::first()->update(['logo_empresa' => 'parametros-empresa/no-existe.png']);
+
+        $carga = $this->crearCargaAbiertaPor($this->conductor);
+
+        $response = $this->actingAs($this->conductor)->get(route('control-cargas.imprimir', $carga->id));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
     public function test_registrar_viaje_guarda_la_foto_y_el_material_seleccionado(): void
     {
         Storage::fake('public');

@@ -50,10 +50,12 @@ class Reportes extends exFPDF
         $rojo = [203, 39, 45];
         $negro = [30, 30, 30];
         $gris = [90, 90, 90];
-        $blanco = [255, 255, 255];
+        $blanco = [30, 30, 30];
 
         $pageW = 215.9;
         $pageH = 279.4;
+
+        $gris = [90, 90, 90];
 
         $this->AddPage('P', 'Letter');
         $this->SetMargins(5, 5, 5);
@@ -63,7 +65,7 @@ class Reportes extends exFPDF
         // FONDO (diseño completo tamaño carta: cuadros, líneas e íconos
         // ya vienen impresos en la imagen; aquí sólo se ubica el texto)
         // ----------------------------------------------------------
-        $this->Image(public_path('images/reportes/vale-fondo-carta.png'), 0, 0, $pageW, $pageH);
+        $this->Image(public_path('images/reportes/vale-fondo-carta.jpg'), 0, 0, $pageW, $pageH);
 
         // ----------------------------------------------------------
         // ENCABEZADO: logo, título "VALE" + correlativo, datos del grifo
@@ -72,7 +74,7 @@ class Reportes extends exFPDF
 
         $this->SetXY(52, 10);
         $this->SetFont('Arial', 'BI', 40);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->Cell(45, 14, utf8Decode('VALE'), 0, 0, 'L');
 
         $this->SetXY(53, 24);
@@ -161,7 +163,7 @@ class Reportes extends exFPDF
         // ----------------------------------------------------------
         $this->SetFont('Arial', 'B', 9);
         $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
-        $this->SetXY(106, 188);
+        $this->SetXY(108, 188);
         $this->Cell(28, 6, utf8Decode($vale->fecha_emision?->format('d/m/Y H:i')), 0, 0, 'L');
 
         $this->SetXY(170, 188);
@@ -249,7 +251,7 @@ class Reportes extends exFPDF
         // íconos ya vienen impresos en la imagen; aquí sólo se ubica el
         // texto).
         // ----------------------------------------------------------
-        $this->Image(public_path('images/reportes/fondo-comprobante-egreso.png'), 0, 0, $pageW, $pageH);
+        $this->Image(public_path('images/reportes/fondo-comprobante-egreso.jpg'), 0, 0, $pageW, $pageH);
 
         // ----------------------------------------------------------
         // ENCABEZADO: logo, título, correlativo y fecha
@@ -258,7 +260,7 @@ class Reportes extends exFPDF
 
         $this->SetXY(50, 8);
         $this->SetFont('Arial', 'B', 18);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->Cell(105, 9, utf8Decode('COMPROBANTE DE EGRESO'), 0, 2, 'C');
         $this->SetX(50);
         $this->Cell(105, 9, utf8Decode('DE COMBUSTIBLE'), 0, 2, 'C');
@@ -266,7 +268,7 @@ class Reportes extends exFPDF
         // Nro. de comprobante, sobre el recuadro azul relleno del encabezado
         $this->SetXY(158, 13.2);
         $this->SetFont('Arial', 'B', 11);
-        $this->SetTextColor($blanco[0], $blanco[1], $blanco[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->Cell(29, 6, utf8Decode($numeroComprobante), 0, 0, 'C');
 
         // Fecha, debajo de la etiqueta "FECHA:" impresa en el fondo (a la
@@ -418,8 +420,14 @@ class Reportes extends exFPDF
         // ══════════════════════════════════════════════════════════════════
         // COLORES
         // ══════════════════════════════════════════════════════════════════
-        $azul = [0, 75, 145]; // mismo azul pedido para la tabla de "TRABAJOS REALIZADOS"
+        $azul = [0, 75, 145];
         $negro = [30, 30, 30];
+        // Tabla dinámica "TRABAJOS REALIZADOS" (única sección que el fondo no
+        // trae impresa): líneas/bordes y todo su texto en negro, y el fondo
+        // de la cabecera de la tabla en gris #c9c9c9 en vez de azul, a pedido
+        // del usuario. El checkbox de tipo de mantenimiento (sobre el fondo
+        // pre-impreso, fuera de esta tabla) sigue en $azul como antes.
+        $grisEncabezado = [201, 201, 201];
 
         $pageW = 215.9;
         $pageH = 279.4;
@@ -432,7 +440,7 @@ class Reportes extends exFPDF
         // FONDO (formulario completo tamaño carta: cajas, etiquetas y líneas
         // ya vienen impresas en la imagen; aquí sólo se ubica el texto).
         // ----------------------------------------------------------
-        $this->Image(public_path('images/reportes/fondo-solicitud-mantenimiento.png'), 0, 0, $pageW, $pageH);
+        $this->Image(public_path('images/reportes/fondo-solicitud-mantenimiento.jpg'), 0, 0, $pageW, $pageH);
 
         // ══════════════════════════════════════════════════════════════════
         // ENCABEZADO: logo (zona x 2.29-48.98) y N° de solicitud (zona x 170.98-212.85)
@@ -499,11 +507,11 @@ class Reportes extends exFPDF
         // el título (8mm) + $maxFilas=10 filas de 6.5mm de alto (65mm) la tabla
         // termina en 128.5 + 8 + 65 = 201.5, dentro de ese límite.
 
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($s4X + 2, $s4Y, $s4W - 4, 8);
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($s4X, $s4Y);
         $this->Cell($s4W, 8, utf8Decode('TRABAJOS REALIZADOS'), 0, 0, 'C');
 
@@ -514,9 +522,11 @@ class Reportes extends exFPDF
         $this->SetMargins(-1, 0, 0);
         $this->SetXY(0, $s4Y + 8);
         $anchoTabla = array_sum($anchos);
-        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$anchoTabla}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; min-height:6.5;");
+        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$anchoTabla}; border:1; border-color:{$negro[0]},{$negro[1]},{$negro[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; min-height:6.5;");
 
-        $tabla->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-color:255,255,255; font-style:B; font-size:7.5; align:C;");
+        // Fondo gris (antes azul) + texto negro (antes blanco, para contraste
+        // sobre azul oscuro; con fondo gris claro el blanco quedaría ilegible).
+        $tabla->rowStyle("bgcolor:{$grisEncabezado[0]},{$grisEncabezado[1]},{$grisEncabezado[2]}; font-color:{$negro[0]},{$negro[1]},{$negro[2]}; font-style:B; font-size:7.5; align:C;");
         foreach ($encabezados as $encabezado) {
             $tabla->easyCell(utf8Decode($encabezado), 'align:C;');
         }
@@ -1483,6 +1493,12 @@ class Reportes extends exFPDF
         $this->SetMargins(8, 8, 8);
         $this->SetAutoPageBreak(true, 15);
 
+        // Calibri en vez de Arial en todo este reporte (a pedido del
+        // usuario) — ver registrarFuenteCalibri()/textoCalibri(). Esto no
+        // afecta a ningún otro reporte de esta clase.
+        $this->registrarFuenteCalibri();
+        $fuente = 'Calibri';
+
         $sx = 8;
         $sy = 8;
         $uw = 199.9;
@@ -1501,41 +1517,41 @@ class Reportes extends exFPDF
         $badgeW = 32;
         $tituloW = $uw - 40 - $badgeW - 3;
 
-        $this->SetFont('Arial', 'B', 13);
+        $this->SetFont($fuente, 'B', 13);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($sx + 40, $sy + 1.5);
-        $this->Cell($tituloW, 8, utf8Decode('DETALLE DE FLETE'), 0, 2, 'L');
+        $this->Cell($tituloW, 8, $this->textoCalibri('DETALLE DE FLETE'), 0, 2, 'L');
 
-        $this->SetFont('Arial', '', 9);
+        $this->SetFont($fuente, '', 9);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
         $this->SetX($sx + 40);
-        $this->Cell($tituloW, 6, utf8Decode('Control de carga de material — vehículos externos'), 0, 2, 'L');
+        $this->Cell($tituloW, 6, $this->textoCalibri('Control de carga de material — vehículos externos'), 0, 2, 'L');
 
         // Placa + propietario, bajo el título (identifica el flete de un
         // vistazo, igual que en generarReporteControlCargasDetalle()).
         $placa = $carga->vehiculoExterno?->nro_placa ?: 'Sin placa';
         $propietario = $carga->vehiculoExterno?->propietario ? '   |   '.$carga->vehiculoExterno->propietario : '';
-        $this->SetFont('Arial', 'B', 9);
+        $this->SetFont($fuente, 'B', 9);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetX($sx + 40);
-        $this->Cell($tituloW, 5, utf8Decode('Vehículo externo: '.$placa.$propietario), 0, 2, 'L');
+        $this->Cell($tituloW, 5, $this->textoCalibri('Vehículo externo: '.$placa.$propietario), 0, 2, 'L');
 
         // Badge de estado + N° de flete, arriba a la derecha.
         $badgeX = $sx + $uw - $badgeW - 3;
         $this->SetFillColor($colorEstado[0], $colorEstado[1], $colorEstado[2]);
         $this->Rect($badgeX, $sy + 3, $badgeW, 7, 'F');
-        $this->SetFont('Arial', 'B', 8.5);
+        $this->SetFont($fuente, 'B', 8.5);
         $this->SetTextColor(255, 255, 255);
         $this->SetXY($badgeX, $sy + 3);
-        $this->Cell($badgeW, 7, utf8Decode($carga->estado_carga), 0, 0, 'C');
+        $this->Cell($badgeW, 7, $this->textoCalibri($carga->estado_carga), 0, 0, 'C');
 
-        $this->SetFont('Arial', 'B', 11);
+        $this->SetFont($fuente, 'B', 11);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($badgeX, $sy + 12);
-        $this->Cell($badgeW, 6, utf8Decode('N° '.$carga->nro), 0, 0, 'C');
+        $this->Cell($badgeW, 6, $this->textoCalibri('N° '.$carga->nro), 0, 0, 'C');
 
         $currentY = $sy + $h1 + 2;
-        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris, $fuente);
         $currentY += 3;
 
         // ── Datos generales (grilla de 2 columnas) ───────────────────────
@@ -1558,25 +1574,25 @@ class Reportes extends exFPDF
         $this->SetLineWidth(0.1);
         $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         foreach ($filas as [$label1, $valor1, $label2, $valor2]) {
-            $this->SetFont('Arial', 'B', 8);
+            $this->SetFont($fuente, 'B', 8);
             $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx, $currentY);
-            $this->Cell($labelW, $rowH, utf8Decode($label1.':'), 0, 0, 'L');
+            $this->Cell($labelW, $rowH, $this->textoCalibri($label1.':'), 0, 0, 'L');
 
-            $this->SetFont('Arial', '', 8.5);
+            $this->SetFont($fuente, '', 8.5);
             $this->SetTextColor(30, 30, 30);
             $this->SetXY($sx + $labelW, $currentY);
-            $this->Cell($colW - $labelW - 2, $rowH, utf8Decode(mb_strtoupper($valor1)), 0, 0, 'L');
+            $this->Cell($colW - $labelW - 2, $rowH, $this->textoCalibri(mb_strtoupper($valor1)), 0, 0, 'L');
 
-            $this->SetFont('Arial', 'B', 8);
+            $this->SetFont($fuente, 'B', 8);
             $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx + $colW, $currentY);
-            $this->Cell($labelW, $rowH, utf8Decode($label2.':'), 0, 0, 'L');
+            $this->Cell($labelW, $rowH, $this->textoCalibri($label2.':'), 0, 0, 'L');
 
-            $this->SetFont('Arial', '', 8.5);
+            $this->SetFont($fuente, '', 8.5);
             $this->SetTextColor(30, 30, 30);
             $this->SetXY($sx + $colW + $labelW, $currentY);
-            $this->Cell($colW - $labelW - 2, $rowH, utf8Decode(mb_strtoupper($valor2)), 0, 0, 'L');
+            $this->Cell($colW - $labelW - 2, $rowH, $this->textoCalibri(mb_strtoupper($valor2)), 0, 0, 'L');
 
             $this->Line($sx, $currentY + $rowH, $sx + $uw, $currentY + $rowH);
             $currentY += $rowH;
@@ -1585,28 +1601,28 @@ class Reportes extends exFPDF
         $currentY += 4;
 
         if ($carga->detalle) {
-            $this->SetFont('Arial', 'B', 8);
+            $this->SetFont($fuente, 'B', 8);
             $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx, $currentY);
-            $this->Cell($uw, 5, utf8Decode('DETALLE DEL FLETE:'), 0, 1, 'L');
+            $this->Cell($uw, 5, $this->textoCalibri('DETALLE DEL FLETE:'), 0, 1, 'L');
 
-            $this->SetFont('Arial', '', 8.5);
+            $this->SetFont($fuente, '', 8.5);
             $this->SetTextColor(30, 30, 30);
             $this->SetX($sx);
-            $this->MultiCell($uw, 4.5, utf8Decode($carga->detalle), 0, 'L');
+            $this->MultiCell($uw, 4.5, $this->textoCalibri($carga->detalle), 0, 'L');
             $currentY = $this->GetY() + 3;
         }
 
         if ($carga->observaciones) {
-            $this->SetFont('Arial', 'B', 8);
+            $this->SetFont($fuente, 'B', 8);
             $this->SetTextColor($negro[0], $negro[1], $negro[2]);
             $this->SetXY($sx, $currentY);
-            $this->Cell($uw, 5, utf8Decode('OBSERVACIONES:'), 0, 1, 'L');
+            $this->Cell($uw, 5, $this->textoCalibri('OBSERVACIONES:'), 0, 1, 'L');
 
-            $this->SetFont('Arial', '', 8.5);
+            $this->SetFont($fuente, '', 8.5);
             $this->SetTextColor(30, 30, 30);
             $this->SetX($sx);
-            $this->MultiCell($uw, 4.5, utf8Decode($carga->observaciones), 0, 'L');
+            $this->MultiCell($uw, 4.5, $this->textoCalibri($carga->observaciones), 0, 'L');
             $currentY = $this->GetY() + 3;
         }
 
@@ -1620,44 +1636,44 @@ class Reportes extends exFPDF
         $this->SetDrawColor($blanco[0], $blanco[1], $blanco[2]);
         $this->SetLineWidth(0.1);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
-        $this->SetFont('Arial', 'B', 9);
+        $this->SetFont($fuente, 'B', 9);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($sx, $currentY);
-        $this->Cell($uw, 8, utf8Decode('DETALLE DE VIAJES'), 0, 1, 'C');
+        $this->Cell($uw, 8, $this->textoCalibri('DETALLE DE VIAJES'), 0, 1, 'C');
         $currentY += 8;
 
         $this->SetXY($sx, $currentY);
-        $tablaViajes = new easyTable($this, '{10, 30, 32, 32, 38, 32, 25}', "width:199; border:1; border-color:{$negro[0]},{$negro[1]},{$negro[2]}; border-width:0.1; font-family:Arial; valign:M; paddingX:1.2; min-height:6;");
+        $tablaViajes = new easyTable($this, '{10, 30, 32, 32, 38, 32, 25}', "width:199; border:1; border-color:{$negro[0]},{$negro[1]},{$negro[2]}; border-width:0.1; font-family:{$fuente}; valign:M; paddingX:1.2; min-height:6;");
 
         // border-color:255,255,255 sólo en esta fila (celda gana sobre tabla):
         // header con fondo gris y borde blanco, sin línea negra encima.
         $tablaViajes->rowStyle("bgcolor:{$grisEncabezado[0]},{$grisEncabezado[1]},{$grisEncabezado[2]}; border-color:{$blanco[0]},{$blanco[1]},{$blanco[2]}; font-style:B; font-size:7; font-color:0,0,0;");
         foreach (['N°', 'MATERIAL', 'ORIGEN', 'DESTINO', 'DETALLE', 'REGISTRADO POR', 'FECHA'] as $i => $encabezado) {
-            $tablaViajes->easyCell(utf8Decode($encabezado), 'align:'.($i === 0 ? 'C' : 'L').';');
+            $tablaViajes->easyCell($this->textoCalibri($encabezado), 'align:'.($i === 0 ? 'C' : 'L').';');
         }
         $tablaViajes->printRow(true);
 
         if ($viajes->isEmpty()) {
             $tablaViajes->rowStyle('font-size:8; font-color:90,90,90;');
-            $tablaViajes->easyCell(utf8Decode('Este flete todavía no registra viajes.'), 'align:C; colspan:7;');
+            $tablaViajes->easyCell($this->textoCalibri('Este flete todavía no registra viajes.'), 'align:C; colspan:7;');
             $tablaViajes->printRow();
         }
 
         foreach ($viajes as $i => $viaje) {
             $tablaViajes->rowStyle('font-style:; font-size:7.5; font-color:30,30,30;');
             $tablaViajes->easyCell((string) ($i + 1), 'align:C;');
-            $tablaViajes->easyCell(utf8Decode($viaje->material?->material ?? '—'), 'align:L;');
-            $tablaViajes->easyCell(utf8Decode($viaje->origen ?: '—'), 'align:L;');
-            $tablaViajes->easyCell(utf8Decode($viaje->destino ?: '—'), 'align:L;');
-            $tablaViajes->easyCell(utf8Decode($viaje->detalle ?: '—'), 'align:L;');
-            $tablaViajes->easyCell(utf8Decode($viaje->usuarioRegistro?->name ?? '—'), 'align:L;');
-            $tablaViajes->easyCell(utf8Decode($fechaHora($viaje->fecha_hora_carga ?? $viaje->created_at)), 'align:L;');
+            $tablaViajes->easyCell($this->textoCalibri($viaje->material?->material ?? '—'), 'align:L;');
+            $tablaViajes->easyCell($this->textoCalibri($viaje->origen ?: '—'), 'align:L;');
+            $tablaViajes->easyCell($this->textoCalibri($viaje->destino ?: '—'), 'align:L;');
+            $tablaViajes->easyCell($this->textoCalibri($viaje->detalle ?: '—'), 'align:L;');
+            $tablaViajes->easyCell($this->textoCalibri($viaje->usuarioRegistro?->name ?? '—'), 'align:L;');
+            $tablaViajes->easyCell($this->textoCalibri($fechaHora($viaje->fecha_hora_carga ?? $viaje->created_at)), 'align:L;');
             $tablaViajes->printRow();
         }
 
         $tablaViajes->endTable();
 
-        $this->pintarPieDePagina($uw, $gris);
+        $this->pintarPieDePagina($uw, $gris, $fuente);
 
         return $this->Output($modo, $nombreArchivo ?? 'flete_'.str_replace('/', '-', (string) $carga->nro).'.pdf');
     }
@@ -1881,7 +1897,7 @@ class Reportes extends exFPDF
      * por los reportes de rendimiento. AliasNbPages()+SetY(-12) sólo puede
      * pintarse una vez que ya se conoce la altura final del contenido.
      */
-    private function pintarPieDePagina(float $uw, array $gris): void
+    private function pintarPieDePagina(float $uw, array $gris, string $fontFamily = 'Arial'): void
     {
         // El auto-salto de página (activado para que la tabla pagine si hay
         // muchas filas) dispara una página nueva en cuanto un Cell() cae
@@ -1890,7 +1906,7 @@ class Reportes extends exFPDF
         // extra en blanco.
         $this->SetAutoPageBreak(false);
         $this->SetY(-12);
-        $this->SetFont('Arial', 'I', 8);
+        $this->SetFont($fontFamily, 'I', 8);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
         $this->Cell($uw, 4, utf8Decode('Reporte generado el: '.date('d/m/Y H:i')), 0, 0, 'L');
         $this->Cell($uw, 4, utf8Decode('Página: ').$this->PageNo().'/{nb}', 0, 0, 'R');
@@ -1910,8 +1926,17 @@ class Reportes extends exFPDF
 
     /**
      * Ruta absoluta al logo a usar en el encabezado: el que esté configurado
-     * en Parámetros de la Empresa si existe el archivo, o el logo estático
-     * como respaldo (para no romper el reporte si aún no se configuró uno).
+     * en Parámetros de la Empresa si el archivo existe en el servidor Y es
+     * una imagen válida/legible, o el logo estático (logo-plus-metals.png)
+     * como respaldo en cualquier otro caso.
+     *
+     * La validación con getimagesize() (no sólo file_exists()) es a propósito:
+     * FPDF::Image() lanza una Exception (Error() en fpdf.php) si el archivo
+     * no es una imagen que pueda parsear — un logo_empresa apuntando a un
+     * archivo borrado, corrupto o de 0 bytes tumbaría CUALQUIER reporte con
+     * un 500 en vez de imprimir con el logo por defecto. @ silencia el
+     * warning nativo de getimagesize() ante un archivo inválido; el valor de
+     * retorno (false) es lo que ya distingue "válido" de "no válido" acá.
      */
     private function logoEmpresa(?ParametrosEmpresa $parametrosEmpresa): string
     {
@@ -1923,7 +1948,11 @@ class Reportes extends exFPDF
 
         $logoConfigurado = storage_path('app/public/'.$parametrosEmpresa->logo_empresa);
 
-        return file_exists($logoConfigurado) ? $logoConfigurado : $logoRespaldo;
+        if (is_file($logoConfigurado) && @getimagesize($logoConfigurado) !== false) {
+            return $logoConfigurado;
+        }
+
+        return $logoRespaldo;
     }
 
     /**
@@ -1931,7 +1960,7 @@ class Reportes extends exFPDF
      * teléfono, NIT), pintada como una línea centrada justo debajo del
      * encabezado del reporte. Devuelve el alto ocupado (0 si no hay datos).
      */
-    private function pintarInfoEmpresa(?ParametrosEmpresa $parametrosEmpresa, float $sx, float $y, float $uw, array $gris): float
+    private function pintarInfoEmpresa(?ParametrosEmpresa $parametrosEmpresa, float $sx, float $y, float $uw, array $gris, string $fontFamily = 'Arial'): float
     {
         if (! $parametrosEmpresa) {
             return 0;
@@ -1948,12 +1977,57 @@ class Reportes extends exFPDF
             return 0;
         }
 
-        $this->SetFont('Arial', '', 7.5);
+        $this->SetFont($fontFamily, '', 7.5);
         $this->SetTextColor($gris[0], $gris[1], $gris[2]);
         $this->SetXY($sx, $y);
         $this->Cell($uw, 4, utf8Decode(implode('   |   ', $partes)), 0, 0, 'C');
 
         return 6;
+    }
+
+    /**
+     * Registra la familia "Calibri" (regular/negrita/cursiva/negrita-cursiva)
+     * para poder usarla con SetFont('Calibri', ...) igual que un core font de
+     * FPDF (Arial, Times, etc.). Los 4 archivos de definición (.php + .z,
+     * generados con la utilidad oficial MakeFont a partir de las Microsoft
+     * Fluent Fonts) viven en public/fonts/fpdf-calibri/font/ — se cargan
+     * desde ahí directamente (sin copiarlos a vendor/) para que sobrevivan a
+     * un `composer update`. AddFont() ya es idempotente (no vuelve a
+     * registrar un fontkey ya cargado), así que es seguro llamar este método
+     * al inicio de cualquier reporte que quiera usar Calibri.
+     *
+     * Sólo úsala en reportes SIN imagen de fondo pre-impresa (generarVale(),
+     * generarComprobanteEgreso(), etc. dependen de que las métricas de Arial
+     * coincidan con las coordenadas medidas sobre el fondo — cambiarles la
+     * fuente los desalinearía).
+     */
+    private function registrarFuenteCalibri(): void
+    {
+        $dir = public_path('fonts/fpdf-calibri/font/');
+
+        $this->AddFont('Calibri', '', 'calibri.php', $dir);
+        $this->AddFont('Calibri', 'B', 'calibrib.php', $dir);
+        $this->AddFont('Calibri', 'I', 'calibrii.php', $dir);
+        $this->AddFont('Calibri', 'BI', 'calibribi.php', $dir);
+    }
+
+    /**
+     * Convierte UTF-8 a cp1252 (Windows-1252), la codificación con la que se
+     * generaron los archivos de fuente de registrarFuenteCalibri(). A
+     * diferencia de utf8Decode() (UTF-8 -> ISO-8859-1, usada por el resto de
+     * Reportes.php con los core fonts de FPDF), cp1252 sí conserva el guión
+     * largo (—), las comillas tipográficas y el símbolo €, que Calibri
+     * incluye pero ISO-8859-1 no representa. //TRANSLIT evita que un
+     * caracter fuera de cp1252 rompa el reporte (se aproxima en vez de
+     * fallar), igual que hace utf8Decode().
+     */
+    private function textoCalibri(?string $texto): string
+    {
+        if (empty($texto)) {
+            return '';
+        }
+
+        return iconv('UTF-8', 'CP1252//TRANSLIT', $texto);
     }
 
     protected function drawCircle(float $cx, float $cy, float $r, string $style = 'D'): void
@@ -2102,8 +2176,15 @@ class Reportes extends exFPDF
         // ══════════════════════════════════════════════════════════════════
         // COLORES / PÁGINA
         // ══════════════════════════════════════════════════════════════════
-        $azul = [0, 75, 145];
-        $celeste = [214, 231, 246]; // celeste claro para las cabeceras (poca tinta)
+        // Ya no queda azul en todo lo que dibuja este método sobre el fondo
+        // pre-impreso ni en las 2 tablas dinámicas (a pedido del usuario):
+        // los encabezados de tabla (antes celeste) van en $grisEncabezado
+        // #c9c9c9; todo el texto (N°, marca DÍA/NOCHE, etiquetas y valores de
+        // los campos superiores, títulos y filas de tabla) en $negro; los
+        // bordes de las 2 tablas también en $negro; y las líneas de los
+        // campos OPERADOR/EQUIPO/lecturas/SUPERVISOR (pintarCampoReporte) en
+        // $gris, más clara que el negro de las tablas.
+        $grisEncabezado = [201, 201, 201];
         $negro = [30, 30, 30];
         $gris = [110, 110, 110];
 
@@ -2113,7 +2194,7 @@ class Reportes extends exFPDF
         $this->AddPage('P', 'Letter');
         $this->SetMargins(8, 8, 8);
         $this->SetAutoPageBreak(false);
-        $this->Image(public_path('images/reportes/fondo-reporte-operacion.png'), 0, 0, $pageW, $pageH);
+        $this->Image(public_path('images/reportes/fondo-reporte-operacion.jpg'), 0, 0, $pageW, $pageH);
 
         $sx = 4.5;
         $uw = 207.0;
@@ -2124,7 +2205,7 @@ class Reportes extends exFPDF
         $this->Image(public_path('images/logo/logo-plus-metals.png'), 9, 7, 34);
 
         $this->SetFont('Arial', 'B', 13);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY(163.8, 6);
         $this->Cell(49.1, 6, utf8Decode('N° '.$nro), 0, 0, 'C');
 
@@ -2138,7 +2219,7 @@ class Reportes extends exFPDF
         $this->Cell(15.9, 5, $anio, 0, 0, 'C');
 
         $this->SetFont('Arial', 'B', 11);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         if ($operacion->turno === 'DIA') {
             $this->SetXY(83.8, 19.9);
             $this->Cell(4.6, 5, 'X', 0, 0, 'C');
@@ -2151,14 +2232,14 @@ class Reportes extends exFPDF
         // CAMPOS: OPERADOR / EQUIPO / LECTURAS / HORAS
         // ══════════════════════════════════════════════════════════════════
         $medio = $sx + $uw / 2;
-        $this->pintarCampoReporte($sx, 35, 30, 'OPERADOR:', mb_strtoupper($operador), $medio - 4, $azul, $negro);
-        $this->pintarCampoReporte($medio, 35, 40, 'DESCRIPCIÓN EQUIPO:', mb_strtoupper($descripcionEquipo), $sx + $uw, $azul, $negro);
+        $this->pintarCampoReporte($sx, 35, 30, 'OPERADOR:', mb_strtoupper($operador), $medio - 4, $negro, $gris, $negro);
+        $this->pintarCampoReporte($medio, 35, 40, 'DESCRIPCIÓN EQUIPO:', mb_strtoupper($descripcionEquipo), $sx + $uw, $negro, $gris, $negro);
 
-        $this->pintarCampoReporte($sx, 43, 44, $etiquetaLectura.' INICIAL:', $this->formatearLecturaReporte($lecturaInicial, $unidadLectura), $medio - 4, $azul, $negro);
-        $this->pintarCampoReporte($medio, 43, 50, 'TOTAL HORAS TRABAJADAS:', $this->formatearLecturaReporte($operacion->horas_trabajadas, 'h'), $sx + $uw, $azul, $negro);
+        $this->pintarCampoReporte($sx, 43, 44, $etiquetaLectura.' INICIAL:', $this->formatearLecturaReporte($lecturaInicial, $unidadLectura), $medio - 4, $negro, $gris, $negro);
+        $this->pintarCampoReporte($medio, 43, 50, 'TOTAL HORAS TRABAJADAS:', $this->formatearLecturaReporte($operacion->horas_trabajadas, 'h'), $sx + $uw, $negro, $gris, $negro);
 
-        $this->pintarCampoReporte($sx, 51, 44, $etiquetaLectura.' FINAL:', $this->formatearLecturaReporte($lecturaFinal, $unidadLectura), $medio - 4, $azul, $negro);
-        $this->pintarCampoReporte($medio, 51, 26, 'SUPERVISOR:', mb_strtoupper($supervisor), $sx + $uw, $azul, $negro);
+        $this->pintarCampoReporte($sx, 51, 44, $etiquetaLectura.' FINAL:', $this->formatearLecturaReporte($lecturaFinal, $unidadLectura), $medio - 4, $negro, $gris, $negro);
+        $this->pintarCampoReporte($medio, 51, 26, 'SUPERVISOR:', mb_strtoupper($supervisor), $sx + $uw, $negro, $gris, $negro);
 
         // ══════════════════════════════════════════════════════════════════
         // TABLA: DETALLE JORNADA DIARIA DE TRABAJO
@@ -2171,12 +2252,12 @@ class Reportes extends exFPDF
         $maxFilas = max(10, count($actividades));
         $filasVacias = max(0, $maxFilas - count($actividades));
 
-        $this->SetFillColor($celeste[0], $celeste[1], $celeste[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $jornadaTitleY, $uw, 7, 'FD');
         $this->SetFont('Arial', 'B', 9.5);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($sx, $jornadaTitleY);
         $this->Cell($uw, 7, utf8Decode('DETALLE JORNADA DIARIA DE TRABAJO'), 0, 0, 'C');
 
@@ -2197,8 +2278,8 @@ class Reportes extends exFPDF
 
         $this->SetMargins(0, 0, 0);
         $this->SetXY($sx, $jornadaTitleY + 7);
-        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$uw}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; paddingY:0.3; min-height:{$filaH};");
-        $tabla->rowStyle("bgcolor:{$celeste[0]},{$celeste[1]},{$celeste[2]}; font-color:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:7.5; align:C; min-height:4.6;");
+        $tabla = new easyTable($this, '{'.implode(',', $anchos).'}', "width:{$uw}; border:1; border-color:{$negro[0]},{$negro[1]},{$negro[2]}; border-width:0.25; font-family:Arial; valign:M; paddingX:1.5; paddingY:0.3; min-height:{$filaH};");
+        $tabla->rowStyle("bgcolor:{$grisEncabezado[0]},{$grisEncabezado[1]},{$grisEncabezado[2]}; font-color:{$negro[0]},{$negro[1]},{$negro[2]}; font-style:B; font-size:7.5; align:C; min-height:4.6;");
         foreach ($encabezados as $encabezado) {
             $tabla->easyCell(utf8Decode($encabezado), 'align:C;');
         }
@@ -2222,19 +2303,19 @@ class Reportes extends exFPDF
         $mantX = $sx + 22;
         $mantW = $uw - 44;
 
-        $this->SetFillColor($celeste[0], $celeste[1], $celeste[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($mantX, $mantTitleY, $mantW, 7, 'FD');
         $this->SetFont('Arial', 'B', 9.5);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
         $this->SetXY($mantX, $mantTitleY);
         $this->Cell($mantW, 7, utf8Decode('MANTENIMIENTO REALIZADO'), 0, 0, 'C');
 
         $mantBodyY = $mantTitleY + 7;
 
         if (count($mantenimiento) === 0) {
-            $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+            $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
             $this->SetLineWidth(0.25);
             $this->Rect($mantX, $mantBodyY, $mantW, 7);
             $this->SetFont('Arial', 'I', 8);
@@ -2251,18 +2332,18 @@ class Reportes extends exFPDF
             $y = $mantBodyY;
 
             foreach ($mantenimiento as $item) {
-                $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+                $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
                 $this->SetLineWidth(0.25);
                 $this->Rect($mantX, $y, $colNameW, $rowH);
                 $this->Rect($valX, $y, $colValW, $rowH);
 
                 $this->SetFont('Arial', 'B', 8);
-                $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+                $this->SetTextColor($negro[0], $negro[1], $negro[2]);
                 $this->SetXY($mantX + 2.5, $y);
                 $this->Cell($colNameW - 5, $rowH, utf8Decode($item['control']), 0, 0, 'L');
 
                 if ($item['tipo_valor'] === 'booleano') {
-                    $this->dibujarCasillaSiNo($valX, $y, $colValW, $rowH, $item['realizado'], $azul, $negro);
+                    $this->dibujarCasillaSiNo($valX, $y, $colValW, $rowH, $item['realizado'], $negro, $negro);
                 } else {
                     $this->SetFont('Arial', '', 8);
                     $this->SetTextColor($negro[0], $negro[1], $negro[2]);
@@ -2320,23 +2401,27 @@ class Reportes extends exFPDF
     }
 
     /**
-     * Etiqueta en negrita azul + línea de campo + valor a la derecha (patrón
-     * de los campos superiores del reporte de operación diaria).
+     * Etiqueta en negrita + línea de campo + valor a la derecha (patrón de
+     * los campos superiores del reporte de operación diaria). La etiqueta y
+     * el valor van en $colorTexto (negro, a pedido del usuario — antes la
+     * etiqueta iba en azul); la línea del campo va en $colorLinea (gris, a
+     * pedido del usuario — antes también azul), separado del texto porque
+     * ambos podían ser colores distintos.
      */
-    private function pintarCampoReporte(float $x, float $y, float $labelW, string $label, string $valor, float $xFin, array $azul, array $negro): void
+    private function pintarCampoReporte(float $x, float $y, float $labelW, string $label, string $valor, float $xFin, array $colorTexto, array $colorLinea, array $colorValor): void
     {
         $h = 5;
         $this->SetFont('Arial', 'B', 8.5);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor($colorTexto[0], $colorTexto[1], $colorTexto[2]);
         $this->SetXY($x, $y);
         $this->Cell($labelW, $h, utf8Decode($label), 0, 0, 'L');
 
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor($colorLinea[0], $colorLinea[1], $colorLinea[2]);
         $this->SetLineWidth(0.2);
         $this->Line($x + $labelW, $y + $h - 0.5, $xFin, $y + $h - 0.5);
 
         $this->SetFont('Arial', '', 8.5);
-        $this->SetTextColor($negro[0], $negro[1], $negro[2]);
+        $this->SetTextColor($colorValor[0], $colorValor[1], $colorValor[2]);
         $this->SetXY($x + $labelW + 1.5, $y);
         $this->Cell($xFin - $x - $labelW - 2, $h, utf8Decode($valor), 0, 0, 'L');
     }
@@ -2577,7 +2662,10 @@ class Reportes extends exFPDF
             .number_format((float) ($totales['total_horometro'] ?? 0), 2, ',', '.').' h';
 
         $totalesFila = [
-            'TOTALES', '', '', '',
+            'TOTALES',
+            '',
+            '',
+            '',
             (string) ($totales['total_operaciones'] ?? 0),
             '',
             number_format((float) ($totales['total_horas'] ?? 0), 2, ',', '.').' h',
@@ -2615,7 +2703,11 @@ class Reportes extends exFPDF
         $colsMant = collect($datos['columnas']['mantenimiento'] ?? []);
         $colsMat = collect($datos['columnas']['material'] ?? []);
         $totales = ($datos['totales'] ?? []) + [
-            'operaciones' => 0, 'horas_trabajadas' => 0, 'litros' => 0, 'costo' => 0, 'litros_por_hora' => 0,
+            'operaciones' => 0,
+            'horas_trabajadas' => 0,
+            'litros' => 0,
+            'costo' => 0,
+            'litros_por_hora' => 0,
         ];
 
         $esKilometraje = ($datos['tipo_medicion'] ?? $vehiculo->tipo_medicion) === 'kilometraje';
@@ -2672,8 +2764,16 @@ class Reportes extends exFPDF
 
         // ── Tabla: anchos proporcionales (se reparten en $uw) ────────────
         $pesos = [
-            2.0, 4.2, 1.3, 2.2, 2.2, 1.6,   // TRABAJO DE EQUIPO (6)
-            1.8, 1.5, 2.2, 2.2,              // COMBUSTIBLE (4)
+            2.0,
+            4.2,
+            1.3,
+            2.2,
+            2.2,
+            1.6,   // TRABAJO DE EQUIPO (6)
+            1.8,
+            1.5,
+            2.2,
+            2.2,              // COMBUSTIBLE (4)
         ];
         foreach ($colsMant as $c) {
             $pesos[] = 2.3;
@@ -2710,9 +2810,16 @@ class Reportes extends exFPDF
         // Fila de encabezados de columna: celeste un poco más claro.
         $tabla->rowStyle('bgcolor:224,238,250; font-style:B; font-size:6; font-color:'.implode(',', $azul).';');
         $encabezados = [
-            ['FECHA', 'L'], ['OPERADOR', 'L'], ['N° PARTE', 'C'],
-            [$lectura.' INICIAL', 'R'], [$lectura.' FINAL', 'R'], ['TOTAL HORAS', 'R'],
-            ['LITROS DIÉSEL', 'R'], ['C / LITRO', 'R'], ['COSTO BS.', 'R'], [$lectura.' DE CARGA', 'R'],
+            ['FECHA', 'L'],
+            ['OPERADOR', 'L'],
+            ['N° PARTE', 'C'],
+            [$lectura.' INICIAL', 'R'],
+            [$lectura.' FINAL', 'R'],
+            ['TOTAL HORAS', 'R'],
+            ['LITROS DIÉSEL', 'R'],
+            ['C / LITRO', 'R'],
+            ['COSTO BS.', 'R'],
+            [$lectura.' DE CARGA', 'R'],
         ];
         foreach ($encabezados as [$txt, $al]) {
             $tabla->easyCell(utf8Decode($txt), "align:{$al};");

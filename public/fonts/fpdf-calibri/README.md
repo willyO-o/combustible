@@ -4,6 +4,26 @@ Archivos de definición de fuente **Calibri** listos para usar con **FPDF** (ver
 clásica, no Unicode), generados a partir de las *Microsoft Fluent Fonts* que
 contienen la métrica y los glifos de Calibri.
 
+> ⚠️ **`font/` actualmente NO viene de los `.ttf` de `makefont/` (2026-09).**
+> Los 4 `Fluent_Calibri*.ttf` de este repo tienen métricas de ancho de glifo
+> rotas (probablemente por ser fuentes variables que `ttfparser.php` —no es
+> compatible con fuentes variables— no lee bien): el ancho del espacio salía
+> en ~678/1000 (debería ser ~226) y cada letra 15-70% más ancha de lo real,
+> lo que se veía como texto con demasiada separación entre letras/palabras
+> en los PDF generados. Los 8 archivos de `font/` se regeneraron a mano
+> ejecutando `MakeFont()` (mismo `makefont.php`/`enc=cp1252, embed=true,
+> subset=true` de siempre) contra la Calibri **estática** normal de Windows
+> (`C:\Windows\Fonts\calibri.ttf` y sus variantes bold/italic/bold-italic —
+> NO redistribuida en este repo por licencia, sólo se usó como entrada
+> puntual para generar el subset embebido, igual que hace Word al exportar
+> a PDF). Confirmado con `ttfparser.php`: esa Calibri da espacio=226,
+> "A"=579, "e"=498, valores normales.
+>
+> **No ejecutes `generar_fuentes.php` para "regenerar" `font/`** — reescribiría
+> estos archivos correctos con la versión rota de las Fluent Fonts. Si en
+> algún momento se corrige/reemplaza `Fluent_Calibri.ttf` por una versión
+> estática con métricas sanas, recién ahí tiene sentido volver a usarlo.
+
 ```
 fpdf-calibri/
 ├── font/                     ← ESTO es lo que copias a tu proyecto
