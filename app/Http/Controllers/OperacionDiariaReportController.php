@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Libraries\Reportes;
+use App\Libraries\ReportesExcel;
 use App\Models\Area;
 use App\Models\TipoCombustible;
 use App\Models\Vehiculo;
@@ -90,6 +91,38 @@ class OperacionDiariaReportController extends Controller
         ]);
     }
 
+    /**
+     * Excel (.xlsx) del reporte de uso: mismos filtros, datos y columnas que
+     * generarPDF(), más el reparto por turno y la última operación (que en el
+     * PDF no entran por falta de ancho de página).
+     */
+    public function generarExcel(Request $request)
+    {
+        $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date',
+        ]);
+
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $idsVehiculo = $this->idsVehiculo($request);
+        $idTipoCombustible = $request->integer('id_tipo_combustible') ?: null;
+        $idArea = $request->integer('id_area') ?: null;
+
+        $resumen = $this->obtenerResumen($fechaInicio, $fechaFin, $idsVehiculo, $idTipoCombustible, $idArea);
+
+        $contenido = (new ReportesExcel)->generarReporteOperacionDiariaUso($resumen, $fechaInicio, $fechaFin, [
+            'tipo_combustible' => $idTipoCombustible ? TipoCombustible::find($idTipoCombustible)?->tipo_combustible : null,
+            'area' => $idArea ? Area::find($idArea)?->nombre_area : null,
+            'vehiculo' => $this->etiquetaVehiculos($idsVehiculo),
+        ]);
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="reporte_operacion_diaria_uso.xlsx"',
+        ]);
+    }
+
     /* ================================================================
      |  Bitácora detallada de UN vehículo
      |  (una fila por operación diaria + combustible del día +
@@ -143,6 +176,35 @@ class OperacionDiariaReportController extends Controller
         return response($contenido, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="bitacora_operacion_'.$vehiculo->codigo.'.pdf"',
+        ]);
+    }
+
+    /**
+     * Excel (.xlsx) de la bitácora: mismos filtros, datos y columnas
+     * (incluidas las dinámicas de mantenimiento y material) que detallePDF().
+     */
+    public function detalleExcel(Request $request)
+    {
+        $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date',
+            'id_vehiculo' => 'required|integer|exists:vehiculo,id',
+        ]);
+
+        $vehiculo = $this->vehiculoDetalle($request->integer('id_vehiculo'));
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+
+        $contenido = (new ReportesExcel)->generarReporteOperacionDiariaDetalle(
+            $vehiculo,
+            $this->obtenerDetalleVehiculo($vehiculo, $fechaInicio, $fechaFin),
+            $fechaInicio,
+            $fechaFin,
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="bitacora_operacion_'.$vehiculo->codigo.'.xlsx"',
         ]);
     }
 

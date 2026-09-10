@@ -467,4 +467,88 @@ class CargasCombustibleReportControllerTest extends TestCase
 
         $response->assertSessionHasErrors('id_vehiculo');
     }
+
+    /* ---------------------------------------------------------------------
+     |  Excel (.xlsx) — mismos datos y filtros que los PDF
+     | ------------------------------------------------------------------- */
+
+    public function test_genera_el_excel_del_reporte_de_cargas(): void
+    {
+        $this->crearVehiculoConDosCargas();
+
+        $response = $this->get(route('cargas-combustible.reporte.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertOk();
+        $this->assertXlsx($response->getContent());
+    }
+
+    public function test_el_excel_del_reporte_de_cargas_exige_fechas(): void
+    {
+        $this->get(route('cargas-combustible.reporte.excel'))
+            ->assertSessionHasErrors(['fecha_inicio', 'fecha_fin']);
+    }
+
+    public function test_genera_el_excel_del_reporte_general_de_rendimiento(): void
+    {
+        $this->crearVehiculoConDosCargas();
+        $this->crearVehiculoConDosCargas();
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertOk();
+        $this->assertXlsx($response->getContent());
+    }
+
+    /**
+     * Sin cargas en el rango la tabla queda vacía: el Excel debe generarse
+     * igual (fila de "sin datos"), no reventar por totales sobre 0 filas.
+     */
+    public function test_genera_el_excel_de_rendimiento_sin_datos_en_el_rango(): void
+    {
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertOk();
+        $this->assertXlsx($response->getContent());
+    }
+
+    public function test_genera_el_excel_del_detalle_de_un_vehiculo(): void
+    {
+        $vehiculo = $this->crearVehiculoConDosCargas();
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.detalle.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => $vehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertXlsx($response->getContent());
+    }
+
+    public function test_el_excel_del_detalle_exige_un_vehiculo(): void
+    {
+        $this->get(route('cargas-combustible.reporte.rendimiento.detalle.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]))->assertSessionHasErrors('id_vehiculo');
+    }
+
+    /**
+     * Un .xlsx es un ZIP: empieza con la firma "PK" y debe traer el
+     * Content-Type de Office Open XML para que el navegador lo descargue.
+     */
+    private function assertXlsx(string $contenido): void
+    {
+        $this->assertStringStartsWith('PK', $contenido);
+        $this->assertGreaterThan(1000, strlen($contenido));
+    }
 }

@@ -178,7 +178,7 @@ const tipoBadge = (tipo) =>
                             <tr v-for="carga in cargas.data" :key="carga.id">
                                 <td class="fw-medium">{{ carga.nro }}</td>
                                 <td>{{ (carga.fecha_carga_formateada) }}</td>
-                                <td class="text-nowrap">
+                                <td>
                                     <span class="fw-semibold d-block" >{{ carga.vehiculo?.codigo ?? '—' }}</span>
                                     <span class="fw-semibold">{{ carga.vehiculo?.nro_placa ?? '—' }}</span>
                                     <small v-if="carga.vehiculo?.marca" class="text-muted d-block">{{ carga.vehiculo.marca }}</small>

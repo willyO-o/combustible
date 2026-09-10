@@ -103,3 +103,10 @@ Patrón:
 Para `<Apexchart>` dentro de un `v-for`: guardar las refs en un objeto (`const graficosRef = ref({})`, `:ref="(el) => (graficosRef[clave] = el)"`).
 
 Aplicado en: Dashboard.vue (3), Reportes/CargasCombustibleRendimientoReporte.vue (1 por tipo de medición), Reportes/CargasCombustibleRendimientoDetalle.vue (1), Reportes/CargasCombustibleReporte.vue (2: barras costo/litros/cargas/precio por vehículo con toggle + donut gasto por tipo de combustible, ambos derivados en el cliente de `datosResumen`, sin tocar el controlador).
+
+## Tablas: sin class text-nowrap (salvo módulo de Reportes)
+Por pedido del usuario, las `<table>` del frontend NO llevan la clase `text-nowrap` (deja que las celdas hagan wrap para que la tabla no se ensanche en horizontal). Se quitó de todas las páginas y se reemplazó por `align-middle` para que las celdas de varias líneas queden alineadas. Cuando una columna concreta no debe partirse (fechas, importes), usar `style="min-width: Npx"` en el `<td>`/`<th>` en vez de `text-nowrap`.
+
+EXCEPCIÓN: las tablas de `resources/js/Pages/Reportes/**` SÍ conservan `text-nowrap` (son densas, con muchas columnas numéricas, y viven dentro de `table-responsive` con scroll horizontal a propósito). No se lo quites a esas.
+
+Único `text-nowrap` restante fuera de Reportes: un `<span>` de fecha en `Layouts/Includes/header/header.vue` (dropdown de notificaciones, no es tabla) — se deja.

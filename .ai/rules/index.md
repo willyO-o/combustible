@@ -8,6 +8,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Actions/Actividades/SincronizarActividadesRealizadasAction.php | .ai/rules/actividades.md |
 | app/Http/Controllers/Api/V1/ValeController.php,app/Http/Requests/ValeRequest.php,app/Http/Controllers/Api/V1/ParametrosController.php | .ai/rules/api-v1.md |
 | app/**/*.php | .ai/rules/app.md |
+| app/Http/Controllers/AreaController.php,resources/js/Pages/Areas/**,routes/web.php | .ai/rules/areas.md |
 | resources/js/Components/PageLoader.vue | .ai/rules/components.md |
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
 | resources/js/Pages/Conductores/**,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-requests.md |
@@ -22,9 +23,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/ConductorController.php,app/Models/Conductor.php,app/Http/Requests/ConductorRequest.php | .ai/rules/http-requests.md |
 | app/Http/**/*.php | .ai/rules/http.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Libraries/Reportes.php,resources/js/Pages/ControlCargas/*.vue | .ai/rules/js-pages-control-cargas.md |
+| app/Libraries/ReportesExcel.php,app/Http/Controllers/CargasCombustibleReportController.php,app/Http/Controllers/ControlCargasReportController.php,app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/** | .ai/rules/js-pages-reportes.md |
 | app/Models/IntervaloMantenimientoTipo.php,app/Http/Controllers/DashboardController.php,app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/Show.vue,resources/js/Pages/Dashboard.vue | .ai/rules/js-pages.md |
 | resources/js/**/*.vue | .ai/rules/js.md |
 | app/Libraries/Reportes.php,app/Http/Controllers/CargaCombustibleController.php | .ai/rules/libraries-http-controllers.md |
+| app/Libraries/Reportes.php,app/Libraries/ReportesExcel.php | .ai/rules/libraries-libraries.md |
 | app/Libraries/*.php, app/Libraries/Reportes.php | .ai/rules/libraries.md |
 | database/migrations/*.php | .ai/rules/migrations.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Models/CargaMaterial.php,app/Models/Viaje.php | .ai/rules/models-models.md |

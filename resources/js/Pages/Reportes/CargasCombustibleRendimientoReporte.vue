@@ -80,6 +80,25 @@ function generarPDF() {
     window.open(url, '_blank')
 }
 
+/**
+ * Mismo reporte que generarPDF(), en Excel. El .xlsx viaja como adjunto, así
+ * que se navega a la URL (el navegador descarga sin abrir una pestaña vacía).
+ */
+function generarExcel() {
+    if (!filtros.value.fecha_inicio || !filtros.value.fecha_fin) {
+        alert('Por favor, selecciona un rango de fechas')
+        return
+    }
+
+    window.location.href = route('cargas-combustible.reporte.rendimiento.excel', {
+        fecha_inicio: filtros.value.fecha_inicio,
+        fecha_fin: filtros.value.fecha_fin,
+        id_vehiculo: filtros.value.id_vehiculo.length ? filtros.value.id_vehiculo : undefined,
+        id_tipo_combustible: filtros.value.id_tipo_combustible || undefined,
+        id_area: filtros.value.id_area || undefined,
+    })
+}
+
 // El backend devuelve los agregados como strings decimales (p.ej. "18.70").
 const num = (v) => Number(v ?? 0)
 
@@ -193,6 +212,9 @@ function chartSeries(tipoMedicion) {
                     </button>
                     <button v-can="'cargas-combustible.reporte.rendimiento.pdf'" type="button" class="btn btn-primary btn-wave flex-grow-1" @click="generarPDF">
                         <i class="ri-file-pdf-line me-1"></i> PDF
+                    </button>
+                    <button v-can="'cargas-combustible.reporte.rendimiento.excel'" type="button" class="btn btn-success btn-wave flex-grow-1" @click="generarExcel">
+                        <i class="ri-file-excel-2-line me-1"></i> Excel
                     </button>
                 </div>
             </div>

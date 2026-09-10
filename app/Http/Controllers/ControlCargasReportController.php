@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Libraries\Reportes;
+use App\Libraries\ReportesExcel;
 use App\Models\ParametrosEmpresa;
 use App\Models\VehiculoExterno;
 use Illuminate\Database\Query\Builder;
@@ -61,6 +62,33 @@ class ControlCargasReportController extends Controller
         return response($contenido, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="reporte_control_cargas_material.pdf"',
+        ]);
+    }
+
+    /**
+     * Genera el Excel (.xlsx) del reporte con los mismos filtros, datos y
+     * columnas que el PDF (ver generarPDF()): mismo obtenerResumen(), sólo
+     * cambia el formato de salida.
+     */
+    public function generarExcel(Request $request)
+    {
+        $request->validate([
+            'fecha_desde' => 'required|date',
+            'fecha_hasta' => 'required|date',
+        ]);
+
+        $filtros = $this->filtrosDesde($request);
+
+        $contenido = (new ReportesExcel)->generarReporteControlCargas(
+            $this->obtenerResumen($filtros),
+            $filtros['fecha_desde'],
+            $filtros['fecha_hasta'],
+            $filtros['ambito'],
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="reporte_control_cargas_material.xlsx"',
         ]);
     }
 
@@ -216,6 +244,34 @@ class ControlCargasReportController extends Controller
         return response($contenido, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="detalle_control_cargas_'.($vehiculo->nro_placa ?: $vehiculo->id).'.pdf"',
+        ]);
+    }
+
+    /**
+     * Excel (.xlsx) del detalle de un vehículo externo: mismos filtros y datos
+     * que generarPDFDetalle(), en dos hojas (fletes y resumen por material).
+     */
+    public function generarExcelDetalle(Request $request)
+    {
+        $request->validate([
+            'fecha_desde' => 'required|date',
+            'fecha_hasta' => 'required|date',
+            'id_vehiculo_externo' => 'required|integer|exists:vehiculo_externo,id',
+        ]);
+
+        $filtros = $this->filtrosDetalle($request);
+        $vehiculo = VehiculoExterno::findOrFail($filtros['id_vehiculo_externo']);
+
+        $contenido = (new ReportesExcel)->generarReporteControlCargasDetalle(
+            $vehiculo,
+            $this->obtenerDetalleVehiculo($vehiculo, $filtros),
+            $filtros['fecha_desde'],
+            $filtros['fecha_hasta'],
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="detalle_control_cargas_'.($vehiculo->nro_placa ?: $vehiculo->id).'.xlsx"',
         ]);
     }
 

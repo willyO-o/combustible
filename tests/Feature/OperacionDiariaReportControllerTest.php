@@ -284,4 +284,46 @@ class OperacionDiariaReportControllerTest extends TestCase
 
         $response->assertSessionHasErrors(['fecha_inicio', 'fecha_fin']);
     }
+
+    /* ---------------------------------------------------------------------
+     |  Excel (.xlsx) — mismos datos y filtros que el PDF
+     | ------------------------------------------------------------------- */
+
+    public function test_genera_el_excel_del_reporte(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->crearOperacion($vehiculo, 3, ['kilometraje_inicio' => 1000, 'kilometraje_fin' => 1200]);
+
+        $response = $this->get(route('operacion-diaria.reporte.uso.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    public function test_genera_el_excel_comparando_varios_vehiculos(): void
+    {
+        $v1 = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $v2 = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);
+        $this->crearOperacion($v1, 3, ['kilometraje_inicio' => 1000, 'kilometraje_fin' => 1200]);
+        $this->crearOperacion($v2, 3, ['horometro_inicio' => 10, 'horometro_fin' => 18]);
+
+        $response = $this->get(route('operacion-diaria.reporte.uso.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => [$v1->id, $v2->id],
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    public function test_el_excel_exige_un_rango_de_fechas(): void
+    {
+        $this->get(route('operacion-diaria.reporte.uso.excel'))
+            ->assertSessionHasErrors(['fecha_inicio', 'fecha_fin']);
+    }
 }

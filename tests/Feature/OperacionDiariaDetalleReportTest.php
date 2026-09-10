@@ -325,4 +325,73 @@ class OperacionDiariaDetalleReportTest extends TestCase
         $this->get(route('operacion-diaria.reporte.detalle.pdf'))
             ->assertSessionHasErrors(['fecha_inicio', 'fecha_fin', 'id_vehiculo']);
     }
+
+    /* ---------------------------------------------------------------------
+     |  Excel (.xlsx) — mismos datos y columnas dinámicas que el PDF
+     | ------------------------------------------------------------------- */
+
+    public function test_genera_el_excel_de_la_bitacora(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $c = $this->crearConductor();
+        $aceite = $this->tipoMantenimiento('Aceite de motor', 'cantidad', 'L');
+        $material = Material::create(['material' => 'Ripio']);
+        $actividad = Actividad::create(['nombre_actividad' => 'Traslado', 'id_area' => $this->area->id]);
+
+        $dia = now()->subDays(5)->format('Y-m-d');
+        $op = $this->crearOperacion($vehiculo, $c, $dia, ['kilometraje_inicio' => 100, 'kilometraje_fin' => 250]);
+        $op->mantenimientosOperacion()->attach($aceite->id, ['valor' => 3]);
+        $op->actividadesRealizadas()->attach($actividad->id, ['id_material' => $material->id, 'cantidad' => 4, 'unidad_medida' => 'viajes']);
+        $this->crearCarga($vehiculo, $c, $dia);
+
+        $response = $this->get(route('operacion-diaria.reporte.detalle.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => $vehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    public function test_genera_el_excel_sin_columnas_dinamicas(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);
+        $c = $this->crearConductor();
+        $this->crearOperacion($vehiculo, $c, now()->subDays(3)->format('Y-m-d'), ['horometro_inicio' => 10, 'horometro_fin' => 18]);
+
+        $response = $this->get(route('operacion-diaria.reporte.detalle.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => $vehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    /**
+     * Sin operaciones en el rango la tabla va vacía: el Excel debe generarse
+     * igual (fila de "sin datos" y sin fila de totales).
+     */
+    public function test_genera_el_excel_de_la_bitacora_sin_operaciones(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+
+        $response = $this->get(route('operacion-diaria.reporte.detalle.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => $vehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    public function test_el_excel_exige_vehiculo_y_fechas(): void
+    {
+        $this->get(route('operacion-diaria.reporte.detalle.excel'))
+            ->assertSessionHasErrors(['fecha_inicio', 'fecha_fin', 'id_vehiculo']);
+    }
 }

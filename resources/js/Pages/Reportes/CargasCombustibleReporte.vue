@@ -91,6 +91,26 @@ function generarReporte() {
     window.open(url, '_blank')
 }
 
+/**
+ * Mismo reporte que generarReporte(), en Excel. La descarga viaja como
+ * adjunto (Content-Disposition: attachment), así que se navega a la URL en
+ * vez de abrir una pestaña: el navegador descarga el archivo sin salir de
+ * la página actual.
+ */
+function generarExcel() {
+    if (!filtros.value.fecha_inicio || !filtros.value.fecha_fin) {
+        alert('Por favor, selecciona un rango de fechas')
+        return
+    }
+
+    window.location.href = route('cargas-combustible.reporte.excel', {
+        fecha_inicio: filtros.value.fecha_inicio,
+        fecha_fin: filtros.value.fecha_fin,
+        id_vehiculo: filtros.value.id_vehiculo || null,
+        id_tipo_vehiculo: filtros.value.id_tipo_vehiculo || null,
+    })
+}
+
 const totalVehiculos = computed(() => {
     return props.datosResumen?.vehiculos?.length || 0
 })
@@ -281,6 +301,9 @@ const donutOptions = computed(() => ({
                         </button>
                         <button v-can="'cargas-combustible.reporte.pdf'" type="button" class="btn btn-primary btn-wave flex-grow-1" @click="generarReporte">
                             <i class="ri-file-pdf-line me-1"></i> PDF
+                        </button>
+                        <button v-can="'cargas-combustible.reporte.excel'" type="button" class="btn btn-success btn-wave flex-grow-1" @click="generarExcel">
+                            <i class="ri-file-excel-2-line me-1"></i> Excel
                         </button>
                     </div>
                 </div>

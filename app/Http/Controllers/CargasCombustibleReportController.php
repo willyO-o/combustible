@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Libraries\Reportes;
+use App\Libraries\ReportesExcel;
 use App\Models\Area;
 use App\Models\CargaCombustible;
 use App\Models\TipoCombustible;
@@ -77,6 +78,40 @@ class CargasCombustibleReportController extends Controller
     }
 
     /**
+     * Generar el Excel (.xlsx) del reporte de cargas de combustible, con las
+     * mismas columnas y totales que el PDF (ver generarPDF()).
+     *
+     * A diferencia del PDF —que arma su propia consulta dentro de
+     * Reportes::generarReporteCargasCombustible()— aquí se reutiliza el
+     * obtenerResumen() que ya alimenta la vista: es exactamente el mismo
+     * agregado por vehículo que muestra la tabla del PDF, sin duplicar la
+     * consulta en la librería de Excel.
+     */
+    public function generarExcel(Request $request)
+    {
+        $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date',
+        ]);
+
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $idVehiculo = $request->input('id_vehiculo', null);
+        $idTipoVehiculo = $request->integer('id_tipo_vehiculo') ?: null;
+
+        $resumen = $this->obtenerResumen($fechaInicio, $fechaFin, $idVehiculo, null, null, $idTipoVehiculo);
+
+        $contenido = (new ReportesExcel)->generarReporteCargasCombustible($resumen, $fechaInicio, $fechaFin, [
+            'tipo_vehiculo' => $idTipoVehiculo ? TipoVehiculo::find($idTipoVehiculo)?->tipo_vehiculo : null,
+        ]);
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="reporte_cargas_combustible.xlsx"',
+        ]);
+    }
+
+    /**
      * Generar el PDF del reporte general de rendimiento (uno o varios
      * vehículos comparados, sin gráfico). Admite los mismos filtros de tipo
      * de combustible y área que la vista (ver generarReporteRendimiento()).
@@ -113,6 +148,36 @@ class CargasCombustibleReportController extends Controller
     }
 
     /**
+     * Excel (.xlsx) del reporte general de rendimiento: mismos filtros, datos
+     * y columnas que generarPDFRendimiento().
+     */
+    public function generarExcelRendimiento(Request $request)
+    {
+        $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date',
+        ]);
+
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $idsVehiculo = array_filter((array) $request->input('id_vehiculo', []));
+        $idTipoCombustible = $request->integer('id_tipo_combustible') ?: null;
+        $idArea = $request->integer('id_area') ?: null;
+
+        $resultado = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, $idsVehiculo, true, $idTipoCombustible, $idArea);
+
+        $contenido = (new ReportesExcel)->generarReporteRendimiento($resultado, $fechaInicio, $fechaFin, [
+            'tipo_combustible' => $idTipoCombustible ? TipoCombustible::find($idTipoCombustible)?->tipo_combustible : null,
+            'area' => $idArea ? Area::find($idArea)?->nombre_area : null,
+        ]);
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="reporte_rendimiento_combustible.xlsx"',
+        ]);
+    }
+
+    /**
      * Generar el PDF del detalle de rendimiento de UN solo vehículo.
      * Igual que detalleRendimientoVehiculo(): siempre delega en
      * obtenerResumenRendimiento() con $soloResumen = false y un único id.
@@ -140,6 +205,35 @@ class CargasCombustibleReportController extends Controller
         return response($contenido, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="detalle_rendimiento_'.$vehiculo->codigo.'.pdf"',
+        ]);
+    }
+
+    /**
+     * Excel (.xlsx) del detalle de rendimiento de UN solo vehículo: mismos
+     * filtros, datos y columnas que generarPDFDetalleRendimiento().
+     */
+    public function generarExcelDetalleRendimiento(Request $request)
+    {
+        $request->validate([
+            'fecha_inicio' => 'required|date',
+            'fecha_fin' => 'required|date',
+            'id_vehiculo' => 'required|integer|exists:vehiculo,id',
+        ]);
+
+        $fechaInicio = $request->input('fecha_inicio');
+        $fechaFin = $request->input('fecha_fin');
+        $idVehiculo = $request->integer('id_vehiculo');
+
+        $vehiculo = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
+            ->with('tipoCombustible:id,tipo_combustible')
+            ->findOrFail($idVehiculo);
+        $detalle = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, [$idVehiculo], false);
+
+        $contenido = (new ReportesExcel)->generarReporteDetalleRendimiento($vehiculo, $detalle, $fechaInicio, $fechaFin);
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="detalle_rendimiento_'.$vehiculo->codigo.'.xlsx"',
         ]);
     }
 

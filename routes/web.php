@@ -81,9 +81,11 @@ Route::middleware('auth')->group(function () {
         ->except(['show']);
 
     Route::resource('areas', AreaController::class)
-        ->only(['index', 'store', 'update', 'destroy']);
+        ->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::post('areas/{area}/encargados', [AreaController::class, 'asignarEncargado'])->name('areas.encargados.asignar');
     Route::patch('areas/{area}/encargados/{encargado}/finalizar', [AreaController::class, 'finalizarEncargado'])->name('areas.encargados.finalizar');
+    Route::post('areas/{area}/vehiculos/{vehiculo}/asignacion', [AreaController::class, 'reasignarVehiculo'])->name('areas.vehiculos.reasignar');
+    Route::patch('areas/{area}/asignaciones-vehiculo/{asignacion}/finalizar', [AreaController::class, 'finalizarAsignacionVehiculo'])->name('areas.vehiculos.finalizar');
     Route::get('/search/personas-para-encargado', [AreaController::class, 'searchPersonasParaEncargado'])->name('search.personas-para-encargado');
 
     Route::resource('tipos-combustible', TipoCombustibleController::class)
@@ -200,10 +202,13 @@ Route::middleware('auth')->group(function () {
     Route::prefix('reportes')->name('cargas-combustible.reporte.')->group(function () {
         Route::get('cargas-combustible', [CargasCombustibleReportController::class, 'index'])->name('index');
         Route::get('cargas-combustible/pdf', [CargasCombustibleReportController::class, 'generarPDF'])->name('pdf');
+        Route::get('cargas-combustible/excel', [CargasCombustibleReportController::class, 'generarExcel'])->name('excel');
         Route::get('cargas-combustible/rendimiento', [CargasCombustibleReportController::class, 'generarReporteRendimiento'])->name('rendimiento');
         Route::get('cargas-combustible/rendimiento/pdf', [CargasCombustibleReportController::class, 'generarPDFRendimiento'])->name('rendimiento.pdf');
+        Route::get('cargas-combustible/rendimiento/excel', [CargasCombustibleReportController::class, 'generarExcelRendimiento'])->name('rendimiento.excel');
         Route::get('cargas-combustible/rendimiento/detalle', [CargasCombustibleReportController::class, 'detalleRendimientoVehiculo'])->name('rendimiento.detalle');
         Route::get('cargas-combustible/rendimiento/detalle/pdf', [CargasCombustibleReportController::class, 'generarPDFDetalleRendimiento'])->name('rendimiento.detalle.pdf');
+        Route::get('cargas-combustible/rendimiento/detalle/excel', [CargasCombustibleReportController::class, 'generarExcelDetalleRendimiento'])->name('rendimiento.detalle.excel');
 
     });
 
@@ -211,8 +216,10 @@ Route::middleware('auth')->group(function () {
     Route::prefix('reportes')->name('control-cargas.reporte.')->group(function () {
         Route::get('control-cargas', [ControlCargasReportController::class, 'index'])->name('index');
         Route::get('control-cargas/pdf', [ControlCargasReportController::class, 'generarPDF'])->name('pdf');
+        Route::get('control-cargas/excel', [ControlCargasReportController::class, 'generarExcel'])->name('excel');
         Route::get('control-cargas/detalle', [ControlCargasReportController::class, 'detalle'])->name('detalle');
         Route::get('control-cargas/detalle/pdf', [ControlCargasReportController::class, 'generarPDFDetalle'])->name('detalle.pdf');
+        Route::get('control-cargas/detalle/excel', [ControlCargasReportController::class, 'generarExcelDetalle'])->name('detalle.excel');
     });
 
     Route::get('reportes/operacion-diaria/pdf/{operacionDiaria}', [OperacionDiariaController::class, 'generarPDF'])->name('operacion-diaria.reporte.pdf');
@@ -221,12 +228,14 @@ Route::middleware('auth')->group(function () {
     Route::prefix('reportes')->name('operacion-diaria.reporte.uso.')->group(function () {
         Route::get('operacion-diaria', [OperacionDiariaReportController::class, 'index'])->name('index');
         Route::get('operacion-diaria/pdf', [OperacionDiariaReportController::class, 'generarPDF'])->name('pdf');
+        Route::get('operacion-diaria/excel', [OperacionDiariaReportController::class, 'generarExcel'])->name('excel');
     });
 
     // ── Bitácora detallada de UN vehículo (horas + combustible + mantenimiento + material) ──
     Route::prefix('reportes')->name('operacion-diaria.reporte.detalle.')->group(function () {
         Route::get('operacion-diaria/detalle', [OperacionDiariaReportController::class, 'detalle'])->name('index');
         Route::get('operacion-diaria/detalle/pdf', [OperacionDiariaReportController::class, 'detallePDF'])->name('pdf');
+        Route::get('operacion-diaria/detalle/excel', [OperacionDiariaReportController::class, 'detalleExcel'])->name('excel');
     });
 
     //  Actividades de los operadores de transporte

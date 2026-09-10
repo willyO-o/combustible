@@ -58,6 +58,27 @@ function generarPDF() {
     }), '_blank')
 }
 
+/**
+ * Misma bitácora que generarPDF(), en Excel. El .xlsx viaja como adjunto, así
+ * que se navega a la URL (el navegador descarga sin abrir una pestaña vacía).
+ */
+function generarExcel() {
+    if (! filtros.value.id_vehiculo) {
+        alert('Selecciona un vehículo')
+        return
+    }
+    if (! filtros.value.fecha_inicio || ! filtros.value.fecha_fin) {
+        alert('Selecciona un rango de fechas')
+        return
+    }
+
+    window.location.href = route('operacion-diaria.reporte.detalle.excel', {
+        fecha_inicio: filtros.value.fecha_inicio,
+        fecha_fin: filtros.value.fecha_fin,
+        id_vehiculo: filtros.value.id_vehiculo,
+    })
+}
+
 /* ------------------------------------------------------------------ */
 /*  Formato                                                            */
 /* ------------------------------------------------------------------ */
@@ -195,10 +216,14 @@ const materialDonutOptions = computed(() => ({
                             no-results-text="Sin resultados"
                         />
                     </div>
-                    <div class="col-lg-2 d-flex align-items-end">
+                    <div class="col-lg-2 d-flex align-items-end gap-2">
                         <button v-can="'operacion-diaria.reporte.detalle.pdf'" type="button"
-                            class="btn btn-primary btn-wave w-100" :disabled="! filtros.id_vehiculo" @click="generarPDF">
+                            class="btn btn-primary btn-wave flex-grow-1" :disabled="! filtros.id_vehiculo" @click="generarPDF">
                             <i class="ri-file-pdf-line me-1"></i> PDF
+                        </button>
+                        <button v-can="'operacion-diaria.reporte.detalle.excel'" type="button"
+                            class="btn btn-success btn-wave flex-grow-1" :disabled="! filtros.id_vehiculo" @click="generarExcel">
+                            <i class="ri-file-excel-2-line me-1"></i> Excel
                         </button>
                     </div>
                 </div>

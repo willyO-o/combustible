@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Area;
+use App\Models\Asignacion;
+use App\Models\Conductor;
 use App\Models\EncargadoArea;
 use App\Models\Persona;
 use App\Models\User;
+use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -48,6 +52,202 @@ class AreaControllerTest extends TestCase
             ->where('areas.data.0.encargados_count', 1)
             ->where('areas.data.0.vehiculos_count', 0)
         );
+    }
+
+    private function asignarVehiculoAArea(Area $area, Vehiculo $vehiculo, array $pivot = []): void
+    {
+        VehiculoArea::create(array_merge([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ], $pivot));
+    }
+
+    public function test_show_muestra_el_area_con_sus_vehiculos_asignados_vigentes(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create(['codigo' => 'AREA-VH-1']);
+        $this->asignarVehiculoAArea($area, $vehiculo, ['motivo_asignacion' => 'Operaciones']);
+
+        $response = $this->get(route('areas.show', $area->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Areas/Show')
+            ->where('area.id', $area->id)
+            ->where('resumen.vehiculos_vigentes', 1)
+            ->has('vehiculos', 1)
+            ->where('vehiculos.0.id', $vehiculo->id)
+            ->where('vehiculos.0.codigo', 'AREA-VH-1')
+            ->where('vehiculos.0.estado_asignacion', 'ACTIVO')
+        );
+    }
+
+    public function test_show_excluye_de_la_tabla_principal_las_asignaciones_no_vigentes_pero_las_deja_en_el_historial(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($area, $vehiculo, [
+            'estado_asignacion' => 'REASIGNADO',
+            'fecha_reasignacion' => now(),
+        ]);
+
+        $response = $this->get(route('areas.show', $area->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('resumen.vehiculos_vigentes', 0)
+            ->has('vehiculos', 0)
+            ->has('historialVehiculos', 1)
+            ->where('historialVehiculos.0.estado_asignacion', 'REASIGNADO')
+        );
+    }
+
+    public function test_show_trae_el_conductor_actual_de_cada_vehiculo_asignado(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($area, $vehiculo);
+
+        $conductor = Conductor::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response = $this->get(route('areas.show', $area->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('vehiculos.0.conductor.nombre_completo', $conductor->persona->nombre_completo)
+        );
+    }
+
+    public function test_show_no_incluye_vehiculos_de_otra_area(): void
+    {
+        $area = Area::factory()->create();
+        $otraArea = Area::factory()->create();
+        $this->asignarVehiculoAArea($otraArea, Vehiculo::factory()->create());
+
+        $response = $this->get(route('areas.show', $area->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('vehiculos', 0)
+            ->has('historialVehiculos', 0)
+        );
+    }
+
+    public function test_show_incluye_los_encargados_vigentes_e_historicos(): void
+    {
+        $area = Area::factory()->create();
+        EncargadoArea::create([
+            'id_persona' => Persona::factory()->create()->id,
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now()->subMonth(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+        EncargadoArea::create([
+            'id_persona' => Persona::factory()->create()->id,
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now()->subYear(),
+            'fecha_reasignacion' => now()->subMonth(),
+            'estado_encargo' => 'INACTIVO',
+        ]);
+
+        $response = $this->get(route('areas.show', $area->id));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('encargados', 2)
+            ->where('resumen.encargados_vigentes', 1)
+            ->where('encargados.0.vigente', true)
+            ->where('encargados.1.vigente', false)
+        );
+    }
+
+    public function test_reasignar_vehiculo_desde_la_ficha_cierra_la_asignacion_previa_y_crea_la_nueva(): void
+    {
+        $areaA = Area::factory()->create();
+        $areaB = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($areaA, $vehiculo);
+
+        $response = $this->post(route('areas.vehiculos.reasignar', [$areaA->id, $vehiculo->id]), [
+            'id_area' => $areaB->id,
+            'estado_asignacion' => 'PROVISIONAL',
+            'fecha_culminacion' => now()->addWeek()->format('Y-m-d'),
+            'motivo_asignacion' => 'Préstamo por campaña',
+        ]);
+
+        $response->assertRedirect(route('areas.show', $areaA->id));
+        $this->assertDatabaseHas('vehiculo_area', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $areaA->id,
+            'estado_asignacion' => 'REASIGNADO',
+        ]);
+        $this->assertDatabaseHas('vehiculo_area', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $areaB->id,
+            'estado_asignacion' => 'PROVISIONAL',
+            'motivo_asignacion' => 'Préstamo por campaña',
+        ]);
+    }
+
+    public function test_reasignar_vehiculo_exige_area_y_tipo_de_asignacion(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($area, $vehiculo);
+
+        $this->post(route('areas.vehiculos.reasignar', [$area->id, $vehiculo->id]), [])
+            ->assertSessionHasErrors(['id_area', 'estado_asignacion']);
+    }
+
+    public function test_reasignar_vehiculo_bloqueado_para_quien_no_es_admin_ni_jefe_de_area(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($area, $vehiculo);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('areas.vehiculos.reasignar', [$area->id, $vehiculo->id]), [
+                'id_area' => $area->id,
+                'estado_asignacion' => 'ACTIVO',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_finalizar_asignacion_de_vehiculo_la_marca_culminada(): void
+    {
+        $area = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($area, $vehiculo);
+        $asignacion = VehiculoArea::where('id_vehiculo', $vehiculo->id)->first();
+
+        $response = $this->patch(route('areas.vehiculos.finalizar', [$area->id, $asignacion->id]));
+
+        $response->assertRedirect(route('areas.show', $area->id));
+        $asignacion->refresh();
+        $this->assertSame('CULMINADO', $asignacion->estado_asignacion);
+        $this->assertNotNull($asignacion->fecha_culminacion);
+    }
+
+    public function test_finalizar_asignacion_de_vehiculo_de_otra_area_devuelve_404(): void
+    {
+        $area = Area::factory()->create();
+        $otraArea = Area::factory()->create();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($otraArea, $vehiculo);
+        $asignacion = VehiculoArea::where('id_vehiculo', $vehiculo->id)->first();
+
+        $this->patch(route('areas.vehiculos.finalizar', [$area->id, $asignacion->id]))
+            ->assertNotFound();
     }
 
     public function test_store_crea_un_area(): void

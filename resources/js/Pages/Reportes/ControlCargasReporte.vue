@@ -64,6 +64,24 @@ function generarPDF() {
     window.open(url, '_blank')
 }
 
+/**
+ * Mismo reporte que generarPDF(), en Excel. El .xlsx viaja como adjunto, así
+ * que se navega a la URL (el navegador descarga sin abrir una pestaña vacía).
+ */
+function generarExcel() {
+    if (!filtros.value.fecha_desde || !filtros.value.fecha_hasta) {
+        alert('Por favor, selecciona un rango de fechas')
+        return
+    }
+
+    window.location.href = route('control-cargas.reporte.excel', {
+        fecha_desde: filtros.value.fecha_desde,
+        fecha_hasta: filtros.value.fecha_hasta,
+        id_vehiculo_externo: filtros.value.id_vehiculo_externo || undefined,
+        ambito: filtros.value.ambito !== 'todos' ? filtros.value.ambito : undefined,
+    })
+}
+
 const vehiculos = computed(() => props.datosResumen?.vehiculos ?? [])
 const totales = computed(() => props.datosResumen?.totales ?? {
     total_vehiculos: 0, total_fletes: 0, total_viajes: 0, viajes_exterior: 0, viajes_nacional: 0, monto_total: 0,
@@ -161,6 +179,9 @@ const barOptions = computed(() => {
                     </button>
                     <button v-can="'control-cargas.reporte.pdf'" type="button" class="btn btn-primary btn-wave" @click="generarPDF">
                         <i class="ri-file-pdf-line me-1"></i> PDF
+                    </button>
+                    <button v-can="'control-cargas.reporte.excel'" type="button" class="btn btn-success btn-wave" @click="generarExcel">
+                        <i class="ri-file-excel-2-line me-1"></i> Excel
                     </button>
                 </div>
             </div>

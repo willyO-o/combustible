@@ -242,7 +242,7 @@ const encargoBadge = (tipo) =>
                                 <th style="width:220px">Encargados</th>
                                 <th style="width:100px" class="text-center">Vehículos</th>
                                 <th style="width:140px">Estado</th>
-                                <th style="width:150px" class="text-center">Acciones</th>
+                                <th style="width:180px" class="text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -283,6 +283,14 @@ const encargoBadge = (tipo) =>
                                 </td>
                                 <td class="text-center">
                                     <div class="d-flex gap-1 justify-content-center">
+                                        <Link
+                                            v-can="'areas.ver'"
+                                            :href="route('areas.show', area.id)"
+                                            class="btn btn-sm btn-icon btn-primary-light"
+                                            title="Ver detalles"
+                                        >
+                                            <i class="ri-eye-line"></i>
+                                        </Link>
                                         <button
                                             v-can="'areas.encargados.asignar'"
                                             type="button"
@@ -349,6 +357,10 @@ const encargoBadge = (tipo) =>
                         </div>
 
                         <div class="d-flex align-items-center justify-content-end gap-1 border-top pt-2">
+                            <Link v-can="'areas.ver'" :href="route('areas.show', area.id)"
+                                class="btn btn-icon btn-primary-light" title="Ver detalles">
+                                <i class="ri-eye-line"></i>
+                            </Link>
                             <button v-can="'areas.encargados.asignar'" type="button" class="btn btn-icon btn-primary-light"
                                 title="Encargados" @click="abrirEncargados(area)">
                                 <i class="ri-user-star-line"></i>

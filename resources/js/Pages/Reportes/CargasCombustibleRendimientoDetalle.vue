@@ -56,6 +56,27 @@ function generarPDF() {
     window.open(url, '_blank')
 }
 
+/**
+ * Mismo detalle que generarPDF(), en Excel. El .xlsx viaja como adjunto, así
+ * que se navega a la URL (el navegador descarga sin abrir una pestaña vacía).
+ */
+function generarExcel() {
+    if (!filtros.value.id_vehiculo) {
+        alert('Por favor, selecciona un vehículo')
+        return
+    }
+    if (!filtros.value.fecha_inicio || !filtros.value.fecha_fin) {
+        alert('Por favor, selecciona un rango de fechas')
+        return
+    }
+
+    window.location.href = route('cargas-combustible.reporte.rendimiento.detalle.excel', {
+        fecha_inicio: filtros.value.fecha_inicio,
+        fecha_fin: filtros.value.fecha_fin,
+        id_vehiculo: filtros.value.id_vehiculo,
+    })
+}
+
 // El backend devuelve los valores como strings decimales (p.ej. "18.70").
 const num = (v) => Number(v ?? 0)
 const unidadLabel = (tipoMedicion) => (tipoMedicion === 'horometro' ? 'L/h' : 'km/L')
@@ -121,6 +142,9 @@ const chartSeries = computed(() => [
         <div class="d-flex gap-2">
             <button v-if="filtros.id_vehiculo" v-can="'cargas-combustible.reporte.rendimiento.pdf'" type="button" class="btn btn-primary btn-wave" @click="generarPDF">
                 <i class="ri-file-pdf-line me-1"></i> PDF
+            </button>
+            <button v-if="filtros.id_vehiculo" v-can="'cargas-combustible.reporte.rendimiento.excel'" type="button" class="btn btn-success btn-wave" @click="generarExcel">
+                <i class="ri-file-excel-2-line me-1"></i> Excel
             </button>
             <Link :href="route('cargas-combustible.reporte.rendimiento')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver al resumen

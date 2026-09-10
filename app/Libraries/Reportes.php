@@ -644,6 +644,7 @@ class Reportes extends exFPDF
 
         // Colores
         $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
         $verde = [24, 125, 170];
         $rojo = [190, 30, 30];
         $negro = [30, 30, 30];
@@ -741,13 +742,13 @@ class Reportes extends exFPDF
         // ════════════════════════════════════════════════════════════════
         // TABLA DE VEHÍCULOS
         // ════════════════════════════════════════════════════════════════
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
 
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('DETALLE POR VEHÍCULO'), 0, 1, 'C');
 
@@ -764,8 +765,8 @@ class Reportes extends exFPDF
             ['label' => 'PRECIO PROM.', 'w' => 28.5, 'align' => 'R'],
         ];
 
-        $this->SetFillColor(240, 240, 240);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.2);
         $this->SetFont('Arial', 'B', 7.5);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
@@ -817,10 +818,10 @@ class Reportes extends exFPDF
         }
 
         // Fila de TOTALES
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetFont('Arial', 'B', 8);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
 
         $totales = [
             'TOTALES',
@@ -863,6 +864,7 @@ class Reportes extends exFPDF
 
         // Colores (consistentes con generarReporteCargasCombustible)
         $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
         $verde = [24, 125, 170];
         $rojo = [190, 30, 30];
         $negro = [30, 30, 30];
@@ -967,13 +969,13 @@ class Reportes extends exFPDF
         // ════════════════════════════════════════════════════════════════
         // TABLA DE VEHÍCULOS
         // ════════════════════════════════════════════════════════════════
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
 
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('DETALLE POR VEHÍCULO'), 0, 1, 'C');
 
@@ -990,8 +992,8 @@ class Reportes extends exFPDF
             ['label' => 'RENDIMIENTO', 'w' => 29, 'align' => 'R'],
         ];
 
-        $this->SetFillColor(240, 240, 240);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.2);
         $this->SetFont('Arial', 'B', 7.5);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
@@ -1054,10 +1056,10 @@ class Reportes extends exFPDF
 
         // Fila de TOTALES (sólo los campos que sí son sumables entre vehículos:
         // el rendimiento no se totaliza porque km/L y L/h no son comparables)
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetFont('Arial', 'B', 8);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
 
         $totales = ['TOTALES', '', '', '', (string) $totalCargas, number_format($totalLitros, 2, ',', '.').' L', number_format($totalRecorrido, 2, ',', '.'), '—'];
 
@@ -1099,6 +1101,7 @@ class Reportes extends exFPDF
         $bs = fn ($valor): string => 'Bs. '.number_format((float) $valor, 2, ',', '.');
 
         $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
         $verde = [24, 125, 170];
         $gris = [90, 90, 90];
 
@@ -1189,21 +1192,21 @@ class Reportes extends exFPDF
         // ════════════════════════════════════════════════════════════════
         // TABLA POR VEHÍCULO EXTERNO
         // ════════════════════════════════════════════════════════════════
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('VIAJES POR VEHÍCULO EXTERNO'), 0, 1, 'C');
 
         $currentY += 8;
 
         $this->SetXY($sx, $currentY);
-        $tabla = new easyTable($this, '{9, 27, 56, 17, 17, 18, 18, 37}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.5; min-height:6;");
+        $tabla = new easyTable($this, '{9, 27, 56, 17, 17, 18, 18, 37}', 'width:199; border:1; border-color:30,30,30; border-width:0.2; font-family:Arial; valign:M; paddingX:1.5; min-height:6;');
 
-        $tabla->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7.5; font-color:30,30,30;');
+        $tabla->rowStyle('bgcolor:201,201,201; font-style:B; font-size:7.5; font-color:30,30,30;');
         foreach (['#', 'PLACA', 'PROPIETARIO', 'FLETES', 'VIAJES', 'AL EXT.', 'NACION.', 'MONTO PAGADO'] as $i => $encabezado) {
             $tabla->easyCell(utf8Decode($encabezado), 'align:'.($i <= 2 ? 'L' : ($i === 7 ? 'R' : 'C')).';');
         }
@@ -1229,7 +1232,7 @@ class Reportes extends exFPDF
         }
 
         if ($vehiculos->isNotEmpty()) {
-            $tabla->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:8; font-color:255,255,255;");
+            $tabla->rowStyle('bgcolor:201,201,201; font-style:B; font-size:8; font-color:30,30,30;');
             $tabla->easyCell(utf8Decode('TOTALES'), 'align:L; colspan:3;');
             $tabla->easyCell((string) $totales['total_fletes'], 'align:C;');
             $tabla->easyCell((string) $totales['total_viajes'], 'align:C;');
@@ -1267,6 +1270,7 @@ class Reportes extends exFPDF
         ];
 
         $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
         $verde = [24, 125, 170];
         $gris = [90, 90, 90];
 
@@ -1348,20 +1352,20 @@ class Reportes extends exFPDF
         $currentY += $cardH + 8;
 
         // ── Resumen por material ────────────────────────────────────────
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('RESUMEN DE TIPOS DE CARGA (VIAJES POR MATERIAL)'), 0, 1, 'C');
         $currentY += 8;
 
         $this->SetXY($sx, $currentY);
-        $tablaMat = new easyTable($this, '{119, 40, 40}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.5; min-height:6;");
+        $tablaMat = new easyTable($this, '{119, 40, 40}', 'width:199; border:1; border-color:30,30,30; border-width:0.2; font-family:Arial; valign:M; paddingX:1.5; min-height:6;');
 
-        $tablaMat->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7.5; font-color:30,30,30;');
+        $tablaMat->rowStyle('bgcolor:201,201,201; font-style:B; font-size:7.5; font-color:30,30,30;');
         $tablaMat->easyCell(utf8Decode('MATERIAL'), 'align:L;');
         $tablaMat->easyCell(utf8Decode('VIAJES'), 'align:C;');
         $tablaMat->easyCell(utf8Decode('% DEL TOTAL'), 'align:R;');
@@ -1382,7 +1386,7 @@ class Reportes extends exFPDF
         }
 
         if ($materiales->isNotEmpty()) {
-            $tablaMat->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:8; font-color:255,255,255;");
+            $tablaMat->rowStyle('bgcolor:201,201,201; font-style:B; font-size:8; font-color:30,30,30;');
             $tablaMat->easyCell(utf8Decode('TOTAL'), 'align:L;');
             $tablaMat->easyCell((string) $totales['total_viajes'], 'align:C;');
             $tablaMat->easyCell(utf8Decode('100 %'), 'align:R;');
@@ -1393,20 +1397,20 @@ class Reportes extends exFPDF
         $currentY = $this->GetY() + 6;
 
         // ── Fletes del vehículo ─────────────────────────────────────────
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('FLETES DEL VEHÍCULO'), 0, 1, 'C');
         $currentY += 8;
 
         $this->SetXY($sx, $currentY);
-        $tablaFle = new easyTable($this, '{21, 25, 25, 17, 23, 14, 45, 29}', "width:199; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1.2; min-height:6;");
+        $tablaFle = new easyTable($this, '{21, 25, 25, 17, 23, 14, 45, 29}', 'width:199; border:1; border-color:30,30,30; border-width:0.2; font-family:Arial; valign:M; paddingX:1.2; min-height:6;');
 
-        $tablaFle->rowStyle('bgcolor:240,240,240; font-style:B; font-size:7; font-color:30,30,30;');
+        $tablaFle->rowStyle('bgcolor:201,201,201; font-style:B; font-size:7; font-color:30,30,30;');
         foreach (['Nº FLETE', 'APERTURA', 'CIERRE', 'ESTADO', 'ÁMBITO', 'VIAJES', 'VIAJES POR MATERIAL', 'MONTO (Bs.)'] as $i => $encabezado) {
             $tablaFle->easyCell(utf8Decode($encabezado), 'align:'.($i === 5 ? 'C' : ($i === 7 ? 'R' : 'L')).';');
         }
@@ -1440,7 +1444,7 @@ class Reportes extends exFPDF
         }
 
         if ($fletes->isNotEmpty()) {
-            $tablaFle->rowStyle("bgcolor:{$azul[0]},{$azul[1]},{$azul[2]}; font-style:B; font-size:7.5; font-color:255,255,255;");
+            $tablaFle->rowStyle('bgcolor:201,201,201; font-style:B; font-size:7.5; font-color:30,30,30;');
             $tablaFle->easyCell(utf8Decode('TOTALES'), 'align:L; colspan:5;');
             $tablaFle->easyCell((string) $totales['total_viajes'], 'align:C;');
             $tablaFle->easyCell(utf8Decode(''), 'align:L;');
@@ -1689,6 +1693,7 @@ class Reportes extends exFPDF
         $detalle = collect($detalle);
 
         $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
         $verde = [24, 125, 170];
         $rojo = [190, 30, 30];
         $negro = [30, 30, 30];
@@ -1795,13 +1800,13 @@ class Reportes extends exFPDF
         // ════════════════════════════════════════════════════════════════
         // TABLA DE CARGAS
         // ════════════════════════════════════════════════════════════════
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
 
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('CARGAS DEL VEHÍCULO'), 0, 1, 'C');
 
@@ -1816,8 +1821,8 @@ class Reportes extends exFPDF
             ['label' => 'RENDIMIENTO', 'w' => 43, 'align' => 'R'],
         ];
 
-        $this->SetFillColor(240, 240, 240);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.2);
         $this->SetFont('Arial', 'B', 7.5);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
@@ -1872,10 +1877,10 @@ class Reportes extends exFPDF
         }
 
         // Fila de TOTALES
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetFont('Arial', 'B', 8);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
 
         $totales = ['TOTALES', number_format($totalLitros, 2, ',', '.').' L', '', '', number_format($totalRecorrido, 2, ',', '.'), number_format($rendimientoPromedio, 2, ',', '.').' '.$unidad];
 
@@ -2482,6 +2487,7 @@ class Reportes extends exFPDF
         $totales = $resumen['totales'] ?? [];
 
         $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
         $verde = [24, 125, 170];
         $negro = [30, 30, 30];
         $gris = [90, 90, 90];
@@ -2567,13 +2573,13 @@ class Reportes extends exFPDF
         $currentY += $cardH + 8;
 
         // ── TABLA DE VEHÍCULOS ──────────────────────────────────────────
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetLineWidth(0.3);
         $this->Rect($sx, $currentY, $uw, 8, 'FD');
 
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $currentY);
         $this->Cell($uw, 8, utf8Decode('DETALLE POR VEHÍCULO'), 0, 1, 'C');
 
@@ -2591,8 +2597,8 @@ class Reportes extends exFPDF
             ['label' => 'RECORRIDO', 'w' => 35.9, 'align' => 'R'],
         ];
 
-        $this->SetFillColor(240, 240, 240);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($negro[0], $negro[1], $negro[2]);
         $this->SetLineWidth(0.2);
         $this->SetFont('Arial', 'B', 7.5);
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
@@ -2653,10 +2659,10 @@ class Reportes extends exFPDF
 
         // Fila de TOTALES (sólo lo que es sumable entre vehículos: el promedio y
         // el recorrido de distinta unidad no se totalizan por fila).
-        $this->SetFillColor($azul[0], $azul[1], $azul[2]);
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->SetFont('Arial', 'B', 8);
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(30, 30, 30);
 
         $totalRecorrido = number_format((float) ($totales['total_km'] ?? 0), 2, ',', '.').' km / '
             .number_format((float) ($totales['total_horometro'] ?? 0), 2, ',', '.').' h';
@@ -2714,6 +2720,7 @@ class Reportes extends exFPDF
         $lectura = $esKilometraje ? 'KILOMETRAJE' : 'HORÓMETRO';
 
         $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
         $verde = [24, 125, 170];
         $gris = [90, 90, 90];
 
@@ -2791,11 +2798,11 @@ class Reportes extends exFPDF
         $anchoStr = '{'.implode(', ', $anchos).'}';
 
         $this->SetXY($sx, $currentY);
-        $tabla = new easyTable($this, $anchoStr, "width:{$anchoTabla}; border:1; border-color:{$azul[0]},{$azul[1]},{$azul[2]}; border-width:0.2; font-family:Arial; valign:M; paddingX:1; paddingY:0.6; min-height:5;");
+        $tabla = new easyTable($this, $anchoStr, "width:{$anchoTabla}; border:1; border-color:30,30,30; border-width:0.2; font-family:Arial; valign:M; paddingX:1; paddingY:0.6; min-height:5;");
 
         // Fila de grupos (colspans): fondo celeste claro (poca tinta), texto de
         // acento en negrita.
-        $tabla->rowStyle('bgcolor:205,227,245; font-style:B; font-size:6.5; font-color:'.implode(',', $azul).';');
+        $tabla->rowStyle('bgcolor:201,201,201; font-style:B; font-size:6.5; font-color:30,30,30;');
         $tabla->easyCell(utf8Decode('TRABAJO DE EQUIPO'), 'align:C; colspan:6;');
         $tabla->easyCell(utf8Decode('CONSUMO Y COSTO DE COMBUSTIBLE'), 'align:C; colspan:4;');
         if ($colsMant->isNotEmpty()) {
@@ -2808,7 +2815,7 @@ class Reportes extends exFPDF
         $tabla->printRow(true);
 
         // Fila de encabezados de columna: celeste un poco más claro.
-        $tabla->rowStyle('bgcolor:224,238,250; font-style:B; font-size:6; font-color:'.implode(',', $azul).';');
+        $tabla->rowStyle('bgcolor:201,201,201; font-style:B; font-size:6; font-color:30,30,30;');
         $encabezados = [
             ['FECHA', 'L'],
             ['OPERADOR', 'L'],
@@ -2880,7 +2887,7 @@ class Reportes extends exFPDF
         // Fila de TOTALES: fondo amarillo claro para destacar el cierre de la
         // tabla, en la misma línea que el recuadro RESUMEN.
         if ($filas->isNotEmpty()) {
-            $tabla->rowStyle('bgcolor:255,240,191; font-style:B; font-size:6; font-color:'.implode(',', $azul).';');
+            $tabla->rowStyle('bgcolor:201,201,201; font-style:B; font-size:6; font-color:30,30,30;');
             $tabla->easyCell(utf8Decode('TOTALES'), 'align:R; colspan:5;');
             $tabla->easyCell(utf8Decode($num($totales['horas_trabajadas'])), 'align:R;');
             $tabla->easyCell(utf8Decode($num($totales['litros'])), 'align:R;');
@@ -2908,13 +2915,13 @@ class Reportes extends exFPDF
         }
 
         $boxW = 128;
-        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->SetDrawColor(30, 30, 30);
         $this->SetLineWidth(0.3);
-        // Encabezado del recuadro con fondo amarillo claro (poca tinta).
-        $this->SetFillColor(255, 240, 191);
+        // Encabezado del recuadro con fondo gris #c9c9c9 (poca tinta).
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
         $this->Rect($sx, $y, $boxW, 7, 'FD');
         $this->SetFont('Arial', 'B', 9);
-        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetTextColor(30, 30, 30);
         $this->SetXY($sx, $y);
         $this->Cell($boxW, 7, utf8Decode('RESUMEN'), 0, 0, 'C');
 
@@ -2933,7 +2940,7 @@ class Reportes extends exFPDF
             $this->SetXY($sx + 2, $ly);
             $this->Cell($boxW * 0.62, 7, utf8Decode($et.' :'), 0, 0, 'L');
             $this->SetFont('Arial', 'B', 8);
-            $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+            $this->SetTextColor(30, 30, 30);
             $this->Cell($boxW * 0.36, 7, utf8Decode($val), 0, 0, 'R');
             $ly += 7;
         }

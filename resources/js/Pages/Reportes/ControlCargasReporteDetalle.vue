@@ -57,6 +57,28 @@ function generarPDF() {
     }), '_blank')
 }
 
+/**
+ * Mismo detalle que generarPDF(), en Excel (fletes y materiales en hojas
+ * separadas). El .xlsx viaja como adjunto, así que se navega a la URL en vez
+ * de abrir una pestaña.
+ */
+function generarExcel() {
+    if (!filtros.value.id_vehiculo_externo) {
+        alert('Selecciona un vehículo externo')
+        return
+    }
+    if (!filtros.value.fecha_desde || !filtros.value.fecha_hasta) {
+        alert('Selecciona un rango de fechas')
+        return
+    }
+
+    window.location.href = route('control-cargas.reporte.detalle.excel', {
+        fecha_desde: filtros.value.fecha_desde,
+        fecha_hasta: filtros.value.fecha_hasta,
+        id_vehiculo_externo: filtros.value.id_vehiculo_externo,
+    })
+}
+
 const bs = (v) => `Bs. ${Number(v ?? 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 function formatFecha(fecha) {
@@ -122,6 +144,9 @@ const pieOptions = computed(() => ({
         <div class="d-flex gap-2">
             <button v-if="filtros.id_vehiculo_externo" v-can="'control-cargas.reporte.pdf'" type="button" class="btn btn-primary btn-wave" @click="generarPDF">
                 <i class="ri-file-pdf-line me-1"></i> PDF
+            </button>
+            <button v-if="filtros.id_vehiculo_externo" v-can="'control-cargas.reporte.excel'" type="button" class="btn btn-success btn-wave" @click="generarExcel">
+                <i class="ri-file-excel-2-line me-1"></i> Excel
             </button>
             <Link :href="route('control-cargas.reporte.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver al resumen

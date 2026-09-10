@@ -74,11 +74,13 @@ class UserSeeder extends Seeder
             // nunca el conductor (que no recibe el bundle completo).
             'operacion-diaria.reporte.uso',
             'operacion-diaria.reporte.uso.pdf',
+            'operacion-diaria.reporte.uso.excel',
             // Bitácora detallada de un vehículo (una fila por operación, con
             // combustible del día, mantenimiento y material). Independiente de
             // su PDF, mismo criterio que el resto de reportes.
             'operacion-diaria.reporte.detalle',
             'operacion-diaria.reporte.detalle.pdf',
+            'operacion-diaria.reporte.detalle.excel',
             'operacion-diaria.verificar',
         ];
     }
@@ -96,8 +98,10 @@ class UserSeeder extends Seeder
             // uno sin el otro.
             'cargas-combustible.reporte',
             'cargas-combustible.reporte.pdf',
+            'cargas-combustible.reporte.excel',
             'cargas-combustible.reporte.rendimiento',
             'cargas-combustible.reporte.rendimiento.pdf',
+            'cargas-combustible.reporte.rendimiento.excel',
         ];
     }
 
@@ -301,6 +305,7 @@ class UserSeeder extends Seeder
         return [
             'control-cargas.reporte',
             'control-cargas.reporte.pdf',
+            'control-cargas.reporte.excel',
         ];
     }
 

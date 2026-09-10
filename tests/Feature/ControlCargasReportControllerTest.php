@@ -10,6 +10,7 @@ use App\Models\VehiculoExterno;
 use App\Models\Viaje;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -321,5 +322,87 @@ class ControlCargasReportControllerTest extends TestCase
         $response = $this->get(route('control-cargas.reporte.detalle.pdf'));
 
         $response->assertSessionHasErrors(['fecha_desde', 'fecha_hasta', 'id_vehiculo_externo']);
+    }
+
+    /* ---------------------------------------------------------------------
+     |  Excel (.xlsx) — mismos datos y filtros que los PDF
+     | ------------------------------------------------------------------- */
+
+    public function test_genera_el_excel_del_reporte(): void
+    {
+        $vehiculo = VehiculoExterno::factory()->create();
+        $this->crearViajes($vehiculo, 3, ['es_al_exterior' => true]);
+
+        $response = $this->get(route('control-cargas.reporte.excel', [
+            'fecha_desde' => now()->subMonth()->format('Y-m-d'),
+            'fecha_hasta' => now()->format('Y-m-d'),
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    public function test_el_excel_exige_un_rango_de_fechas(): void
+    {
+        $this->get(route('control-cargas.reporte.excel'))
+            ->assertSessionHasErrors(['fecha_desde', 'fecha_hasta']);
+    }
+
+    /**
+     * El .xlsx tiene que ser un libro válido y legible con los mismos datos
+     * que la tabla del PDF: se vuelve a abrir con PhpSpreadsheet y se busca
+     * la fila del vehículo para comprobar placa y cantidad de viajes.
+     * Además, los números deben quedar como números (no como texto ya
+     * formateado), que es lo que permite sumarlos y ordenarlos en Excel.
+     */
+    public function test_el_excel_es_un_libro_legible_con_los_datos_del_reporte(): void
+    {
+        $vehiculo = VehiculoExterno::factory()->create(['nro_placa' => 'XYZ-999']);
+        $this->crearViajes($vehiculo, 3, ['es_al_exterior' => true, 'monto_pago' => 1500]);
+
+        $response = $this->get(route('control-cargas.reporte.excel', [
+            'fecha_desde' => now()->subMonth()->format('Y-m-d'),
+            'fecha_hasta' => now()->format('Y-m-d'),
+        ]));
+
+        $archivo = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+        file_put_contents($archivo, $response->getContent());
+
+        try {
+            $hoja = IOFactory::load($archivo)->getActiveSheet();
+            $celdas = collect($hoja->toArray(null, true, false));
+
+            $fila = $celdas->first(fn ($f) => in_array('XYZ-999', $f, true));
+
+            $this->assertNotNull($fila, 'El Excel no contiene la fila del vehículo externo.');
+            $this->assertSame(3, (int) $fila[4], 'La columna VIAJES no coincide con el resumen.');
+            $this->assertSame(1500.0, (float) $fila[7], 'El monto pagado no coincide con el resumen.');
+            $this->assertIsFloat($fila[7], 'El monto debe escribirse como número, no como texto formateado.');
+        } finally {
+            @unlink($archivo);
+        }
+    }
+
+    public function test_genera_el_excel_del_detalle(): void
+    {
+        $vehiculo = VehiculoExterno::factory()->create();
+        $material = Material::create(['material' => 'Colá']);
+        $this->crearViajes($vehiculo, 2, [], ['id_material' => $material->id]);
+
+        $response = $this->get(route('control-cargas.reporte.detalle.excel', [
+            'fecha_desde' => now()->subMonth()->format('Y-m-d'),
+            'fecha_hasta' => now()->format('Y-m-d'),
+            'id_vehiculo_externo' => $vehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    public function test_el_excel_del_detalle_exige_vehiculo_y_fechas(): void
+    {
+        $this->get(route('control-cargas.reporte.detalle.excel'))
+            ->assertSessionHasErrors(['fecha_desde', 'fecha_hasta', 'id_vehiculo_externo']);
     }
 }
