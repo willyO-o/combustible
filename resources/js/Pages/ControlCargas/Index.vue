@@ -65,7 +65,7 @@ const estadoBadge = (estado) => ({
 </script>
 
 <template>
-    <Head title="Fletes y Viajes" />
+    <Head title="Volteos y Viajes" />
 
     <!-- Page header -->
     <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -75,13 +75,13 @@ const estadoBadge = (estado) => ({
                     <li class="breadcrumb-item">
                         <Link :href="route('dashboard')">Inicio</Link>
                     </li>
-                    <li class="breadcrumb-item active">Fletes y Viajes</li>
+                    <li class="breadcrumb-item active">Volteos y Viajes</li>
                 </ol>
             </nav>
-            <h1 class="page-title fw-medium fs-18 mb-0">Fletes y Viajes</h1>
+            <h1 class="page-title fw-medium fs-18 mb-0">Volteos y Viajes</h1>
         </div>
         <Link v-can="'control-cargas.crear'" :href="route('control-cargas.create')" class="btn btn-primary btn-wave">
-            <i class="ri-add-line me-1"></i> Nuevo Flete
+            <i class="ri-add-line me-1"></i> Nuevo Viaje
         </Link>
     </div>
 

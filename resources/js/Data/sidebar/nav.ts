@@ -47,7 +47,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
 
 
   {
-    title: 'Operación Diaria', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['operacion-diaria.ver', 'operacion-diaria.crear', 'operacion-diaria.informe'],
+    title: 'Actividades Operativas', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['operacion-diaria.ver', 'operacion-diaria.crear', 'operacion-diaria.informe'],
     children: [
       { path: '/operacion-diaria', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Actividades', permission: 'operacion-diaria.ver' },
       { path: '/operacion-diaria/create', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Registrar Actividad', permission: 'operacion-diaria.crear' },
@@ -63,10 +63,10 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
 
     {
-    menutitle: 'FLETES Y VIAJES', permission: ['control-cargas.ver', 'materiales.ver', 'vehiculos-externos.ver']
+    menutitle: 'Volteos y Viajes', permission: ['control-cargas.ver', 'materiales.ver', 'vehiculos-externos.ver']
   },
   {
-    title: 'Fletes y Viajes', icon: Svgicons.ControlCargasIcon, type: 'link', path: '/control-cargas', active: false, selected: false, dirchange: false, permission: 'control-cargas.ver'
+    title: 'Volteos y Viajes', icon: Svgicons.ControlCargasIcon, type: 'link', path: '/control-cargas', active: false, selected: false, dirchange: false, permission: 'control-cargas.ver'
   },
   {
     title: 'Materiales', icon: Svgicons.MaterialIcon, type: 'link', path: '/materiales', active: false, selected: false, dirchange: false, permission: 'materiales.ver'

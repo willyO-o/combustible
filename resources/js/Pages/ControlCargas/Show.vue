@@ -198,7 +198,7 @@ function submitPago() {
                         <Link :href="route('dashboard')">Inicio</Link>
                     </li>
                     <li class="breadcrumb-item">
-                        <Link :href="route('control-cargas.index')">Fletes y Viajes</Link>
+                        <Link :href="route('control-cargas.index')">Volteos y Viajes</Link>
                     </li>
                     <li class="breadcrumb-item active">Flete #{{ carga.nro }}</li>
                 </ol>
