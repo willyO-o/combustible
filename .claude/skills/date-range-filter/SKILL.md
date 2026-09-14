@@ -55,9 +55,10 @@ import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 ## Presets incluidos (en español)
 
 Hoy, Ayer, Últimos 3 días, Últimos 7 días, Esta semana (desde el lunes), Este mes (día 1 → hoy),
-Últimos 6 meses, Este año, Año pasado, y Rango personalizado (calendario manual). No hace falta
-tocar el componente para usarlos — vienen todos activos siempre; sólo `default-range` controla
-cuál queda preseleccionado al cargar la página.
+Mes anterior (día 1 → último día del mes calendario anterior), Últimos 3 meses, Últimos 6 meses,
+Este año, Año pasado, y Rango personalizado (calendario manual). No hace falta tocar el
+componente para usarlos — vienen todos activos siempre; sólo `default-range` controla cuál queda
+preseleccionado al cargar la página.
 
 ## Qué NO hacer
 

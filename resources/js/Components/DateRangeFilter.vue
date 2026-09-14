@@ -3,10 +3,10 @@
  * Filtro de rango de fechas reutilizable (@vueform/multiselect es el
  * equivalente para selects; este es el equivalente para "fecha desde/hasta").
  * Envuelve daterange-picker-vue3 con: presets en español (Hoy, Ayer,
- * Últimos 3/7 días, Esta semana desde el lunes, Este mes, Últimos 6 meses,
- * Este año, Año pasado) + rango personalizado, y expone dos v-model en
- * formato 'YYYY-MM-DD' (sólo fecha, sin horas) — el mismo formato que
- * esperan los filtros whereDate(...) del backend.
+ * Últimos 3/7 días, Esta semana desde el lunes, Este mes, Mes anterior,
+ * Últimos 3/6 meses, Este año, Año pasado) + rango personalizado, y expone
+ * dos v-model en formato 'YYYY-MM-DD' (sólo fecha, sin horas) — el mismo
+ * formato que esperan los filtros whereDate(...) del backend.
  *
  * Uso:
  *   <DateRangeFilter v-model:fecha-desde="filters.fecha_desde"
@@ -135,6 +135,11 @@ const ranges = {
     'Últimos 7 días': [inicioDelDia(sumarDias(hoy, -6)), finHoy],
     'Esta semana': [inicioSemanaLunes(hoy), finHoy],
     'Este mes': [inicioDelDia(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), finHoy],
+    'Mes anterior': [
+        inicioDelDia(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)),
+        finDelDia(new Date(hoy.getFullYear(), hoy.getMonth(), 0)),
+    ],
+    'Últimos 3 meses': [inicioDelDia(sumarMeses(hoy, -3)), finHoy],
     'Últimos 6 meses': [inicioDelDia(sumarMeses(hoy, -6)), finHoy],
     'Este año': [inicioDelDia(new Date(hoy.getFullYear(), 0, 1)), finHoy],
     'Año pasado': [

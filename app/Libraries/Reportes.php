@@ -464,18 +464,18 @@ class Reportes extends exFPDF
         $this->SetTextColor($negro[0], $negro[1], $negro[2]);
 
         $filasIzq = [
-            [29.9, $solicitante],
-            [39.0, $maquinaria],
-            [48.1, $modelo],
-            [57.2, $placa],
-            [66.3, $codigoVehiculo],
+            [31.5, $solicitante],
+            [40.0, $maquinaria],
+            [49.1, $modelo],
+            [58.2, $placa],
+            [67.3, $codigoVehiculo],
         ];
         foreach ($filasIzq as [$y, $valor]) {
             $this->SetXY(55, $y);
             $this->Cell(56, 6, $this->textoCalibri((string) ($valor ?? '')), 0, 0, 'L');
         }
 
-        $this->SetXY(168, 30.9);
+        $this->SetXY(168, 31.5);
         $this->Cell(40, 6, $this->textoCalibri((string) $fechaSolicitud), 0, 0, 'L');
 
         // -- Tipo de mantenimiento: casilla marcada con una "X" (caja derecha
@@ -567,9 +567,13 @@ class Reportes extends exFPDF
 
         // ══════════════════════════════════════════════════════════════════
         // FIRMAS (SOLICITANTE / EJECUTOR DE TRABAJO / Vo. Bo. — columnas ya
-        // impresas en el fondo en x 4.53-71.50 / 71.50-141.18 / 141.18-210.10;
-        // cada nombre se imprime centrado justo encima de su línea de firma,
-        // en y=256.37). El ejecutor y el visto bueno sólo existen si la
+        // impresas en el fondo en x 4.53-71.50 / 71.50-141.18 / 141.18-210.10).
+        // La línea de firma del fondo va en y≈256.4; cada nombre se imprime
+        // centrado DEBAJO de su línea (y=258.5, medido sobre un render real:
+        // deja hueco en blanco arriba de la línea para la firma a mano y no
+        // se pisa con "FECHA ___/___/___", que empieza en y≈265.4 — antes el
+        // nombre se imprimía encima de la línea, a pedido del usuario ahora
+        // va debajo). El ejecutor y el visto bueno sólo existen si la
         // solicitud ya derivó en una orden de trabajo emitida (Paso 2).
         // ══════════════════════════════════════════════════════════════════
         $columnasFirma = [
@@ -584,7 +588,7 @@ class Reportes extends exFPDF
             if (! $nombre) {
                 continue;
             }
-            $this->SetXY($x, 250);
+            $this->SetXY($x, 258.5);
             $this->Cell($w, 5, $this->textoCalibri($nombre), 0, 0, 'C');
         }
 

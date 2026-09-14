@@ -24,7 +24,7 @@ Multiselect needs a `label` field on each option; if the prop array doesn't alre
 Small fixed enums (e.g. tipo_mantenimiento: PREVENTIVO/CORRECTIVO) stay as plain `<select>` — this rule is only for selects backed by a growable list of vehiculo/repuesto/persona/conductor records.
 
 ## Filtros de rango de fechas usan DateRangeFilter.vue, no dos &lt;input type=date&gt;
-Para cualquier filtro "fecha desde/hasta" en una página (listados con ListValeAction-style filtros), usa resources/js/Components/DateRangeFilter.vue en vez de dos <input type="date"> sueltos. Es un wrapper de daterange-picker-vue3 (instalado vía npm) con presets en español (Hoy, Ayer, Últimos 3/7 días, Esta semana desde el lunes, Este mes, Últimos 6 meses, Este año, Año pasado, Rango personalizado) y dos v-model en formato 'YYYY-MM-DD' (sólo fecha, sin horas — coincide con lo que esperan los whereDate(...) del backend):
+Para cualquier filtro "fecha desde/hasta" en una página (listados con ListValeAction-style filtros), usa resources/js/Components/DateRangeFilter.vue en vez de dos <input type="date"> sueltos. Es un wrapper de daterange-picker-vue3 (instalado vía npm) con presets en español (Hoy, Ayer, Últimos 3/7 días, Esta semana desde el lunes, Este mes, Mes anterior, Últimos 3/6 meses, Este año, Año pasado, Rango personalizado) y dos v-model en formato 'YYYY-MM-DD' (sólo fecha, sin horas — coincide con lo que esperan los whereDate(...) del backend):
 
 <DateRangeFilter v-model:fecha-desde="filters.fecha_desde" v-model:fecha-hasta="filters.fecha_hasta" label="..." />
 
