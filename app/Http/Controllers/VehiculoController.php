@@ -71,7 +71,9 @@ class VehiculoController extends Controller
         return Inertia::render('Vehiculos/Create', [
             'vehiculo' => null,
             'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']),
-            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
+            // 'unidad_capacidad_sugerida' precarga el select de capacidad del
+            // formulario al elegir el tipo (ver Vehiculos/Create.vue).
+            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo', 'unidad_capacidad_sugerida']),
         ]);
     }
 
@@ -138,7 +140,7 @@ class VehiculoController extends Controller
         return Inertia::render('Vehiculos/Create', [
             'vehiculo' => $vehiculo->load(['tipoCombustible', 'tipoVehiculo']),
             'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']),
-            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
+            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo', 'unidad_capacidad_sugerida']),
         ]);
     }
 

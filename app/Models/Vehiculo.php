@@ -21,6 +21,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'uuid',
     'detalles',
     'tipo_medicion',
+    'capacidad',
+    'capacidad_unidad',
 ])]
 class Vehiculo extends Model
 {

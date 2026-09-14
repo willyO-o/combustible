@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
     'tipo_vehiculo',
     'estado_tipo_vehiculo',
     'id_grupo_vehiculo',
+    'unidad_capacidad_sugerida',
 ])]
 class TipoVehiculo extends Model
 {

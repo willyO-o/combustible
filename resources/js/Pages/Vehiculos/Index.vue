@@ -59,8 +59,9 @@ function clearFilters() {
 }
 
 async function confirmDelete(vehiculo) {
+    const identificador = vehiculo.nro_placa ?? vehiculo.codigo ?? `#${vehiculo.id}`
     const confirmado = await confirm(
-        `¿Eliminar el vehículo con placa "${vehiculo.nro_placa}"?`,
+        `¿Eliminar el vehículo con placa "${identificador}"?`,
         'Eliminar Vehículo',
         'Sí, eliminar',
     )
@@ -82,6 +83,8 @@ const estadoBadge = (estado) => {
 }
 
 const fotoUrl = (foto) => foto ? `/storage/${foto}` : null
+
+const capacidadTexto = (v) => (v.capacidad ? `${v.capacidad} ${v.capacidad_unidad ?? ''}`.trim() : '—')
 
 
 
@@ -262,6 +265,7 @@ const tipoAsignacionBadge = (tipo) =>
                             <th>Vehiculo / Placa / Modelo</th>
                             <th>Codigo</th>
                             <th>Tipo Vehículo</th>
+                            <th>Capacidad</th>
                             <th>Área Asignada</th>
                             <th>Estado</th>
                             <th>Operario</th>
@@ -290,7 +294,7 @@ const tipoAsignacionBadge = (tipo) =>
                                         </span>
                                     </div>
                                     <div>
-                                        <span class="d-block fw-semibold">{{ vehiculo.nro_placa }}</span>
+                                        <span class="d-block fw-semibold">{{ vehiculo.nro_placa ?? 'Sin placa' }}</span>
                                         <span class="text-muted fs-13">
                                             {{ vehiculo.marca ?? '—' }} {{ vehiculo.modelo ?? '' }}
                                         </span>
@@ -307,6 +311,7 @@ const tipoAsignacionBadge = (tipo) =>
                                     {{ vehiculo.tipo_vehiculo?.tipo_vehiculo ?? '—' }}
                                 </span>
                             </td>
+                            <td>{{ capacidadTexto(vehiculo) }}</td>
                             <td>
                                 <div class="d-flex align-items-center small gap-2">
                                     <div>
@@ -386,7 +391,7 @@ const tipoAsignacionBadge = (tipo) =>
                             </span>
                         </span>
                         <div class="flex-grow-1">
-                            <span class="d-block fw-semibold">{{ vehiculo.nro_placa }}</span>
+                            <span class="d-block fw-semibold">{{ vehiculo.nro_placa ?? 'Sin placa' }}</span>
                             <span class="text-muted fs-13">{{ vehiculo.marca ?? '—' }} {{ vehiculo.modelo ?? '' }} ({{ vehiculo.anio ?? '—' }})</span>
                         </div>
                         <span class="badge" :class="estadoBadge(vehiculo.estado_vehiculo)">{{ vehiculo.estado_vehiculo }}</span>
@@ -400,6 +405,10 @@ const tipoAsignacionBadge = (tipo) =>
                         <div class="col-6">
                             <span class="text-muted d-block">Tipo Vehículo</span>
                             <span>{{ vehiculo.tipo_vehiculo?.tipo_vehiculo ?? '—' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Capacidad</span>
+                            <span>{{ capacidadTexto(vehiculo) }}</span>
                         </div>
                         <div class="col-6">
                             <span class="text-muted d-block">Operario</span>

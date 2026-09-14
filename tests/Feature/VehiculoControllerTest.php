@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -33,6 +35,8 @@ class VehiculoControllerTest extends TestCase
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('administrador');
+
+        Storage::fake('public');
     }
 
     public function test_index_filtra_vehiculos_por_nro_placa(): void
@@ -102,6 +106,7 @@ class VehiculoControllerTest extends TestCase
             'tipo_medicion' => 'horometro',
             'id_tipo_combustible' => $tipoCombustible->id,
             'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
         ]);
 
         $response->assertRedirect(route('vehiculos.index'));
@@ -112,6 +117,121 @@ class VehiculoControllerTest extends TestCase
             'modelo' => 'Hilux',
             'tipo_medicion' => 'horometro',
         ]);
+    }
+
+    public function test_crea_un_vehiculo_con_capacidad_y_unidad(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+            'nro_placa' => '2222BBB',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'capacidad' => '3.5',
+            'capacidad_unidad' => 'm³',
+            'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
+        ]);
+
+        $response->assertRedirect(route('vehiculos.index'));
+
+        $this->assertDatabaseHas('vehiculo', [
+            'nro_placa' => '2222BBB',
+            'capacidad' => 3.5,
+            'capacidad_unidad' => 'm³',
+        ]);
+    }
+
+    public function test_capacidad_unidad_es_requerida_si_se_envia_capacidad(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+            'nro_placa' => '3333CCC',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'capacidad' => '10',
+            'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
+        ]);
+
+        $response->assertSessionHasErrors('capacidad_unidad');
+        $this->assertDatabaseMissing('vehiculo', ['nro_placa' => '3333CCC']);
+    }
+
+    public function test_puede_crear_un_vehiculo_sin_capacidad(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+            'nro_placa' => '4444DDD',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
+        ]);
+
+        $response->assertRedirect(route('vehiculos.index'));
+        $this->assertDatabaseHas('vehiculo', ['nro_placa' => '4444DDD', 'capacidad' => null]);
+    }
+
+    public function test_puede_crear_un_vehiculo_sin_nro_placa(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+            'codigo' => 'ACT-0100',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
+        ]);
+
+        $response->assertRedirect(route('vehiculos.index'));
+        $this->assertDatabaseHas('vehiculo', ['codigo' => 'ACT-0100', 'nro_placa' => null]);
+    }
+
+    public function test_fotografia_es_obligatoria_al_crear_un_vehiculo(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+            'nro_placa' => '5555EEE',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+        ]);
+
+        $response->assertSessionHasErrors('fotografia');
+        $this->assertDatabaseMissing('vehiculo', ['nro_placa' => '5555EEE']);
+    }
+
+    public function test_fotografia_es_opcional_al_actualizar_un_vehiculo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['codigo' => 'ACT-0020']);
+
+        $response = $this->actingAs($this->admin)->put(route('vehiculos.update', $vehiculo->id), [
+            'nro_placa' => $vehiculo->nro_placa,
+            'codigo' => 'ACT-0021',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => $vehiculo->tipo_medicion,
+            'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+            'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+        ]);
+
+        $response->assertRedirect(route('vehiculos.index'));
+        $response->assertSessionDoesntHaveErrors('fotografia');
+        $this->assertDatabaseHas('vehiculo', ['id' => $vehiculo->id, 'codigo' => 'ACT-0021']);
     }
 
     public function test_show_incluye_el_historial_de_asignaciones_y_el_conductor_actual(): void

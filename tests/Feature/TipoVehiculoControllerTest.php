@@ -68,6 +68,41 @@ class TipoVehiculoControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_guarda_la_unidad_de_capacidad_sugerida(): void
+    {
+        $grupo = GrupoVehiculo::factory()->create();
+
+        $response = $this->post(route('tipos-vehiculo.store'), [
+            'tipo_vehiculo' => 'Camión Volquete',
+            'estado_tipo_vehiculo' => 'ACTIVO',
+            'id_grupo_vehiculo' => $grupo->id,
+            'unidad_capacidad_sugerida' => 'm³',
+        ]);
+
+        $response->assertRedirect(route('tipos-vehiculo.index'));
+        $this->assertDatabaseHas('tipo_vehiculo', [
+            'tipo_vehiculo' => 'Camión Volquete',
+            'unidad_capacidad_sugerida' => 'm³',
+        ]);
+    }
+
+    public function test_unidad_de_capacidad_sugerida_es_opcional(): void
+    {
+        $grupo = GrupoVehiculo::factory()->create();
+
+        $response = $this->post(route('tipos-vehiculo.store'), [
+            'tipo_vehiculo' => 'Automóvil',
+            'estado_tipo_vehiculo' => 'ACTIVO',
+            'id_grupo_vehiculo' => $grupo->id,
+        ]);
+
+        $response->assertRedirect(route('tipos-vehiculo.index'));
+        $this->assertDatabaseHas('tipo_vehiculo', [
+            'tipo_vehiculo' => 'Automóvil',
+            'unidad_capacidad_sugerida' => null,
+        ]);
+    }
+
     public function test_store_exige_el_grupo_de_vehiculo(): void
     {
         $response = $this->post(route('tipos-vehiculo.store'), [

@@ -47,6 +47,8 @@ const tipoMedicionLabel = (tipo) => (tipo === 'horometro' ? 'Horómetro' : 'Kilo
 
 const unidadMedicion = (tipo) => (tipo === 'horometro' ? 'h' : 'km')
 
+const capacidadTexto = (v) => (v.capacidad ? `${v.capacidad} ${v.capacidad_unidad ?? ''}`.trim() : 'N/A')
+
 const numero = (valor) =>
     valor === null || valor === undefined
         ? '—'
@@ -193,9 +195,13 @@ const restanteTexto = (alerta) => {
                                     {{ vehiculo.tipo_combustible?.tipo_combustible ?? 'N/A' }}
                                 </span>
                             </li>
-                            <li class="d-flex align-items-center justify-content-between gap-2 py-1">
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
                                 <span class="text-muted fs-13">Medición</span>
                                 <span class="fw-medium">{{ tipoMedicionLabel(vehiculo.tipo_medicion) }}</span>
+                            </li>
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1">
+                                <span class="text-muted fs-13">Capacidad</span>
+                                <span class="fw-medium">{{ capacidadTexto(vehiculo) }}</span>
                             </li>
                         </ul>
 

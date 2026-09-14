@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import UnidadCapacidadSelect from '@/Components/UnidadCapacidadSelect.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -24,7 +25,24 @@ const form = useForm({
     id_tipo_combustible: props.vehiculo?.id_tipo_combustible ?? '',
     id_tipo_vehiculo:    props.vehiculo?.id_tipo_vehiculo ?? '',
     fotografia:          null,
+    capacidad:           props.vehiculo?.capacidad ?? '',
+    capacidad_unidad:    props.vehiculo?.capacidad_unidad ?? '',
 })
+
+// Al elegir (o cambiar) el tipo de vehículo, si todavía no hay una unidad de
+// capacidad cargada se precarga con la sugerida de ese tipo (tipo_vehiculo.
+// unidad_capacidad_sugerida) — sólo una sugerencia, el usuario la puede
+// cambiar o dejar en blanco.
+watch(
+    () => form.id_tipo_vehiculo,
+    (idTipoVehiculo) => {
+        if (form.capacidad_unidad) return
+        const tipo = props.tiposVehiculo.find((t) => t.id === idTipoVehiculo)
+        if (tipo?.unidad_capacidad_sugerida) {
+            form.capacidad_unidad = tipo.unidad_capacidad_sugerida
+        }
+    },
+)
 
 const fotoPreview = ref(
     props.vehiculo?.fotografia ? `/storage/${props.vehiculo.fotografia}` : null,
@@ -97,7 +115,10 @@ function submit() {
                                 </div>
                             </div>
                             <div class="w-100">
-                                <label class="form-label fw-medium">{{ isEditing ? 'Cambiar foto' : 'Seleccionar foto' }}</label>
+                                <label class="form-label fw-medium">
+                                    {{ isEditing ? 'Cambiar foto' : 'Seleccionar foto' }}
+                                    <span v-if="!isEditing" class="text-danger">*</span>
+                                </label>
                                 <input
                                     type="file"
                                     class="form-control"
@@ -124,14 +145,14 @@ function submit() {
                                 <!-- Nro. Placa -->
                                 <div class="col-sm-4">
                                     <label class="form-label fw-medium">
-                                        Nro. Placa <span class="text-danger">*</span>
+                                        Nro. Placa
                                     </label>
                                     <input
                                         v-model="form.nro_placa"
                                         type="text"
                                         class="form-control"
                                         :class="{ 'is-invalid': form.errors.nro_placa }"
-                                        placeholder="Ej: 1234ABC"
+                                        placeholder="Ej: 1234ABC (opcional)"
                                         maxlength="20"
                                         style="text-transform:uppercase;"
                                         @input="form.nro_placa = form.nro_placa.toUpperCase()"
@@ -262,6 +283,31 @@ function submit() {
                                         <option value="horometro">Horómetro</option>
                                     </select>
                                     <div v-if="form.errors.tipo_medicion" class="invalid-feedback">{{ form.errors.tipo_medicion }}</div>
+                                </div>
+
+                                <!-- Capacidad -->
+                                <div class="col-sm-4">
+                                    <label class="form-label fw-medium">Capacidad</label>
+                                    <input
+                                        v-model="form.capacidad"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        class="form-control"
+                                        :class="{ 'is-invalid': form.errors.capacidad }"
+                                        placeholder="Ej: 3.00"
+                                    />
+                                    <div v-if="form.errors.capacidad" class="invalid-feedback">{{ form.errors.capacidad }}</div>
+                                </div>
+
+                                <!-- Unidad de Capacidad -->
+                                <div class="col-sm-4">
+                                    <label class="form-label fw-medium">Unidad de Capacidad</label>
+                                    <UnidadCapacidadSelect
+                                        v-model="form.capacidad_unidad"
+                                        :invalid="!!form.errors.capacidad_unidad"
+                                    />
+                                    <div v-if="form.errors.capacidad_unidad" class="invalid-feedback d-block">{{ form.errors.capacidad_unidad }}</div>
                                 </div>
 
                             </div>

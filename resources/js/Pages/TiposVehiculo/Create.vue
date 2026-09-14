@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import Multiselect from '@vueform/multiselect'
+import UnidadCapacidadSelect from '@/Components/UnidadCapacidadSelect.vue'
 
 const props = defineProps({
     tipo:               Object, // null en creación
@@ -19,6 +20,7 @@ const form = useForm({
     tipo_vehiculo:        props.tipo?.tipo_vehiculo ?? '',
     estado_tipo_vehiculo: props.tipo?.estado_tipo_vehiculo ?? 'ACTIVO',
     id_grupo_vehiculo:    props.tipo?.id_grupo_vehiculo ?? '',
+    unidad_capacidad_sugerida: props.tipo?.unidad_capacidad_sugerida ?? '',
     intervalos: (props.tipo?.intervalos ?? []).map((i) => ({
         id_tipo_mantenimiento: i.id_tipo_mantenimiento,
         tipo_medicion:         i.tipo_medicion,
@@ -130,6 +132,22 @@ function submit() {
                                         </option>
                                     </select>
                                     <InputError :message="form.errors.id_grupo_vehiculo" class="mt-1" />
+                                </div>
+
+                                <!-- Unidad de Capacidad Sugerida -->
+                                <div class="col-12">
+                                    <label for="unidad_capacidad_sugerida" class="form-label fw-medium">
+                                        Unidad de Capacidad Sugerida
+                                    </label>
+                                    <UnidadCapacidadSelect
+                                        id="unidad_capacidad_sugerida"
+                                        v-model="form.unidad_capacidad_sugerida"
+                                        :invalid="!!form.errors.unidad_capacidad_sugerida"
+                                    />
+                                    <InputError :message="form.errors.unidad_capacidad_sugerida" class="mt-1" />
+                                    <small class="text-muted">
+                                        Precarga la unidad de capacidad al registrar un vehículo de este tipo (ej. m³ para volquetas).
+                                    </small>
                                 </div>
 
                                 <!-- Estado -->
