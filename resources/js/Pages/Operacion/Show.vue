@@ -422,6 +422,13 @@ const verificarOperacion =  async () => {
                                             {{ m.pivot.realizado === 'SI' ? 'Sí' : 'No' }}
                                         </span>
                                         <span v-else class="text-muted fs-12">—</span>
+
+                                        <a v-if="m.pivot.evidencia" :href="`/storage/${m.pivot.evidencia}`"
+                                            target="_blank" class="mant-evidencia-btn ms-2"
+                                            title="Ver evidencia fotográfica">
+                                            <img :src="`/storage/${m.pivot.evidencia}`" class="mant-evidencia-thumb"
+                                                alt="Evidencia" />
+                                        </a>
                                     </span>
                                 </div>
                             </div>

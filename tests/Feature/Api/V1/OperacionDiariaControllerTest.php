@@ -13,6 +13,8 @@ use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -36,6 +38,8 @@ class OperacionDiariaControllerTest extends TestCase
             'parametros_vale' => ['tiempo_expiracion' => 1],
             'estado' => 'ACTIVO',
         ]);
+
+        Storage::fake('public');
     }
 
     /**
@@ -112,15 +116,18 @@ class OperacionDiariaControllerTest extends TestCase
         $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
         $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
 
+        // Evidencia obligatoria en ambos controles (uno con valor, el otro
+        // marcado "Sí"): la petición pasa a ser multipart (->post(), no
+        // ->postJson() — un cuerpo JSON no puede llevar archivos).
         $payload = $this->payloadValido($conductor, $vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null],
-                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
             ],
         ]);
         $payload['actividades_realizadas'][0]['id_material'] = $material->id;
 
-        $response = $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $payload);
+        $response = $this->actingAs($user, 'api')->post(route('api.v1.operacion-diaria.store'), $payload);
 
         $response->assertCreated();
         $response->assertJsonPath('data.actividades_realizadas.0.pivot.id_material', $material->id);
@@ -132,14 +139,102 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertSame('SI', $controles['Nivel de aceite']['pivot']['realizado']);
     }
 
+    /**
+     * A diferencia del resto de los tests de este archivo (postJson, cuerpo
+     * JSON puro): la evidencia es un archivo, así que la petición debe
+     * enviarse como multipart/form-data (mismo patrón que CargaCombustible
+     * "respaldos" / CargaMaterial "viaje.foto") — ->post() en vez de
+     * ->postJson(), con el arreglo `mantenimientos` anidado tal cual.
+     */
+    public function test_store_guarda_la_evidencia_del_mantenimiento_convertida_a_webp(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $response = $this->actingAs($user, 'api')->post(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg', 800, 600)],
+            ],
+        ]));
+
+        $response->assertCreated();
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $pivote = $operacion->mantenimientosOperacion()->first()->pivot;
+
+        $this->assertNotNull($pivote->evidencia);
+        $this->assertStringEndsWith('.webp', $pivote->evidencia);
+        Storage::disk('public')->assertExists($pivote->evidencia);
+        $response->assertJsonPath('data.mantenimientos_operacion.0.pivot.evidencia', $pivote->evidencia);
+    }
+
+    public function test_update_conserva_la_evidencia_del_mantenimiento_si_no_llega_un_archivo_nuevo(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user, 'api')->post(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $rutaOriginal = $operacion->mantenimientosOperacion()->first()->pivot->evidencia;
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.operacion-diaria.update', $operacion), $this->payloadValido($conductor, $vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'realizado' => 'SI'],
+            ],
+        ]));
+
+        $this->assertSame($rutaOriginal, $operacion->mantenimientosOperacion()->first()->pivot->evidencia);
+        Storage::disk('public')->assertExists($rutaOriginal);
+    }
+
+    public function test_store_exige_evidencia_para_un_control_con_valor_o_realizado_si(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $response = $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+            ],
+        ]));
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('mantenimientos.0.evidencia');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    public function test_store_no_exige_evidencia_para_un_control_marcado_no(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $response = $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'NO'],
+            ],
+        ]));
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('mantenimiento_operacion_diaria', [
+            'id_tipo_mantenimiento' => $aceite->id,
+            'realizado' => 'NO',
+            'evidencia' => null,
+        ]);
+    }
+
     public function test_show_devuelve_los_controles_de_mantenimiento_registrados(): void
     {
         [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
         $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
 
-        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+        $this->actingAs($user, 'api')->post(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 30, 'realizado' => null],
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 30, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
             ],
         ]))->assertCreated();
 
@@ -158,17 +253,20 @@ class OperacionDiariaControllerTest extends TestCase
         $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
         $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
 
-        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+        $this->actingAs($user, 'api')->post(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 10, 'realizado' => null],
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 10, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
             ],
         ]))->assertCreated();
 
         $operacion = OperacionDiaria::firstOrFail();
 
-        $response = $this->actingAs($user, 'api')->putJson(route('api.v1.operacion-diaria.update', $operacion), $this->payloadValido($conductor, $vehiculo, [
+        // ->put() (no ->putJson()): el control nuevo también exige evidencia.
+        // El cliente de test de Laravel sí sabe mandar archivos con PUT sin
+        // necesidad de spoofear con _method (a diferencia del navegador).
+        $response = $this->actingAs($user, 'api')->put(route('api.v1.operacion-diaria.update', $operacion), $this->payloadValido($conductor, $vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
             ],
         ]));
 

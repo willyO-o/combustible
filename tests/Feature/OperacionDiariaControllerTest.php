@@ -14,6 +14,8 @@ use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -41,6 +43,8 @@ class OperacionDiariaControllerTest extends TestCase
             'parametros_vale' => ['tiempo_expiracion' => 1],
             'estado' => 'ACTIVO',
         ]);
+
+        Storage::fake('public');
     }
 
     private function crearConductorConUsuario(): array
@@ -674,8 +678,8 @@ class OperacionDiariaControllerTest extends TestCase
 
         $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null],
-                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
             ],
         ]));
 
@@ -722,9 +726,9 @@ class OperacionDiariaControllerTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null],
-                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
-                // Sin cargar nada: no debe registrarse.
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
+                // Sin cargar nada: no debe registrarse (y no exige evidencia).
                 ['id_tipo_mantenimiento' => $agua->id, 'valor' => null, 'realizado' => null],
             ],
         ]));
@@ -750,6 +754,71 @@ class OperacionDiariaControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_exige_evidencia_para_un_control_con_valor_cargado(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null],
+            ],
+        ]));
+
+        $response->assertSessionHasErrors('mantenimientos.0.evidencia');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    public function test_store_exige_evidencia_para_un_control_booleano_marcado_si(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+            ],
+        ]));
+
+        $response->assertSessionHasErrors('mantenimientos.0.evidencia');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    /**
+     * Marcar "NO" (no se realizó el control) no exige evidencia — no hay
+     * nada que fotografiar.
+     */
+    public function test_store_no_exige_evidencia_para_un_control_booleano_marcado_no(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'NO'],
+            ],
+        ]));
+
+        $response->assertRedirect(route('operacion-diaria.index'));
+        $this->assertDatabaseHas('mantenimiento_operacion_diaria', [
+            'id_tipo_mantenimiento' => $aceite->id,
+            'realizado' => 'NO',
+            'evidencia' => null,
+        ]);
+    }
+
     public function test_edit_precarga_los_controles_de_mantenimiento_ya_guardados(): void
     {
         [$user, $conductor] = $this->crearConductorConUsuario();
@@ -761,7 +830,7 @@ class OperacionDiariaControllerTest extends TestCase
 
         $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 20, 'realizado' => null],
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 20, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
             ],
         ]));
 
@@ -811,7 +880,7 @@ class OperacionDiariaControllerTest extends TestCase
 
         $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 10, 'realizado' => null],
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 10, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
             ],
         ]));
 
@@ -819,7 +888,7 @@ class OperacionDiariaControllerTest extends TestCase
 
         $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
             'mantenimientos' => [
-                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
             ],
         ]));
 
@@ -833,6 +902,182 @@ class OperacionDiariaControllerTest extends TestCase
             'id_tipo_mantenimiento' => $aceite->id,
             'realizado' => 'SI',
         ]);
+    }
+
+    public function test_store_guarda_la_evidencia_del_mantenimiento_convertida_a_webp(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg', 800, 600)],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $pivote = $operacion->mantenimientosOperacion()->first()->pivot;
+
+        $this->assertNotNull($pivote->evidencia);
+        $this->assertStringEndsWith('.webp', $pivote->evidencia);
+        Storage::disk('public')->assertExists($pivote->evidencia);
+    }
+
+    public function test_update_conserva_la_evidencia_si_no_llega_un_archivo_nuevo(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $rutaOriginal = $operacion->mantenimientosOperacion()->first()->pivot->evidencia;
+
+        // Reenvía el mismo control sin archivo nuevo (edición típica: sólo se
+        // toca otro campo de la operación).
+        $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI'],
+            ],
+        ]));
+
+        $pivote = $operacion->mantenimientosOperacion()->first()->pivot;
+        $this->assertSame($rutaOriginal, $pivote->evidencia);
+        Storage::disk('public')->assertExists($rutaOriginal);
+    }
+
+    public function test_update_reemplaza_la_evidencia_y_borra_la_anterior(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $rutaOriginal = $operacion->mantenimientosOperacion()->first()->pivot->evidencia;
+
+        $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite-nuevo.jpg')],
+            ],
+        ]));
+
+        $rutaNueva = $operacion->mantenimientosOperacion()->first()->pivot->evidencia;
+        $this->assertNotSame($rutaOriginal, $rutaNueva);
+        Storage::disk('public')->assertMissing($rutaOriginal);
+        Storage::disk('public')->assertExists($rutaNueva);
+    }
+
+    /**
+     * La evidencia es obligatoria mientras el control siga "activo"
+     * (realizado = SI): no se puede quitar sólo la foto y dejar el control
+     * marcado como hecho sin evidencia.
+     */
+    public function test_update_no_permite_eliminar_la_evidencia_de_un_control_marcado_si(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $rutaOriginal = $operacion->mantenimientosOperacion()->first()->pivot->evidencia;
+
+        $response = $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'eliminar_evidencia' => true],
+            ],
+        ]));
+
+        $response->assertSessionHasErrors('mantenimientos.0.evidencia');
+        $this->assertSame($rutaOriginal, $operacion->mantenimientosOperacion()->first()->pivot->evidencia);
+        Storage::disk('public')->assertExists($rutaOriginal);
+    }
+
+    /**
+     * `eliminar_evidencia` sí tiene efecto cuando además se destilda/vacía el
+     * control por completo: al no quedar valor/realizado ni evidencia, el
+     * control deja de registrarse (mismo criterio que cualquier control sin
+     * datos) y su foto se borra del disco.
+     */
+    public function test_update_eliminar_evidencia_junto_con_destildar_el_control_lo_quita_por_completo(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $rutaOriginal = $operacion->mantenimientosOperacion()->first()->pivot->evidencia;
+
+        $response = $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => null, 'eliminar_evidencia' => true],
+            ],
+        ]));
+
+        $response->assertRedirect(route('operacion-diaria.index'));
+        $this->assertSame(0, $operacion->mantenimientosOperacion()->count());
+        Storage::disk('public')->assertMissing($rutaOriginal);
+    }
+
+    public function test_destroy_borra_los_archivos_de_evidencia_de_mantenimiento(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $aceite = $this->crearTipoMantenimientoOperacion('Nivel de aceite', 'booleano');
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'valor' => null, 'realizado' => 'SI', 'evidencia' => UploadedFile::fake()->image('aceite.jpg')],
+            ],
+        ]));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $ruta = $operacion->mantenimientosOperacion()->first()->pivot->evidencia;
+
+        $this->actingAs($user)->delete(route('operacion-diaria.destroy', $operacion));
+
+        Storage::disk('public')->assertMissing($ruta);
     }
 
     public function test_un_jefe_de_area_recibe_el_selector_de_conductor_con_los_asignados_al_vehiculo(): void

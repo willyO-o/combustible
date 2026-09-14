@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.5.0"
+  version: "1.6.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -405,7 +405,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.5.0"
+                api_version: "1.6.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -694,6 +694,32 @@ paths:
           por completo** el conjunto guardado y sólo se persisten los controles que traen
           `valor` o `realizado`. El catálogo de tipos disponibles está en
           `GET /parametros/colecciones` → `operaciones_diarias.tipos_mantenimiento`.
+        - `mantenimientos[].evidencia` es **obligatoria** para todo control que se registre con
+          `valor` o `realizado = SI` (no para `realizado = NO`) — ver la sección siguiente.
+
+        ## Envío con evidencia fotográfica (`multipart/form-data`)
+
+        Un control de mantenimiento puede (y a veces debe) llevar una foto de evidencia
+        (`mantenimientos[].evidencia`, convertida a `.webp` en el servidor): es **obligatoria**
+        para cualquier control que traiga `valor` o `realizado = SI` — sin ella la petición
+        falla con `422` (`mantenimientos.{i}.evidencia`). Un control marcado `realizado = NO`
+        no la necesita. Un cuerpo `application/json` no puede llevar archivos — si algún
+        control la necesita, la petición completa debe enviarse como `multipart/form-data`,
+        con el arreglo `mantenimientos` anidado igual que `respaldos` en `POST /cargas`:
+
+        ```
+        mantenimientos[0][id_tipo_mantenimiento] = 12
+        mantenimientos[0][realizado]              = SI
+        mantenimientos[0][evidencia]               = (aceite.jpg)
+        mantenimientos[1][id_tipo_mantenimiento] = 13
+        mantenimientos[1][valor]                  = 45.5
+        mantenimientos[1][evidencia]               = (combustible.jpg)
+        mantenimientos[2][id_tipo_mantenimiento] = 14
+        mantenimientos[2][realizado]              = NO
+        ```
+
+        (el control 14, marcado `NO`, no necesita `evidencia`). Sin ningún control con `valor`
+        o `realizado = SI`, `application/json` sigue funcionando igual que antes.
       requestBody:
         required: true
         content:
@@ -750,6 +776,15 @@ paths:
                       unidad_medida: horas
                       hora_inicio: "19:30"
                       hora_fin: "03:30"
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OperacionDiariaStoreRequest'
+            description: |
+              Usar sólo cuando algún elemento de `mantenimientos` lleva `evidencia` — ver
+              "Envío con evidencia fotográfica" arriba. El resto de los campos viaja igual que
+              en `application/json`, incluidos los arreglos anidados (`actividades_realizadas`,
+              `mantenimientos`), con la notación de corchetes estándar de multipart
+              (`mantenimientos[0][id_tipo_mantenimiento]`, etc.).
       responses:
         '201':
           description: Operación diaria creada exitosamente.
@@ -919,8 +954,16 @@ paths:
           incremental) — y al ser obligatorio, debe reenviarse siempre completo, incluidas las
           actividades que no cambiaron.
         - `mantenimientos` (opcional) también **reemplaza por completo** los controles de
-          mantenimiento guardados: los que no se reenvíen se eliminan. Omitirlo por completo
-          deja el conjunto sin controles.
+          mantenimiento guardados: los que no se reenvíen se eliminan (junto con su evidencia
+          fotográfica, si tenía). Omitirlo por completo deja el conjunto sin controles.
+        - La evidencia (`mantenimientos[].evidencia`, obligatoria si el control trae `valor` o
+          `realizado = SI` — ver "Envío con evidencia fotográfica" en `POST /operacion-diaria`)
+          de un control que sí se reenvía se conserva automáticamente si no llega un archivo
+          nuevo para ese mismo `id_tipo_mantenimiento` — no hace falta reenviarla.
+          `eliminar_evidencia: true` la borra sin reemplazarla, pero sólo tiene efecto real si
+          el control además deja de traer `valor`/`realizado = SI` en el mismo envío; si no, la
+          petición falla con `422` (no se puede marcar un control como hecho sin evidencia
+          quitándosela aparte).
         - Si `observaciones` cambia respecto al valor original y `notificar_observaciones: true`,
           se envía una notificación (a diferencia del registro, aquí solo notifica cuando el
           texto de las observaciones efectivamente cambió).
@@ -952,6 +995,15 @@ paths:
               mantenimientos:
                 - id_tipo_mantenimiento: 13
                   realizado: SI
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OperacionDiariaUpdateRequest'
+            description: |
+              Usar sólo cuando algún elemento de `mantenimientos` lleva `evidencia` — ver
+              "Envío con evidencia fotográfica" en `POST /operacion-diaria`. Al ser un PUT con
+              archivos, enviar con `_method=PUT` sobre una petición `POST` (spoofing estándar de
+              Laravel), ya que la mayoría de los clientes HTTP no arman `multipart/form-data`
+              sobre verbos `PUT` directamente.
       responses:
         '200':
           description: Operación diaria actualizada exitosamente.
@@ -3453,7 +3505,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.5.0" }
+        api_version: { type: string, example: "1.6.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -3743,8 +3795,15 @@ components:
         en `tipo_mantenimiento` y ser de ámbito `operacion_diaria` (los de ámbito `taller` se
         usan en órdenes de trabajo, no aquí). Sólo se registran los controles que traen algún
         dato: `valor` para los tipos de `tipo_valor = cantidad`, o `realizado` para los de
-        `tipo_valor = booleano`. Ambos son opcionales y anulables; los que no apliquen a la
-        operación se pueden omitir. Cada envío reemplaza por completo el conjunto guardado.
+        `tipo_valor = booleano`. Los controles que no apliquen a la operación se pueden omitir.
+        Cada envío reemplaza por completo el conjunto guardado.
+
+        **`evidencia` es obligatoria** para todo control que se está registrando con `valor`
+        (cualquier valor no nulo) o `realizado = SI`. Marcar `realizado = NO` NO exige
+        evidencia — no hay nada que fotografiar de un control que no se hizo. Ver la sección
+        "Envío con evidencia fotográfica" más abajo sobre el formato del archivo y cómo se
+        conserva/reemplaza/borra entre envíos (`422` con el error en
+        `mantenimientos.{i}.evidencia` si falta donde corresponde).
       required: [id_tipo_mantenimiento]
       properties:
         id_tipo_mantenimiento:
@@ -3763,6 +3822,26 @@ components:
           nullable: true
           description: Marca para los tipos de `tipo_valor = booleano`.
           example: SI
+        evidencia:
+          type: string
+          format: binary
+          nullable: true
+          description: |
+            Foto de evidencia de lo realizado en este control. Obligatoria cuando `valor` o
+            `realizado = SI` vienen presentes (ver arriba), salvo que el control, en una
+            edición, ya tenga una evidencia guardada de un envío anterior — en ese caso se
+            puede omitir y se conserva la existente. Sólo tiene efecto enviada como
+            `multipart/form-data` (un cuerpo `application/json` no puede adjuntar archivos).
+            Se convierte a `.webp` en el servidor antes de guardarse.
+        eliminar_evidencia:
+          type: boolean
+          nullable: true
+          description: |
+            `true` borra la evidencia ya guardada de este control sin subir una nueva. Sólo
+            tiene efecto real si además el control deja de tener `valor`/`realizado = SI` en
+            el mismo envío (si no, sigue exigiendo evidencia y la petición falla con `422`
+            — no se puede marcar un control como hecho sin evidencia quitándosela aparte). Se
+            ignora si `evidencia` también viene en la misma petición.
 
     OperacionDiariaStoreRequest:
       type: object
@@ -3964,6 +4043,14 @@ components:
             id: { type: integer, example: 88 }
             valor: { type: string, nullable: true, description: "Presente para `tipo_valor = cantidad`.", example: "45.50" }
             realizado: { type: string, enum: [SI, NO], nullable: true, description: "Presente para `tipo_valor = booleano`.", example: null }
+            evidencia:
+              type: string
+              nullable: true
+              description: |
+                Ruta relativa dentro del disco público de la foto de evidencia (ya convertida a
+                `.webp`), o `null` si el control no tiene ninguna. Se sirve en
+                `{app_url}/storage/{evidencia}`.
+              example: operacion-diaria/mantenimiento/3f9c1a7b2e4d5f6a8b9c0d1e2f3a4b5c6d7e8f9a.webp
 
     OperacionDiaria:
       type: object

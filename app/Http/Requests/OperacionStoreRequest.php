@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\MantenimientoOperacionDiaria;
 use App\Models\Vehiculo;
 use App\Rules\GreaterThanPreviousReading;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -45,6 +46,59 @@ class OperacionStoreRequest extends FormRequest
         }
 
         parent::failedValidation($validator);
+    }
+
+    /**
+     * La evidencia fotográfica es obligatoria para todo control de
+     * mantenimiento que se está registrando: `valor` cargado (tipo
+     * `cantidad`), o `realizado = SI` (tipo `booleano`). Marcar `NO` no
+     * exige evidencia — no hay nada que fotografiar de algo que no se hizo.
+     *
+     * No se valida como regla normal en rules() porque una regla de archivo
+     * (`image`, `mimes`, o un closure común) no se ejecuta cuando el campo
+     * llega ausente — y "ausente" es exactamente el caso que hay que
+     * detectar aquí (sin archivo nuevo). Se resuelve con un `after()`, mismo
+     * patrón que EncargadoAreaRequest.
+     *
+     * Al editar, si el control ya tenía evidencia guardada y no se pidió
+     * `eliminar_evidencia`, se conserva la existente sin exigir un archivo
+     * nuevo (mismo criterio que "sometimes" ya usado en el resto de esta
+     * request para PUT/PATCH).
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $operacion = $this->route('operacionDiaria');
+
+            foreach ($this->input('mantenimientos', []) as $idx => $fila) {
+                $valor = $fila['valor'] ?? null;
+                $realizado = $fila['realizado'] ?? null;
+                $eliminarEvidencia = $fila['eliminar_evidencia'] ?? false;
+
+                $requiereEvidencia = ($valor !== null && $valor !== '') || $realizado === 'SI';
+
+                if (! $requiereEvidencia || $this->hasFile("mantenimientos.$idx.evidencia")) {
+                    continue;
+                }
+
+                if ($operacion && ! $eliminarEvidencia) {
+                    $yaTieneEvidencia = MantenimientoOperacionDiaria::query()
+                        ->where('id_operacion_diaria', $operacion->id)
+                        ->where('id_tipo_mantenimiento', $fila['id_tipo_mantenimiento'] ?? null)
+                        ->whereNotNull('evidencia')
+                        ->exists();
+
+                    if ($yaTieneEvidencia) {
+                        continue;
+                    }
+                }
+
+                $validator->errors()->add(
+                    "mantenimientos.$idx.evidencia",
+                    'La evidencia fotográfica es obligatoria para este control de mantenimiento.'
+                );
+            }
+        });
     }
 
     /**
@@ -115,6 +169,13 @@ class OperacionStoreRequest extends FormRequest
             'mantenimientos.*.id_tipo_mantenimiento' => ['required', 'integer', Rule::exists('tipo_mantenimiento', 'id')->where('ambito', 'operacion_diaria')],
             'mantenimientos.*.valor' => 'nullable|numeric|min:0',
             'mantenimientos.*.realizado' => 'nullable|in:SI,NO',
+            // Evidencia fotográfica opcional de lo realizado en ese control
+            // (se convierte a webp en el servidor, ver
+            // SincronizarMantenimientosOperacionAction). Sin archivo nuevo se
+            // conserva la ya guardada; eliminar_evidencia la borra sin subir
+            // una nueva.
+            'mantenimientos.*.evidencia' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:8192'],
+            'mantenimientos.*.eliminar_evidencia' => ['nullable', 'boolean'],
 
         ];
     }
@@ -136,6 +197,7 @@ class OperacionStoreRequest extends FormRequest
             'actividades_realizadas.*.hora_fin.after' => 'La hora de fin debe ser posterior a la hora de inicio.',
             'mantenimientos.*.id_tipo_mantenimiento.exists' => 'El control de mantenimiento seleccionado no es válido para operación diaria.',
             'mantenimientos.*.valor.numeric' => 'El valor del control de mantenimiento debe ser numérico.',
+            'mantenimientos.*.evidencia.image' => 'La evidencia debe ser una imagen.',
         ];
     }
 }

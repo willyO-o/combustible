@@ -2,6 +2,37 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.6.0 — 2026-09-14
+
+Evidencia fotográfica opcional en los controles de mantenimiento de operación diaria.
+
+### Agregado
+
+#### `POST /operacion-diaria`, `PUT /operacion-diaria/{id}`
+
+- `mantenimientos[].evidencia`: foto de lo realizado en ese control, convertida a `.webp` en el
+  servidor antes de guardarse. **Obligatoria** para todo control que se registre con `valor` o
+  `realizado = SI` (marcar `NO` no la exige) — sin ella la petición falla con `422`
+  (`mantenimientos.{i}.evidencia`). Sólo funciona enviando la petición completa como
+  `multipart/form-data` (nueva alternativa de `requestBody`, documentada junto a
+  `application/json`) — un cuerpo JSON no puede llevar archivos.
+- `mantenimientos[].eliminar_evidencia`: borra la evidencia ya guardada de un control sin subir
+  una nueva — sólo tiene efecto si el control además deja de traer `valor`/`realizado = SI` en
+  el mismo envío (si no, sigue siendo obligatoria y la petición falla).
+- En una edición, sin archivo nuevo para un control que ya reenvía `valor`/`realizado = SI`, su
+  evidencia ya guardada se conserva automáticamente — no hace falta reenviarla.
+- `MantenimientoOperacionRegistrado.pivot.evidencia`: nuevo campo en las respuestas de
+  `store`/`show`/`update` con la ruta relativa de la evidencia guardada (o `null`).
+- Nueva sección "Envío con evidencia fotográfica" en la descripción de
+  `POST /operacion-diaria`, con el mismo formato de arreglo anidado que ya usa `respaldos` en
+  `POST /cargas`.
+
+#### Varios
+
+- `info.version`: `1.5.0` → `1.6.0`; el ejemplo de `GET /parametros` (`api_version`) y el
+  esquema `ParametrosGenerales` pasan a `"1.6.0"`. `ParametrosController::index()` devuelve
+  `api_version: "1.6.0"`.
+
 ## 1.5.0 — 2026-09-06
 
 Dos cambios en `GET /parametros/colecciones`, ambos **retrocompatibles** (un cliente que no

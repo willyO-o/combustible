@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -379,6 +380,20 @@ class OperacionDiariaController extends Controller
     }
 
     /**
+     * Borra del disco las fotos de evidencia de los controles de
+     * mantenimiento de la operación, antes de desasociarlos/eliminarla (si
+     * no, quedarían huérfanas en storage/app/public).
+     */
+    private function eliminarEvidenciasMantenimiento(OperacionDiaria $operacionDiaria): void
+    {
+        $operacionDiaria->mantenimientosOperacion()
+            ->get()
+            ->pluck('pivot.evidencia')
+            ->filter()
+            ->each(fn ($ruta) => Storage::disk('public')->delete($ruta));
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(OperacionDiaria $operacionDiaria)
@@ -388,6 +403,8 @@ class OperacionDiariaController extends Controller
         }
 
         try {
+
+            $this->eliminarEvidenciasMantenimiento($operacionDiaria);
 
             $operacionDiaria->actividadesRealizadas()->detach();
             $operacionDiaria->mantenimientosOperacion()->detach();

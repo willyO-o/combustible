@@ -119,7 +119,10 @@ class Vehiculo extends Model
             return [
                 'id' => $conductor->id,
                 'label' => "{$conductor->persona->nombre_completo} (CI: {$conductor->persona->ci})",
-                'meta' => [],
+                'meta' => [
+                    'ci' => $conductor->persona->ci,
+                    'nombre_completo' => $conductor->persona->nombre_completo,
+                ],
             ];
         });
     }

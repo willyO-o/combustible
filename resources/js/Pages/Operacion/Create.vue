@@ -95,6 +95,13 @@ const form = useForm({
             unidad_medida: t.unidad_medida,
             valor: guardado?.valor ?? '',
             realizado: guardado?.realizado === 'SI',
+            // evidencia: File nuevo a subir (null = no se cambia). La ruta ya
+            // guardada (para mostrar la miniatura) va aparte, en
+            // evidencia_actual — nunca se reenvía al servidor tal cual, éste
+            // la conserva solo si no llega un archivo nuevo.
+            evidencia: null,
+            evidencia_actual: guardado?.evidencia ?? null,
+            eliminar_evidencia: false,
         }
     }),
 })
@@ -220,31 +227,83 @@ function submit() {
             const out = {
                 ...data,
                 id_vehiculo: data.id_vehiculo?.id ?? data.id_vehiculo,
-                // Sólo se mandan los controles con algo cargado; el resto no
-                // aplica a esta operación y no debe registrarse.
-                mantenimientos: data.mantenimientos
-                    .map((m) => ({
-                        id_tipo_mantenimiento: m.id_tipo_mantenimiento,
-                        valor:
-                            m.tipo_valor === 'cantidad' && m.valor !== '' && m.valor !== null
-                                ? m.valor
-                                : null,
-                        realizado: m.tipo_valor === 'booleano' && m.realizado ? 'SI' : null,
-                    }))
-                    .filter((m) => m.valor !== null || m.realizado !== null),
+                // Se manda SIEMPRE una entrada por cada tipo de mantenimiento
+                // (aunque esté vacía) y en el mismo orden que form.mantenimientos:
+                // el índice de cada fila en el arreglo enviado tiene que calzar
+                // con el índice que usa el template para mostrar sus errores
+                // (`mantenimientos.${idx}.evidencia`, etc.) — filtrar acá antes
+                // de enviar reindexaba el arreglo y los errores del servidor
+                // terminaban debajo de la fila equivocada. El propio backend ya
+                // descarta las filas sin valor/realizado/evidencia (ver
+                // SincronizarMantenimientosOperacionAction), así que no hace
+                // falta filtrar de este lado. "evidencia" viaja como File sólo
+                // si se eligió una foto nueva — sin archivo nuevo, el servidor
+                // conserva sola la que ya tenía guardada para ese control.
+                mantenimientos: data.mantenimientos.map((m) => ({
+                    id_tipo_mantenimiento: m.id_tipo_mantenimiento,
+                    valor:
+                        m.tipo_valor === 'cantidad' && m.valor !== '' && m.valor !== null
+                            ? m.valor
+                            : null,
+                    realizado: m.tipo_valor === 'booleano' && m.realizado ? 'SI' : null,
+                    evidencia: m.evidencia ?? null,
+                    eliminar_evidencia: !!m.eliminar_evidencia,
+                })),
                 _method: props.operacion ? 'PUT' : 'POST', // Agregar el campo _method para PUT si es una actualización
             }
             return out
         })
-        .post(routeName)
+        .post(routeName, { forceFormData: true })
 }
 
 /* ------------------------------------------------------------------ */
 /*  Mantenimiento (operación diaria)                                   */
 /* ------------------------------------------------------------------ */
+// Vista previa de la evidencia de cada control (clave = id_tipo_mantenimiento).
+// Arranca con las ya guardadas (edición, como URL /storage/...); al elegir un
+// archivo nuevo se reemplaza por su data-URL (mismo patrón que la fotografía
+// del vehículo en Vehiculos/Create.vue). Quitar la evidencia borra la clave.
+const evidenciaPreview = ref(
+    Object.fromEntries(
+        form.mantenimientos
+            .filter((m) => m.evidencia_actual)
+            .map((m) => [m.id_tipo_mantenimiento, `/storage/${m.evidencia_actual}`]),
+    ),
+)
+// Referencias a los <input type=file> de cada fila (no necesita ser
+// reactivo): sólo se usan para limpiar el input nativo al quitar una
+// evidencia, así se puede volver a elegir el mismo archivo después.
+const evidenciaInputs = {}
+
+function onEvidenciaChange(m, e) {
+    const file = e.target.files[0]
+    if (!file) return
+    m.evidencia = file
+    m.eliminar_evidencia = false
+    const reader = new FileReader()
+    reader.onload = (ev) => { evidenciaPreview.value[m.id_tipo_mantenimiento] = ev.target.result }
+    reader.readAsDataURL(file)
+}
+
+function quitarEvidencia(m, inputEl) {
+    m.evidencia = null
+    m.eliminar_evidencia = true
+    delete evidenciaPreview.value[m.id_tipo_mantenimiento]
+    if (inputEl) inputEl.value = ''
+}
+
+// La evidencia es obligatoria para todo control que se está registrando
+// (cantidad con valor cargado, o booleano marcado "Sí"); marcar "No" no la
+// exige — no hay nada que fotografiar de algo que no se hizo (mismo
+// criterio que valida OperacionStoreRequest en el servidor).
+const evidenciaRequerida = (m) =>
+    (m.tipo_valor === 'cantidad' && m.valor !== '' && m.valor !== null && m.valor !== undefined) ||
+    (m.tipo_valor === 'booleano' && m.realizado === true)
+
 const mantenimientoRegistrado = (m) =>
     (m.tipo_valor === 'cantidad' && m.valor !== '' && m.valor !== null && m.valor !== undefined) ||
-    (m.tipo_valor === 'booleano' && !!m.realizado)
+    (m.tipo_valor === 'booleano' && !!m.realizado) ||
+    !!evidenciaPreview.value[m.id_tipo_mantenimiento]
 
 const mantenimientosRegistrados = computed(
     () => form.mantenimientos.filter(mantenimientoRegistrado).length,
@@ -696,10 +755,36 @@ onMounted(() => {
                                         </div>
 
                                         <span v-else class="mant-row__control text-muted fs-12">Sin configurar</span>
+
+                                        <div class="mant-row__evidencia">
+                                            <input
+                                                :ref="(el) => { if (el) evidenciaInputs[m.id_tipo_mantenimiento] = el }"
+                                                :id="`mant-foto-${m.id_tipo_mantenimiento}`" type="file"
+                                                accept="image/*" capture="environment" class="d-none"
+                                                @change="onEvidenciaChange(m, $event)" />
+                                            <label :for="`mant-foto-${m.id_tipo_mantenimiento}`"
+                                                class="mant-evidencia-btn"
+                                                :class="{ 'mant-evidencia-btn--requerida': evidenciaRequerida(m) && !evidenciaPreview[m.id_tipo_mantenimiento] }"
+                                                :title="evidenciaRequerida(m) ? 'Evidencia fotográfica obligatoria' : 'Adjuntar evidencia fotográfica'">
+                                                <img v-if="evidenciaPreview[m.id_tipo_mantenimiento]"
+                                                    :src="evidenciaPreview[m.id_tipo_mantenimiento]"
+                                                    class="mant-evidencia-thumb" alt="Evidencia" />
+                                                <i v-else class="ri-camera-line"></i>
+                                            </label>
+                                            <button v-if="evidenciaPreview[m.id_tipo_mantenimiento]" type="button"
+                                                class="mant-evidencia-quitar" title="Quitar evidencia"
+                                                @click="quitarEvidencia(m, evidenciaInputs[m.id_tipo_mantenimiento])">
+                                                <i class="ri-close-line"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div v-if="form.errors[`mantenimientos.${idx}.valor`]"
                                         class="text-danger fs-12 mant-row__error">
                                         {{ form.errors[`mantenimientos.${idx}.valor`] }}
+                                    </div>
+                                    <div v-if="form.errors[`mantenimientos.${idx}.evidencia`]"
+                                        class="text-danger fs-12 mant-row__error">
+                                        {{ form.errors[`mantenimientos.${idx}.evidencia`] }}
                                     </div>
                                 </div>
                             </div>

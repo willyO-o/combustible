@@ -347,6 +347,74 @@
     padding-block: 0.25rem 0.5rem;
 }
 
+/* Evidencia fotográfica de un control de mantenimiento (Operacion/Create.vue):
+   botón cuadrado que muestra una cámara vacía, o la miniatura ya elegida/
+   guardada, más un pequeño botón "x" para quitarla. Tokens del tema -> ok en
+   claro y oscuro. */
+.mant-row__evidencia {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.mant-evidencia-btn {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px dashed var(--input-border);
+    border-radius: 0.375rem;
+    color: var(--text-muted);
+    background-color: var(--bs-secondary-bg);
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.mant-evidencia-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+/* Evidencia obligatoria para este control (tiene valor/realizado=Sí) y
+   todavía no se adjuntó ninguna: borde en rojo de aviso, sin llegar a ser un
+   estado de error (eso ya lo cubre mant-row__error debajo, tras un intento
+   de guardado fallido). */
+.mant-evidencia-btn--requerida {
+    border-style: solid;
+    border-color: var(--bs-danger);
+    color: var(--bs-danger);
+}
+
+.mant-evidencia-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mant-evidencia-quitar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background-color: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.mant-evidencia-quitar:hover {
+    color: var(--bs-danger);
+    background-color: rgba(var(--bs-danger-rgb), 0.1);
+}
+
 @media (max-width: 575.98px) {
     .mant-row {
         flex-wrap: wrap;
@@ -362,6 +430,11 @@
     .mant-input {
         width: 100%;
         max-width: 11rem;
+    }
+
+    .mant-row__evidencia {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 

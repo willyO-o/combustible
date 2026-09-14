@@ -13,6 +13,7 @@ use App\Models\OperacionDiaria;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class OperacionDiariaController extends Controller
@@ -88,6 +89,20 @@ class OperacionDiariaController extends Controller
         }
     }
 
+    /**
+     * Borra del disco las fotos de evidencia de los controles de
+     * mantenimiento de la operación, antes de desasociarlos/eliminarla (si
+     * no, quedarían huérfanas en storage/app/public).
+     */
+    private function eliminarEvidenciasMantenimiento(OperacionDiaria $operacionDiaria): void
+    {
+        $operacionDiaria->mantenimientosOperacion()
+            ->get()
+            ->pluck('pivot.evidencia')
+            ->filter()
+            ->each(fn ($ruta) => Storage::disk('public')->delete($ruta));
+    }
+
     public function destroy(OperacionDiaria $operacionDiaria)
     {
         if ($operacionDiaria->estado === 'VERIFICADO') {
@@ -98,6 +113,8 @@ class OperacionDiariaController extends Controller
         }
 
         try {
+
+            $this->eliminarEvidenciasMantenimiento($operacionDiaria);
 
             $operacionDiaria->actividadesRealizadas()->detach();
             $operacionDiaria->mantenimientosOperacion()->detach();

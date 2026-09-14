@@ -145,14 +145,14 @@ class OperacionDiaria extends Model
             'id_operacion_diaria',
             'id_tipo_mantenimiento'
         )->using(MantenimientoOperacionDiaria::class)
-            ->withPivot('id', 'valor', 'realizado');
+            ->withPivot('id', 'valor', 'realizado', 'evidencia');
     }
 
     /**
      * Valores de mantenimiento ya guardados, en la forma que consume el
      * formulario (Operacion/Create.vue).
      *
-     * @return Collection<int, array{id_tipo_mantenimiento: int, valor: string|null, realizado: string|null}>
+     * @return Collection<int, array{id_tipo_mantenimiento: int, valor: string|null, realizado: string|null, evidencia: string|null}>
      */
     public function mantenimientosOperacionEdit()
     {
@@ -160,6 +160,11 @@ class OperacionDiaria extends Model
             'id_tipo_mantenimiento' => $tipo->id,
             'valor' => $tipo->pivot->valor,
             'realizado' => $tipo->pivot->realizado,
+            // Ruta ya guardada (para previsualizarla en el formulario de
+            // edición) — NO se reenvía al servidor tal cual: sin un archivo
+            // nuevo, SincronizarMantenimientosOperacionAction la conserva
+            // sola a partir de lo que ya hay en la BD.
+            'evidencia' => $tipo->pivot->evidencia,
         ]);
     }
 
