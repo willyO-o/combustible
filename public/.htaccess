@@ -23,3 +23,17 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# El Service Worker de la PWA (vite-plugin-pwa) se sirve físicamente desde
+# /build/sw.js (junto a los demás assets de Vite), pero se registra con scope
+# "/" para poder controlar todo el sitio (ver vite.config.js). Un navegador
+# sólo permite un scope más amplio que la carpeta del script si el servidor
+# responde esta cabecera al pedirlo — sin ella, el registro falla con
+# SecurityError y la PWA deja de ser instalable. Sólo aplica en Apache: si
+# producción corre Nginx hay que agregar el equivalente
+# (`add_header Service-Worker-Allowed "/";`) en la configuración del servidor.
+<IfModule mod_headers.c>
+    <Files "sw.js">
+        Header set Service-Worker-Allowed "/"
+    </Files>
+</IfModule>

@@ -7,6 +7,20 @@
 
     <title inertia>{{ config('app.name', 'SIGET') }}</title>
 
+    <!-- Open Graph / Twitter Card: controla la tarjeta que arma WhatsApp,
+    Telegram, Slack, Facebook, etc. al compartir el enlace. Sin estas
+    etiquetas cada plataforma decide por su cuenta qué mostrar (a veces cae
+    en un <title> o metadata vieja cacheada por el propio crawler). -->
+    <meta property="og:site_name" content="{{ config('app.name') }}">
+    <meta property="og:title" content="{{ config('app.name') }}">
+    <meta property="og:description" content="Gestión integral de maquinaria y operaciones: vehículos, conductores, combustible y mantenimiento.">
+    <meta property="og:image" content="{{ asset('pwa-512x512.png') }}">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ config('app.name') }}">
+    <meta name="twitter:image" content="{{ asset('pwa-512x512.png') }}">
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />

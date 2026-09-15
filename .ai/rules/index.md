@@ -23,6 +23,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/OrdenTrabajo.php,app/Models/DetalleMantenimiento.php,app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/http-controllers.md |
 | app/Http/Controllers/ConductorController.php,app/Models/Conductor.php,app/Http/Requests/ConductorRequest.php | .ai/rules/http-requests.md |
 | app/Http/**/*.php | .ai/rules/http.md |
+| vite.config.js,public/.htaccess,resources/js/app.js | .ai/rules/js-2.md |
 | app/Models/Vehiculo.php,app/Models/TipoVehiculo.php,app/Http/Requests/VehiculoRequest.php,app/Http/Requests/TipoVehiculoRequest.php,app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/**,resources/js/Pages/TiposVehiculo/**,resources/js/Components/UnidadCapacidadSelect.vue | .ai/rules/js-components.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Libraries/Reportes.php,resources/js/Pages/ControlCargas/*.vue | .ai/rules/js-pages-control-cargas.md |
 | app/Libraries/ReportesExcel.php,app/Http/Controllers/CargasCombustibleReportController.php,app/Http/Controllers/ControlCargasReportController.php,app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/** | .ai/rules/js-pages-reportes.md |

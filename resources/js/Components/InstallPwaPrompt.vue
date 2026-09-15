@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
     <Transition name="pwa-banner-fade">
         <div v-if="visible" class="pwa-install-banner" role="status" aria-live="polite">
             <span class="pwa-install-icon">
-                <i class="ri-gas-station-fill"></i>
+                <i class="ri-landscape-fill"></i>
             </span>
 
             <div class="pwa-install-texto">

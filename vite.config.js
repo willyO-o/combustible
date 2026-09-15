@@ -26,6 +26,21 @@ export default defineConfig({
         }),
         VitePWA({
             registerType: 'autoUpdate',
+            // laravel-vite-plugin fija el `base` de Vite en "/build/" (ahí viven los
+            // assets compilados). vite-plugin-pwa, si no se le indica lo contrario,
+            // reutiliza ESE MISMO base como `scope` del Service Worker al registrarlo
+            // — es decir, sin esto el SW quedaba con scope "/build/" y nunca llegaba a
+            // controlar el resto del sitio ("/", "/dashboard", etc.), rompiendo el
+            // soporte offline y el criterio de instalabilidad de Chrome (el scope
+            // efectivo del SW debe cubrir el `start_url`, "/"). Se fija explícitamente
+            // a la raíz del sitio. NO se toca `base` (sigue en "/build/", el de Vite):
+            // el archivo sw.js se sigue sirviendo físicamente desde /build/sw.js —de
+            // ahí dependen, relativas a esa carpeta, las rutas del precache— y para que
+            // el navegador acepte un scope de registro ("/") más amplio que la carpeta
+            // donde vive el script ("/build/") el servidor debe responder ese request
+            // con la cabecera `Service-Worker-Allowed: /` (ver public/.htaccess y la
+            // nota para Nginx en .ai/rules).
+            scope: '/',
             includeAssets: [
                 'favicon.ico',
                 'favicon-16x16.png',
@@ -65,6 +80,13 @@ export default defineConfig({
                 ],
             },
             workbox: {
+                // El default de generateSW ("index.html") es para SPAs con un único
+                // shell estático: no aplica acá, cada ruta la renderiza Laravel/Inertia
+                // en el servidor con props distintas por página. Con scope "/" activo
+                // (ver arriba), dejar el default haría que el SW intente servir un
+                // "/index.html" que no existe ante cualquier navegación offline no
+                // cacheada, en vez de dejar que el navegador la reporte sin conexión.
+                navigateFallback: null,
                 navigateFallbackDenylist: [/^\/api/],
                 cleanupOutdatedCaches: true,
                 // Los íconos PWA/favicons y las fotos (vehículos, conductores, logo)
