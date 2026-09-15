@@ -296,4 +296,179 @@ class OperacionDiariaControllerTest extends TestCase
         $response->assertJsonValidationErrors('mantenimientos.0.id_tipo_mantenimiento');
         $this->assertDatabaseCount('operacion_diaria', 0);
     }
+
+    /**
+     * Un conductor "puro" (sin rol de gestión) siempre opera como él mismo:
+     * cualquier `id_conductor` que envíe se ignora y se usa el suyo propio.
+     * El conductor autenticado es el PROVISIONAL (no el titular) a
+     * propósito, para probar que se resuelve al usuario autenticado y no
+     * "por casualidad" al titular del vehículo.
+     */
+    public function test_conductor_puro_ignora_el_id_conductor_enviado_y_usa_el_propio(): void
+    {
+        $titular = Conductor::factory()->create();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $titular->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        $vehiculo->areas()->attach(Area::factory()->create()->id, [
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $personaSuplente = Persona::factory()->create();
+        $suplente = Conductor::factory()->create(['id' => $personaSuplente->id]);
+        $user = User::factory()->create(['id_persona' => $personaSuplente->id]);
+        $user->assignRole('conductor');
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $suplente->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'PROVISIONAL',
+        ]);
+
+        // Envía el id_conductor del titular (otro conductor asignado al
+        // mismo vehículo) — debe guardarse igual con el suyo (suplente).
+        $response = $this->actingAs($user, 'api')->postJson(
+            route('api.v1.operacion-diaria.store'),
+            $this->payloadValido($titular, $vehiculo)
+        );
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('operacion_diaria', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $suplente->id,
+        ]);
+        $this->assertDatabaseMissing('operacion_diaria', ['id_conductor' => $titular->id]);
+    }
+
+    public function test_conductor_con_rol_de_jefe_area_puede_registrar_para_otro_conductor_asignado(): void
+    {
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+
+        $personaJefe = Persona::factory()->create();
+        $conductorJefe = Conductor::factory()->create(['id' => $personaJefe->id]);
+        $user = User::factory()->create(['id_persona' => $personaJefe->id]);
+        $user->assignRole(['conductor', 'jefe-area']);
+
+        $otroConductor = Conductor::factory()->create();
+
+        // Ambos asignados al mismo vehículo (el jefe de área, como titular;
+        // el otro conductor, como provisional que en verdad hizo la jornada).
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorJefe->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $otroConductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'PROVISIONAL',
+        ]);
+        $vehiculo->areas()->attach(Area::factory()->create()->id, [
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        // Registra la operación a nombre del OTRO conductor, no del suyo.
+        $response = $this->actingAs($user, 'api')->postJson(
+            route('api.v1.operacion-diaria.store'),
+            $this->payloadValido($otroConductor, $vehiculo)
+        );
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('operacion_diaria', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $otroConductor->id,
+        ]);
+    }
+
+    public function test_conductor_con_rol_de_administrador_puede_registrar_para_otro_conductor_asignado(): void
+    {
+        Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
+
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+
+        $personaAdmin = Persona::factory()->create();
+        $conductorAdmin = Conductor::factory()->create(['id' => $personaAdmin->id]);
+        $user = User::factory()->create(['id_persona' => $personaAdmin->id]);
+        $user->assignRole(['conductor', 'administrador']);
+
+        $otroConductor = Conductor::factory()->create();
+
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorAdmin->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $otroConductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'PROVISIONAL',
+        ]);
+        $vehiculo->areas()->attach(Area::factory()->create()->id, [
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $response = $this->actingAs($user, 'api')->postJson(
+            route('api.v1.operacion-diaria.store'),
+            $this->payloadValido($otroConductor, $vehiculo)
+        );
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('operacion_diaria', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $otroConductor->id,
+        ]);
+    }
+
+    /**
+     * ConductorNoAsignadoException antes cala en el catch (\Exception $e)
+     * genérico y devolvía 500; ahora tiene su propio catch, igual que
+     * AreaNoAsignadaException.
+     */
+    public function test_store_devuelve_422_si_el_id_conductor_no_esta_asignado_al_vehiculo(): void
+    {
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+
+        $personaJefe = Persona::factory()->create();
+        $conductorJefe = Conductor::factory()->create(['id' => $personaJefe->id]);
+        $user = User::factory()->create(['id_persona' => $personaJefe->id]);
+        $user->assignRole(['conductor', 'jefe-area']);
+
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductorJefe->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        $vehiculo->areas()->attach(Area::factory()->create()->id, [
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        // Conductor que existe pero NO está asignado a este vehículo.
+        $conductorAjeno = Conductor::factory()->create();
+
+        $response = $this->actingAs($user, 'api')->postJson(
+            route('api.v1.operacion-diaria.store'),
+            $this->payloadValido($conductorAjeno, $vehiculo)
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'El conductor seleccionado no está asignado actualmente a este vehículo.');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
 }

@@ -2,6 +2,54 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.8.0 — 2026-09-14
+
+Alcance por rol en `GET /vales` y `GET /vales/pendientes`: jefe de área ve las de su área,
+administrador/super-admin ven todas. Cambio exclusivo de la API, la web no se modificó.
+
+### Corregido
+
+#### `GET /vales`, `GET /vales/pendientes`
+
+- Un jefe de área (puro, o combinado con `conductor`, pero sin `administrador`/`super-admin`)
+  ahora ve los vales de los vehículos asignados a sus áreas a cargo, en vez de todos los vales
+  del sistema — mismo criterio que `ValeController::restringirVehiculosPorAreaDeJefe` (web) para
+  emitir vales.
+- Un conductor que ADEMÁS es `jefe-area`, `administrador` o `super-admin` deja de verse limitado
+  a sus propios vales (antes, tener el rol `conductor` bastaba para restringir el listado a
+  `id_conductor` propio sin importar los demás roles) — mismo criterio de "conductor puro" usado
+  en `POST`/`PUT /operacion-diaria` (ver 1.7.0).
+- `administrador`/`super-admin` siguen viendo todos los vales del sistema, sin cambios.
+
+## 1.7.0 — 2026-09-14
+
+Corrección de `id_conductor` en `POST`/`PUT /operacion-diaria` para usuarios con más de un rol,
+y de un `500` que debía ser `422`.
+
+### Corregido
+
+#### `POST /operacion-diaria`, `PUT /operacion-diaria/{id}`
+
+- Un conductor **puro** (sin ningún otro rol) sigue operando siempre como él mismo — sin
+  cambios de comportamiento para ese caso, sólo quedó documentado.
+- Un usuario con rol `conductor` que ADEMÁS es `jefe-area`, `administrador` o `super-admin`
+  (p.ej. un jefe de área que también conduce un vehículo) ahora puede registrar/editar una
+  operación a nombre de **otro** conductor asignado al vehículo, enviando `id_conductor`
+  explícitamente. Antes, tener el rol `conductor` bastaba para que el servidor ignorara
+  cualquier `id_conductor` enviado y forzara siempre el propio, sin importar los demás roles.
+- `id_conductor` que no está entre los conductores actualmente asignados al vehículo
+  respondía `500` (`ConductorNoAsignadoException` sin capturar); ahora responde `422` con un
+  mensaje claro, igual que `AreaNoAsignadaException`.
+
+### Agregado
+
+#### `OperacionDiariaStoreRequest`, `OperacionDiariaUpdateRequest`
+
+- `id_conductor` documentado como propiedad real (antes decía "se calcula en el servidor y no
+  debe enviarse", que ya no era del todo cierto): obligatorio en el registro para
+  jefe-area/administrador/super-admin, opcional en la actualización, siempre ignorado (se usa
+  el propio) para un conductor puro.
+
 ## 1.6.0 — 2026-09-14
 
 Evidencia fotográfica opcional en los controles de mantenimiento de operación diaria.

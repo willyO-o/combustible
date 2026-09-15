@@ -6,6 +6,7 @@ use App\Actions\OperacionDiaria\CreateOperacionDiariaAction;
 use App\Actions\OperacionDiaria\ListOperacionesDiariasAction;
 use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
 use App\Exceptions\AreaNoAsignadaException;
+use App\Exceptions\ConductorNoAsignadoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OperacionStoreRequest;
 use App\Libraries\Reportes;
@@ -29,13 +30,40 @@ class OperacionDiariaController extends Controller
     }
 
     /**
+     * Un conductor "puro" (sin ningún rol de gestión) siempre opera como él
+     * mismo: se ignora cualquier `id_conductor` que envíe la petición y se
+     * usa el suyo propio (un vehículo puede tener varios conductores
+     * asignados a la vez — titular + provisionales — así que dejar pasar lo
+     * que mande el cliente permitiría atribuir la operación a otro
+     * conductor asignado al mismo vehículo). Un conductor que ADEMÁS es
+     * jefe de área, administrador o super-admin puede gestionar operaciones
+     * de otros conductores (p.ej. corrigiendo una jornada de su equipo), así
+     * que en ese caso se respeta el `id_conductor` que llegó validado —
+     * mismo criterio de "conductor puro" ya usado en
+     * Api\V1\CargaMaterialController.
+     */
+    private function datosConConductorResuelto(OperacionStoreRequest $request): array
+    {
+        $datos = $request->validated();
+        $user = $request->user();
+
+        $esConductorPuro = $user->hasRole('conductor') && ! $user->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
+
+        if ($esConductorPuro && $user->persona?->conductor) {
+            $datos['id_conductor'] = $user->persona->conductor->id;
+        }
+
+        return $datos;
+    }
+
+    /**
      * Almacena una nueva operación diaria.
      */
     public function store(OperacionStoreRequest $request, CreateOperacionDiariaAction $action): JsonResponse
     {
         try {
 
-            $operacionDiaria = $action->execute($request->validated());
+            $operacionDiaria = $action->execute($this->datosConConductorResuelto($request));
             $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas', 'mantenimientosOperacion'])
                 ->cargarMaterialDeActividades();
 
@@ -46,6 +74,10 @@ class OperacionDiariaController extends Controller
         } catch (AreaNoAsignadaException $e) {
             return response()->json([
                 'message' => 'Error: El conductor no tiene un área asignada.',
+            ], 422);
+        } catch (ConductorNoAsignadoException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
             ], 422);
         } catch (\Exception $e) {
 
@@ -72,7 +104,7 @@ class OperacionDiariaController extends Controller
     public function update(OperacionStoreRequest $request, OperacionDiaria $operacionDiaria, UpdateOperacionDiariaAction $action)
     {
         try {
-            $operacionDiaria = $action->execute($operacionDiaria, $request->validated());
+            $operacionDiaria = $action->execute($operacionDiaria, $this->datosConConductorResuelto($request));
             $operacionDiaria->load(['conductor.persona', 'vehiculo', 'area', 'actividadesRealizadas', 'mantenimientosOperacion'])
                 ->cargarMaterialDeActividades();
 
@@ -81,6 +113,10 @@ class OperacionDiariaController extends Controller
                 'data' => $operacionDiaria,
             ]);
 
+        } catch (ConductorNoAsignadoException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al actualizar la operación diaria.',

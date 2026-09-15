@@ -17,12 +17,16 @@ class ValeController extends Controller
 {
     /**
      * Display a listing of the resource.
+     *
+     * Alcance por rol (sólo API, ver ListValeAction::aplicarRestriccionesPorRol):
+     * un jefe de área ve sólo los vales de vehículos de sus áreas a cargo,
+     * administrador/super-admin ven todos los vales del sistema.
      */
     public function index(Request $request, ListValeAction $listValeAction): JsonResponse
     {
         $filters = $request->only(['nro_vale', 'fecha_desde', 'fecha_hasta', 'estado_vale', 'id_conductor']);
 
-        $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10), true);
+        $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10), true, true);
 
         return response()->json($vales);
     }
@@ -80,7 +84,7 @@ class ValeController extends Controller
 
     public function valesPendientes(Request $request, ListValeAction $listValeAction)
     {
-        $vales = $listValeAction->execute([], $request->user(), $request->input('per_page', 10), true);
+        $vales = $listValeAction->execute([], $request->user(), $request->input('per_page', 10), true, true);
 
         // modificar los campos pendientes para que solo se muestren los que tienen estado pendiente y fecha de vencimiento mayor o igual a la fecha actual
         $valesPendientes = $vales->map(function ($vale) {

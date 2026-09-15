@@ -35,6 +35,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/CargaMaterialController.php,app/Models/CargaMaterial.php,app/Models/Viaje.php | .ai/rules/models-models.md |
 | app/Models/**, app/Models/*.php, app/Models/CargaCombustible.php | .ai/rules/models.md |
 | app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaReporte.vue,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php | .ai/rules/operacion-diaria-reporte.md |
+| app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Http/Requests/OperacionStoreRequest.php,app/Actions/OperacionDiaria/*.php | .ai/rules/operacion-diaria.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/operacion.md |
 | app/Http/Controllers/OrdenTrabajoController.php,app/Http/Requests/OrdenTrabajoRequest.php,app/Models/SolicitudMantenimiento.php,resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/orden-trabajo.md |
 | app/Http/Controllers/CargaMaterialController.php,resources/js/Pages/ControlCargas/Index.vue | .ai/rules/pages-control-cargas.md |
@@ -57,4 +58,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/TipoMantenimientoController.php,app/Http/Requests/TipoMantenimientoRequest.php,resources/js/Pages/TiposMantenimiento/**,app/Http/Controllers/OrdenTrabajoController.php,app/Http/Controllers/TipoVehiculoController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Http/Requests/DetalleMantenimientoRequest.php,app/Http/Requests/TipoVehiculoRequest.php | .ai/rules/tipos-mantenimiento.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml, app/Http/Controllers/Api/V1/VehiculoController.php,routes/api.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
 | app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php, app/Http/Controllers/Api/V1/*.php,routes/api.php, app/Http/Controllers/Api/V1/*.php | .ai/rules/v1.md |
+| app/Http/Controllers/Api/V1/ValeController.php,app/Actions/Vale/ListValeAction.php | .ai/rules/vale.md |
 | app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/Show.vue,routes/web.php | .ai/rules/vehiculos.md |

@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.6.0"
+  version: "1.8.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -405,7 +405,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.6.0"
+                api_version: "1.8.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -494,8 +494,8 @@ paths:
                       id_conductor: 45
                       conductor_asignado: { id: 45, nombre_completo: Juan Pérez Quispe, ci: "1234567" }
                       conductores_asignados:
-                        - { id: 45, label: "Juan Pérez Quispe (CI: 1234567)", meta: [] }
-                        - { id: 52, label: "María Rodríguez Alba (CI: 7654321)", meta: [] }
+                        - { id: 45, label: "Juan Pérez Quispe (CI: 1234567)", meta: { ci: "1234567", nombre_completo: "Juan Pérez Quispe" } }
+                        - { id: 52, label: "María Rodríguez Alba (CI: 7654321)", meta: { ci: "7654321", nombre_completo: "María Rodríguez Alba" } }
                   estaciones_servicio:
                     - id: 1
                       razon_social: Grifo Central YPFB S.R.L.
@@ -598,6 +598,16 @@ paths:
                     estados_carga: [ABIERTA, CERRADA, PAGADA]
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Algún valor de `incluir` no está entre las secciones permitidas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              example:
+                message: The given data was invalid.
+                errors:
+                  incluir.1: ["El valor seleccionado para incluir.1 no es válido."]
 
   # ──────────────────────────────────────────────────────────────────────
   # OPERACIÓN DIARIA
@@ -856,7 +866,7 @@ paths:
                       unidad_medida: null
                       pivot: { id: 89, valor: null, realizado: SI }
         '422':
-          description: Error de validación, o el vehículo no tiene un área asignada.
+          description: Error de validación, el vehículo no tiene un área asignada, o `id_conductor` no está asignado al vehículo.
           content:
             application/json:
               examples:
@@ -872,6 +882,10 @@ paths:
                   summary: Vehículo sin área asignada
                   value:
                     message: "Error: El conductor no tiene un área asignada."
+                conductor_no_asignado:
+                  summary: "`id_conductor` enviado (obligatorio para jefe-area/administrador/super-admin) no es uno de los conductores actualmente asignados al vehículo"
+                  value:
+                    message: "El conductor seleccionado no está asignado actualmente a este vehículo."
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -949,6 +963,9 @@ paths:
         - **`id_vehiculo` no se puede cambiar**: cualquier valor enviado se ignora y la
           operación conserva su vehículo original (sus lecturas y actividades dependen del
           `tipo_medicion` de ese vehículo).
+        - `id_conductor` es opcional aquí (a diferencia del registro): omitido, conserva el
+          conductor que ya tenía la operación. Si se envía, mismo criterio de rol que en
+          `POST /operacion-diaria` — ver `OperacionDiariaUpdateRequest.id_conductor`.
         - `actividades_realizadas` **reemplaza por completo** el conjunto de actividades
           previamente registradas para esta operación (se resincroniza, no se agrega de forma
           incremental) — y al ser obligatorio, debe reenviarse siempre completo, incluidas las
@@ -1059,16 +1076,23 @@ paths:
                       unidad_medida: null
                       pivot: { id: 90, valor: null, realizado: SI }
         '422':
-          description: Error de validación.
+          description: Error de validación, o `id_conductor` no está asignado al vehículo.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-              example:
-                success: false
-                message: Los datos enviados no son válidos.
-                errors:
-                  kilometraje_fin: ["El kilometraje fin debe ser mayor que kilometraje inicio."]
+              examples:
+                validacion:
+                  summary: Error de validación de campos
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      kilometraje_fin: ["El kilometraje fin debe ser mayor que kilometraje inicio."]
+                conductor_no_asignado:
+                  summary: "`id_conductor` enviado no es uno de los conductores actualmente asignados al vehículo"
+                  value:
+                    message: "El conductor seleccionado no está asignado actualmente a este vehículo."
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1289,8 +1313,13 @@ paths:
         recibidos, las condiciones `estado_vale = PENDIENTE` **y** `fecha_vencimiento >= ahora`.
 
         Las restricciones de visibilidad dependen del rol del usuario autenticado:
-        - **conductor**: solo ve sus propios vales (`id_conductor` = persona del usuario).
-        - Otros roles: sin restricción adicional.
+        - **conductor** (sin ningún otro rol): solo ve sus propios vales (`id_conductor` =
+          persona del usuario).
+        - **jefe-area** (puro, o combinado con `conductor`, pero sin `administrador`/
+          `super-admin`): ve todos los vales de vehículos asignados a alguna de sus áreas a
+          cargo, sin importar quién los emitió o a nombre de qué conductor.
+        - **administrador** / **super-admin** (incluso combinado con otros roles): sin
+          restricción, ve todos los vales del sistema.
       parameters:
         - name: nro_vale
           in: query
@@ -1322,7 +1351,10 @@ paths:
           example: PENDIENTE
         - name: id_conductor
           in: query
-          description: Filtra por conductor. Ignorado para usuarios con rol `conductor`, que siempre quedan restringidos a su propio `id_conductor`.
+          description: |
+            Filtra por conductor. Ignorado para un conductor puro (sin `jefe-area`,
+            `administrador` ni `super-admin`), que siempre queda restringido a su propio
+            `id_conductor` sin importar este parámetro.
           schema: { type: integer }
           example: 1
         - name: per_page
@@ -1612,8 +1644,8 @@ paths:
         A diferencia de `GET /vales`, **no acepta ningún filtro de query** (`nro_vale`,
         `fecha_desde`, `fecha_hasta`, `estado_vale`, `id_conductor` son ignorados: siempre
         devuelve el listado completo de vales pendientes vigentes). Las restricciones de
-        visibilidad por rol son las mismas que en `GET /vales`:
-        - **conductor**: solo ve sus propios vales (`id_conductor` = persona del usuario).
+        visibilidad por rol son las mismas que en `GET /vales` (conductor puro: solo los propios;
+        jefe-area: los de sus áreas a cargo; administrador/super-admin: todos).
 
         **Nota:** el campo `grifo` de cada vale devuelto **no** refleja el grifo real del vale
         (`id_grifo`) — actualmente siempre se devuelve el mismo grifo fijo (`id: 3,
@@ -3505,7 +3537,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.6.0" }
+        api_version: { type: string, example: "1.8.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -3563,10 +3595,11 @@ components:
                 description: Etiqueta lista para mostrar en un selector.
                 example: "Juan Pérez Quispe (CI: 1234567)"
               meta:
-                type: array
-                description: Reservado para datos adicionales; actualmente siempre vacío.
-                items: {}
-                example: []
+                type: object
+                description: Datos adicionales del conductor, para mostrar en el selector sin otra consulta.
+                properties:
+                  ci: { type: string, nullable: true, example: "1234567" }
+                  nombre_completo: { type: string, example: Juan Pérez Quispe }
 
     Grifo:
       type: object
@@ -3846,15 +3879,31 @@ components:
     OperacionDiariaStoreRequest:
       type: object
       description: |
-        Cuerpo esperado por `POST /operacion-diaria`. `id_conductor`, `id_area`, `nro_operacion`
-        y `horas_trabajadas` (calculada a partir de `fecha_inicio`/`fecha_fin`) se calculan en
-        el servidor y no deben enviarse.
+        Cuerpo esperado por `POST /operacion-diaria`. `id_area`, `nro_operacion` y
+        `horas_trabajadas` (calculada a partir de `fecha_inicio`/`fecha_fin`) se calculan en el
+        servidor y no deben enviarse. `id_conductor` depende del rol del usuario autenticado —
+        ver su descripción abajo.
       required: [id_vehiculo, turno, fecha_inicio, fecha_fin, notificar_observaciones, actividades_realizadas]
       properties:
         id_vehiculo:
           type: integer
           description: Debe existir en la tabla `vehiculo`.
           example: 8
+        id_conductor:
+          type: integer
+          nullable: true
+          description: |
+            Un conductor **puro** (sin ningún otro rol) siempre opera como él mismo: cualquier
+            valor que envíe se ignora y el servidor usa su propio `id_conductor` — se puede
+            omitir por completo. Para cualquier usuario con rol `jefe-area`, `administrador` o
+            `super-admin` (aunque también tenga el rol `conductor` — p.ej. un jefe de área que
+            además es conductor de otro vehículo) es **obligatorio** y debe ser uno de los
+            conductores actualmente asignados al vehículo (`vehiculos[].id_conductor` /
+            `conductores_asignados` de `GET /parametros/colecciones` sólo trae el titular; para
+            ver todos los asignados —titular + provisionales— no hay otro endpoint todavía,
+            se conoce por contexto de la operación de campo). Un valor que no esté asignado al
+            vehículo responde `422`.
+          example: 45
         turno:
           type: string
           enum: [DIA, NOCHE]
@@ -3934,6 +3983,18 @@ components:
           type: integer
           description: Se ignora en la actualización — la operación conserva su vehículo original. Sólo se documenta porque el cliente puede reenviarlo sin efecto.
           example: 8
+        id_conductor:
+          type: integer
+          nullable: true
+          description: |
+            Opcional en la actualización (a diferencia del registro, nunca es obligatorio): si
+            se omite, la operación conserva el conductor que ya tenía. Mismo criterio de rol
+            que en `POST /operacion-diaria` (ver `OperacionDiariaStoreRequest.id_conductor`) si
+            se envía: un conductor puro no puede cambiarlo (se ignora lo que envíe, sigue
+            siendo él mismo); para jefe-area/administrador/super-admin (aunque también tengan
+            el rol `conductor`) el valor enviado se respeta y debe ser uno de los conductores
+            actualmente asignados al vehículo (`422` si no lo es).
+          example: 45
         turno:
           type: string
           enum: [DIA, NOCHE]

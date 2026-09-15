@@ -78,6 +78,17 @@ class ValeControllerTest extends TestCase
         ]);
     }
 
+    private function crearVale(Vehiculo $vehiculo, ?Conductor $conductor = null, ?Grifo $grifo = null): Vale
+    {
+        return Vale::create([
+            'litros' => 10, 'precio' => 6, 'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => ($conductor ?? Conductor::factory()->create())->id,
+            'id_grifo' => ($grifo ?? $this->crearGrifo())->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'estado_vale' => 'PENDIENTE',
+        ]);
+    }
+
     public function test_un_jefe_de_area_emite_un_vale_para_un_vehiculo_de_su_area(): void
     {
         $area = Area::factory()->create();
@@ -220,5 +231,90 @@ class ValeControllerTest extends TestCase
         $response = $this->actingAs($user, 'api')->getJson(route('api.v1.vales.show', $vale));
 
         $response->assertStatus(403);
+    }
+
+    public function test_un_jefe_de_area_solo_ve_en_el_listado_los_vales_de_vehiculos_de_su_area(): void
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+
+        $grifo = $this->crearGrifo();
+
+        $vehiculoDelArea = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoDelArea, $area);
+        $valeDelArea = $this->crearVale($vehiculoDelArea, grifo: $grifo);
+
+        $vehiculoAjeno = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoAjeno, Area::factory()->create());
+        $this->crearVale($vehiculoAjeno, grifo: $grifo);
+
+        $response = $this->actingAs($jefe, 'api')->getJson(route('api.v1.vales.index'));
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $valeDelArea->id);
+    }
+
+    public function test_un_conductor_con_rol_de_jefe_area_ve_en_el_listado_los_vales_de_su_area_no_solo_los_propios(): void
+    {
+        $area = Area::factory()->create();
+        $persona = Persona::factory()->create();
+        EncargadoArea::create([
+            'id_persona' => $persona->id, 'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR', 'fecha_inicio' => now(), 'estado_encargo' => 'ACTIVO',
+        ]);
+        $conductorJefe = Conductor::factory()->create(['id' => $persona->id]);
+        $user = User::factory()->create(['id_persona' => $persona->id]);
+        $user->assignRole(['conductor', 'jefe-area']);
+
+        $grifo = $this->crearGrifo();
+
+        $vehiculoDelArea = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoDelArea, $area);
+        // El vale es de OTRO conductor asignado al mismo vehículo, no del propio.
+        $valeDeOtroConductor = $this->crearVale($vehiculoDelArea, Conductor::factory()->create(), $grifo);
+
+        $vehiculoAjeno = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoAjeno, Area::factory()->create());
+        $this->crearVale($vehiculoAjeno, grifo: $grifo);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.vales.index'));
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $valeDeOtroConductor->id);
+    }
+
+    public function test_un_conductor_puro_solo_ve_sus_propios_vales_en_el_listado(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+
+        $grifo = $this->crearGrifo();
+        $vehiculo = Vehiculo::factory()->create();
+        $valePropio = $this->crearVale($vehiculo, $conductor, $grifo);
+        $this->crearVale($vehiculo, Conductor::factory()->create(), $grifo);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.vales.index'));
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $valePropio->id);
+    }
+
+    public function test_un_administrador_ve_todos_los_vales_del_sistema_en_el_listado(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+
+        $grifo = $this->crearGrifo();
+        $this->crearVale(Vehiculo::factory()->create(), grifo: $grifo);
+        $this->crearVale(Vehiculo::factory()->create(), grifo: $grifo);
+
+        $response = $this->actingAs($admin, 'api')->getJson(route('api.v1.vales.index'));
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'data');
     }
 }
