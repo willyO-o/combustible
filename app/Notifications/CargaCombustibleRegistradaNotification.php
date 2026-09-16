@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Channels\FcmChannel;
 use App\Models\CargaCombustible;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -24,7 +25,7 @@ class CargaCombustibleRegistradaNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', FcmChannel::class];
     }
 
     /**
@@ -52,6 +53,23 @@ class CargaCombustibleRegistradaNotification extends Notification
             'id_vale' => $this->carga->id_vale,
             'litros' => $this->carga->litros,
             'url' => route('cargas.index'),
+        ];
+    }
+
+    /**
+     * Get the FCM representation of the notification (ver App\Channels\FcmChannel).
+     *
+     * @return array{title: string, body: string, data: array<string, mixed>}
+     */
+    public function toFcm(object $notifiable): array
+    {
+        $data = $this->toArray($notifiable);
+        $formato = NotificacionFormatter::formatear($data);
+
+        return [
+            'title' => $formato['titulo'],
+            'body' => $formato['descripcion'],
+            'data' => $data,
         ];
     }
 }

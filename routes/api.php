@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CargaCombustibleController;
 use App\Http\Controllers\Api\V1\CargaMaterialController;
+use App\Http\Controllers\Api\V1\DispositivoController;
 use App\Http\Controllers\Api\V1\MaterialController;
 use App\Http\Controllers\Api\V1\NotificacionController;
 use App\Http\Controllers\Api\V1\OperacionDiariaController;
@@ -54,6 +55,11 @@ Route::middleware('auth:api')->group(function () {
 
     Route::get('notificaciones', [NotificacionController::class, 'index'])->name('api.v1.notificaciones.index');
     Route::post('notificaciones/{notificacion}/marcar-leida', [NotificacionController::class, 'marcarLeida'])->name('api.v1.notificaciones.marcar-leida');
+
+    // Registro de tokens FCM para push (app Flutter): se registra al iniciar
+    // sesión (o cuando Firebase rota el token) y se elimina al cerrar sesión.
+    Route::post('dispositivos', [DispositivoController::class, 'store'])->name('api.v1.dispositivos.store');
+    Route::delete('dispositivos', [DispositivoController::class, 'destroy'])->name('api.v1.dispositivos.destroy');
 
     Route::get('vales/pendientes', [ValeController::class, 'valesPendientes'])->name('api.v1.vales.pendientes');
     Route::get('vales/{vale}/pdf', [ValeController::class, 'pdf'])->name('api.v1.vales.pdf');

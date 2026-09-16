@@ -2,6 +2,21 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.10.0 — 2026-09-16
+
+Notificaciones push (Firebase Cloud Messaging) para la app Flutter: nuevo tag y 2 endpoints para
+registrar/eliminar el token del dispositivo. No cambia el formato de `GET /notificaciones` — el
+push es un canal adicional (mismo contenido) además del que ya se veía ahí.
+
+### Agregado
+
+#### Tag "Dispositivos"
+
+- `POST /dispositivos`: registra (o reasigna, si el token ya pertenecía a otro usuario) el token
+  FCM del dispositivo actual. Llamar tras el login y en cada `onTokenRefresh` del SDK de Flutter.
+- `DELETE /dispositivos`: elimina el token del dispositivo actual (llamar al cerrar sesión).
+- Schemas `DispositivoStoreRequest`, `Dispositivo`, `DispositivoResponse`.
+
 ## 1.9.0 — 2026-09-16
 
 Nuevos tipos de notificación de base de datos (`GET /notificaciones`, mismas que ve el dropdown

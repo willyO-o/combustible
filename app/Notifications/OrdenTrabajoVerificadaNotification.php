@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Channels\FcmChannel;
 use App\Models\OrdenTrabajo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -24,7 +25,7 @@ class OrdenTrabajoVerificadaNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', FcmChannel::class];
     }
 
     /**
@@ -51,6 +52,23 @@ class OrdenTrabajoVerificadaNotification extends Notification
             'nro_orden' => $this->orden->nro,
             'id_vehiculo' => $this->orden->id_vehiculo,
             'url' => route('mantenimiento.ordenes.show', $this->orden->id),
+        ];
+    }
+
+    /**
+     * Get the FCM representation of the notification (ver App\Channels\FcmChannel).
+     *
+     * @return array{title: string, body: string, data: array<string, mixed>}
+     */
+    public function toFcm(object $notifiable): array
+    {
+        $data = $this->toArray($notifiable);
+        $formato = NotificacionFormatter::formatear($data);
+
+        return [
+            'title' => $formato['titulo'],
+            'body' => $formato['descripcion'],
+            'data' => $data,
         ];
     }
 }

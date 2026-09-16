@@ -2,11 +2,11 @@
 
 namespace App\Notifications;
 
+use App\Channels\FcmChannel;
+use App\Models\OperacionDiaria;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Models\OperacionDiaria;
 
 class ObservacionOperacionNotification extends Notification
 {
@@ -17,8 +17,7 @@ class ObservacionOperacionNotification extends Notification
      */
     public function __construct(
         public OperacionDiaria $operacion,
-    )
-    {
+    ) {
         //
     }
 
@@ -29,7 +28,7 @@ class ObservacionOperacionNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', FcmChannel::class];
     }
 
     /**
@@ -57,6 +56,23 @@ class ObservacionOperacionNotification extends Notification
             'observaciones' => $this->operacion->observaciones,
             'url' => route('operacion-diaria.show', $this->operacion->id),
             //
+        ];
+    }
+
+    /**
+     * Get the FCM representation of the notification (ver App\Channels\FcmChannel).
+     *
+     * @return array{title: string, body: string, data: array<string, mixed>}
+     */
+    public function toFcm(object $notifiable): array
+    {
+        $data = $this->toArray($notifiable);
+        $formato = NotificacionFormatter::formatear($data);
+
+        return [
+            'title' => $formato['titulo'],
+            'body' => $formato['descripcion'],
+            'data' => $data,
         ];
     }
 }

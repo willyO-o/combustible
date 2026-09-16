@@ -55,4 +55,13 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasOne(Persona::class, 'id', 'id_persona');
     }
+
+    /**
+     * Tokens FCM de los dispositivos (app Flutter) donde el usuario inició
+     * sesión, para el envío de notificaciones push (App\Channels\FcmChannel).
+     */
+    public function dispositivos()
+    {
+        return $this->hasMany(Dispositivo::class, 'id_usuario');
+    }
 }

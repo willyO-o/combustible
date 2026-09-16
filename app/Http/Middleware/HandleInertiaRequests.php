@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Notifications\NotificacionFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 use Inertia\Middleware;
@@ -59,69 +60,19 @@ class HandleInertiaRequests extends Middleware
     /**
      * Da forma a una notificación de base de datos para el dropdown del header.
      *
-     * Cada nuevo tipo de notificación (identificado por data['tipo']) debe
-     * añadir su propio caso aquí con título, descripción e ícono.
+     * El título/descripción/ícono según el tipo (data['tipo']) vive en
+     * NotificacionFormatter, compartido con Api\V1\NotificacionController y
+     * App\Channels\FcmChannel — no dupliques el match aquí.
      *
      * @return array<string, mixed>
      */
     private function formatearNotificacion(DatabaseNotification $notificacion): array
     {
         $data = $notificacion->data;
-        $tipo = $data['tipo'] ?? 'general';
-
-        [$titulo, $descripcion, $icono] = match ($tipo) {
-            'observacion_operacion' => [
-                'Observación en operación diaria',
-                $data['observaciones'] ?? '',
-                'ri-error-warning-line',
-            ],
-            'orden_trabajo_asignada' => [
-                'Orden de trabajo asignada',
-                'Se te asignó la orden N° '.($data['nro_orden'] ?? '').' para su ejecución.',
-                'ri-tools-line',
-            ],
-            'orden_trabajo_culminada' => [
-                'Orden de trabajo culminada',
-                'El técnico culminó la orden N° '.($data['nro_orden'] ?? '').'.',
-                'ri-checkbox-circle-line',
-            ],
-            'orden_trabajo_verificada' => [
-                'Orden de trabajo verificada',
-                'Tu orden N° '.($data['nro_orden'] ?? '').' fue verificada y cerrada.',
-                'ri-shield-check-line',
-            ],
-            'vale_emitido' => [
-                'Vale de combustible emitido',
-                'Se emitió el vale N° '.($data['nro'] ?? '').' por '.($data['litros'] ?? '').' Lt.',
-                'ri-file-list-3-line',
-            ],
-            'vale_por_vencer' => [
-                'Vale por vencer',
-                'El vale N° '.($data['nro'] ?? '').' vence pronto, aún no se usó.',
-                'ri-alarm-warning-line',
-            ],
-            'carga_combustible_registrada' => [
-                'Carga de combustible registrada',
-                'Se registró la carga N° '.($data['nro'] ?? '').' ('.($data['litros'] ?? '').' Lt) del vale que emitiste.',
-                'ri-gas-station-line',
-            ],
-            'carga_material_registrada' => [
-                'Nuevo flete registrado',
-                'Se abrió el flete N° '.($data['nro'] ?? '').'.',
-                'ri-truck-line',
-            ],
-            default => [
-                'Notificación',
-                $data['mensaje'] ?? '',
-                'ri-notification-line',
-            ],
-        };
 
         return [
             'id' => $notificacion->id,
-            'titulo' => $titulo,
-            'descripcion' => $descripcion,
-            'icono' => $icono,
+            ...NotificacionFormatter::formatear($data),
             'url' => $data['url'] ?? null,
             'leida' => $notificacion->read_at !== null,
             'fecha' => $notificacion->created_at->diffForHumans(),

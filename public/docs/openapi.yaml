@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.9.0"
+  version: "1.10.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -110,7 +110,15 @@ tags:
   - name: Notificaciones
     description: |
       Notificaciones de base de datos (`illuminate/notifications`) del usuario autenticado
-      (observaciones de operaciones diarias, y las que se vayan añadiendo a futuro).
+      (observaciones de operaciones diarias, y las que se vayan añadiendo a futuro). Cada una de
+      estas notificaciones **también** se envía como push (Firebase Cloud Messaging) a los
+      dispositivos registrados del usuario — ver el tag "Dispositivos" para registrar el token.
+  - name: Dispositivos
+    description: |
+      Registro de tokens **FCM** (Firebase Cloud Messaging) de la app Flutter, para recibir como
+      push las mismas notificaciones que aparecen en `GET /notificaciones`. Sin esto registrado,
+      el usuario sigue viendo sus notificaciones en la app (al consultar el endpoint), pero no
+      recibe el aviso push mientras la app está en background o cerrada.
 
 security:
   - bearerAuth: []
@@ -405,7 +413,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.9.0"
+                api_version: "1.10.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -3404,6 +3412,87 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /dispositivos:
+    post:
+      tags: [Dispositivos]
+      summary: Registrar (o actualizar) el token FCM del dispositivo actual
+      description: |
+        Registra el token FCM del dispositivo desde el que se llama, para que el usuario
+        autenticado reciba como push las mismas notificaciones que ve en `GET /notificaciones`.
+
+        Llamar a este endpoint:
+        - Justo después de iniciar sesión (`POST /auth/login`), con el token FCM inicial.
+        - Cada vez que Firebase rota el token (evento `onTokenRefresh` del SDK de Flutter).
+
+        El `token` es único globalmente (no por usuario): si el mismo dispositivo ya tenía un
+        token registrado a nombre de **otro** usuario (por ejemplo, cerró sesión y otra persona
+        inició sesión en el mismo teléfono), este endpoint reasigna el registro al usuario actual
+        en vez de duplicarlo — así se deja de enviarle push al usuario anterior en ese dispositivo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispositivoStoreRequest'
+            example:
+              token: "d3f9...token-fcm-del-dispositivo...a1b2"
+              plataforma: android
+      responses:
+        '201':
+          description: Dispositivo registrado (o reasignado) exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispositivoResponse'
+              example:
+                message: Dispositivo registrado exitosamente.
+                data:
+                  id: 5
+                  id_usuario: 12
+                  token: "d3f9...token-fcm-del-dispositivo...a1b2"
+                  plataforma: android
+                  ultima_actividad: "2026-09-16T14:30:00+00:00"
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [Dispositivos]
+      summary: Eliminar el token FCM del dispositivo actual
+      description: |
+        Elimina el token indicado, para dejar de enviarle push. Llamar al cerrar sesión
+        (`POST /auth/logout`), antes o después de invalidar el token JWT. Sólo elimina tokens del
+        propio usuario autenticado: un token de otro usuario no se ve afectado (no es un error,
+        simplemente no borra nada).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, example: "d3f9...token-fcm-del-dispositivo...a1b2" }
+      responses:
+        '200':
+          description: Dispositivo eliminado (o no encontrado, tratado igual).
+          content:
+            application/json:
+              example:
+                message: Dispositivo eliminado exitosamente.
+        '422':
+          description: Error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3551,7 +3640,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.9.0" }
+        api_version: { type: string, example: "1.10.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -5380,6 +5469,35 @@ components:
       properties:
         message: { type: string, example: Notificación marcada como leída. }
         data: { $ref: '#/components/schemas/Notificacion' }
+
+    # ── Dispositivos (push FCM) ─────────────────────────────────────────
+    DispositivoStoreRequest:
+      type: object
+      required: [token, plataforma]
+      properties:
+        token:
+          type: string
+          description: Token FCM entregado por el SDK de Firebase Messaging en el dispositivo.
+          example: "d3f9...token-fcm-del-dispositivo...a1b2"
+        plataforma:
+          type: string
+          enum: [android, ios, web]
+          example: android
+
+    Dispositivo:
+      type: object
+      properties:
+        id: { type: integer, example: 5 }
+        id_usuario: { type: integer, example: 12 }
+        token: { type: string, example: "d3f9...token-fcm-del-dispositivo...a1b2" }
+        plataforma: { type: string, enum: [android, ios, web], example: android }
+        ultima_actividad: { type: string, format: date-time, example: "2026-09-16T14:30:00+00:00" }
+
+    DispositivoResponse:
+      type: object
+      properties:
+        message: { type: string, example: Dispositivo registrado exitosamente. }
+        data: { $ref: '#/components/schemas/Dispositivo' }
 
     # ── Vehículos ─────────────────────────────────────────────────────
     MantenimientoSugeridoResponse:
