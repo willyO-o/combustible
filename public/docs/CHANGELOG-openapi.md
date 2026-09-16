@@ -2,6 +2,29 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.9.0 — 2026-09-16
+
+Nuevos tipos de notificación de base de datos (`GET /notificaciones`, mismas que ve el dropdown
+del panel web): orden de trabajo culminada/verificada, vale emitido/por vencer, y carga de
+combustible/material registrada. No hay endpoints nuevos: estos tipos aparecen dentro del arreglo
+que ya devolvía `GET /notificaciones`.
+
+### Agregado
+
+#### `GET /notificaciones`
+
+- `orden_trabajo_culminada`: al emisor de la orden, cuando el técnico culmina su ejecución.
+- `orden_trabajo_verificada`: al técnico asignado, cuando el emisor verifica y cierra la orden
+  (sólo se genera desde el panel web; VERIFICADO sigue sin estar disponible en la API).
+- `vale_emitido`: al conductor del vale (si tiene cuenta de usuario), al emitirse.
+- `vale_por_vencer`: al conductor del vale, aviso diario automático cuando un vale PENDIENTE está
+  a 2 días o menos de vencer (tarea programada `vales:notificar-vencimiento`, sin endpoint propio).
+- `carga_combustible_registrada`: a quien emitió el vale, cuando se registra la carga que lo usó
+  (una carga sin vale no genera esta notificación).
+- `carga_material_registrada`: a los supervisores (jefe-area/administrador), al abrirse un flete.
+- Schema `Notificacion.tipo` documentado como `enum` con los 8 tipos existentes y tabla de
+  referencia (evento que la genera + destinatario) en la descripción de `GET /notificaciones`.
+
 ## 1.8.0 — 2026-09-14
 
 Alcance por rol en `GET /vales` y `GET /vales/pendientes`: jefe de área ve las de su área,

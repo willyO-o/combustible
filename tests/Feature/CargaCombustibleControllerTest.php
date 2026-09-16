@@ -15,7 +15,9 @@ use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
+use App\Notifications\CargaCombustibleRegistradaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -475,6 +477,63 @@ class CargaCombustibleControllerTest extends TestCase
         $this->assertSame('VALE', $carga->tipo_carga);
         $this->assertSame('F-100', $carga->nro_factura);
         $this->assertSame('USADO', $vale->fresh()->estado_vale);
+    }
+
+    public function test_store_con_vale_notifica_a_quien_lo_emitio(): void
+    {
+        Notification::fake();
+
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        // El vale lo emite otro usuario (jefe de área); la carga la registra
+        // $this->admin: la notificación debe ir al emisor del vale, no a
+        // quien registra la carga.
+        $jefe = User::factory()->create();
+        $jefe->assignRole('administrador');
+        $this->actingAs($jefe);
+        $vale = $this->crearVale($vehiculo, $conductor, $grifo, $tipoCombustible);
+        $this->assertSame($jefe->id, $vale->id_user);
+
+        $this->actingAs($this->admin)->post(route('cargas.store'), [
+            'fecha_carga' => now()->format('Y-m-d'),
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_vale' => $vale->id,
+            'tipo_carga' => 'VALE',
+        ])->assertSessionDoesntHaveErrors()->assertRedirect(route('cargas.index'));
+
+        Notification::assertSentTo($jefe, CargaCombustibleRegistradaNotification::class);
+    }
+
+    public function test_store_sin_vale_no_genera_notificacion(): void
+    {
+        Notification::fake();
+
+        $this->crearParametrosEmpresa();
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        $this->post(route('cargas.store'), [
+            'fecha_carga' => now()->format('Y-m-d'),
+            'litros' => 30,
+            'precio' => 7,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'tipo_carga' => 'PREPAGO',
+        ])->assertSessionDoesntHaveErrors()->assertRedirect(route('cargas.index'));
+
+        Notification::assertNothingSent();
     }
 
     public function test_update_con_vale_fuerza_tipo_carga_vale_aunque_se_envie_prepago(): void

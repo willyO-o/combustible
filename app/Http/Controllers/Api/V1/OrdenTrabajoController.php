@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\OrdenTrabajoCulminada;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DetalleMantenimientoRequest;
 use App\Http\Requests\EjecucionOrdenTrabajoRequest;
@@ -215,6 +216,8 @@ class OrdenTrabajoController extends Controller
             'fecha_culminacion' => now(),
             'estado_orden' => 'CULMINADO',
         ]);
+
+        OrdenTrabajoCulminada::dispatch($orden);
 
         $orden->load([
             'vehiculo',

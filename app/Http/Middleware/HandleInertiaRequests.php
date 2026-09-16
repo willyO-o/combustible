@@ -80,6 +80,36 @@ class HandleInertiaRequests extends Middleware
                 'Se te asignó la orden N° '.($data['nro_orden'] ?? '').' para su ejecución.',
                 'ri-tools-line',
             ],
+            'orden_trabajo_culminada' => [
+                'Orden de trabajo culminada',
+                'El técnico culminó la orden N° '.($data['nro_orden'] ?? '').'.',
+                'ri-checkbox-circle-line',
+            ],
+            'orden_trabajo_verificada' => [
+                'Orden de trabajo verificada',
+                'Tu orden N° '.($data['nro_orden'] ?? '').' fue verificada y cerrada.',
+                'ri-shield-check-line',
+            ],
+            'vale_emitido' => [
+                'Vale de combustible emitido',
+                'Se emitió el vale N° '.($data['nro'] ?? '').' por '.($data['litros'] ?? '').' Lt.',
+                'ri-file-list-3-line',
+            ],
+            'vale_por_vencer' => [
+                'Vale por vencer',
+                'El vale N° '.($data['nro'] ?? '').' vence pronto, aún no se usó.',
+                'ri-alarm-warning-line',
+            ],
+            'carga_combustible_registrada' => [
+                'Carga de combustible registrada',
+                'Se registró la carga N° '.($data['nro'] ?? '').' ('.($data['litros'] ?? '').' Lt) del vale que emitiste.',
+                'ri-gas-station-line',
+            ],
+            'carga_material_registrada' => [
+                'Nuevo flete registrado',
+                'Se abrió el flete N° '.($data['nro'] ?? '').'.',
+                'ri-truck-line',
+            ],
             default => [
                 'Notificación',
                 $data['mensaje'] ?? '',

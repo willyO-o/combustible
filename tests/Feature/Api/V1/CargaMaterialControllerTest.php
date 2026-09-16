@@ -7,8 +7,10 @@ use App\Models\Material;
 use App\Models\ParametrosEmpresa;
 use App\Models\User;
 use App\Models\VehiculoExterno;
+use App\Notifications\CargaMaterialRegistradaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -66,6 +68,21 @@ class CargaMaterialControllerTest extends TestCase
         $carga = CargaMaterial::first();
         $this->assertSame($this->conductor->id, $carga->id_usuario_apertura);
         $this->assertSame('ABIERTA', $carga->estado_carga);
+    }
+
+    public function test_store_notifica_a_los_supervisores_jefe_area_y_administrador(): void
+    {
+        Notification::fake();
+
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $this->actingAs($this->conductor, 'api')->postJson(route('api.v1.cargas-material.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'nombre_conductor' => 'Juan Externo',
+        ])->assertCreated();
+
+        Notification::assertSentTo($this->jefeArea, CargaMaterialRegistradaNotification::class);
+        Notification::assertNothingSentTo($this->conductor);
     }
 
     public function test_store_permite_registrar_el_primer_viaje_junto_con_la_carga(): void

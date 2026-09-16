@@ -13,7 +13,9 @@ use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
+use App\Notifications\ValeEmitidoNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -115,6 +117,30 @@ class ValeControllerTest extends TestCase
         $this->assertSame($jefe->id, $vale->id_user);
         $this->assertSame($vehiculo->id, $vale->id_vehiculo);
         $this->assertNotNull($vale->fecha_vencimiento);
+    }
+
+    public function test_store_notifica_al_conductor_si_tiene_cuenta_de_usuario(): void
+    {
+        Notification::fake();
+
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculo, $area);
+        $conductor = Conductor::factory()->create();
+        $usuarioConductor = User::factory()->create(['id_persona' => $conductor->id]);
+        $usuarioConductor->assignRole('conductor');
+
+        $this->actingAs($jefe, 'api')->postJson(route('api.v1.vales.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ])->assertCreated();
+
+        Notification::assertSentTo($usuarioConductor, ValeEmitidoNotification::class);
     }
 
     public function test_un_jefe_de_area_no_puede_emitir_un_vale_para_un_vehiculo_de_otra_area(): void

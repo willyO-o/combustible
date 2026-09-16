@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.8.0"
+  version: "1.9.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -405,7 +405,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.8.0"
+                api_version: "1.9.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -3337,6 +3337,20 @@ paths:
         Cada notificación se muestra ya formateada (`titulo`, `descripcion`, `icono`, `url`)
         según su tipo (`data.tipo` en la tabla `notifications`); un tipo sin caso definido cae
         en un formato genérico.
+
+        **Tipos disponibles (`tipo`)** — cada uno se genera automáticamente cuando ocurre el
+        evento de negocio indicado, no se crean manualmente:
+
+        | `tipo`                          | Se genera cuando…                                                    | Destinatario |
+        |----------------------------------|-----------------------------------------------------------------------|--------------|
+        | `observacion_operacion`          | Una operación diaria se guarda con observaciones.                     | Encargados del área del vehículo |
+        | `orden_trabajo_asignada`         | Se emite o reasigna una orden de trabajo a un técnico.                 | Técnico asignado (`usuarioEjecuta`) |
+        | `orden_trabajo_culminada`        | El técnico culmina la ejecución de una orden de trabajo.               | Quien emitió la orden (`usuarioEmite`) |
+        | `orden_trabajo_verificada`       | Quien emitió la orden la marca VERIFICADO (sólo panel web).            | Técnico asignado (`usuarioEjecuta`) |
+        | `vale_emitido`                   | Se emite un nuevo vale de combustible.                                 | Conductor asignado al vale (si tiene cuenta de usuario) |
+        | `vale_por_vencer`                | Un vale PENDIENTE está a 2 días o menos de su vencimiento (aviso diario automático). | Conductor asignado al vale |
+        | `carga_combustible_registrada`   | Se registra una carga de combustible que usó un vale.                  | Quien emitió ese vale |
+        | `carga_material_registrada`      | Se abre un nuevo flete (carga de material).                            | Supervisores (jefe-area/administrador) |
       responses:
         '200':
           description: Notificaciones disponibles del usuario autenticado.
@@ -3537,7 +3551,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.8.0" }
+        api_version: { type: string, example: "1.9.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -5333,7 +5347,19 @@ components:
         `notifications` (`data.tipo` determina `titulo`/`descripcion`/`icono`).
       properties:
         id: { type: string, format: uuid, example: "9d1f7e2a-6b3c-4e10-9a3d-2f6b6c1e5a90" }
-        tipo: { type: string, example: observacion_operacion }
+        tipo:
+          type: string
+          description: Ver la tabla de tipos disponibles en la descripción de `GET /notificaciones`.
+          enum:
+            - observacion_operacion
+            - orden_trabajo_asignada
+            - orden_trabajo_culminada
+            - orden_trabajo_verificada
+            - vale_emitido
+            - vale_por_vencer
+            - carga_combustible_registrada
+            - carga_material_registrada
+          example: observacion_operacion
         titulo: { type: string, example: Observación en operación diaria }
         descripcion: { type: string, example: Falta revisar presión de llantas }
         icono: { type: string, example: ri-error-warning-line }

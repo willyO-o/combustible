@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'nro_vale',
     'fecha_emision',
     'fecha_vencimiento',
+    'notificado_vencimiento_at',
     'litros',
     'precio',
     'id_vehiculo',
@@ -34,6 +35,7 @@ class Vale extends Model
         return [
             'fecha_emision' => 'datetime:Y-m-d H:i',
             'fecha_vencimiento' => 'datetime:Y-m-d H:i',
+            'notificado_vencimiento_at' => 'datetime',
         ];
     }
 

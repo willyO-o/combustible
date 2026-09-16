@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Events\CargaMaterialRegistrada;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CargaMaterialRequest;
 use App\Http\Requests\ViajeRequest;
@@ -82,6 +83,8 @@ class CargaMaterialController extends Controller
 
                 return $carga;
             });
+
+            CargaMaterialRegistrada::dispatch($carga);
 
             $carga->load(['vehiculoExterno', 'viajes.material']);
 

@@ -13,7 +13,9 @@ use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
+use App\Notifications\ValeEmitidoNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -308,6 +310,30 @@ class ValeControllerTest extends TestCase
 
         $response->assertRedirect(route('vales.index'));
         $this->assertDatabaseHas('vale', ['id_vehiculo' => $vehiculoSinArea->id]);
+    }
+
+    public function test_store_notifica_al_conductor_si_tiene_cuenta_de_usuario(): void
+    {
+        Notification::fake();
+
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = Conductor::factory()->create();
+        $usuarioConductor = User::factory()->create(['id_persona' => $conductor->id]);
+        $usuarioConductor->assignRole('conductor');
+        $grifo = Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        $this->actingAs($this->admin)->post(route('vales.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ])->assertRedirect(route('vales.index'));
+
+        Notification::assertSentTo($usuarioConductor, ValeEmitidoNotification::class);
     }
 
     /**

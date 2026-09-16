@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Events\OrdenTrabajoAsignada;
+use App\Events\OrdenTrabajoCulminada;
+use App\Events\OrdenTrabajoVerificada;
 use App\Http\Requests\DetalleMantenimientoRequest;
 use App\Http\Requests\EjecucionOrdenTrabajoRequest;
 use App\Http\Requests\OrdenTrabajoRequest;
@@ -332,6 +334,12 @@ class OrdenTrabajoController extends Controller
 
         $orden->update($data);
 
+        if ($nuevoEstado === 'CULMINADO') {
+            OrdenTrabajoCulminada::dispatch($orden);
+        } elseif ($nuevoEstado === 'VERIFICADO') {
+            OrdenTrabajoVerificada::dispatch($orden);
+        }
+
         return redirect()->back()
             ->with('success', 'Estado de la orden actualizado a "'.$nuevoEstado.'".');
     }
@@ -450,6 +458,8 @@ class OrdenTrabajoController extends Controller
         $data['estado_orden'] = 'CULMINADO';
 
         $orden->update($data);
+
+        OrdenTrabajoCulminada::dispatch($orden);
 
         return redirect()->route('mantenimiento.ordenes.show', $orden)
             ->with('success', 'Ejecución de la orden de trabajo culminada exitosamente.');

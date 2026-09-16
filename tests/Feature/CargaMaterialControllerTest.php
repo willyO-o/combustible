@@ -8,8 +8,10 @@ use App\Models\ParametrosEmpresa;
 use App\Models\User;
 use App\Models\VehiculoExterno;
 use App\Models\Viaje;
+use App\Notifications\CargaMaterialRegistradaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
@@ -189,6 +191,26 @@ class CargaMaterialControllerTest extends TestCase
         $this->assertSame('ABIERTA', $carga->estado_carga);
         $this->assertSame($this->conductor->id, $carga->id_usuario_apertura);
         $this->assertSame('Juan Externo', $carga->nombre_conductor);
+    }
+
+    public function test_store_notifica_a_los_supervisores_jefe_area_y_administrador(): void
+    {
+        Notification::fake();
+
+        $administrador = User::factory()->create();
+        $administrador->assignRole('administrador');
+        // No debe notificarse a sí mismo por abrir la carga (no tiene rol de
+        // supervisor: es sólo conductor).
+        $vehiculoExterno = VehiculoExterno::factory()->create();
+
+        $this->actingAs($this->conductor)->post(route('control-cargas.store'), [
+            'id_vehiculo_externo' => $vehiculoExterno->id,
+            'nombre_conductor' => 'Juan Externo',
+        ])->assertRedirect();
+
+        Notification::assertSentTo($this->jefeArea, CargaMaterialRegistradaNotification::class);
+        Notification::assertSentTo($administrador, CargaMaterialRegistradaNotification::class);
+        Notification::assertNothingSentTo($this->conductor);
     }
 
     public function test_store_numera_las_cargas_de_forma_secuencial(): void

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Vale\ListValeAction;
+use App\Events\ValeEmitido;
 use App\Http\Requests\ValeRequest;
 use App\Libraries\Reportes;
 use App\Models\Conductor;
@@ -89,6 +90,8 @@ class ValeController extends Controller
             $vale = Vale::create($datos);
 
             DB::commit();
+
+            ValeEmitido::dispatch($vale);
 
             return redirect()->route('vales.index')
                 ->with('success', "Vale #{$vale->nro} registrado exitosamente.");

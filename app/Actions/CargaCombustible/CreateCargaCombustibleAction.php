@@ -3,6 +3,7 @@
 namespace App\Actions\CargaCombustible;
 
 use App\Actions\Respaldo\SincronizarRespaldoCargaAction;
+use App\Events\CargaCombustibleRegistrada;
 use App\Models\CargaCombustible;
 use App\Models\Vale;
 use Illuminate\Support\Facades\DB;
@@ -15,14 +16,13 @@ class CreateCargaCombustibleAction
     {
         //
 
-        return DB::transaction(function () use ($request) {
+        $cargaCombustible = DB::transaction(function () use ($request) {
 
             $datos = $request->all();
 
-            if (!$request->input('is_offline', false)) {
+            if (! $request->input('is_offline', false)) {
                 $datos['fecha_carga'] = now();
             }
-
 
             if ($request->filled('id_vale')) {
                 $vale = Vale::findOrFail($datos['id_vale']);
@@ -40,9 +40,7 @@ class CreateCargaCombustibleAction
                 $datos['precio'] = $vale->precio;
                 $datos['tipo_carga'] = 'VALE';
 
-
                 $cargaCombustible = CargaCombustible::create($datos);
-
 
                 $vale->update([
                     'estado_vale' => 'USADO',
@@ -55,5 +53,9 @@ class CreateCargaCombustibleAction
 
             return $cargaCombustible;
         });
+
+        CargaCombustibleRegistrada::dispatch($cargaCombustible);
+
+        return $cargaCombustible;
     }
 }

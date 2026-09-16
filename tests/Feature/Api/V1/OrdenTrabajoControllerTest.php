@@ -9,7 +9,9 @@ use App\Models\Repuesto;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Notifications\OrdenTrabajoCulminadaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -366,6 +368,29 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame('CULMINADO', $orden->estado_orden);
         $this->assertSame(85300, $orden->kilometraje_actual);
         $this->assertNotNull($orden->fecha_culminacion);
+    }
+
+    public function test_culminar_notifica_a_quien_emitio_la_orden(): void
+    {
+        Notification::fake();
+
+        $tecnico = $this->crearTecnico();
+        // crearOrden() emite bajo $this->admin (ver helper de este archivo).
+        $orden = $this->crearOrden($tecnico, ['estado_orden' => 'EN_EJECUCION']);
+        $tipo = $this->crearTipoMantenimiento();
+        $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipo->id,
+            'fecha' => now()->toDateString(),
+            'kilometraje' => 100,
+            'cantidad' => 1,
+        ]);
+
+        $this->actingAs($tecnico, 'api')->postJson(
+            route('api.v1.ordenes-trabajo.culminar', $orden),
+            ['kilometraje_actual' => 85300]
+        )->assertOk();
+
+        Notification::assertSentTo($this->admin, OrdenTrabajoCulminadaNotification::class);
     }
 
     public function test_no_se_puede_culminar_una_orden_no_iniciada(): void

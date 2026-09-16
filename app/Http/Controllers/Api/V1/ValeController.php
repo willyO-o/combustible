@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Vale\ListValeAction;
+use App\Events\ValeEmitido;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ValeRequest;
 use App\Libraries\Reportes;
@@ -53,6 +54,8 @@ class ValeController extends Controller
 
                 return Vale::create($datos);
             });
+
+            ValeEmitido::dispatch($vale);
 
             $vale->load(['vehiculo', 'conductor.persona', 'grifo', 'tipoCombustible']);
 

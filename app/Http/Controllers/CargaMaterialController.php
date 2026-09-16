@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CargaMaterialRegistrada;
 use App\Http\Requests\CargaMaterialRequest;
 use App\Http\Requests\ViajeRequest;
 use App\Libraries\Reportes;
@@ -121,6 +122,8 @@ class CargaMaterialController extends Controller
         }
 
         $carga = CargaMaterial::create($datos);
+
+        CargaMaterialRegistrada::dispatch($carga);
 
         return redirect()->route('control-cargas.show', $carga->id)
             ->with('success', "Flete #{$carga->nro} registrado exitosamente. Ya puedes registrar viajes.");

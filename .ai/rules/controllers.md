@@ -63,3 +63,13 @@ Al emitir (`store`) o reasignar (`update`, sólo si `id_usuario_ejecuta` cambió
 Mismo patrón que `ObservacionOperacionEvent` / `NotificarObservacionOperacion` / `ObservacionOperacionNotification`. La notificación lleva `data['tipo'] => 'orden_trabajo_asignada'` + `nro_orden`, `id_orden_trabajo`, `id_vehiculo`, `url` (ruta a `mantenimiento.ordenes.show`).
 
 Todo tipo de notificación nuevo debe añadir su `match` en AMBOS formateadores: `HandleInertiaRequests::formatearNotificacion()` (dropdown web) y `Api/V1/NotificacionController::formatear()` (API). Ícono usado: `ri-tools-line`.
+
+## Notificaciones de orden culminada/verificada, vale emitido/por vencer y carga registrada
+Mismo patrón Event+Listener+Notification(canal database) que OrdenTrabajoAsignada, ampliado con 3 features nuevas (6 tipos):
+- `OrdenTrabajoCulminada` → `NotificarOrdenTrabajoCulminada` → notifica a `usuarioEmite`. Se dispara en 3 sitios: OrdenTrabajoController::cambiarEstado() (si nuevoEstado=CULMINADO) y ::culminarEjecucion() (web), y Api/V1/OrdenTrabajoController::culminar().
+- `OrdenTrabajoVerificada` → notifica a `usuarioEjecuta`. Sólo se dispara en OrdenTrabajoController::cambiarEstado() (VERIFICADO sigue siendo sólo web).
+- `ValeEmitido` → notifica a `vale->conductor->user` (puede no existir cuenta). Se dispara en ValeController::store() web y Api/V1/ValeController::store().
+- Vale "por vencer": sin Event, va directo por Console\Commands\NotificarValesPorVencerCommand (`vales:notificar-vencimiento`, `Schedule::command()->daily()` en routes/console.php), que notifica PENDIENTE con fecha_vencimiento en [now, now+2 días] y marca `vale.notificado_vencimiento_at` (columna nueva) para no repetir el aviso.
+- `CargaCombustibleRegistrada` → notifica a `carga->vale->user` (sólo si la carga tiene vale; PREPAGO sin vale no notifica). Se dispara DENTRO de CreateCargaCombustibleAction::execute() (Action existente, compartida por web+API) — no en los controladores, por la regla de Actions.
+- `CargaMaterialRegistrada` → notifica a `User::role(['jefe-area','administrador'])->where('estado_usuario','ACTIVO')`. Se dispara en CargaMaterialController::store() web y Api/V1/CargaMaterialController::store() (sin Action compartida, hay que tocar los 2 controladores).
+Los 6 `tipo` nuevos se agregaron en AMBOS formateadores (HandleInertiaRequests::formatearNotificacion() y Api/V1/NotificacionController::formatear(), ver regla existente sobre esto) y en el enum de `Notificacion.tipo` de openapi.yaml (bump 1.8.0→1.9.0 + CHANGELOG-openapi.md, también en ParametrosController::index()['api_version']).

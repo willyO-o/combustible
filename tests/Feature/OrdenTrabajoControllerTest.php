@@ -14,6 +14,8 @@ use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Notifications\OrdenTrabajoAsignadaNotification;
+use App\Notifications\OrdenTrabajoCulminadaNotification;
+use App\Notifications\OrdenTrabajoVerificadaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -698,6 +700,30 @@ class OrdenTrabajoControllerTest extends TestCase
         $this->assertSame(90000, $orden->kilometraje_actual);
     }
 
+    public function test_culminar_ejecucion_notifica_a_quien_emitio_la_orden(): void
+    {
+        Notification::fake();
+
+        // crearOrden() se emite bajo $this->admin (ver setUp: $this->actingAs($this->admin)).
+        $orden = $this->crearOrden();
+        $tipoMantenimiento = TipoMantenimiento::create([
+            'tipo_mantenimiento' => 'Cambio de aceite',
+            'estado_tipo_mantenimiento' => 'ACTIVO',
+        ]);
+        $orden->detalles()->create([
+            'id_tipo_mantenimiento' => $tipoMantenimiento->id,
+            'fecha' => now()->toDateString(),
+            'cantidad' => 1,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('mantenimiento.ordenes.ejecucion.culminar', $orden), [
+                'kilometraje_actual' => 90000,
+            ])->assertRedirect();
+
+        Notification::assertSentTo($this->admin, OrdenTrabajoCulminadaNotification::class);
+    }
+
     public function test_no_se_puede_modificar_el_detalle_de_una_orden_ya_culminada(): void
     {
         // OrdenTrabajo::boot() fuerza estado_orden = PENDIENTE al crear, así que
@@ -930,6 +956,39 @@ class OrdenTrabajoControllerTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('VERIFICADO', $orden->fresh()->estado_orden);
+    }
+
+    public function test_cambiar_estado_a_culminado_notifica_a_quien_emitio_la_orden(): void
+    {
+        Notification::fake();
+
+        $tecnico = $this->crearTecnico();
+        // crearOrden() se emite bajo $this->admin (ver setUp). OrdenTrabajo::boot()
+        // fuerza estado_orden = PENDIENTE al crear, así que EN_EJECUCION se fija
+        // en un segundo paso.
+        $orden = $this->crearOrden(['id_usuario_ejecuta' => $tecnico->id]);
+        $orden->update(['estado_orden' => 'EN_EJECUCION']);
+
+        $this->actingAs($tecnico)
+            ->patch(route('mantenimiento.ordenes.estado', $orden), ['estado_orden' => 'CULMINADO'])
+            ->assertRedirect();
+
+        Notification::assertSentTo($this->admin, OrdenTrabajoCulminadaNotification::class);
+    }
+
+    public function test_verificar_una_orden_notifica_al_tecnico_asignado(): void
+    {
+        Notification::fake();
+
+        $tecnico = $this->crearTecnico();
+        $orden = $this->crearOrden(['id_usuario_ejecuta' => $tecnico->id]);
+        $orden->update(['estado_orden' => 'CULMINADO']);
+
+        $this->actingAs($this->admin)
+            ->patch(route('mantenimiento.ordenes.estado', $orden), ['estado_orden' => 'VERIFICADO'])
+            ->assertRedirect();
+
+        Notification::assertSentTo($tecnico, OrdenTrabajoVerificadaNotification::class);
     }
 
     public function test_un_tecnico_solo_gestiona_el_detalle_de_sus_propias_ordenes(): void
