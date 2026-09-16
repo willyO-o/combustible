@@ -36,7 +36,7 @@ info:
     | conductor             | conductor3@gmail.com     | `conductor123`  | Solo sus propias operaciones |
     | jefe-area             | jefearea1@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
     | jefe-area             | jefearea2@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
-    | jefe-area             | jefearea3@gmail.com      | `jefearea123`   | Solo las operaciones de su área a cargo |
+    | jefe-area             | jefelogistica@gmail.com  | `jefearea123`   | Solo las operaciones de su área a cargo |
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |

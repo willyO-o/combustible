@@ -4,6 +4,13 @@ import vue from '@vitejs/plugin-vue';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+    build: {
+        // 'hidden': genera los .map en public/build para poder depurar errores
+        // de producción localmente (mapear un stack minificado a su archivo
+        // .vue real), pero SIN el comentario //# sourceMappingURL al final del
+        // .js — el navegador del usuario final nunca los pide ni los descarga.
+        sourcemap: 'hidden',
+    },
     server: {
         // host: '0.0.0.0',
         watch: {
