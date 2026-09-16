@@ -56,7 +56,22 @@ createInertiaApp({
         resolvePageComponent(
             `./Pages/${name}.vue`,
             import.meta.glob('./Pages/**/*.vue'),
-        ),
+        ).then((module) => {
+            // Mismo problema documentado en DateRangeFilter.vue: en el build de
+            // producción (Rollup) un import() dinámico puede resolver al
+            // namespace del módulo ES (congelado) en vez de a su
+            // `module.default`. @inertiajs/vue3 intenta desenvolverlo con
+            // `module.default || module`, pero si eso falla igual, cae en el
+            // namespace crudo y Vue truena al escribirle `inheritAttrs`
+            // ("Cannot assign to property 'inheritAttrs' of [object Module]")
+            // — sólo en producción, nunca en `npm run dev`. Se refuerza acá,
+            // en el único punto por el que pasan TODAS las páginas (en vez de
+            // en cada .vue por separado), y se congela el objeto plano
+            // resultante como defensa extra ante quien vuelva a mutarlo.
+            const pagina = module.default ?? module;
+
+            return Object.isFrozen(pagina) ? { ...pagina } : pagina;
+        }),
     setup({ el, App, props, plugin }) {
         // PageLoader e InstallPwaPrompt se montan como hermanos de <App>, fuera
         // de cualquier layout de página: así funcionan igual sin importar si la
