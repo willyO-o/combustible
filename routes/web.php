@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AreaController;
+use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\CargaMaterialController;
 use App\Http\Controllers\CargasCombustibleReportController;
@@ -126,6 +127,12 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('roles', RolController::class)
         ->except(['show', 'destroy']);
+
+    // ── Auditoría (bitácora de cambios del sistema) ──────────────────────────
+    // El detalle se pide por AJAX desde el modal del listado (mismo patrón que
+    // vales.detalle / cargas.detalle), no es una página aparte.
+    Route::get('auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
+    Route::get('auditoria/{audit}/detalle', [AuditoriaController::class, 'detalle'])->name('auditoria.detalle');
 
     // Parámetros de la Empresa (registro único: se crea o se actualiza)
     Route::get('parametros-empresa', [ParametrosEmpresaController::class, 'edit'])->name('parametros-empresa.edit');

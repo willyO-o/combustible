@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
+use OwenIt\Auditing\Contracts\Auditable;
+
 #[Fillable([
     'razon_social',
     'nit',
@@ -15,15 +17,14 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'es_principal',
 ])]
 
-
-class Grifo extends Model
+class Grifo extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
     use SoftDeletes;
 
     protected $table = 'grifo';
 
-
-     protected function casts()
+    protected function casts()
     {
         return [
             'es_principal' => 'boolean',

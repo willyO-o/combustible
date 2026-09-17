@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'nro_carga',
@@ -25,9 +26,10 @@ use Illuminate\Support\Facades\Auth;
     'observaciones',
     'estado_carga',
 ])]
-class CargaMaterial extends Model
+class CargaMaterial extends Model implements Auditable
 {
     use HasFactory, HasUuids;
+    use \OwenIt\Auditing\Auditable;
 
     protected $table = 'carga_material';
 

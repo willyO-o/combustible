@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'id_conductor',
@@ -17,9 +18,10 @@ use Illuminate\Database\Eloquent\Model;
     'estado_documento',
     'observacion',
 ])]
-class DocumentoConductor extends Model
+class DocumentoConductor extends Model implements Auditable
 {
     use HasFactory;
+    use \OwenIt\Auditing\Auditable;
 
     protected $table = 'documento_conductor';
 

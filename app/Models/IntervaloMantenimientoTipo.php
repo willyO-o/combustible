@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'id_tipo_vehiculo',
@@ -15,8 +16,10 @@ use Illuminate\Support\Facades\DB;
     'estado',
 ])]
 
-class IntervaloMantenimientoTipo extends Pivot
+class IntervaloMantenimientoTipo extends Pivot implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'intervalo_mantenimiento_tipo';
 
     /**

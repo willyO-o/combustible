@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Casts\ParametrosVale;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use App\Casts\ParametrosVale;
+use OwenIt\Auditing\Contracts\Auditable;
 
-#[fillable(
+#[Fillable(
     'nombre_empresa',
     'direccion_empresa',
     'telefono_empresa',
@@ -17,8 +18,10 @@ use App\Casts\ParametrosVale;
     'parametros_vale',
     'estado'
 )]
-class ParametrosEmpresa extends Model
+class ParametrosEmpresa extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     //
     protected $table = 'parametros_empresa';
 
@@ -31,7 +34,7 @@ class ParametrosEmpresa extends Model
 
     protected static function booted(): void
     {
-        static::saved(fn() => Cache::forget('parametros_empresa'));
-        static::deleted(fn() => Cache::forget('parametros_empresa'));
+        static::saved(fn () => Cache::forget('parametros_empresa'));
+        static::deleted(fn () => Cache::forget('parametros_empresa'));
     }
 }

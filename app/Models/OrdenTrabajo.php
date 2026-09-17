@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
 
 /**
  * Paso 2 y 3 del flujo de mantenimiento: la orden de trabajo emitida por el
@@ -30,8 +31,10 @@ use Illuminate\Database\Eloquent\Model;
     'horometro_actual',
     'estado_orden',
 ])]
-class OrdenTrabajo extends Model
+class OrdenTrabajo extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'orden_trabajo';
 
     protected function casts(): array

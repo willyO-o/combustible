@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'id_persona',
@@ -16,8 +17,10 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
     'estado_encargo',
 ])]
 
-class EncargadoArea extends Pivot
+class EncargadoArea extends Pivot implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     // La tabla tiene su propia PK autoincremental (id), a diferencia de un
     // pivot tradicional sin clave propia: Pivot::$incrementing es false por
     // defecto, así que hay que reactivarlo para que create()/fresh()/refresh()

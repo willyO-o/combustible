@@ -30,3 +30,10 @@ Shape Eloquent query results for Inertia/JSON output with ->get()->map(fn ($x) =
 
 ## carga_combustible.estado_carga: REGISTRADO/VERIFICADO/ANULADO, default REGISTRADO
 `carga_combustible.estado_carga` es varchar(30) nullable (sin enum en BD). Valores válidos: REGISTRADO, VERIFICADO, ANULADO (así lo valida CargaCombustibleRequest y lo publica GET /parametros/colecciones). NO son PENDIENTE/USADO/ANULADO (eso es estado_vale). El modelo pone `estado_carga ??= 'REGISTRADO'` en creating() cuando el cliente no lo envía.
+
+## Todo modelo nuevo debe ser Auditable (owen-it/laravel-auditing)
+Los 35 modelos de app/Models implementan `OwenIt\Auditing\Contracts\Auditable` + `use \OwenIt\Auditing\Auditable;` (import del CONTRATO como `Auditable`, trait con su FQN inline — así lo documenta el paquete y así quedó en todo el proyecto). Un modelo nuevo sin eso queda fuera de la bitácora de Auditoría sin que nada falle: agrégalo siempre.
+
+Además, si el modelo se puede listar en la pantalla de Auditoría, dale su entrada en `config/auditoria.php` -> `modelos` (label en español, ícono RemixIcon, `descriptor` con las columnas que lo identifican y `formato` opcional tipo 'Vale N° {nro_vale}/{gestion}'); y si tiene llaves foráneas nuevas, agrégalas a `relaciones` + `atributos` para que el detalle muestre "Gasolina 95 (#2)" y no "id_tipo_combustible: 2". Hay una comprobación de humo lista en la descripción de AuditoriaControllerTest: todo lo catalogado debe poder consultarse contra la BD.
+
+Campos sensibles: `config/audit.php -> exclude` (password, remember_token, token) nunca se graban; `config/auditoria.php -> ocultos` los vuelve a filtrar al mostrarlos.

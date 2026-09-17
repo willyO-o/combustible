@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'tipo_vehiculo',
@@ -12,9 +13,10 @@ use Illuminate\Database\Eloquent\Model;
     'id_grupo_vehiculo',
     'unidad_capacidad_sugerida',
 ])]
-class TipoVehiculo extends Model
+class TipoVehiculo extends Model implements Auditable
 {
     use HasFactory;
+    use \OwenIt\Auditing\Auditable;
 
     protected $table = 'tipo_vehiculo';
 

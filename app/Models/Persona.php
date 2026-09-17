@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'ci',
@@ -19,9 +20,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'estado_persona',
 ])]
 
-class Persona extends Model
+class Persona extends Model implements Auditable
 {
     use HasFactory, SoftDeletes;
+    use \OwenIt\Auditing\Auditable;
 
     protected $table = 'persona';
 

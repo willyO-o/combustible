@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'tipo_mantenimiento',
@@ -12,8 +13,10 @@ use Illuminate\Database\Eloquent\Model;
     'ambito',
     'unidad_medida',
 ])]
-class TipoMantenimiento extends Model
+class TipoMantenimiento extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'tipo_mantenimiento';
 
     // Relaciones

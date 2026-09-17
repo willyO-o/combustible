@@ -7,15 +7,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'id',
     'estado_conductor',
 ])]
 
-class Conductor extends Model
+class Conductor extends Model implements Auditable
 {
     use HasFactory, SoftDeletes;
+    use \OwenIt\Auditing\Auditable;
 
     protected $table = 'conductor';
 
@@ -62,7 +64,7 @@ class Conductor extends Model
         return $this->hasMany(DocumentoConductor::class, 'id_conductor');
     }
 
-    //extraer los datos de la licencia de conducir del conductor
+    // extraer los datos de la licencia de conducir del conductor
     public function licenciaConducir()
     {
         return $this->documentos()->where('tipo_documento', 'LICENCIA_DE_CONDUCIR')->first();

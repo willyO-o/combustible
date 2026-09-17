@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 // soft delete
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'nro_vale',
@@ -22,8 +23,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'id_user',
 ])]
 
-class Vale extends Model
+class Vale extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
     use SoftDeletes;
 
     protected $table = 'vale';

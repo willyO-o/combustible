@@ -335,6 +335,19 @@ class UserSeeder extends Seeder
     }
 
     /**
+     * Bitácora de auditoría (App\Http\Controllers\AuditoriaController): expone
+     * el "antes y después" de cada registro del sistema, incluidos datos de
+     * usuarios y parámetros de la empresa. Sólo administrador/super-admin, así
+     * que no forma parte de ningún otro bundle de permisos.
+     */
+    private function permisosAuditoria(): array
+    {
+        return [
+            'auditoria.ver',
+        ];
+    }
+
+    /**
      * Todos los catálogos (conductores, vehículos, grifos, tipos-*) agrupados,
      * útil porque varios roles (admin, jefe de transporte) los comparten.
      */
@@ -395,6 +408,7 @@ class UserSeeder extends Seeder
             ...$this->permisosControlCargasReporte(),
             ...$this->permisosRoles(),
             ...$this->permisosParametrosEmpresa(),
+            ...$this->permisosAuditoria(),
         ];
     }
 

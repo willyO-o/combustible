@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'id_vehiculo',
@@ -20,8 +21,10 @@ use Illuminate\Support\Facades\Auth;
     'estado',
     'observacion',
 ])]
-class SolicitudMantenimiento extends Model
+class SolicitudMantenimiento extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'solicitud_mantenimiento';
 
     protected function casts(): array

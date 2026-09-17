@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
 
 /**
  * Línea de detalle de una orden de trabajo: un repuesto/insumo aplicado (o
@@ -21,8 +22,10 @@ use Illuminate\Database\Eloquent\Model;
     'kilometraje',
     'cantidad',
 ])]
-class DetalleMantenimiento extends Model
+class DetalleMantenimiento extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'detalle_mantenimiento';
 
     protected function casts(): array

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
+
 #[Fillable([
     'fecha_inicio',
     'fecha_fin',
@@ -11,13 +13,13 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
     'id_vehiculo',
     'id_conductor',
     'id_tipo_mantenimiento',
-    'estado_mantenimiento'
+    'estado_mantenimiento',
 ])]
-class Mantenimiento extends Model
+class Mantenimiento extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'mantenimiento';
-
-
 
     protected function casts()
     {

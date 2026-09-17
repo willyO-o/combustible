@@ -123,7 +123,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
 
   {
-    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'areas.ver', 'roles.ver', 'permisos.ver', 'parametros-empresa.ver']
+    menutitle: 'ADMINISTRACIÓN', permission: ['usuarios.ver', 'personas.ver', 'areas.ver', 'roles.ver', 'permisos.ver', 'parametros-empresa.ver', 'auditoria.ver']
   },
   {
     title: 'Personas', icon: Svgicons.UsuarioIcon, type: 'link', path: '/personas', active: false, selected: false, dirchange: false, permission: 'personas.ver'
@@ -139,6 +139,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
   {
     title: 'Parámetros de la Empresa', icon: Svgicons.Generalicon, type: 'link', path: '/parametros-empresa', active: false, selected: false, dirchange: false, permission: 'parametros-empresa.ver'
+  },
+  {
+    title: 'Auditoría', icon: Svgicons.AuditoriaIcon, type: 'link', path: '/auditoria', active: false, selected: false, dirchange: false, permission: 'auditoria.ver'
   },
 
 ]

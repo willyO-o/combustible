@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'nro_operacion',
@@ -24,8 +25,10 @@ use Illuminate\Support\Collection;
     'observaciones',
 ])]
 
-class OperacionDiaria extends Model
+class OperacionDiaria extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     //
     protected $table = 'operacion_diaria';
 

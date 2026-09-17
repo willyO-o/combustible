@@ -22,3 +22,8 @@ $version = file_exists(public_path('build/manifest.json'))
     : null;
 ```
 Also note `$response->original` has a DIFFERENT shape depending on the request type: for a normal full-page visit (no `X-Inertia` header) Inertia returns a Blade `view('app')->with('page', $page)`, so `$response->original` is that `View` and you need `->getData()['page']`; for an `X-Inertia` XHR/partial request it returns `new JsonResponse($page)` directly, and Laravel's `JsonResponse::setData()` stores the raw array on `->original` — so it's already the `$page` array (`$response->original['props']['vales']...`), calling `->getData()` on it fatals with "Call to a member function getData() on array". See ValeControllerTest::test_index_marca_vales_como_scrolleable_para_el_infinite_scroll_mobile for a worked example (also asserts the `mergeProps` key that `Inertia::scroll()` adds — ver .ai/rules/pages.md).
+
+## Auditar en tests requiere config(['audit.console' => true])
+owen-it/laravel-auditing NO graba nada cuando la app corre en consola (`OwenIt\Auditing\Auditable::readyForAuditing()` devuelve `Config::get('audit.enabled') && Config::get('audit.console')` si `App::runningInConsole()`), y PHPUnit ES consola. `config/audit.php` deja `'console' => false` a propósito (para que seeders y comandos no llenen la bitácora), así que cualquier test que espere filas en `audits` debe poner `config(['audit.console' => true]);` en su setUp() — ver tests/Feature/AuditoriaControllerTest.php. Sin eso, `assertDatabaseHas('audits', ...)` falla sin ninguna pista.
+
+Corolario en producción: los cambios hechos desde comandos artisan (p.ej. `vales:notificar-vencimiento`) tampoco quedan auditados mientras `audit.console` siga en false.

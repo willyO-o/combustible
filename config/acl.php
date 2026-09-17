@@ -280,6 +280,13 @@ return [
             ],
         ],
 
+        'auditoria' => [
+            'label' => 'Auditoría',
+            'permisos' => [
+                'auditoria.ver' => 'Ver bitácora de cambios',
+            ],
+        ],
+
     ],
 
 ];

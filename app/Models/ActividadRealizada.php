@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class ActividadRealizada extends Pivot
+class ActividadRealizada extends Pivot implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     //
     protected $table = 'actividad_realizada';
 

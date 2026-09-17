@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'fecha_carga',
@@ -27,8 +28,10 @@ use Illuminate\Support\Facades\Auth;
 
 ])]
 
-class CargaCombustible extends Model
+class CargaCombustible extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'carga_combustible';
 
     protected function casts()

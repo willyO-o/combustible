@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Contracts\Auditable;
+
 #[Fillable([
     'kilometraje',
     'fecha_kilometraje',
     'id_vehiculo',
 ])]
-class Kilometraje extends Model
+class Kilometraje extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
+
     protected $table = 'kilometraje';
-
-
 
     protected function casts()
     {

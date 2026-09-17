@@ -34,23 +34,23 @@ watch(
 
 const estadoBadgeClass = (estado) => {
     const map = {
-        REGISTRADO: 'bg-info text-white',
-        VERIFICADO: 'bg-success text-white',
-        ANULADO: 'bg-danger text-white',
+        REGISTRADO: 'bg-info text-fixed-white',
+        VERIFICADO: 'bg-success text-fixed-white',
+        ANULADO: 'bg-danger text-fixed-white',
     }
-    return map[estado] ?? 'bg-secondary text-white'
+    return map[estado] ?? 'bg-secondary text-fixed-white'
 }
 
 const tipoBadgeClass = (tipo) =>
-    tipo === 'VALE' ? 'bg-primary text-white' : 'bg-warning text-dark'
+    tipo === 'VALE' ? 'bg-primary text-fixed-white' : 'bg-warning text-fixed-black'
 
 const valeEstadoBadgeClass = (estado) => {
     const map = {
-        PENDIENTE: 'bg-warning text-dark',
-        USADO: 'bg-success text-white',
-        ANULADO: 'bg-danger text-white',
+        PENDIENTE: 'bg-warning text-fixed-black',
+        USADO: 'bg-success text-fixed-white',
+        ANULADO: 'bg-danger text-fixed-white',
     }
-    return map[estado] ?? 'bg-secondary text-white'
+    return map[estado] ?? 'bg-secondary text-fixed-white'
 }
 
 const respaldoUrl = (ruta) => `/storage/${ruta}`
@@ -73,7 +73,7 @@ const fmt = (val, decimals = 2) =>
                 <div class="modal-content border-0 shadow-lg">
 
                     <!-- Header -->
-                    <div class="modal-header bg-primary text-white">
+                    <div class="modal-header bg-primary text-fixed-white">
                         <div class="d-flex align-items-center gap-2">
                             <i class="ri-gas-station-fill fs-4"></i>
                             <div>

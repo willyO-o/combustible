@@ -34,11 +34,11 @@ watch(
 
 const estadoBadgeClass = (estado) => {
     const map = {
-        PENDIENTE: 'bg-warning text-dark',
-        USADO: 'bg-success text-white',
-        ANULADO: 'bg-danger text-white',
+        PENDIENTE: 'bg-warning text-fixed-black',
+        USADO: 'bg-success text-fixed-white',
+        ANULADO: 'bg-danger text-fixed-white',
     }
-    return map[estado] ?? 'bg-secondary text-white'
+    return map[estado] ?? 'bg-secondary text-fixed-white'
 }
 
 const fmt = (val, decimals = 2) =>
@@ -59,7 +59,7 @@ const fmt = (val, decimals = 2) =>
                 <div class="modal-content border-0 shadow-lg">
 
                     <!-- Header -->
-                    <div class="modal-header bg-primary text-white">
+                    <div class="modal-header bg-primary text-fixed-white">
                         <div class="d-flex align-items-center gap-2">
                             <i class="ri-file-list-3-line fs-4"></i>
                             <div>
