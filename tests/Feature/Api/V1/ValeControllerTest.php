@@ -15,6 +15,7 @@ use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use App\Notifications\ValeEmitidoNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -342,5 +343,78 @@ class ValeControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonCount(2, 'data');
+    }
+
+    /**
+     * GET /vales es el equivalente API del index de la web (Vales/Index.vue):
+     * debe listar vales en cualquier estado, igual que la web. A diferencia
+     * de GET /vales/pendientes, NO debe limitarse a PENDIENTE con vencimiento
+     * futuro (ver ListValeAction::execute() $soloPendientes).
+     */
+    public function test_el_listado_incluye_vales_en_cualquier_estado_no_solo_pendientes(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+
+        $grifo = $this->crearGrifo();
+        $pendiente = $this->crearVale(Vehiculo::factory()->create(), grifo: $grifo);
+        $usado = $this->crearVale(Vehiculo::factory()->create(), grifo: $grifo);
+        $usado->update(['estado_vale' => 'USADO']);
+        $anulado = $this->crearVale(Vehiculo::factory()->create(), grifo: $grifo);
+        $anulado->update(['estado_vale' => 'ANULADO']);
+        // PENDIENTE pero ya vencido: /vales/pendientes lo excluiría, este listado no.
+        $vencido = $this->crearVale(Vehiculo::factory()->create(), grifo: $grifo);
+        $vencido->update(['fecha_vencimiento' => now()->subDay()]);
+
+        $response = $this->actingAs($admin, 'api')->getJson(route('api.v1.vales.index'));
+
+        $response->assertOk();
+        $response->assertJsonCount(4, 'data');
+
+        $responseFiltrada = $this->actingAs($admin, 'api')->getJson(route('api.v1.vales.index', ['estado_vale' => 'USADO']));
+        $responseFiltrada->assertOk();
+        $responseFiltrada->assertJsonCount(1, 'data');
+        $responseFiltrada->assertJsonPath('data.0.id', $usado->id);
+    }
+
+    /**
+     * El orWhere() suelto de la búsqueda por nro_vale se combinaba (por
+     * precedencia de AND/OR en SQL) con el resto de la query, saltándose la
+     * restricción por área del jefe: bastaba con que el nro_vale coincidiera
+     * para ver vales de otras áreas. Ver ListValeAction::execute().
+     */
+    public function test_la_busqueda_por_nro_vale_respeta_la_restriccion_por_area_del_jefe(): void
+    {
+        // ListValeAction busca con whereRaw('CONCAT(...)'), sintaxis MySQL
+        // (la BD real); sqlite (BD de test) no trae CONCAT nativo, así que se
+        // registra aquí sólo para poder ejercitar la query completa.
+        DB::connection()->getPdo()->sqliteCreateFunction('CONCAT', fn (...$partes) => implode('', $partes));
+
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+
+        $grifo = $this->crearGrifo();
+
+        $vehiculoDelArea = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoDelArea, $area);
+        $valeDelArea = $this->crearVale($vehiculoDelArea, grifo: $grifo);
+
+        $vehiculoAjeno = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculoAjeno, Area::factory()->create());
+        $valeAjeno = $this->crearVale($vehiculoAjeno, grifo: $grifo);
+
+        // Mismo nro_vale pero distinta gestión (el par nro_vale+gestion es
+        // único): basta con que coincida el nro_vale suelto para disparar el
+        // bug, sin importar la gestión. `gestion` no está en Fillable (se
+        // autogenera en Vale::boot()), así que se asigna directo y se guarda.
+        $valeAjeno->nro_vale = $valeDelArea->nro_vale;
+        $valeAjeno->gestion = $valeDelArea->gestion - 1;
+        $valeAjeno->save();
+
+        $response = $this->actingAs($jefe, 'api')->getJson(route('api.v1.vales.index', ['nro_vale' => $valeDelArea->nro_vale]));
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.id', $valeDelArea->id);
     }
 }

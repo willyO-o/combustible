@@ -27,7 +27,10 @@ class ValeController extends Controller
     {
         $filters = $request->only(['nro_vale', 'fecha_desde', 'fecha_hasta', 'estado_vale', 'id_conductor']);
 
-        $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10), true, true);
+        // $soloPendientes=false: a diferencia de /vales/pendientes, este listado
+        // debe traer todos los estados (PENDIENTE, USADO, ANULADO) igual que el
+        // index de la web, filtrando sólo por lo que el cliente pida en $filters.
+        $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10), false, true);
 
         return response()->json($vales);
     }

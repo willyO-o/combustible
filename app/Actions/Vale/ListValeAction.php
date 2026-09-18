@@ -29,8 +29,14 @@ class ListValeAction
             ]);
 
         if (! empty($filtros['nro_vale'])) {
-            $query->where('nro_vale', $filtros['nro_vale'])
-                ->orWhereRaw('CONCAT(nro_vale, "/", gestion) = ?', [$filtros['nro_vale']]);
+            // Agrupado en un closure: un orWhere() suelto se combina con AND
+            // de menor precedencia que el resto de filtros (fechas, estado,
+            // restricción por rol), así que sin agrupar un nro_vale coincidente
+            // podía devolver vales que no cumplían el resto de condiciones.
+            $query->where(function ($query) use ($filtros) {
+                $query->where('nro_vale', $filtros['nro_vale'])
+                    ->orWhereRaw('CONCAT(nro_vale, "/", gestion) = ?', [$filtros['nro_vale']]);
+            });
         }
 
         if (! empty($filtros['fecha_desde'])) {
