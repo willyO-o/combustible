@@ -8,4 +8,4 @@
 export const APP_NAME = import.meta.env.VITE_APP_NAME || 'SIGET'
 
 export const APP_LONG_NAME =
-    import.meta.env.VITE_APP_LONG_NAME || 'Sistema Integral de Gestión de Maquinaria y Operaciones'
+    import.meta.env.VITE_APP_LONG_NAME || 'Sistema Integral de Gestión de Equipo y Transporte'

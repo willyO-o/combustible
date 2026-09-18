@@ -26,7 +26,7 @@ return [
     |
     */
 
-    'long_name' => env('APP_LONG_NAME', 'Sistema Integral de Gestión de Maquinaria y Operaciones'),
+    'long_name' => env('APP_LONG_NAME', 'Sistema Integral de Gestión de Equipo y Transporte'),
 
     /*
     |--------------------------------------------------------------------------

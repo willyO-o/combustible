@@ -35,7 +35,7 @@
 </head>
 <body>
     <div class="doc-topbar">
-        <h1>{{ config('app.name') }} — API de Gestión de Maquinaria y Operaciones</h1>
+        <h1>{{ config('app.name') }} — API de Gestión de Equipo y Transporte</h1>
         <span>Especificación: <a href="{{ asset('docs/openapi.yaml') }}" style="color:#9aa4b2;">openapi.yaml</a></span>
     </div>
 

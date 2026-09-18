@@ -1,7 +1,7 @@
 openapi: 3.0.3
 
 info:
-  title: SIGET — API de Gestión de Maquinaria y Operaciones
+  title: SIGET — API de Gestión de Equipo y Transporte
   description: |
     API REST para la gestión de operaciones diarias de la flota vehicular, autenticación de usuarios
     y parámetros generales del sistema.
