@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Models\ActividadRealizada;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\Conductor;
@@ -137,6 +138,37 @@ class OperacionDiariaControllerTest extends TestCase
         $controles = collect($response->json('data.mantenimientos_operacion'))->keyBy('tipo_mantenimiento');
         $this->assertSame('12.50', $controles['Combustible cargado']['pivot']['valor']);
         $this->assertSame('SI', $controles['Nivel de aceite']['pivot']['realizado']);
+    }
+
+    /**
+     * owen-it/laravel-auditing no audita nada cuando la app corre en consola
+     * (config/audit.php -> 'console'), así que este bug sólo se reproduce
+     * fuera de una prueba "normal" — de ahí el config(['audit.console' =>
+     * true]) explícito. ActividadRealizada extiende Pivot, que por defecto
+     * trae $incrementing = false; como actividad_realizada sí tiene su
+     * propia columna `id` autoincremental, sin ese override Eloquent nunca
+     * recupera el id tras el insert y el auditable_id queda null, violando
+     * el NOT NULL de `audits` (ver ActividadRealizada::$incrementing).
+     */
+    public function test_store_audita_la_actividad_realizada_sin_romper_por_auditable_id_nulo(): void
+    {
+        config(['audit.console' => true]);
+
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+        $payload = $this->payloadValido($conductor, $vehiculo);
+
+        $response = $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $payload);
+
+        $response->assertCreated();
+
+        $idActividadRealizada = $response->json('data.actividades_realizadas.0.pivot.id');
+        $this->assertNotNull($idActividadRealizada);
+
+        $this->assertDatabaseHas('audits', [
+            'auditable_type' => ActividadRealizada::class,
+            'auditable_id' => $idActividadRealizada,
+            'event' => 'created',
+        ]);
     }
 
     /**

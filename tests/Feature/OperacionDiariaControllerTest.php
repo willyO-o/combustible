@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Libraries\Reportes;
+use App\Models\ActividadRealizada;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\Conductor;
+use App\Models\MantenimientoOperacionDiaria;
 use App\Models\Material;
 use App\Models\OperacionDiaria;
 use App\Models\ParametrosEmpresa;
@@ -514,6 +516,53 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertDatabaseHas('actividad_realizada', [
             'id_operacion_diaria' => $operacion->id,
             'id_material' => $material->id,
+        ]);
+    }
+
+    /**
+     * owen-it/laravel-auditing no audita nada cuando la app corre en consola
+     * (config/audit.php -> 'console'), así que este bug sólo se reproduce
+     * fuera de una prueba "normal" — de ahí el config(['audit.console' =>
+     * true]) explícito. ActividadRealizada y MantenimientoOperacionDiaria
+     * extienden Pivot, que por defecto trae $incrementing = false; como
+     * ambas tablas tienen su propia columna `id` autoincremental, sin ese
+     * override Eloquent nunca recupera el id tras el insert y el
+     * auditable_id queda null, violando el NOT NULL de `audits` — el 500
+     * que se veía al crear una operación diaria desde la web.
+     */
+    public function test_store_audita_actividades_y_mantenimientos_sin_romper_por_auditable_id_nulo(): void
+    {
+        config(['audit.console' => true]);
+
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $combustible = $this->crearTipoMantenimientoOperacion('Combustible cargado', 'cantidad', 'L');
+
+        $response = $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'mantenimientos' => [
+                ['id_tipo_mantenimiento' => $combustible->id, 'valor' => 12.5, 'realizado' => null, 'evidencia' => UploadedFile::fake()->image('combustible.jpg')],
+            ],
+        ]));
+
+        $response->assertRedirect(route('operacion-diaria.index'));
+        $response->assertSessionDoesntHaveErrors();
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $actividadRealizada = $operacion->actividadesRealizadas()->firstOrFail()->pivot;
+        $mantenimientoOperacion = $operacion->mantenimientosOperacion()->firstOrFail()->pivot;
+
+        $this->assertDatabaseHas('audits', [
+            'auditable_type' => ActividadRealizada::class,
+            'auditable_id' => $actividadRealizada->id,
+            'event' => 'created',
+        ]);
+        $this->assertDatabaseHas('audits', [
+            'auditable_type' => MantenimientoOperacionDiaria::class,
+            'auditable_id' => $mantenimientoOperacion->id,
+            'event' => 'created',
         ]);
     }
 

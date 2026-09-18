@@ -68,6 +68,46 @@ class TipoVehiculoControllerTest extends TestCase
         ]);
     }
 
+    /**
+     * owen-it/laravel-auditing no audita nada cuando la app corre en consola
+     * (config/audit.php -> 'console'), así que este bug sólo se reproduce
+     * fuera de una prueba "normal" — de ahí el config(['audit.console' =>
+     * true]) explícito. IntervaloMantenimientoTipo extiende Pivot, que por
+     * defecto trae $incrementing = false; como intervalo_mantenimiento_tipo
+     * sí tiene su propia columna `id` autoincremental, sin ese override
+     * Eloquent nunca recupera el id tras el insert y el auditable_id queda
+     * null, violando el NOT NULL de `audits` (ver
+     * IntervaloMantenimientoTipo::$incrementing).
+     */
+    public function test_store_audita_los_intervalos_sin_romper_por_auditable_id_nulo(): void
+    {
+        config(['audit.console' => true]);
+
+        $aceite = $this->crearTipoMantenimiento('Cambio de aceite');
+        $grupo = GrupoVehiculo::factory()->create();
+
+        $response = $this->post(route('tipos-vehiculo.store'), [
+            'tipo_vehiculo' => 'Camioneta',
+            'estado_tipo_vehiculo' => 'ACTIVO',
+            'id_grupo_vehiculo' => $grupo->id,
+            'intervalos' => [
+                ['id_tipo_mantenimiento' => $aceite->id, 'tipo_medicion' => 'kilometraje', 'frecuencia' => 10000],
+            ],
+        ]);
+
+        $response->assertRedirect(route('tipos-vehiculo.index'));
+        $response->assertSessionDoesntHaveErrors();
+
+        $tipoVehiculo = TipoVehiculo::where('tipo_vehiculo', 'Camioneta')->firstOrFail();
+        $intervalo = $tipoVehiculo->intervalos()->firstOrFail();
+
+        $this->assertDatabaseHas('audits', [
+            'auditable_type' => IntervaloMantenimientoTipo::class,
+            'auditable_id' => $intervalo->id,
+            'event' => 'created',
+        ]);
+    }
+
     public function test_store_guarda_la_unidad_de_capacidad_sugerida(): void
     {
         $grupo = GrupoVehiculo::factory()->create();
