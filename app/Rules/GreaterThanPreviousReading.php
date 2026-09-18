@@ -2,15 +2,15 @@
 
 namespace App\Rules;
 
+use App\Models\CargaCombustible;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Translation\PotentiallyTranslatedString;
-use App\Models\CargaCombustible;
 
 class GreaterThanPreviousReading implements ValidationRule
 {
-
     protected mixed $idVehiculo;
+
     protected string $type; // 'kilometraje' u 'horometro'
 
     public function __construct(mixed $idVehiculo, string $type)
@@ -18,6 +18,7 @@ class GreaterThanPreviousReading implements ValidationRule
         $this->idVehiculo = $idVehiculo;
         $this->type = strtolower($type);
     }
+
     /**
      * Run the validation rule.
      *
@@ -26,7 +27,7 @@ class GreaterThanPreviousReading implements ValidationRule
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         //
-     if (!$this->idVehiculo || is_null($value)) {
+        if (! $this->idVehiculo || is_null($value)) {
             return;
         }
 
@@ -39,9 +40,10 @@ class GreaterThanPreviousReading implements ValidationRule
             $previousValue = $lastRecord->{$this->type};
 
             if ($previousValue !== null && $value < $previousValue) {
+                $etiqueta = $this->type === 'kilometraje' ? 'kilometraje' : 'horómetro';
                 $unidad = $this->type === 'kilometraje' ? 'km' : 'hrs';
 
-                $fail("El {$this->type} no puede ser inferior al último registrado ({$previousValue} {$unidad}).");
+                $fail("El {$etiqueta} no puede ser menor al último registrado para este vehículo ({$previousValue} {$unidad}).");
             }
         }
     }

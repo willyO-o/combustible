@@ -114,8 +114,11 @@ class CargaCombustibleRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'kilometraje.greater_than_previous_reading' => 'El kilometraje debe ser mayor al último registrado para este vehículo.',
-            'horometro.greater_than_previous_reading' => 'El horómetro debe ser mayor al último registrado para este vehículo.',
+            // kilometraje/horometro.greater_than_previous_reading NO se define
+            // aquí a propósito: GreaterThanPreviousReading ya arma su propio
+            // mensaje con el último valor registrado (ver su $fail()), y una
+            // entrada estática aquí lo pisaría dejando al usuario sin saber
+            // cuál es el valor mínimo esperado.
             'kilometraje.required_if' => 'El kilometraje es obligatorio para vehículos con medición por kilometraje.',
             'horometro.required_if' => 'El horómetro es obligatorio para vehículos con medición por horómetro.',
         ];

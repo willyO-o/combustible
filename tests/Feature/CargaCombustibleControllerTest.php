@@ -479,6 +479,50 @@ class CargaCombustibleControllerTest extends TestCase
         $this->assertSame('USADO', $vale->fresh()->estado_vale);
     }
 
+    /**
+     * GreaterThanPreviousReading ya arma su propio mensaje con el último
+     * valor registrado (sólo de carga_combustible, no de operacion_diaria);
+     * CargaCombustibleRequest::messages() ya no lo pisa con un texto
+     * genérico sin el valor (ver el comentario ahí).
+     */
+    public function test_store_rechaza_un_kilometraje_menor_al_ultimo_registrado_mostrando_el_valor(): void
+    {
+        $this->crearParametrosEmpresa();
+
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $conductor = $this->crearConductor();
+        $grifo = $this->crearGrifo();
+        $tipoCombustible = TipoCombustible::factory()->create();
+
+        CargaCombustible::create([
+            'fecha_carga' => now()->subDay(),
+            'litros' => 40,
+            'precio' => 9.5,
+            'kilometraje' => 15000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'tipo_carga' => 'PREPAGO',
+        ]);
+
+        $response = $this->post(route('cargas.store'), [
+            'fecha_carga' => now()->format('Y-m-d'),
+            'litros' => 40,
+            'precio' => 9.5,
+            'kilometraje' => 14000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'tipo_carga' => 'PREPAGO',
+        ]);
+
+        $response->assertSessionHasErrors('kilometraje');
+        $mensaje = session('errors')->get('kilometraje')[0];
+        $this->assertStringContainsString('15000', $mensaje);
+    }
+
     public function test_store_con_vale_notifica_a_quien_lo_emitio(): void
     {
         Notification::fake();
