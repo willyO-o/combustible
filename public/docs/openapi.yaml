@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.10.0"
+  version: "1.11.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -83,8 +83,9 @@ tags:
     description: |
       Paso 1 del flujo de mantenimiento: el conductor (o quien registre en su nombre) reporta
       una solicitud o alarma de mantenimiento preventivo/correctivo para un vehículo. Por ahora
-      solo se documentan los endpoints de **listado** y **registro**; el resto del flujo
-      (aprobación, orden de trabajo, ejecución) se documentará más adelante, una vez probado.
+      solo se documentan los endpoints de **listado**, **registro**, **detalle**, **descarga del
+      PDF** y **emisión de la orden de trabajo** (Paso 2, para jefe de área / administrador) a
+      partir de una solicitud pendiente.
   - name: Órdenes de Trabajo
     description: |
       Paso 3 del flujo de mantenimiento, visto desde la app móvil del **técnico de
@@ -413,7 +414,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.10.0"
+                api_version: "1.11.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -2708,6 +2709,232 @@ paths:
                 message: Error al registrar la solicitud de mantenimiento.
                 error: "Detalle técnico interno del error (varía según la causa)."
 
+  /solicitudes-mantenimiento/{solicitud}/orden-trabajo/formulario:
+    get:
+      tags: [Solicitudes de Mantenimiento]
+      summary: Datos y catálogos del formulario para emitir la orden de trabajo
+      description: |
+        Entrega **en un solo llamado** todo lo necesario para armar el formulario que termina en
+        `POST /solicitudes-mantenimiento/{solicitud}/orden-trabajo`:
+
+        - `solicitud`: los datos que la orden **hereda** de la solicitud (vehículo, conductor,
+          categoría, kilometraje/horómetro). La app los muestra **bloqueados**, sólo como
+          información.
+        - `valores_por_defecto.nota_emisor`: la nota del emisor precargada con la descripción
+          del problema de la solicitud. Es editable y, al enviar el formulario, es obligatoria.
+        - `catalogos.tecnicos`: técnicos de mantenimiento **activos** (cada `id` va en
+          `id_usuario_ejecuta`, obligatorio).
+        - `catalogos.talleres`: talleres externos **activos** (cada `id` va en `id_taller`,
+          opcional; sin taller la orden es interna).
+
+        Requiere el mismo permiso que el POST (`mantenimiento.ordenes.crear`) y la solicitud
+        debe estar `PENDIENTE` sin orden previa; si no, responde `403` / `422` respectivamente,
+        de modo que la app puede usar este llamado para decidir si muestra el formulario.
+      parameters:
+        - name: solicitud
+          in: path
+          required: true
+          description: ID de la solicitud de mantenimiento (debe estar `PENDIENTE`).
+          schema: { type: integer }
+          example: 12
+      responses:
+        '200':
+          description: Datos y catálogos del formulario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FormularioOrdenTrabajoResponse'
+              example:
+                data:
+                  solicitud:
+                    id: 12
+                    nro: "000012/2026"
+                    estado: PENDIENTE
+                    tipo_mantenimiento: PREVENTIVO
+                    descripcion_problema: Cambio de aceite y filtros
+                    kilometraje_actual: 85000
+                    horometro_actual: null
+                    vehiculo:
+                      id: 1
+                      codigo: PM-TRA-0001
+                      nro_placa: 148-JLK
+                      marca: Volvo
+                      modelo: FH16
+                      tipo_medicion: kilometraje
+                    conductor:
+                      id: 1
+                      persona:
+                        id: 1
+                        nombres: Juan
+                        paterno: García
+                        materno: López
+                        ci: "1234567"
+                  valores_por_defecto:
+                    nota_emisor: Cambio de aceite y filtros
+                  catalogos:
+                    tecnicos:
+                      - { id: 5, name: Técnico Uno }
+                      - { id: 6, name: Técnico Dos }
+                    talleres:
+                      - { id: 4, razon_social: Taller Mecánico Central S.R.L., nit: "1023456019" }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El usuario autenticado no tiene el permiso `mantenimiento.ordenes.crear`.
+          content:
+            application/json:
+              example:
+                message: No tiene permiso para generar órdenes de trabajo.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: La solicitud ya no está disponible (no está `PENDIENTE` o ya tiene una orden de trabajo).
+          content:
+            application/json:
+              example:
+                message: Sólo las solicitudes PENDIENTES sin orden de trabajo pueden generar una orden.
+
+  /solicitudes-mantenimiento/{solicitud}/orden-trabajo:
+    post:
+      tags: [Solicitudes de Mantenimiento]
+      summary: Emitir la orden de trabajo de una solicitud pendiente
+      description: |
+        Convierte una solicitud de mantenimiento **PENDIENTE** en una orden de trabajo (Paso 2 del
+        flujo). Es el equivalente al botón **"Generar orden de trabajo"** del sistema web, pero
+        con un cuerpo mínimo: sólo se envían los datos que se pueden editar.
+
+        **Qué se hereda de la solicitud (no se envía):** el vehículo, el conductor, la categoría
+        (`tipo_mantenimiento`: preventivo o correctivo) y la lectura de kilometraje u horómetro.
+        Si se envían en el cuerpo, se ignoran.
+
+        **Qué se envía:**
+        - `id_usuario_ejecuta` (**obligatorio**): el **técnico de mantenimiento** responsable.
+          Debe ser un técnico activo (ver `GET /solicitudes-mantenimiento/{solicitud}/orden-trabajo/formulario`
+          → `catalogos.tecnicos`).
+        - `nota_emisor` (**obligatorio**): el trabajo a realizar. El formulario la entrega
+          precargada con la descripción del problema de la solicitud (`valores_por_defecto`),
+          y se puede modificar.
+        - `id_taller` (opcional): taller externo activo (`catalogos.talleres`). Sin taller la
+          orden es `INTERNO`; con taller es `EXTERNO`.
+        - `observacion` (opcional): observaciones adicionales.
+
+        **Resultado:** se crea la orden en estado `PENDIENTE` (con el número correlativo de la
+        gestión, emitida por el usuario autenticado), la solicitud pasa a `APROBADA` y se
+        notifica al técnico asignado (notificación en `GET /notificaciones` y push).
+
+        **Restricciones:**
+        - El usuario autenticado debe tener el permiso **`mantenimiento.ordenes.crear`** (el
+          mismo que muestra el botón "Generar Orden de Trabajo" en el sistema web). Lo tienen
+          por defecto `jefe-area` y `administrador`, y `super-admin` siempre; quien no lo tenga
+          (p. ej. `conductor` o `tecnico-mantenimiento`) recibe `403`. Los permisos del
+          usuario se consultan en `GET /auth/me`.
+        - La solicitud debe estar `PENDIENTE` y no tener ya una orden de trabajo; una solicitud
+          puede generar **una sola** orden. En caso contrario responde `422`.
+      parameters:
+        - name: solicitud
+          in: path
+          required: true
+          description: ID de la solicitud de mantenimiento (debe estar `PENDIENTE`).
+          schema: { type: integer }
+          example: 12
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmitirOrdenTrabajoRequest'
+            examples:
+              minimo:
+                summary: Mínimo (orden interna)
+                value:
+                  id_usuario_ejecuta: 5
+                  nota_emisor: Cambio de aceite y filtros
+              completo:
+                summary: Con taller externo y notas
+                value:
+                  id_usuario_ejecuta: 5
+                  id_taller: 4
+                  nota_emisor: Cambiar aceite y filtros. Revisar también el sistema de frenos.
+                  observacion: Priorizar, el vehículo sale de viaje el lunes.
+      responses:
+        '201':
+          description: Orden de trabajo emitida. La solicitud de origen quedó `APROBADA`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: "Orden de trabajo N° 000001/2026 emitida exitosamente." }
+                  data: { $ref: '#/components/schemas/OrdenTrabajo' }
+              example:
+                message: "Orden de trabajo N° 000001/2026 emitida exitosamente."
+                data:
+                  id: 1
+                  id_solicitud_mantenimiento: 12
+                  id_vehiculo: 1
+                  id_conductor: 1
+                  id_taller: null
+                  id_usuario_emite: 2
+                  id_usuario_ejecuta: 5
+                  nro_orden: 1
+                  gestion: "2026"
+                  fecha_emision: "2026-09-19T10:15:00.000000Z"
+                  fecha_ejecucion: null
+                  fecha_culminacion: null
+                  nota_emisor: Cambio de aceite y filtros
+                  observacion: null
+                  tipo_mantenimiento: PREVENTIVO
+                  kilometraje_actual: 85000
+                  horometro_actual: null
+                  estado_orden: PENDIENTE
+                  nro: "000001/2026"
+                  tipo_orden: INTERNO
+                  vehiculo:
+                    id: 1
+                    nro_placa: 148-JLK
+                    codigo: PM-TRA-0001
+                    marca: Volvo
+                  usuarioEmite: { id: 2, name: Jefe de Transportes }
+                  usuarioEjecuta: { id: 5, name: Técnico Uno }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El usuario autenticado no tiene el permiso `mantenimiento.ordenes.crear`.
+          content:
+            application/json:
+              example:
+                message: No tiene permiso para generar órdenes de trabajo.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: |
+            Error de validación de los datos enviados, o la solicitud ya no está disponible
+            (no está `PENDIENTE` o ya tiene una orden de trabajo).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefaultValidationErrorResponse'
+              examples:
+                validacion:
+                  summary: Datos inválidos
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      id_usuario_ejecuta: ["Debe asignar un responsable de ejecución."]
+                      nota_emisor: ["Debe indicar el trabajo a realizar (nota del emisor)."]
+                solicitud_no_disponible:
+                  summary: La solicitud no está pendiente o ya tiene orden
+                  value:
+                    message: Sólo las solicitudes PENDIENTES sin orden de trabajo pueden generar una orden.
+        '500':
+          description: Error inesperado al emitir la orden de trabajo.
+          content:
+            application/json:
+              example:
+                message: Error al emitir la orden de trabajo.
+                error: "Detalle técnico interno del error (varía según la causa)."
+
   /solicitudes-mantenimiento/{solicitud}/pdf:
     get:
       tags: [Solicitudes de Mantenimiento]
@@ -3640,7 +3867,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.10.0" }
+        api_version: { type: string, example: "1.11.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -5361,6 +5588,101 @@ components:
         prev_page_url: { type: string, nullable: true, example: null }
         to: { type: integer, nullable: true, example: 1 }
         total: { type: integer, example: 1 }
+
+    FormularioOrdenTrabajoResponse:
+      type: object
+      description: Datos y catálogos para armar el formulario de emisión de la orden de trabajo.
+      properties:
+        data:
+          type: object
+          properties:
+            solicitud:
+              type: object
+              description: Solicitud de origen. Los datos que la orden hereda se muestran bloqueados en la app.
+              properties:
+                id: { type: integer, example: 12 }
+                nro: { type: string, example: "000012/2026" }
+                estado: { type: string, example: PENDIENTE }
+                tipo_mantenimiento: { type: string, enum: [PREVENTIVO, CORRECTIVO], example: PREVENTIVO }
+                descripcion_problema: { type: string, example: Cambio de aceite y filtros }
+                kilometraje_actual: { type: integer, nullable: true, example: 85000 }
+                horometro_actual: { type: integer, nullable: true, example: null }
+                vehiculo:
+                  type: object
+                  properties:
+                    id: { type: integer, example: 1 }
+                    codigo: { type: string, example: PM-TRA-0001 }
+                    nro_placa: { type: string, example: 148-JLK }
+                    marca: { type: string, example: Volvo }
+                    modelo: { type: string, nullable: true, example: FH16 }
+                    tipo_medicion: { type: string, enum: [kilometraje, horometro], example: kilometraje }
+                conductor:
+                  type: object
+                  nullable: true
+                  description: "`null` si la solicitud no tiene conductor."
+                  properties:
+                    id: { type: integer, example: 1 }
+                    persona:
+                      type: object
+                      properties:
+                        id: { type: integer, example: 1 }
+                        nombres: { type: string, example: Juan }
+                        paterno: { type: string, example: García }
+                        materno: { type: string, nullable: true, example: López }
+                        ci: { type: string, example: "1234567" }
+            valores_por_defecto:
+              type: object
+              properties:
+                nota_emisor: { type: string, description: Descripción del problema de la solicitud, para precargar la nota (editable)., example: Cambio de aceite y filtros }
+            catalogos:
+              type: object
+              properties:
+                tecnicos:
+                  type: array
+                  description: Técnicos de mantenimiento activos (`id` → `id_usuario_ejecuta`).
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 5 }
+                      name: { type: string, example: Técnico Uno }
+                talleres:
+                  type: array
+                  description: Talleres externos activos (`id` → `id_taller`).
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 4 }
+                      razon_social: { type: string, example: Taller Mecánico Central S.R.L. }
+                      nit: { type: string, nullable: true, example: "1023456019" }
+
+    EmitirOrdenTrabajoRequest:
+      type: object
+      description: |
+        Cuerpo esperado por `POST /solicitudes-mantenimiento/{solicitud}/orden-trabajo`. El
+        vehículo, el conductor, la categoría y las lecturas se toman de la solicitud y no deben
+        enviarse (si se envían se ignoran).
+      required: [id_usuario_ejecuta, nota_emisor]
+      properties:
+        id_usuario_ejecuta:
+          type: integer
+          description: Técnico de mantenimiento **activo** responsable de ejecutar la orden (ver `catalogos.tecnicos` en `GET /solicitudes-mantenimiento/{solicitud}/orden-trabajo/formulario`).
+          example: 5
+        nota_emisor:
+          type: string
+          maxLength: 1000
+          description: Trabajo a realizar. El formulario la entrega precargada con la descripción del problema de la solicitud; se puede modificar.
+          example: Cambiar aceite y filtros. Revisar también el sistema de frenos.
+        id_taller:
+          type: integer
+          nullable: true
+          description: Taller externo **activo** (ver `catalogos.talleres` del formulario). Omitir o `null` para una orden interna.
+          example: null
+        observacion:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Observaciones adicionales.
+          example: Priorizar, el vehículo sale de viaje el lunes.
 
     DetalleMantenimientoStoreRequest:
       type: object

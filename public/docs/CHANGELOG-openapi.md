@@ -2,6 +2,36 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.11.0 — 2026-09-19
+
+Emisión de órdenes de trabajo desde la API: quien tenga el permiso `mantenimiento.ordenes.crear`
+puede convertir una solicitud de mantenimiento pendiente en orden de trabajo con un cuerpo mínimo,
+igual que el botón "Generar Orden de Trabajo" del sistema web. No cambia ningún endpoint existente.
+
+### Agregado
+
+#### `GET /solicitudes-mantenimiento/{solicitud}/orden-trabajo/formulario`
+
+- Entrega en un solo llamado lo necesario para armar el formulario: los datos heredados de la
+  solicitud (`solicitud`, sólo informativos/bloqueados), la nota precargada
+  (`valores_por_defecto.nota_emisor`) y los catálogos `catalogos.tecnicos` (técnicos activos) y
+  `catalogos.talleres` (talleres activos).
+- Mismo permiso y misma disponibilidad de la solicitud que el POST: `403` sin permiso, `422` si
+  la solicitud no está `PENDIENTE` o ya tiene orden.
+- Schema `FormularioOrdenTrabajoResponse`.
+
+#### `POST /solicitudes-mantenimiento/{solicitud}/orden-trabajo`
+
+- Emite la orden de trabajo de una solicitud `PENDIENTE` (sin orden previa). Se envían sólo los
+  datos editables: `id_usuario_ejecuta` y `nota_emisor` (**obligatorios**), `id_taller` y
+  `observacion` (opcionales). Vehículo, conductor, categoría y lecturas se heredan de la solicitud.
+- Requiere el permiso `mantenimiento.ordenes.crear` (lo tienen `jefe-area` y `administrador`;
+  `super-admin` siempre). La lista de permisos del usuario viene en `GET /auth/me`.
+- La orden nace `PENDIENTE`, la solicitud pasa a `APROBADA` y se notifica al técnico asignado.
+- Respuestas: `201` con la orden, `401`, `403` (sin permiso), `404`, `422` (datos inválidos, o
+  solicitud no pendiente / ya con orden).
+- Schema `EmitirOrdenTrabajoRequest`.
+
 ## 1.10.0 — 2026-09-16
 
 Notificaciones push (Firebase Cloud Messaging) para la app Flutter: nuevo tag y 2 endpoints para

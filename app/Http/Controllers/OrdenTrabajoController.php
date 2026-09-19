@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\OrdenTrabajo\CreateOrdenTrabajoAction;
 use App\Events\OrdenTrabajoAsignada;
 use App\Events\OrdenTrabajoCulminada;
 use App\Events\OrdenTrabajoVerificada;
@@ -20,7 +21,6 @@ use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -147,59 +147,12 @@ class OrdenTrabajoController extends Controller
      * Guarda la orden de trabajo.
      *
      * El acceso ya queda restringido a jefes de área/administradores por
-     * OrdenTrabajoRequest::authorize(). Toca 2 tablas (solicitud_mantenimiento
-     * + orden_trabajo, ver abajo), por eso corre dentro de una transacción.
+     * OrdenTrabajoRequest::authorize(). La lógica de emisión (con o sin
+     * solicitud de origen) vive en CreateOrdenTrabajoAction, compartida con la API.
      */
-    public function store(OrdenTrabajoRequest $request): RedirectResponse
+    public function store(OrdenTrabajoRequest $request, CreateOrdenTrabajoAction $action): RedirectResponse
     {
-        $data = $request->validated();
-
-        $orden = DB::transaction(function () use ($data) {
-            $huboSolicitudOrigen = ! empty($data['id_solicitud_mantenimiento']);
-
-            if ($huboSolicitudOrigen) {
-                // Si la orden nace de una solicitud, el vehículo/conductor y la
-                // clasificación del mantenimiento se toman siempre de la
-                // solicitud de origen: se fuerzan aquí para que no puedan
-                // alterarse manipulando el formulario (que ya los muestra
-                // bloqueados como información).
-                $solicitud = SolicitudMantenimiento::findOrFail($data['id_solicitud_mantenimiento']);
-                $data['id_vehiculo'] = $solicitud->id_vehiculo;
-                $data['id_conductor'] = $solicitud->id_conductor;
-                $data['tipo_mantenimiento'] = $solicitud->tipo_mantenimiento;
-                $data['kilometraje_actual'] = $solicitud->kilometraje_actual;
-                $data['horometro_actual'] = $solicitud->horometro_actual;
-            } else {
-                // Sin solicitud de origen: se genera una automáticamente, ya
-                // APROBADA (nace junto con una orden ya emitida), con los
-                // mismos datos del formulario — el reporte de mantenimiento
-                // requiere que toda orden quede vinculada a una solicitud.
-                $solicitud = SolicitudMantenimiento::create([
-                    'id_vehiculo' => $data['id_vehiculo'],
-                    'id_conductor' => $data['id_conductor'] ?? null,
-                    'tipo_mantenimiento' => $data['tipo_mantenimiento'],
-                    'descripcion_problema' => ($data['nota_emisor'] ?? null)
-                        ?: 'Generado automáticamente al emitir la orden de trabajo, sin solicitud de origen.',
-                    'kilometraje_actual' => $data['kilometraje_actual'] ?? null,
-                    'horometro_actual' => $data['horometro_actual'] ?? null,
-                    'fecha_solicitud' => now(),
-                    'estado' => 'APROBADA',
-                ]);
-                $data['id_solicitud_mantenimiento'] = $solicitud->id;
-            }
-
-            $orden = OrdenTrabajo::create($data);
-
-            // Marcar la solicitud origen como aprobada (la recién generada ya
-            // nace así; sólo aplica cuando venía de una solicitud existente).
-            if ($huboSolicitudOrigen) {
-                $solicitud->update(['estado' => 'APROBADA']);
-            }
-
-            return $orden;
-        });
-
-        OrdenTrabajoAsignada::dispatch($orden);
+        $orden = $action->execute($request->validated());
 
         return redirect()->route('mantenimiento.ordenes.show', $orden)
             ->with('success', 'Orden de trabajo N° '.$orden->nro.' emitida exitosamente.');

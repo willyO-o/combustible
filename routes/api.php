@@ -112,6 +112,14 @@ Route::middleware('auth:api')->group(function () {
 
     Route::get('solicitudes-mantenimiento/{solicitud}/pdf', [SolicitudMantenimientoController::class, 'pdf'])->name('api.v1.solicitudes-mantenimiento.pdf');
 
+    // Emitir la orden de trabajo de una solicitud PENDIENTE (requiere el
+    // permiso mantenimiento.ordenes.crear): payload simplificado, el resto se
+    // hereda de la solicitud. El GET entrega los datos y catálogos del formulario.
+    Route::get('solicitudes-mantenimiento/{solicitud}/orden-trabajo/formulario', [SolicitudMantenimientoController::class, 'formularioOrden'])
+        ->name('api.v1.solicitudes-mantenimiento.orden-trabajo.formulario');
+    Route::post('solicitudes-mantenimiento/{solicitud}/orden-trabajo', [SolicitudMantenimientoController::class, 'emitirOrden'])
+        ->name('api.v1.solicitudes-mantenimiento.orden-trabajo.store');
+
     Route::resource('solicitudes-mantenimiento', SolicitudMantenimientoController::class)
         ->parameters(['solicitudes-mantenimiento' => 'solicitud'])
         ->only(['index', 'store', 'show', 'update'])
