@@ -2,6 +2,26 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.12.0 — 2026-09-23
+
+Nuevas notificaciones para los jefes de área. No cambia ningún endpoint.
+
+### Agregado
+
+- `carga_combustible_area`: al registrarse una carga de combustible (con o sin vale) de un
+  vehículo del área, se avisa a los jefes de esa área para que la revisen. Campos extra en
+  `data`: `id_carga_combustible`, `nro`, `id_vale` (puede ser nulo), `id_vehiculo`, `placa`, `litros`.
+- `solicitud_mantenimiento_registrada`: al registrarse una solicitud de mantenimiento se avisa a
+  los jefes del área del vehículo. Campos extra en `data`: `id_solicitud`, `nro`, `id_vehiculo`,
+  `placa`, `tipo_mantenimiento`.
+
+### Cambiado
+
+- `carga_combustible_registrada` (aviso a quien emitió el vale) ahora dice "de tu vale". Si el
+  emisor también es jefe del área recibe sólo este aviso. Quien registra la carga o la solicitud
+  no recibe notificación de su propia acción.
+
+
 ## 1.11.0 — 2026-09-19
 
 Emisión de órdenes de trabajo desde la API: quien tenga el permiso `mantenimiento.ordenes.crear`

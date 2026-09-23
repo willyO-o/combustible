@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.11.0"
+  version: "1.12.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -3584,7 +3584,9 @@ paths:
         | `orden_trabajo_verificada`       | Quien emitió la orden la marca VERIFICADO (sólo panel web).            | Técnico asignado (`usuarioEjecuta`) |
         | `vale_emitido`                   | Se emite un nuevo vale de combustible.                                 | Conductor asignado al vale (si tiene cuenta de usuario) |
         | `vale_por_vencer`                | Un vale PENDIENTE está a 2 días o menos de su vencimiento (aviso diario automático). | Conductor asignado al vale |
-        | `carga_combustible_registrada`   | Se registra una carga de combustible que usó un vale.                  | Quien emitió ese vale |
+        | `carga_combustible_registrada`   | Se registra una carga de combustible que usó un vale.                  | Quien emitió ese vale ("tu vale") |
+        | `carga_combustible_area`         | Se registra una carga de combustible (con o sin vale) de un vehículo del área. | Jefes del área del vehículo (no se repite al emisor del vale ni a quien registró la carga) |
+        | `solicitud_mantenimiento_registrada` | Se registra una nueva solicitud de mantenimiento.                  | Jefes del área del vehículo (no a quien la registró) |
         | `carga_material_registrada`      | Se abre un nuevo flete (carga de material).                            | Supervisores (jefe-area/administrador) |
       responses:
         '200':
@@ -5769,6 +5771,8 @@ components:
             - vale_emitido
             - vale_por_vencer
             - carga_combustible_registrada
+            - carga_combustible_area
+            - solicitud_mantenimiento_registrada
             - carga_material_registrada
           example: observacion_operacion
         titulo: { type: string, example: Observación en operación diaria }

@@ -57,8 +57,18 @@ class NotificacionFormatter
             ],
             'carga_combustible_registrada' => [
                 'Carga de combustible registrada',
-                'Se registró la carga N° '.($data['nro'] ?? '').' ('.($data['litros'] ?? '').' Lt) del vale que emitiste.',
+                'Se registró la carga N° '.($data['nro'] ?? '').' ('.($data['litros'] ?? '').' Lt) de tu vale.',
                 'ri-gas-station-line',
+            ],
+            'carga_combustible_area' => [
+                'Carga de combustible en tu área',
+                'Se registró la carga N° '.($data['nro'] ?? '').' ('.($data['litros'] ?? '').' Lt) del vehículo '.($data['placa'] ?? '').'. Revísala.',
+                'ri-gas-station-line',
+            ],
+            'solicitud_mantenimiento_registrada' => [
+                'Nueva solicitud de mantenimiento',
+                'Se registró la solicitud N° '.($data['nro'] ?? '').' del vehículo '.($data['placa'] ?? '').'. Revísala.',
+                'ri-tools-line',
             ],
             'carga_material_registrada' => [
                 'Nuevo flete registrado',

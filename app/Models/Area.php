@@ -106,6 +106,10 @@ class Area extends Model implements Auditable
             User::class,
             'encargado_area',
             'id_area',
+            'id_persona',
+            null,
+            // El pivote guarda id_persona: se une contra users.id_persona,
+            // no contra users.id (que sólo coincidiría por casualidad).
             'id_persona'
         )->withPivot(['id', 'tipo_encargo', 'fecha_inicio', 'fecha_reasignacion', 'fecha_fin', 'motivo', 'estado_encargo'])->withTimestamps();
     }

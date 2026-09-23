@@ -182,4 +182,23 @@ class Vehiculo extends Model implements Auditable
                 ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
         })->orderBy('vehiculo_area.fecha_asignacion', 'desc');
     }
+
+    /**
+     * Usuarios activos que son encargados (jefes) vigentes de alguna de las
+     * áreas a las que el vehículo está asignado hoy. Un vehículo puede estar
+     * en varias áreas a la vez, por eso puede devolver más de un jefe.
+     */
+    public function usuariosEncargadosActivos()
+    {
+        $idsAreas = $this->areasAsignadas()->pluck('area.id');
+
+        return User::where('estado_usuario', 'ACTIVO')
+            ->whereIn('id_persona', EncargadoArea::query()
+                ->whereIn('id_area', $idsAreas)
+                ->where('estado_encargo', 'ACTIVO')
+                ->where(function ($query) {
+                    $query->whereNull('fecha_fin')->orWhere('fecha_fin', '>', now());
+                })
+                ->select('id_persona'));
+    }
 }

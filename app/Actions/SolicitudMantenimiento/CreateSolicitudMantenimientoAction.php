@@ -2,6 +2,7 @@
 
 namespace App\Actions\SolicitudMantenimiento;
 
+use App\Events\MantenimientoSolicitado;
 use App\Models\SolicitudMantenimiento;
 use App\Models\User;
 
@@ -27,6 +28,10 @@ class CreateSolicitudMantenimientoAction
         $datos['id_usuario_registra'] = $user->id;
         $datos['estado'] = 'PENDIENTE';
 
-        return SolicitudMantenimiento::create($datos);
+        $solicitud = SolicitudMantenimiento::create($datos);
+
+        MantenimientoSolicitado::dispatch($solicitud);
+
+        return $solicitud;
     }
 }

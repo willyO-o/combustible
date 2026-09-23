@@ -211,6 +211,8 @@ necesarios para navegar a la pantalla correcta — es el mismo `data` que ya dev
 | `vale_emitido` | `id_vale`, `nro`, `litros`, `fecha_vencimiento` | Listado de vales (o detalle si se agrega luego) |
 | `vale_por_vencer` | `id_vale`, `nro`, `dias_restantes`, `fecha_vencimiento` | Listado de vales |
 | `carga_combustible_registrada` | `id_carga_combustible`, `nro`, `id_vale`, `litros` | Listado de cargas de combustible |
+| `carga_combustible_area` | `id_carga_combustible`, `nro`, `id_vale` (puede ser vacío), `id_vehiculo`, `placa`, `litros` | Listado de cargas de combustible (jefes de área: revisar) |
+| `solicitud_mantenimiento_registrada` | `id_solicitud`, `nro`, `id_vehiculo`, `placa`, `tipo_mantenimiento` | Detalle de la solicitud `id_solicitud` (jefes de área) |
 | `carga_material_registrada` | `id_carga_material`, `nro` | Detalle del flete `id_carga_material` |
 
 Todos además traen `url` (ruta absoluta del panel **web**, ej. `http://.../mantenimiento/ordenes/7`)
@@ -232,8 +234,12 @@ void _manejarTap(Map<String, dynamic> data) {
     case 'vale_por_vencer':
       Navigator.pushNamed(context, '/vales');
       break;
+    case 'carga_combustible_area':
     case 'carga_combustible_registrada':
       Navigator.pushNamed(context, '/cargas-combustible');
+      break;
+    case 'solicitud_mantenimiento_registrada':
+      Navigator.pushNamed(context, '/solicitudes/${data['id_solicitud']}');
       break;
     case 'carga_material_registrada':
       Navigator.pushNamed(context, '/control-cargas/${data['id_carga_material']}');
