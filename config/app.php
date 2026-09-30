@@ -30,6 +30,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | API Documentation (Swagger UI)
+    |--------------------------------------------------------------------------
+    |
+    | Habilita /api/documentation y la especificación OpenAPI. Debe permanecer
+    | en false en producción; actívala sólo de forma temporal con
+    | API_DOCS_ENABLED=true en el .env.
+    |
+    */
+
+    'api_docs_enabled' => (bool) env('API_DOCS_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

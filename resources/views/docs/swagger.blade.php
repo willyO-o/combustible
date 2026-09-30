@@ -36,7 +36,7 @@
 <body>
     <div class="doc-topbar">
         <h1>{{ config('app.name') }} — API de Gestión de Equipo y Transporte</h1>
-        <span>Especificación: <a href="{{ asset('docs/openapi.yaml') }}" style="color:#9aa4b2;">openapi.yaml</a></span>
+        <span>Especificación: <a href="{{ route('api.documentation.spec') }}" style="color:#9aa4b2;">openapi.yaml</a></span>
     </div>
 
     <div id="swagger-ui"></div>
@@ -46,7 +46,7 @@
     <script>
         window.onload = function() {
             window.ui = SwaggerUIBundle({
-                url: "{{ asset('docs/openapi.yaml') }}",
+                url: "{{ route('api.documentation.spec') }}",
                 dom_id: '#swagger-ui',
                 deepLinking: true,
                 presets: [

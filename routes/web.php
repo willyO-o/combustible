@@ -48,9 +48,24 @@ Route::get('/', function () {
 // Sirve una página estática con Swagger UI apuntando al archivo público
 // public/docs/openapi.yaml, que se mantiene desacoplado de Laravel: el
 // contenido de la documentación se edita ahí, no en anotaciones PHP.
+//
+// Deshabilitada por defecto: sólo responde cuando API_DOCS_ENABLED=true
+// (config('app.api_docs_enabled')); en caso contrario devuelve 404. La
+// especificación también se sirve por aquí (y no como archivo estático) porque
+// public/docs/ está bloqueada en public/.htaccess.
 Route::get('/api/documentation', function () {
+    abort_unless(config('app.api_docs_enabled'), 404);
+
     return view('docs.swagger');
 })->name('api.documentation');
+
+Route::get('/api/documentation/openapi.yaml', function () {
+    abort_unless(config('app.api_docs_enabled'), 404);
+
+    return response()->file(public_path('docs/openapi.yaml'), [
+        'Content-Type' => 'application/yaml; charset=UTF-8',
+    ]);
+})->name('api.documentation.spec');
 
 // ── Verificación pública de vales (QR) ──────────────────────────────────────
 // Sin autenticación: la URL sólo expone md5(id), nunca el id real. Pensada

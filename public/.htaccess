@@ -13,6 +13,11 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # La especificación OpenAPI (public/docs/) no debe ser pública: se sirve
+    # sólo a través de /api/documentation/openapi.yaml cuando
+    # API_DOCS_ENABLED=true. En Nginx: `location ^~ /docs/ { return 404; }`.
+    RewriteRule ^docs/ - [F,L]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
