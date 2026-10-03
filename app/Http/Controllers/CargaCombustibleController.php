@@ -65,13 +65,14 @@ class CargaCombustibleController extends Controller
                 'label' => $g->razon_social.($g->ciudad ? " — {$g->ciudad}" : ''),
             ]);
 
-        // verificar si el rol es conductor y obtener el conductor asignado al usuario autenticado
+        // Sólo un conductor puro (sin rol de gestión) registra en "modo
+        // conductor", limitado a sus vehículos y vales; si además es
+        // jefe-area/administrador, ese rol prevalece y ve el formulario completo.
         $conductor = null;
         $vehiculosAsignados = [];
         $valesConductor = [];
-        if (request()->user()->hasRole('conductor')) {
+        if (request()->user()->esConductorPuro() && request()->user()->persona?->conductor) {
             $conductor = request()->user()->persona;
-            $conductor->load('conductor');
 
             $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
 
@@ -146,9 +147,8 @@ class CargaCombustibleController extends Controller
         $carga->load(['vehiculo.tipoCombustible', 'vehiculo', 'conductor', 'grifo', 'tipoCombustible', 'vale', 'respaldosDigitales']);
 
         $conductor = null;
-        if (request()->user()->hasRole('conductor')) {
+        if (request()->user()->esConductorPuro() && request()->user()->persona?->conductor) {
             $conductor = request()->user()->persona;
-            $conductor->load('conductor');
         }
 
         // dd($carga->vehiculo->conductoresAsignados);
@@ -453,13 +453,16 @@ class CargaCombustibleController extends Controller
         }
         if ($q) {
             $nro = (int) $q;
-            $query->where('nro_vale', 'like', "%{$q}%")
-                ->orWhere('nro_vale', 'like', "%{$nro}%");
+            // Agrupado: un orWhere() suelto anulaba los filtros de estado,
+            // vencimiento, vehículo y conductor.
+            $query->where(function ($query) use ($q, $nro) {
+                $query->where('nro_vale', 'like', "%{$q}%")
+                    ->orWhere('nro_vale', 'like', "%{$nro}%");
+            });
         }
 
-        if (request()->user()->hasRole('conductor')) {
-            $idConductor = request()->user()->persona->id;
-            $query->where('id_conductor', $idConductor);
+        if (request()->user()->esConductorPuro()) {
+            $query->where('id_conductor', request()->user()->id_persona);
         }
 
         $vales = $query->limit(20)->get()

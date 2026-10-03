@@ -94,6 +94,22 @@ class CargaCombustiblePdfControllerTest extends TestCase
         $this->assertStringStartsWith('%PDF', $response->getContent());
     }
 
+    /**
+     * El rol administrador prevalece sobre conductor: no debe recibir 403
+     * por no ser el conductor del registro.
+     */
+    public function test_un_administrador_que_tambien_es_conductor_descarga_el_comprobante_de_cualquier_carga(): void
+    {
+        $admin = User::factory()->create(['id_persona' => Persona::factory()->create()->id]);
+        $admin->assignRole(['administrador', 'conductor']);
+        $carga = $this->crearCarga($this->crearConductor());
+
+        $response = $this->actingAs($admin, 'api')->get(route('api.v1.cargas.pdf', $carga));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
     public function test_un_conductor_no_descarga_el_comprobante_de_otro_conductor(): void
     {
         $carga = $this->crearCarga($this->crearConductor());

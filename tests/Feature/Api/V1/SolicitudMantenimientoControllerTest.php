@@ -122,6 +122,25 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $this->assertCount(1, $response->json('data'));
     }
 
+    /**
+     * Un conductor que además es administrador no queda limitado a sus
+     * propias solicitudes: el rol de gestión prevalece.
+     */
+    public function test_un_administrador_que_tambien_es_conductor_ve_todas_las_solicitudes(): void
+    {
+        $conductor = $this->crearConductor();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole(['administrador', 'conductor']);
+
+        $this->crearSolicitud(['id_conductor' => $this->crearConductor()->id]);
+
+        $response = $this->actingAs($user, 'api')
+            ->getJson(route('api.v1.solicitudes-mantenimiento.index'));
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+    }
+
     public function test_crea_una_solicitud_de_mantenimiento(): void
     {
         $conductor = $this->crearConductor();
@@ -177,6 +196,35 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $response->assertCreated();
         $response->assertJsonPath('data.id_conductor', $conductor->id);
         $response->assertJsonPath('data.id_usuario_registra', $admin->id);
+    }
+
+    /**
+     * CreateSolicitudMantenimientoAction usa el mismo criterio de conductor
+     * puro que el Request y el controller: un administrador que también es
+     * conductor registra para el conductor que eligió, no para sí mismo.
+     */
+    public function test_un_administrador_que_tambien_es_conductor_registra_para_el_conductor_elegido(): void
+    {
+        $propio = $this->crearConductor();
+        $user = User::factory()->create(['id_persona' => $propio->id]);
+        $user->assignRole(['administrador', 'conductor']);
+
+        $conductor = $this->crearConductor();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->crearAsignacion($conductor, $vehiculo);
+
+        $response = $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.solicitudes-mantenimiento.store'), [
+                'id_vehiculo' => $vehiculo->id,
+                'id_conductor' => $conductor->id,
+                'tipo_mantenimiento' => 'CORRECTIVO',
+                'descripcion_problema' => 'Falla en el motor',
+                'kilometraje_actual' => 15000,
+                'fecha_solicitud' => now()->toDateString(),
+            ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.id_conductor', $conductor->id);
     }
 
     public function test_store_rechaza_a_un_administrador_que_no_elige_conductor(): void

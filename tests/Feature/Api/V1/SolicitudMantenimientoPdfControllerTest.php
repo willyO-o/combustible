@@ -90,6 +90,24 @@ class SolicitudMantenimientoPdfControllerTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $response->getContent());
     }
 
+    /**
+     * El rol administrador prevalece sobre conductor: no debe recibir 403
+     * por no ser el conductor del registro.
+     */
+    public function test_un_administrador_que_tambien_es_conductor_puede_descargar_cualquier_solicitud(): void
+    {
+        $admin = User::factory()->create(['id_persona' => Persona::factory()->create()->id]);
+        $admin->assignRole(['administrador', 'conductor']);
+        $this->actingAs($admin, 'api');
+
+        $solicitud = $this->crearSolicitud(['id_conductor' => $this->crearConductor()->id]);
+
+        $response = $this->get(route('api.v1.solicitudes-mantenimiento.pdf', $solicitud->id));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
     public function test_un_conductor_no_puede_descargar_la_solicitud_de_otro_conductor(): void
     {
         // Los assignRole() van antes de cualquier actingAs(..., 'api'): Spatie

@@ -41,7 +41,7 @@ class SolicitudMantenimientoController extends Controller
             $query->where('id_vehiculo', $request->id_vehiculo);
         }
 
-        if ($request->user()->hasRole('conductor')) {
+        if ($request->user()->esConductorPuro()) {
             $query->where('id_conductor', $request->user()->id_persona);
         }
 

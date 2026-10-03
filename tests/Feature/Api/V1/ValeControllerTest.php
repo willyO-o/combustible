@@ -260,6 +260,24 @@ class ValeControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_un_administrador_que_tambien_es_conductor_ve_el_vale_de_otro_en_show(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $vale = Vale::create([
+            'litros' => 10, 'precio' => 6,
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'estado_vale' => 'PENDIENTE',
+        ]);
+
+        $user = User::factory()->create(['id_persona' => Conductor::factory()->create()->id]);
+        $user->assignRole(['administrador', 'conductor']);
+
+        $this->actingAs($user, 'api')->getJson(route('api.v1.vales.show', $vale))->assertOk();
+    }
+
     public function test_un_jefe_de_area_solo_ve_en_el_listado_los_vales_de_vehiculos_de_su_area(): void
     {
         $area = Area::factory()->create();

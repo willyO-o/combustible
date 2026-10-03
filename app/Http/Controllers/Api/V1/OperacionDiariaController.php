@@ -176,7 +176,7 @@ class OperacionDiariaController extends Controller
      */
     public function pdf(Request $request, OperacionDiaria $operacionDiaria): Response
     {
-        if ($request->user()->hasRole('conductor') && $operacionDiaria->id_conductor !== $request->user()->id_persona) {
+        if ($request->user()->esConductorPuro() && $operacionDiaria->id_conductor !== $request->user()->id_persona) {
             abort(403, 'No tienes permiso para descargar este reporte.');
         }
 

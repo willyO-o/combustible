@@ -102,6 +102,25 @@ class ValePdfControllerTest extends TestCase
         $this->assertStringStartsWith('%PDF-', $response->getContent());
     }
 
+    /**
+     * El rol administrador prevalece sobre conductor: no debe recibir 403
+     * por no ser el conductor del registro.
+     */
+    public function test_un_administrador_que_tambien_es_conductor_puede_descargar_cualquier_vale(): void
+    {
+        $admin = User::factory()->create(['id_persona' => Persona::factory()->create()->id]);
+        $admin->assignRole(['administrador', 'conductor']);
+
+        $conductor = $this->crearConductor();
+        $vale = $this->crearVale($conductor);
+
+        $response = $this->actingAs($admin, 'api')
+            ->get(route('api.v1.vales.pdf', $vale->id));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
     public function test_un_conductor_no_puede_descargar_el_vale_de_otro_conductor(): void
     {
         $conductor = $this->crearConductor();

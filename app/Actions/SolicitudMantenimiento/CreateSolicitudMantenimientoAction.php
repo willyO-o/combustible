@@ -17,7 +17,7 @@ class CreateSolicitudMantenimientoAction
         // "puro" queda siempre atado a sí mismo, ignorando cualquier
         // id_conductor que llegue en el payload (evita que se pueda
         // suplantar a otro conductor).
-        if (! $user->hasRole('jefe-area') && $user->hasRole('conductor') && $user->persona?->conductor) {
+        if ($user->esConductorPuro() && $user->persona?->conductor) {
             $datos['id_conductor'] = $user->id_persona;
         }
 

@@ -31,9 +31,13 @@ class ListSolicitudesMantenimientoAction
             ->withQueryString();
     }
 
+    /**
+     * Sólo un conductor puro queda limitado a sus propias solicitudes: si
+     * además es jefe-area, administrador o super-admin, ese rol prevalece.
+     */
     private function aplicarRestriccionesPorRol($query, User $user): void
     {
-        if ($user->hasRole('conductor')) {
+        if ($user->esConductorPuro()) {
             $query->where('id_conductor', $user->id_persona);
         }
     }

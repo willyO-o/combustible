@@ -44,14 +44,18 @@ class OperacionDiariaController extends Controller
 
         $conductores = [];
 
+        // Mismo criterio que ListOperacionesDiariasAction: administrador ve
+        // todos los conductores; jefe-area, los de sus áreas; conductor puro,
+        // ninguno (no filtra por conductor, sólo ve lo suyo).
         $areas = [];
+        $user = $request->user();
 
-        if ($request->user()->hasRole('conductor')) {
-            $areas = false;
-        }
-
-        if ($request->user()->hasRole('jefe-area')) {
-            $areas = $request->user()->persona->encargadoAreas()->pluck('id_area')->toArray();
+        if (! $user->hasAnyRole(['administrador', 'super-admin'])) {
+            if ($user->hasRole('jefe-area')) {
+                $areas = $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?: false;
+            } elseif ($user->hasRole('conductor')) {
+                $areas = false;
+            }
         }
 
         $conductores = Area::conductores($areas)?->map(function ($conductor) {

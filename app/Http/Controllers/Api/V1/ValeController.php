@@ -19,7 +19,7 @@ class ValeController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * Alcance por rol (sólo API, ver ListValeAction::aplicarRestriccionesPorRol):
+     * Alcance por rol (compartido con la web, ver ListValeAction::aplicarRestriccionesPorRol):
      * un jefe de área ve sólo los vales de vehículos de sus áreas a cargo,
      * administrador/super-admin ven todos los vales del sistema.
      */
@@ -30,7 +30,7 @@ class ValeController extends Controller
         // $soloPendientes=false: a diferencia de /vales/pendientes, este listado
         // debe traer todos los estados (PENDIENTE, USADO, ANULADO) igual que el
         // index de la web, filtrando sólo por lo que el cliente pida en $filters.
-        $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10), false, true);
+        $vales = $listValeAction->execute($filters, $request->user(), $request->input('per_page', 10));
 
         return response()->json($vales);
     }
@@ -79,7 +79,7 @@ class ValeController extends Controller
      */
     public function show(Request $request, Vale $vale): JsonResponse
     {
-        if ($request->user()->hasRole('conductor') && $vale->id_conductor !== $request->user()->id_persona) {
+        if ($request->user()->esConductorPuro() && $vale->id_conductor !== $request->user()->id_persona) {
             abort(403, 'No tienes permiso para ver este vale.');
         }
 
@@ -90,7 +90,7 @@ class ValeController extends Controller
 
     public function valesPendientes(Request $request, ListValeAction $listValeAction)
     {
-        $vales = $listValeAction->execute([], $request->user(), $request->input('per_page', 10), true, true);
+        $vales = $listValeAction->execute([], $request->user(), $request->input('per_page', 10), true);
 
         // modificar los campos pendientes para que solo se muestren los que tienen estado pendiente y fecha de vencimiento mayor o igual a la fecha actual
         $valesPendientes = $vales->map(function ($vale) {
@@ -128,7 +128,7 @@ class ValeController extends Controller
      */
     public function pdf(Request $request, Vale $vale): Response
     {
-        if ($request->user()->hasRole('conductor') && $vale->id_conductor !== $request->user()->id_persona) {
+        if ($request->user()->esConductorPuro() && $vale->id_conductor !== $request->user()->id_persona) {
             abort(403, 'No tienes permiso para descargar este vale.');
         }
 

@@ -9,6 +9,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Api/V1/ValeController.php,app/Http/Requests/ValeRequest.php,app/Http/Controllers/Api/V1/ParametrosController.php | .ai/rules/api-v1.md |
 | app/**/*.php | .ai/rules/app.md |
 | app/Http/Controllers/AreaController.php,resources/js/Pages/Areas/**,routes/web.php | .ai/rules/areas.md |
+| app/Actions/CargaCombustible/ListCargaCombustibleAction.php | .ai/rules/carga-combustible.md |
 | app/Notifications/*.php,app/Channels/*.php | .ai/rules/channels.md |
 | resources/js/Components/PageLoader.vue | .ai/rules/components.md |
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |

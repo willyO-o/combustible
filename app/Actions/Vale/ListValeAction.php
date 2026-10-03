@@ -9,13 +9,12 @@ use Illuminate\Pagination\LengthAwarePaginator;
 class ListValeAction
 {
     /**
-     * @param  bool  $aplicarAlcanceGestion  Cuando es `true`, un jefe de área
-     *                                       (puro o combinado con `conductor`, pero sin `administrador`/`super-admin`)
-     *                                       ve sólo los vales de vehículos asignados a sus áreas a cargo, en vez de
-     *                                       todos los vales del sistema. `false` (comportamiento previo/por
-     *                                       defecto, usado por la web) no aplica ningún filtro para jefe-area.
+     * El alcance depende del rol (web y API): administrador/super-admin ven
+     * todo y prevalecen sobre cualquier otro rol combinado; un jefe de área
+     * ve los vales de vehículos de sus áreas a cargo; un conductor puro ve
+     * sólo los suyos.
      */
-    public function execute(array $filtros, User $user, int $perPage = 10, $soloPendientes = false, bool $aplicarAlcanceGestion = false): LengthAwarePaginator
+    public function execute(array $filtros, User $user, int $perPage = 10, $soloPendientes = false): LengthAwarePaginator
     {
 
         $query = Vale::select([
@@ -62,7 +61,7 @@ class ListValeAction
 
         }
 
-        $this->aplicarRestriccionesPorRol($query, $user, $aplicarAlcanceGestion);
+        $this->aplicarRestriccionesPorRol($query, $user);
 
         return $query->orderBy('nro_vale', 'desc')
             ->orderBy('gestion', 'desc')
@@ -71,42 +70,29 @@ class ListValeAction
     }
 
     /**
-     * Con `$aplicarAlcanceGestion = false` (web) el comportamiento es
-     * exactamente el de antes: sólo se restringe a quien tenga rol
-     * `conductor`, sin importar qué otros roles tenga combinados.
-     *
-     * Con `$aplicarAlcanceGestion = true` (API) se respeta el mismo criterio
-     * de "conductor puro" ya usado en Api\V1\OperacionDiariaController: un
-     * conductor que ADEMÁS es jefe-area, administrador o super-admin deja de
-     * verse limitado a sus propios vales. Un jefe de área (puro o combinado,
-     * pero sin administrador/super-admin) ve los vales de los vehículos
-     * asignados a sus áreas a cargo — mismo criterio de
-     * ValeController::restringirVehiculosPorAreaDeJefe (web). Administrador
-     * y super-admin ven todos los vales del sistema, sin restricción (mismo
-     * criterio que ParametrosController::colecciones()).
+     * Precedencia: administrador/super-admin (sin restricción) > jefe-area
+     * (vales de vehículos de sus áreas a cargo, mismo criterio de
+     * ValeController::restringirVehiculosPorAreaDeJefe) > conductor (sólo
+     * sus propios vales).
      */
-    private function aplicarRestriccionesPorRol($query, User $user, bool $aplicarAlcanceGestion): void
+    private function aplicarRestriccionesPorRol($query, User $user): void
     {
-        $esConductorPuro = $aplicarAlcanceGestion
-            ? $user->hasRole('conductor') && ! $user->hasAnyRole(['jefe-area', 'administrador', 'super-admin'])
-            : $user->hasRole('conductor');
-
-        if ($esConductorPuro) {
-            $query->where('id_conductor', $user->id_persona);
-
+        if ($user->hasAnyRole(['administrador', 'super-admin'])) {
             return;
         }
 
-        if (! $aplicarAlcanceGestion) {
-            return;
-        }
-
-        if ($user->hasRole('jefe-area') && ! $user->hasAnyRole(['administrador', 'super-admin'])) {
+        if ($user->hasRole('jefe-area')) {
             $areas = $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? [];
 
             $query->whereHas('vehiculo.areasAsignadas', function ($q) use ($areas) {
                 $q->whereIn('area.id', $areas);
             });
+
+            return;
+        }
+
+        if ($user->hasRole('conductor')) {
+            $query->where('id_conductor', $user->id_persona);
         }
     }
 }

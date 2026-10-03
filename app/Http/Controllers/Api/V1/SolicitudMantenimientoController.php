@@ -205,7 +205,7 @@ class SolicitudMantenimientoController extends Controller
      */
     public function pdf(Request $request, SolicitudMantenimiento $solicitud): Response
     {
-        if ($request->user()->hasRole('conductor') && $solicitud->id_conductor !== $request->user()->id_persona) {
+        if ($request->user()->esConductorPuro() && $solicitud->id_conductor !== $request->user()->id_persona) {
             abort(403, 'No tienes permiso para descargar esta solicitud.');
         }
 

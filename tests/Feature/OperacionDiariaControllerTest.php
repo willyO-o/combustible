@@ -234,6 +234,41 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertTrue($ids->contains($operacionDelMesPasado->id));
     }
 
+    /**
+     * Un usuario con los 3 roles (administrador, jefe-area, conductor) ve
+     * todas las operaciones y todos los conductores en el filtro: el rol
+     * administrador prevalece (ver ListOperacionesDiariasAction).
+     */
+    public function test_index_un_usuario_con_los_tres_roles_ve_todas_las_operaciones(): void
+    {
+        [$user] = $this->crearConductorConUsuario();
+        $user->assignRole(['administrador', 'jefe-area']);
+
+        $vehiculo = Vehiculo::factory()->create();
+        $area = Area::factory()->create();
+        $this->asignarVehiculoAArea($vehiculo, $area);
+        [, $otroConductor] = $this->crearConductorConUsuario();
+        $this->asignarVehiculoAConductor($vehiculo, $otroConductor);
+
+        $operacionDeOtro = OperacionDiaria::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $otroConductor->id,
+            'id_area' => $area->id,
+            'turno' => 'DIA',
+            'fecha_inicio' => now()->subHours(4),
+            'fecha_fin' => now(),
+            'kilometraje_inicio' => 1000,
+            'kilometraje_fin' => 1050,
+            'estado' => 'PENDIENTE',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.index'));
+
+        $props = $response->original->getData()['page']['props'];
+        $this->assertTrue(collect($props['actividades']['data'])->pluck('id')->contains($operacionDeOtro->id));
+        $this->assertTrue(collect($props['conductores'])->pluck('id')->contains($otroConductor->id));
+    }
+
     public function test_un_administrador_ve_todos_los_vehiculos_activos_sin_filtro(): void
     {
         $admin = User::factory()->create();

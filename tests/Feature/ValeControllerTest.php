@@ -15,6 +15,7 @@ use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use App\Notifications\ValeEmitidoNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -200,6 +201,79 @@ class ValeControllerTest extends TestCase
         $this->assertContains('vales.data', $pagina['mergeProps'] ?? []);
         $this->assertSame(2, $pagina['props']['vales']['current_page']);
         $this->assertCount(2, $pagina['props']['vales']['data']);
+    }
+
+    private function crearValeParaListado(Vehiculo $vehiculo, Conductor $conductor): Vale
+    {
+        $grifo = Grifo::firstOrCreate(['nit' => '123'], [
+            'razon_social' => 'Grifo de Prueba', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        return Vale::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'litros' => 10,
+            'precio' => 6.97,
+        ]);
+    }
+
+    private function idsDelListado($response): Collection
+    {
+        return collect($response->original->getData()['page']['props']['vales']['data'])->pluck('id');
+    }
+
+    public function test_index_un_usuario_con_los_tres_roles_prevalece_como_administrador_y_ve_todo(): void
+    {
+        $area = Area::factory()->create();
+        $user = $this->crearJefeDeArea($area);
+        $user->assignRole(['administrador', 'conductor']);
+
+        $valeAjeno = $this->crearValeParaListado(Vehiculo::factory()->create(), Conductor::factory()->create());
+        $valeDeArea = $this->crearValeParaListado(
+            tap(Vehiculo::factory()->create(), fn ($v) => $this->asignarVehiculoAArea($v, $area)),
+            Conductor::factory()->create()
+        );
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('vales.index')));
+
+        $this->assertTrue($ids->contains($valeAjeno->id));
+        $this->assertTrue($ids->contains($valeDeArea->id));
+    }
+
+    public function test_index_un_jefe_de_area_con_rol_conductor_ve_los_vales_de_su_area(): void
+    {
+        $area = Area::factory()->create();
+        $user = $this->crearJefeDeArea($area);
+        $user->assignRole('conductor');
+
+        $valeDeArea = $this->crearValeParaListado(
+            tap(Vehiculo::factory()->create(), fn ($v) => $this->asignarVehiculoAArea($v, $area)),
+            Conductor::factory()->create()
+        );
+        $valeAjeno = $this->crearValeParaListado(Vehiculo::factory()->create(), Conductor::factory()->create());
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('vales.index')));
+
+        $this->assertTrue($ids->contains($valeDeArea->id));
+        $this->assertFalse($ids->contains($valeAjeno->id));
+    }
+
+    public function test_index_un_conductor_puro_solo_ve_sus_propios_vales(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+
+        $valePropio = $this->crearValeParaListado(Vehiculo::factory()->create(), $conductor);
+        $valeAjeno = $this->crearValeParaListado(Vehiculo::factory()->create(), Conductor::factory()->create());
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('vales.index')));
+
+        $this->assertTrue($ids->contains($valePropio->id));
+        $this->assertFalse($ids->contains($valeAjeno->id));
     }
 
     public function test_search_vehiculos_restringe_a_un_jefe_de_area_a_los_vehiculos_de_su_area(): void

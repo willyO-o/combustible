@@ -17,6 +17,7 @@ use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use App\Notifications\CargaCombustibleRegistradaNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -72,6 +73,140 @@ class CargaCombustibleControllerTest extends TestCase
             'parametros_vale' => ['tiempo_expiracion' => 5],
             'estado' => 'ACTIVO',
         ]);
+    }
+
+    private function crearCargaParaListado(Vehiculo $vehiculo, Conductor $conductor): CargaCombustible
+    {
+        return CargaCombustible::create([
+            'fecha_carga' => now(),
+            'litros' => 20,
+            'precio' => 10,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => Grifo::first()?->id ?? $this->crearGrifo()->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'id_conductor' => $conductor->id,
+            'tipo_carga' => 'PREPAGO',
+            'estado_carga' => 'REGISTRADO',
+        ]);
+    }
+
+    private function crearUsuarioConductorJefeDeArea(Area $area): User
+    {
+        $conductor = $this->crearConductor();
+        EncargadoArea::create([
+            'id_persona' => $conductor->id,
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole(['jefe-area', 'conductor']);
+
+        return $user;
+    }
+
+    private function idsDelListado($response): Collection
+    {
+        return collect($response->original->getData()['page']['props']['cargas']['data'])->pluck('id');
+    }
+
+    /**
+     * Caso real: un usuario con los 3 roles registró una carga con el vale de
+     * otro conductor y no la veía en el listado porque el rol conductor lo
+     * limitaba a sus propias cargas. El rol administrador debe prevalecer.
+     */
+    public function test_index_un_usuario_con_los_tres_roles_prevalece_como_administrador_y_ve_todo(): void
+    {
+        $this->crearParametrosEmpresa();
+        $user = $this->crearUsuarioConductorJefeDeArea(Area::factory()->create());
+        $user->assignRole('administrador');
+
+        $cargaDeOtroConductor = $this->crearCargaParaListado(Vehiculo::factory()->create(), $this->crearConductor());
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('cargas.index')));
+
+        $this->assertTrue($ids->contains($cargaDeOtroConductor->id));
+    }
+
+    public function test_index_un_jefe_de_area_con_rol_conductor_ve_las_cargas_de_su_area(): void
+    {
+        $this->crearParametrosEmpresa();
+        $area = Area::factory()->create();
+        $user = $this->crearUsuarioConductorJefeDeArea($area);
+
+        $vehiculoDelArea = Vehiculo::factory()->create();
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculoDelArea->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $cargaDelArea = $this->crearCargaParaListado($vehiculoDelArea, $this->crearConductor());
+        $cargaAjena = $this->crearCargaParaListado(Vehiculo::factory()->create(), $this->crearConductor());
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('cargas.index')));
+
+        $this->assertTrue($ids->contains($cargaDelArea->id));
+        $this->assertFalse($ids->contains($cargaAjena->id));
+    }
+
+    public function test_index_un_conductor_puro_solo_ve_sus_propias_cargas(): void
+    {
+        $this->crearParametrosEmpresa();
+        $conductor = $this->crearConductor();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+
+        $cargaPropia = $this->crearCargaParaListado(Vehiculo::factory()->create(), $conductor);
+        $cargaAjena = $this->crearCargaParaListado(Vehiculo::factory()->create(), $this->crearConductor());
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('cargas.index')));
+
+        $this->assertTrue($ids->contains($cargaPropia->id));
+        $this->assertFalse($ids->contains($cargaAjena->id));
+    }
+
+    public function test_create_un_administrador_que_tambien_es_conductor_no_entra_en_modo_conductor(): void
+    {
+        $user = User::factory()->create(['id_persona' => $this->crearConductor()->id]);
+        $user->assignRole(['administrador', 'conductor']);
+
+        $this->actingAs($user)->get(route('cargas.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('conductor', null));
+    }
+
+    /**
+     * Buscador de vales del formulario de carga: un administrador que también
+     * es conductor ve vales de otros conductores, y buscar por número no debe
+     * devolver vales ya usados (el orWhere suelto anulaba los demás filtros).
+     */
+    public function test_search_vales_respeta_el_rol_administrador_y_los_filtros_al_buscar_por_numero(): void
+    {
+        $this->crearParametrosEmpresa();
+        $user = User::factory()->create(['id_persona' => $this->crearConductor()->id]);
+        $user->assignRole(['administrador', 'conductor']);
+
+        $datosVale = fn (string $estado) => [
+            'litros' => 10, 'precio' => 6,
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_conductor' => $this->crearConductor()->id,
+            'id_grifo' => Grifo::first()?->id ?? $this->crearGrifo()->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'estado_vale' => $estado,
+        ];
+        $valePendiente = Vale::create($datosVale('PENDIENTE'));
+        $valeUsado = Vale::create($datosVale('USADO'));
+
+        $ids = collect($this->actingAs($user)->getJson(route('search.vales-carga', ['q' => $valeUsado->nro_vale]))->json())->pluck('id');
+        $this->assertFalse($ids->contains($valeUsado->id));
+
+        $ids = collect($this->actingAs($user)->getJson(route('search.vales-carga', ['q' => $valePendiente->nro_vale]))->json())->pluck('id');
+        $this->assertTrue($ids->contains($valePendiente->id));
     }
 
     /**

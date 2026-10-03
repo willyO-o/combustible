@@ -77,7 +77,7 @@ class CargaCombustibleController extends Controller
      */
     public function pdf(Request $request, CargaCombustible $carga): Response
     {
-        if ($request->user()->hasRole('conductor') && $carga->id_conductor !== $request->user()->id_persona) {
+        if ($request->user()->esConductorPuro() && $carga->id_conductor !== $request->user()->id_persona) {
             abort(403, 'No tienes permiso para descargar este comprobante.');
         }
 

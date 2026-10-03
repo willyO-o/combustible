@@ -2,8 +2,8 @@
 
 namespace App\Actions\OperacionDiaria;
 
-use App\Models\User;
 use App\Models\OperacionDiaria;
+use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class ListOperacionesDiariasAction
@@ -14,8 +14,8 @@ class ListOperacionesDiariasAction
 
         if (! empty($filtros['nro_placa'])) {
             $query->whereHas('vehiculo', function ($q) use ($filtros) {
-                $q->where('nro_placa', 'like', '%' . $filtros['nro_placa'] . '%')
-                    ->orWhere('codigo', 'like', '%' . $filtros['nro_placa'] . '%');
+                $q->where('nro_placa', 'like', '%'.$filtros['nro_placa'].'%')
+                    ->orWhere('codigo', 'like', '%'.$filtros['nro_placa'].'%');
             });
         }
 
@@ -42,15 +42,25 @@ class ListOperacionesDiariasAction
             ->withQueryString();
     }
 
+    /**
+     * Precedencia (mismo criterio que ListValeAction): administrador/super-admin
+     * (sin restricción) > jefe-area (operaciones de sus áreas a cargo) >
+     * conductor (sólo sus propias operaciones).
+     */
     private function aplicarRestriccionesPorRol($query, User $user): void
     {
-        if ($user->hasRole('conductor')) {
-            $query->where('id_conductor', $user->id_persona);
+        if ($user->hasAnyRole(['administrador', 'super-admin'])) {
             return;
         }
 
         if ($user->hasRole('jefe-area')) {
-            $query->whereIn('id_area', $user->persona->encargadoAreas()->pluck('id_area'));
+            $query->whereIn('id_area', $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? []);
+
+            return;
+        }
+
+        if ($user->hasRole('conductor')) {
+            $query->where('id_conductor', $user->id_persona);
         }
     }
 }

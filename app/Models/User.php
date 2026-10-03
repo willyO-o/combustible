@@ -66,4 +66,14 @@ class User extends Authenticatable implements Auditable, JWTSubject
     {
         return $this->hasMany(Dispositivo::class, 'id_usuario');
     }
+
+    /**
+     * Conductor sin ningún rol de gestión. Un usuario que además es
+     * jefe-area, administrador o super-admin no queda limitado a sus propios
+     * registros: el rol de gestión prevalece sobre conductor.
+     */
+    public function esConductorPuro(): bool
+    {
+        return $this->hasRole('conductor') && ! $this->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
+    }
 }
