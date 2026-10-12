@@ -2,6 +2,25 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.13.0 — 2026-10-12
+
+Fecha de vencimiento elegible al emitir un vale. Compatible con la versión anterior.
+
+### Cambiado
+
+- `POST /vales`: nuevo campo opcional `fecha_vencimiento` (día `Y-m-d`, posterior a hoy; el vale
+  queda vigente hasta las `23:59` de ese día). Si no se envía, se sigue calculando como
+  `fecha_emision` + `tiempo_expiracion` días de los parámetros de la empresa. Una fecha de hoy o
+  anterior responde `422` con el error en `fecha_vencimiento`.
+- `GET /parametros`: `api_version` pasa a `1.13.0`.
+
+### Agregado
+
+- `GET /parametros` → `vales` (schema `ParametrosVale`): `tiempo_expiracion` (días configurados),
+  `fecha_vencimiento_sugerida` (hoy + `tiempo_expiracion`, para prellenar el selector) y
+  `fecha_vencimiento_minima` (mañana, la fecha más temprana que acepta `POST /vales`).
+
+
 ## 1.12.0 — 2026-09-23
 
 Nuevas notificaciones para los jefes de área. No cambia ningún endpoint.

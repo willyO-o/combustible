@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1;
 use App\Models\Area;
 use App\Models\Conductor;
 use App\Models\Material;
+use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
@@ -75,6 +76,43 @@ class ParametrosControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonStructure(['api_version', 'app_name', 'app_env', 'app_url', 'timezone', 'locale']);
+    }
+
+    /**
+     * La app usa `vales` para prellenar y limitar el selector de fecha de
+     * vencimiento al emitir un vale (mismo cálculo que el formulario web).
+     */
+    public function test_index_devuelve_la_sugerencia_de_vencimiento_de_vales(): void
+    {
+        ParametrosEmpresa::create([
+            'nombre_empresa' => 'Plus Metals Ltda.',
+            'direccion_empresa' => 'Calle Principal 123',
+            'telefono_empresa' => '123456789',
+            'correo_empresa' => 'info@miempresa.com',
+            'nit_empresa' => '123456789',
+            'parametros_vale' => ['tiempo_expiracion' => 3],
+            'estado' => 'ACTIVO',
+        ]);
+
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(route('api.v1.parametros.index'));
+
+        $response->assertOk()
+            ->assertJsonPath('vales.tiempo_expiracion', 3)
+            ->assertJsonPath('vales.fecha_vencimiento_sugerida', today()->addDays(3)->format('Y-m-d'))
+            ->assertJsonPath('vales.fecha_vencimiento_minima', today()->addDay()->format('Y-m-d'));
+    }
+
+    /**
+     * Sin parámetros de empresa cargados se usa el plazo por defecto de
+     * ValeConfig en vez de fallar.
+     */
+    public function test_index_sin_parametros_de_empresa_usa_el_plazo_por_defecto(): void
+    {
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')->getJson(route('api.v1.parametros.index'));
+
+        $response->assertOk()
+            ->assertJsonPath('vales.tiempo_expiracion', 1)
+            ->assertJsonPath('vales.fecha_vencimiento_sugerida', today()->addDay()->format('Y-m-d'));
     }
 
     public function test_colecciones_incluye_los_materiales_y_los_estados_de_carga(): void

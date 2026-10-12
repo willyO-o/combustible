@@ -42,8 +42,11 @@ class ValeController extends Controller
      * peticiones de la API (en la web ese gating es sólo de frontend).
      *
      * Se autogeneran en el servidor (Vale::boot()) y no deben enviarse:
-     * `nro_vale`, `gestion`, `fecha_emision`, `fecha_vencimiento` e `id_user`.
+     * `nro_vale`, `gestion`, `fecha_emision` e `id_user`.
      * `id_tipo_combustible` se toma del vehículo y el vale nace `PENDIENTE`.
+     * `fecha_vencimiento` es opcional (día Y-m-d posterior a hoy, vigente
+     * hasta las 23:59:59); si no se envía se calcula como fecha de emisión
+     * + `tiempo_expiracion` de los parámetros de la empresa.
      * Un jefe de área sólo puede emitir vales para vehículos asignados a
      * alguna de sus áreas a cargo (lo valida ValeRequest).
      */

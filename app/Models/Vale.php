@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\ValueObjects\ValeConfig;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 // soft delete
@@ -98,6 +99,25 @@ class Vale extends Model implements Auditable
         return $this->fecha_emision->copy()->addDays($dias);
     }
 
+    /**
+     * Vencimiento que se sugiere al emitir un vale (formulario web y
+     * `GET /parametros` de la API): hoy más los días de `tiempo_expiracion`
+     * parametrizados, vigente hasta el final de ese día. Es sólo una
+     * sugerencia: quien emite el vale puede elegir otra fecha.
+     *
+     * @return array{fecha: string, dias: int}
+     */
+    public static function vencimientoSugerido(): array
+    {
+        $parametrosVale = ParametrosEmpresa::first()?->parametros_vale ?? ValeConfig::fromArray([]);
+        $dias = $parametrosVale->tiempo_expiracion;
+
+        return [
+            'fecha' => today()->addDays($dias)->format('Y-m-d'),
+            'dias' => $dias,
+        ];
+    }
+
     protected function calcularGestion(): int
     {
         $mesCicloContable = ParametrosEmpresa::first()->parametros_vale->mes_ciclo_contable;
@@ -146,7 +166,11 @@ class Vale extends Model implements Auditable
             $model->gestion = $gestion;
             $model->nro_vale = self::siguienteNroVale($gestion);
 
-            $model->fecha_vencimiento = $model->generarFechaVencimiento();
+            // Puede venir elegida (web/API); si no, se usa el plazo
+            // parametrizado desde la fecha de emisión.
+            if (! $model->fecha_vencimiento) {
+                $model->fecha_vencimiento = $model->generarFechaVencimiento();
+            }
         });
     }
 }

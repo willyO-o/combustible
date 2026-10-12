@@ -48,16 +48,41 @@ class ValeRequest extends FormRequest
         parent::failedValidation($validator);
     }
 
+    /**
+     * La fecha de vencimiento se recibe sólo como día (Y-m-d), tanto en el
+     * formulario web como en la API: el vale queda vigente durante todo ese
+     * día, hasta las 23:59:59.
+     */
+    protected function prepareForValidation(): void
+    {
+        $fechaVencimiento = $this->input('fecha_vencimiento');
+
+        if (is_string($fechaVencimiento) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVencimiento)) {
+            $this->merge(['fecha_vencimiento' => "{$fechaVencimiento} 23:59:59"]);
+        }
+    }
+
     public function rules(): array
     {
-        $vale = $this->route('vale');
-
         return [
             'litros' => ['required', 'numeric', 'min:0.01', 'max:9999.99'],
             'precio' => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
             'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id', $this->reglaVehiculoDeAreaDeJefe()],
             'id_conductor' => ['required', 'integer', 'exists:conductor,id'],
             'id_grifo' => ['required', 'integer', 'exists:grifo,id'],
+            // En la API es opcional: si no se envía, Vale::boot() la calcula
+            // como fecha de emisión + tiempo_expiracion (ver openapi.yaml).
+            'fecha_vencimiento' => [$this->is('api/*') ? 'nullable' : 'required', 'date', 'after_or_equal:tomorrow'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'fecha_vencimiento.after_or_equal' => 'La fecha de vencimiento debe ser posterior a hoy.',
         ];
     }
 
@@ -103,6 +128,7 @@ class ValeRequest extends FormRequest
         return [
             'nro_vale' => 'número de vale',
             'fecha_emision' => 'fecha de emisión',
+            'fecha_vencimiento' => 'fecha de vencimiento',
             'litros' => 'litros',
             'precio' => 'precio',
             'id_vehiculo' => 'vehículo',

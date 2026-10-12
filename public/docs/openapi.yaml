@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.12.0"
+  version: "1.13.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -405,7 +405,14 @@ paths:
     get:
       tags: [Parámetros]
       summary: Parámetros generales de la aplicación
-      description: Devuelve información general de configuración de la app (nombre, entorno, url, logo, etc.).
+      description: |
+        Devuelve información general de configuración de la app (nombre, entorno, url, logo, etc.).
+
+        `vales` trae lo necesario para el selector de fecha de vencimiento al emitir un vale
+        (`POST /vales`): `fecha_vencimiento_sugerida` (hoy + `tiempo_expiracion` días, para
+        prellenar el campo) y `fecha_vencimiento_minima` (mañana, la fecha más temprana que
+        acepta el servidor). Ambas se calculan con la fecha del servidor (`timezone`), por lo que
+        conviene volver a pedirlas si la app pasa de un día a otro abierta.
       responses:
         '200':
           description: Parámetros generales.
@@ -414,7 +421,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.11.0"
+                api_version: "1.13.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -422,6 +429,10 @@ paths:
                 timezone: America/La_Paz
                 locale: es
                 url_logo: http://localhost/images/logo.png
+                vales:
+                  tiempo_expiracion: 3
+                  fecha_vencimiento_sugerida: "2026-10-15"
+                  fecha_vencimiento_minima: "2026-10-13"
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1510,9 +1521,16 @@ paths:
         control es sólo de interfaz; en la API se aplica en el servidor.)
 
         Se calculan/asignan en el servidor y **no deben enviarse**: `nro_vale`, `gestion`,
-        `fecha_emision`, `fecha_vencimiento` (según los parámetros de la empresa), `id_user`
-        (usuario autenticado), `id_tipo_combustible` (se toma del vehículo) y `estado_vale`
-        (siempre nace `PENDIENTE`).
+        `fecha_emision`, `id_user` (usuario autenticado), `id_tipo_combustible` (se toma del
+        vehículo) y `estado_vale` (siempre nace `PENDIENTE`).
+
+        **Fecha de vencimiento (opcional):** `fecha_vencimiento` acepta un día `Y-m-d`
+        **posterior a hoy** (mañana como mínimo); el vale queda vigente hasta las `23:59` de ese
+        día. Si no se envía (o se envía `null`), se calcula como `fecha_emision` + los días de
+        `tiempo_expiracion` configurados en los parámetros de la empresa (comportamiento previo).
+        Una fecha de hoy o anterior responde `422` con el error en `fecha_vencimiento`.
+        Para prellenar el selector usar `GET /parametros` → `vales.fecha_vencimiento_sugerida`
+        (y `vales.fecha_vencimiento_minima` como mínimo).
 
         **Restricción del jefe de área:** sólo puede emitir vales para vehículos con una
         asignación de área activa/provisional a alguna de las áreas que tiene a cargo; en caso
@@ -1528,12 +1546,24 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ValeStoreRequest'
-            example:
-              id_vehiculo: 8
-              id_conductor: 45
-              id_grifo: 2
-              litros: 30
-              precio: 6.97
+            examples:
+              vencimiento_calculado:
+                summary: Sin fecha de vencimiento (se calcula con los parámetros)
+                value:
+                  id_vehiculo: 8
+                  id_conductor: 45
+                  id_grifo: 2
+                  litros: 30
+                  precio: 6.97
+              vencimiento_elegido:
+                summary: Con fecha de vencimiento elegida
+                value:
+                  id_vehiculo: 8
+                  id_conductor: 45
+                  id_grifo: 2
+                  litros: 30
+                  precio: 6.97
+                  fecha_vencimiento: "2026-09-10"
       responses:
         '201':
           description: Vale emitido exitosamente.
@@ -1589,6 +1619,13 @@ paths:
                     errors:
                       litros: ["El campo litros es obligatorio."]
                       id_grifo: ["El campo estación de servicio es obligatorio."]
+                vencimiento_no_posterior_a_hoy:
+                  summary: Fecha de vencimiento de hoy o anterior
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      fecha_vencimiento: ["La fecha de vencimiento debe ser posterior a hoy."]
                 vehiculo_fuera_de_area:
                   summary: Vehículo fuera del área del jefe
                   value:
@@ -3869,7 +3906,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.11.0" }
+        api_version: { type: string, example: "1.13.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -3877,6 +3914,29 @@ components:
         timezone: { type: string, example: America/La_Paz }
         locale: { type: string, example: es }
         url_logo: { type: string, example: http://localhost/images/logo.png }
+        vales: { $ref: '#/components/schemas/ParametrosVale' }
+
+    ParametrosVale:
+      type: object
+      description: |
+        Parámetros para sugerir la fecha de vencimiento al emitir un vale (`POST /vales`). La
+        sugerencia es orientativa: el usuario puede elegir cualquier día desde
+        `fecha_vencimiento_minima`, o no enviar la fecha para que el servidor la calcule.
+      properties:
+        tiempo_expiracion:
+          type: integer
+          description: Días de vigencia configurados en los parámetros de la empresa.
+          example: 3
+        fecha_vencimiento_sugerida:
+          type: string
+          format: date
+          description: Hoy + `tiempo_expiracion` días (`Y-m-d`). Valor sugerido para prellenar el campo.
+          example: "2026-10-15"
+        fecha_vencimiento_minima:
+          type: string
+          format: date
+          description: Mañana (`Y-m-d`). Fecha más temprana que acepta `fecha_vencimiento`.
+          example: "2026-10-13"
 
     VehiculoAsignado:
       type: object
@@ -4633,9 +4693,9 @@ components:
     ValeStoreRequest:
       type: object
       description: |
-        Cuerpo esperado por `POST /vales`. `nro_vale`, `gestion`, `fecha_emision`,
-        `fecha_vencimiento`, `id_user`, `id_tipo_combustible` y `estado_vale` se resuelven en
-        el servidor y no deben enviarse.
+        Cuerpo esperado por `POST /vales`. `nro_vale`, `gestion`, `fecha_emision`, `id_user`,
+        `id_tipo_combustible` y `estado_vale` se resuelven en el servidor y no deben enviarse.
+        `fecha_vencimiento` es opcional: si se omite se calcula en el servidor.
       required: [id_vehiculo, id_conductor, id_grifo, litros, precio]
       properties:
         id_vehiculo:
@@ -4663,6 +4723,15 @@ components:
           maximum: 99999.99
           description: Precio por litro.
           example: 6.97
+        fecha_vencimiento:
+          type: string
+          format: date
+          nullable: true
+          description: |
+            Opcional. Día de vencimiento `Y-m-d`, debe ser **posterior a hoy** (mañana como
+            mínimo). El vale queda vigente hasta las `23:59` de ese día. Si se omite o es `null`,
+            se calcula como `fecha_emision` + `tiempo_expiracion` días (parámetros de la empresa).
+          example: "2026-09-10"
 
     ValeStoreResponse:
       type: object

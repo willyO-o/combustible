@@ -328,6 +328,7 @@ class ValeControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($jefe)->post(route('vales.store'), [
+            'fecha_vencimiento' => now()->addDays(5)->format('Y-m-d'),
             'id_vehiculo' => $vehiculoDeOtraArea->id,
             'id_conductor' => $conductor->id,
             'id_grifo' => $grifo->id,
@@ -354,6 +355,7 @@ class ValeControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($jefe)->post(route('vales.store'), [
+            'fecha_vencimiento' => now()->addDays(5)->format('Y-m-d'),
             'id_vehiculo' => $vehiculo->id,
             'id_conductor' => $conductor->id,
             'id_grifo' => $grifo->id,
@@ -375,6 +377,7 @@ class ValeControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)->post(route('vales.store'), [
+            'fecha_vencimiento' => now()->addDays(5)->format('Y-m-d'),
             'id_vehiculo' => $vehiculoSinArea->id,
             'id_conductor' => $conductor->id,
             'id_grifo' => $grifo->id,
@@ -400,6 +403,7 @@ class ValeControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)->post(route('vales.store'), [
+            'fecha_vencimiento' => now()->addDays(5)->format('Y-m-d'),
             'id_vehiculo' => $vehiculo->id,
             'id_conductor' => $conductor->id,
             'id_grifo' => $grifo->id,
@@ -512,6 +516,7 @@ class ValeControllerTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)->put(route('vales.update', $vale->id), [
+            'fecha_vencimiento' => now()->addDays(5)->format('Y-m-d'),
             'id_vehiculo' => $vehiculo->id,
             'id_conductor' => $conductor->id,
             'id_grifo' => $grifo->id,
@@ -552,6 +557,7 @@ class ValeControllerTest extends TestCase
         VehiculoArea::where('id_vehiculo', $vehiculo->id)->update(['estado_asignacion' => 'REASIGNADO']);
 
         $response = $this->actingAs($jefe)->put(route('vales.update', $vale->id), [
+            'fecha_vencimiento' => now()->addDays(5)->format('Y-m-d'),
             'id_vehiculo' => $vehiculo->id,
             'id_conductor' => $conductor->id,
             'id_grifo' => $grifo->id,
@@ -561,5 +567,165 @@ class ValeControllerTest extends TestCase
 
         $response->assertRedirect(route('vales.index'));
         $this->assertEquals(25, $vale->fresh()->litros);
+    }
+
+    /**
+     * @return array{id_vehiculo: int, id_conductor: int, id_grifo: int, litros: int, precio: float}
+     */
+    private function datosDeVale(): array
+    {
+        $grifo = Grifo::create([
+            'razon_social' => 'Grifo de Prueba', 'nit' => '123', 'direccion' => 'Calle 1',
+            'ciudad' => 'Oruro', 'telefono' => '123', 'estado_grifo' => 'ACTIVO', 'es_principal' => true,
+        ]);
+
+        return [
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'id_grifo' => $grifo->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ];
+    }
+
+    /**
+     * La duración parametrizada (tiempo_expiracion) sólo se ofrece como
+     * sugerencia al crear y al editar: hoy + N días.
+     */
+    public function test_create_y_edit_sugieren_el_vencimiento_segun_los_parametros(): void
+    {
+        ParametrosEmpresa::first()->update(['parametros_vale' => ['tiempo_expiracion' => 3]]);
+
+        $this->actingAs($this->admin)->get(route('vales.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Vales/Create')
+                ->where('vencimientoSugerido.fecha', today()->addDays(3)->format('Y-m-d'))
+                ->where('vencimientoSugerido.dias', 3)
+            );
+
+        $vale = Vale::create([...$this->datosDeVale(), 'id_tipo_combustible' => TipoCombustible::factory()->create()->id]);
+
+        $this->actingAs($this->admin)->get(route('vales.edit', $vale))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vencimientoSugerido.fecha', today()->addDays(3)->format('Y-m-d'))
+            );
+    }
+
+    /**
+     * El formulario envía sólo el día: el vale queda vigente hasta el final
+     * de ese día, sin importar el plazo parametrizado.
+     */
+    public function test_store_guarda_el_vencimiento_elegido_hasta_el_final_del_dia(): void
+    {
+        $fecha = today()->addDays(10);
+
+        $this->actingAs($this->admin)->post(route('vales.store'), [
+            ...$this->datosDeVale(),
+            'fecha_vencimiento' => $fecha->format('Y-m-d'),
+        ])->assertRedirect(route('vales.index'))->assertSessionHas('success');
+
+        $this->assertEquals(
+            $fecha->copy()->endOfDay()->format('Y-m-d H:i:s'),
+            Vale::first()->fecha_vencimiento->format('Y-m-d H:i:s'),
+        );
+    }
+
+    public function test_store_requiere_la_fecha_de_vencimiento(): void
+    {
+        $this->actingAs($this->admin)->post(route('vales.store'), $this->datosDeVale())
+            ->assertSessionHasErrors('fecha_vencimiento');
+
+        $this->assertDatabaseCount('vale', 0);
+    }
+
+    public function test_store_rechaza_un_vencimiento_que_no_es_posterior_a_hoy(): void
+    {
+        $datos = $this->datosDeVale();
+
+        foreach ([today(), today()->subDay()] as $fecha) {
+            $this->actingAs($this->admin)->post(route('vales.store'), [
+                ...$datos,
+                'fecha_vencimiento' => $fecha->format('Y-m-d'),
+            ])->assertSessionHasErrors([
+                'fecha_vencimiento' => 'La fecha de vencimiento debe ser posterior a hoy.',
+            ]);
+        }
+
+        $this->assertDatabaseCount('vale', 0);
+    }
+
+    public function test_store_acepta_manana_como_vencimiento_minimo(): void
+    {
+        $this->actingAs($this->admin)->post(route('vales.store'), [
+            ...$this->datosDeVale(),
+            'fecha_vencimiento' => today()->addDay()->format('Y-m-d'),
+        ])->assertSessionHasNoErrors()->assertRedirect(route('vales.index'));
+
+        $this->assertTrue(Vale::first()->fecha_vencimiento->isTomorrow());
+    }
+
+    /**
+     * Al cambiar el vencimiento se reinicia el aviso "por vencer" para que
+     * el conductor vuelva a ser notificado respecto de la nueva fecha.
+     */
+    public function test_update_cambia_el_vencimiento_y_reinicia_el_aviso_por_vencer(): void
+    {
+        $datos = $this->datosDeVale();
+        $vale = Vale::create([...$datos, 'id_tipo_combustible' => TipoCombustible::factory()->create()->id]);
+        $vale->update(['notificado_vencimiento_at' => now()]);
+
+        $nuevaFecha = today()->addDays(7);
+
+        $this->actingAs($this->admin)->put(route('vales.update', $vale), [
+            ...$datos,
+            'fecha_vencimiento' => $nuevaFecha->format('Y-m-d'),
+        ])->assertRedirect(route('vales.index'))->assertSessionHas('success');
+
+        $vale->refresh();
+        $this->assertEquals($nuevaFecha->copy()->endOfDay()->format('Y-m-d H:i:s'), $vale->fecha_vencimiento->format('Y-m-d H:i:s'));
+        $this->assertNull($vale->notificado_vencimiento_at);
+    }
+
+    public function test_update_sin_cambiar_el_vencimiento_conserva_el_aviso_por_vencer(): void
+    {
+        $datos = $this->datosDeVale();
+        $vale = Vale::create([
+            ...$datos,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'fecha_vencimiento' => today()->addDays(2)->endOfDay(),
+        ]);
+        $vale->update(['notificado_vencimiento_at' => now()]);
+
+        $this->actingAs($this->admin)->put(route('vales.update', $vale), [
+            ...$datos,
+            'litros' => 30,
+            'fecha_vencimiento' => today()->addDays(2)->format('Y-m-d'),
+        ])->assertRedirect(route('vales.index'));
+
+        $this->assertNotNull($vale->fresh()->notificado_vencimiento_at);
+        $this->assertEquals(30, $vale->fresh()->litros);
+    }
+
+    /**
+     * Un vale PENDIENTE ya vencido puede volver a estar vigente al editarlo
+     * con una fecha posterior a hoy.
+     */
+    public function test_update_permite_extender_un_vale_vencido(): void
+    {
+        $datos = $this->datosDeVale();
+        $vale = Vale::create([
+            ...$datos,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'fecha_vencimiento' => now()->subDay(),
+        ]);
+
+        $this->actingAs($this->admin)->put(route('vales.update', $vale), [
+            ...$datos,
+            'fecha_vencimiento' => today()->addDays(3)->format('Y-m-d'),
+        ])->assertRedirect(route('vales.index'))->assertSessionHas('success');
+
+        $this->assertTrue($vale->fresh()->fecha_vencimiento->isFuture());
     }
 }

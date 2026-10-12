@@ -5,7 +5,8 @@ defineOptions({ layout: Maindashboard })
 import SearchSelect from '@/Components/SearchSelect.vue'
 import GrifoFormModal from '@/Components/GrifoFormModal.vue'
 
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { formatDate } from '@/Utils/dateUtil'
 
 const props = defineProps({
     nextNroVale: String,
@@ -14,6 +15,8 @@ const props = defineProps({
     vehiculoActual: Object,
     conductorActual: Object,
     grifos: Array,
+    // { fecha: 'YYYY-MM-DD', dias: int } según tiempo_expiracion parametrizado
+    vencimientoSugerido: Object,
 })
 
 // Copia local editable: al dar de alta un grifo nuevo desde el "+", se
@@ -40,13 +43,85 @@ const form = useForm({
     id_grifo: props.vale ? props.vale.id_grifo : null,
     estado_vale: 'PENDIENTE',
     id_tipo_combustible: props.vale ? props.vale.id_tipo_combustible : null,
+    fecha_vencimiento: props.vale
+        ? String(props.vale.fecha_vencimiento ?? '').slice(0, 10)
+        : props.vencimientoSugerido.fecha,
 })
+
+/* ------------------------------------------------------------------ */
+/*  Vencimiento: sólo día, vigente hasta las 23:59 de esa fecha.       */
+/*  Debe ser posterior a hoy; la duración parametrizada es sugerencia. */
+/* ------------------------------------------------------------------ */
+
+const MS_POR_DIA = 86400000
+
+// 'YYYY-MM-DD' -> Date en hora local (new Date('YYYY-MM-DD') parsearía en UTC)
+const fechaLocal = (ymd) => {
+    const m = String(ymd ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null
+}
+
+const aYmd = (d) => [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+].join('-')
+
+const hoy = new Date()
+hoy.setHours(0, 0, 0, 0)
+const manana = aYmd(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1))
+
+const fechaLarga = new Intl.DateTimeFormat('es-BO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+const diasVigencia = computed(() => {
+    const fecha = fechaLocal(form.fecha_vencimiento)
+    return fecha ? Math.round((fecha - hoy) / MS_POR_DIA) : null
+})
+
+const vencimientoInvalido = computed(() => diasVigencia.value !== null && diasVigencia.value < 1)
+
+const textoVigencia = computed(() => {
+    const dias = diasVigencia.value
+    if (dias === null || dias < 1) return null
+    return dias === 1 ? 'Vigente hasta mañana' : `Vigente ${dias} días`
+})
+
+const textoFechaLarga = computed(() => {
+    const fecha = fechaLocal(form.fecha_vencimiento)
+    return fecha ? fechaLarga.format(fecha) : ''
+})
+
+const esSugerida = computed(() => form.fecha_vencimiento === props.vencimientoSugerido.fecha)
+
+const diasSugeridos = computed(() => {
+    const dias = props.vencimientoSugerido.dias
+    return `${dias} día${dias === 1 ? '' : 's'}`
+})
+
+// Al editar un vale cuyo vencimiento ya pasó: hay que elegir una fecha nueva.
+const vencimientoOriginalPasado = !!props.vale?.fecha_vencimiento
+    && new Date(String(props.vale.fecha_vencimiento).replace(' ', 'T')) <= new Date()
+
+function usarVencimientoSugerido() {
+    form.fecha_vencimiento = props.vencimientoSugerido.fecha
+}
+
+watch(() => form.fecha_vencimiento, () => form.clearErrors('fecha_vencimiento'))
 
 const paramsConductor = ref({ id_vehiculo: null })
 
 // Los SearchSelect retornan el objeto completo {id, label}
 // Extraemos el id antes de enviar
 function submit() {
+    if (!form.fecha_vencimiento) {
+        form.setError('fecha_vencimiento', 'Indique la fecha de vencimiento.')
+        return
+    }
+
+    if (vencimientoInvalido.value) {
+        form.setError('fecha_vencimiento', 'La fecha de vencimiento debe ser posterior a hoy.')
+        return
+    }
 
     const ruta = props.vale ? route('vales.update', props.vale.id) : route('vales.store')
     form
@@ -87,7 +162,7 @@ const vehiculoSeleccionado = (vehiculo) => {
 
 <template>
 
-    <Head title="Nuevo Vale" />
+    <Head :title="props.vale ? 'Editar Vale' : 'Nuevo Vale'" />
 
     <!-- Breadcrumb -->
     <div class="d-flex align-items-center justify-content-between page-header-breadcrumb flex-wrap gap-2 mb-4">
@@ -100,7 +175,7 @@ const vehiculoSeleccionado = (vehiculo) => {
                     <li class="breadcrumb-item">
                         <Link :href="route('vales.index')">Vales</Link>
                     </li>
-                    <li class="breadcrumb-item active">Nuevo</li>
+                    <li class="breadcrumb-item active">{{ props.vale ? 'Editar' : 'Nuevo' }}</li>
                 </ol>
             </nav>
             <h1 class="page-title fw-medium fs-18 mb-0">
@@ -219,6 +294,51 @@ const vehiculoSeleccionado = (vehiculo) => {
                                     :class="{ 'is-invalid': form.errors.fecha_emision }" />
                                 <div v-if="form.errors.fecha_emision" class="invalid-feedback">{{
                                     form.errors.fecha_emision }}</div>
+                            </div>
+
+                            <!-- Fecha de Vencimiento -->
+                            <div class="col-12">
+                                <label for="fecha_vencimiento" class="form-label fw-medium">
+                                    Vence el <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group has-validation">
+                                    <span class="input-group-text"><i class="ri-calendar-event-line"></i></span>
+                                    <input id="fecha_vencimiento" v-model="form.fecha_vencimiento" type="date"
+                                        class="form-control" :min="manana" required
+                                        :class="{ 'is-invalid': form.errors.fecha_vencimiento || vencimientoInvalido }"
+                                        aria-describedby="fecha_vencimiento_ayuda" />
+                                    <span class="input-group-text vale-vencimiento-hora">hasta las 23:59</span>
+                                    <div v-if="form.errors.fecha_vencimiento || vencimientoInvalido"
+                                        class="invalid-feedback">
+                                        {{ form.errors.fecha_vencimiento || 'La fecha de vencimiento debe ser posterior a hoy.' }}
+                                    </div>
+                                </div>
+
+                                <div id="fecha_vencimiento_ayuda" class="vale-vencimiento-ayuda">
+                                    <span v-if="textoVigencia" class="vale-vencimiento-resumen">
+                                        <i class="ri-time-line" aria-hidden="true"></i>
+                                        <strong>{{ textoVigencia }}</strong>
+                                        <span>· {{ textoFechaLarga }}</span>
+                                    </span>
+
+                                    <span v-if="esSugerida" class="vale-vencimiento-sugerida">
+                                        <i class="ri-checkbox-circle-line" aria-hidden="true"></i>
+                                        Plazo sugerido por parámetros ({{ diasSugeridos }})
+                                    </span>
+                                    <button v-else type="button" class="btn btn-sm btn-primary-light btn-wave"
+                                        @click="usarVencimientoSugerido">
+                                        <i class="ri-lightbulb-flash-line me-1" aria-hidden="true"></i>
+                                        Usar sugerida: {{ formatDate(props.vencimientoSugerido.fecha) }}
+                                        ({{ diasSugeridos }})
+                                    </button>
+                                </div>
+
+                                <div v-if="vencimientoOriginalPasado" class="alert alert-warning py-2 mt-2 mb-0 small"
+                                    role="status">
+                                    <i class="ri-error-warning-line me-1" aria-hidden="true"></i>
+                                    Este vale venció el {{ formatDate(props.vale.fecha_vencimiento, true) }}. Elija una
+                                    fecha posterior a hoy para que vuelva a estar vigente.
+                                </div>
                             </div>
 
                             <!-- Litros -->

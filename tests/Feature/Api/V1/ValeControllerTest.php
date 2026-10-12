@@ -120,6 +120,109 @@ class ValeControllerTest extends TestCase
         $this->assertNotNull($vale->fecha_vencimiento);
     }
 
+    private function crearAdministradorQuePuedeEmitir(): User
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrador');
+        $admin->givePermissionTo('vales.crear');
+
+        return $admin;
+    }
+
+    /**
+     * @return array{id_vehiculo: int, id_conductor: int, id_grifo: int, litros: int, precio: float}
+     */
+    private function datosDeVale(): array
+    {
+        return [
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_conductor' => Conductor::factory()->create()->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ];
+    }
+
+    /**
+     * Sin fecha_vencimiento (omitida o null) se mantiene el comportamiento
+     * previo: fecha de emisión + tiempo_expiracion de los parámetros.
+     */
+    public function test_emitir_vale_sin_fecha_de_vencimiento_la_calcula_con_el_plazo_parametrizado(): void
+    {
+        $this->freezeTime();
+        ParametrosEmpresa::first()->update(['parametros_vale' => ['tiempo_expiracion' => 4]]);
+        $admin = $this->crearAdministradorQuePuedeEmitir();
+        $datos = $this->datosDeVale();
+
+        $this->actingAs($admin, 'api')->postJson(route('api.v1.vales.store'), $datos)
+            ->assertCreated();
+
+        $this->actingAs($admin, 'api')->postJson(route('api.v1.vales.store'), [
+            ...$datos,
+            'fecha_vencimiento' => null,
+        ])->assertCreated();
+
+        Vale::all()->each(fn (Vale $vale) => $this->assertTrue(
+            $vale->fecha_vencimiento->equalTo($vale->fecha_emision->copy()->addDays(4))
+        ));
+        $this->assertSame(2, Vale::count());
+    }
+
+    /**
+     * La app puede elegir el día de vencimiento: queda vigente hasta las
+     * 23:59:59 de ese día, sin importar el plazo parametrizado.
+     */
+    public function test_emitir_vale_con_fecha_de_vencimiento_la_guarda_hasta_el_final_del_dia(): void
+    {
+        $fecha = today()->addDays(10);
+
+        $response = $this->actingAs($this->crearAdministradorQuePuedeEmitir(), 'api')
+            ->postJson(route('api.v1.vales.store'), [
+                ...$this->datosDeVale(),
+                'fecha_vencimiento' => $fecha->format('Y-m-d'),
+            ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.fecha_vencimiento', $fecha->format('Y-m-d').' 23:59');
+        $this->assertEquals(
+            $fecha->copy()->endOfDay()->format('Y-m-d H:i:s'),
+            Vale::firstOrFail()->fecha_vencimiento->format('Y-m-d H:i:s'),
+        );
+    }
+
+    public function test_emitir_vale_acepta_manana_como_vencimiento_minimo(): void
+    {
+        $this->actingAs($this->crearAdministradorQuePuedeEmitir(), 'api')
+            ->postJson(route('api.v1.vales.store'), [
+                ...$this->datosDeVale(),
+                'fecha_vencimiento' => today()->addDay()->format('Y-m-d'),
+            ])->assertCreated();
+
+        $this->assertTrue(Vale::firstOrFail()->fecha_vencimiento->isTomorrow());
+    }
+
+    public function test_emitir_vale_rechaza_una_fecha_de_vencimiento_que_no_es_posterior_a_hoy(): void
+    {
+        $admin = $this->crearAdministradorQuePuedeEmitir();
+        $datos = $this->datosDeVale();
+
+        foreach ([today(), today()->subDay()] as $fecha) {
+            $this->actingAs($admin, 'api')->postJson(route('api.v1.vales.store'), [
+                ...$datos,
+                'fecha_vencimiento' => $fecha->format('Y-m-d'),
+            ])
+                ->assertUnprocessable()
+                ->assertJsonPath('errors.fecha_vencimiento.0', 'La fecha de vencimiento debe ser posterior a hoy.');
+        }
+
+        $this->actingAs($admin, 'api')->postJson(route('api.v1.vales.store'), [
+            ...$datos,
+            'fecha_vencimiento' => 'no-es-fecha',
+        ])->assertUnprocessable()->assertJsonValidationErrors('fecha_vencimiento');
+
+        $this->assertSame(0, Vale::count());
+    }
+
     public function test_store_notifica_al_conductor_si_tiene_cuenta_de_usuario(): void
     {
         Notification::fake();

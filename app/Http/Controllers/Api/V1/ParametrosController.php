@@ -11,6 +11,7 @@ use App\Models\Repuesto;
 use App\Models\TipoCombustible;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
+use App\Models\Vale;
 use App\Models\Vehiculo;
 use App\Models\VehiculoExterno;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -26,7 +27,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.11.0',
+            'api_version' => '1.13.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -34,9 +35,28 @@ class ParametrosController extends Controller
             'timezone' => config('app.timezone'),
             'locale' => config('app.locale'),
             'url_logo' => asset('images/logo.png'),
+            'vales' => $this->parametrosVale(),
         ];
 
         return response()->json($parametros);
+    }
+
+    /**
+     * Datos para que la app sugiera la fecha de vencimiento al emitir un vale
+     * (mismo cálculo que el formulario web, ver Vale::vencimientoSugerido()).
+     * La fecha mínima aceptada por `POST /vales` es mañana.
+     *
+     * @return array{tiempo_expiracion: int, fecha_vencimiento_sugerida: string, fecha_vencimiento_minima: string}
+     */
+    private function parametrosVale(): array
+    {
+        $vencimientoSugerido = Vale::vencimientoSugerido();
+
+        return [
+            'tiempo_expiracion' => $vencimientoSugerido['dias'],
+            'fecha_vencimiento_sugerida' => $vencimientoSugerido['fecha'],
+            'fecha_vencimiento_minima' => today()->addDay()->format('Y-m-d'),
+        ];
     }
 
     /**

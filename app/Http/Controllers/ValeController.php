@@ -75,6 +75,7 @@ class ValeController extends Controller
             'tiposCombustible' => $tiposCombustible,
             'grifos' => $grifos,
             'vale' => null,
+            'vencimientoSugerido' => Vale::vencimientoSugerido(),
         ]);
     }
 
@@ -125,6 +126,7 @@ class ValeController extends Controller
             'conductorActual' => $vale->conductor ? ['id' => $vale->conductor->id, 'label' => trim("{$vale->conductor->persona->nombre_completo}")." (CI: {$vale->conductor->persona->ci})"] : null,
             'tiposCombustible' => $tiposCombustible,
             'grifos' => $grifos,
+            'vencimientoSugerido' => Vale::vencimientoSugerido(),
         ]);
     }
 
@@ -137,7 +139,15 @@ class ValeController extends Controller
                 ->with('error', "No se puede editar el Vale #{$vale->nro} porque ya no está PENDIENTE.");
         }
 
-        $vale->update($request->validated());
+        $vale->fill($request->validated());
+
+        // Si se cambia el vencimiento, el aviso "por vencer" debe volver a
+        // enviarse respecto de la nueva fecha (ver NotificarValesPorVencerCommand).
+        if ($vale->isDirty('fecha_vencimiento')) {
+            $vale->notificado_vencimiento_at = null;
+        }
+
+        $vale->save();
 
         return redirect()->route('vales.index')
             ->with('success', "Vale #{$vale->nro} actualizado exitosamente.");
