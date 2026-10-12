@@ -58,6 +58,30 @@ function clearFilters() {
     filters.value = { nro_placa: '', codigo: '', marca: '', estado_vehiculo: '', id_tipo_vehiculo: '', id_area: '' }
 }
 
+/* ------------------------------------------------------------------ *
+ * Exportar listado (PDF / Excel)
+ * Usa los filtros ya aplicados por el servidor (props.filters), no los
+ * del formulario: así lo exportado coincide exactamente con lo que se ve
+ * aunque haya un cambio de filtro todavía dentro del debounce.
+ * ------------------------------------------------------------------ */
+const hayVehiculos = computed(() => (props.vehiculos?.total ?? 0) > 0)
+
+function parametrosExportacion() {
+    return Object.fromEntries(
+        Object.entries(props.filters ?? {}).filter(([, valor]) => valor !== null && valor !== undefined && valor !== ''),
+    )
+}
+
+function exportarPdf() {
+    window.open(route('vehiculos.reporte.pdf', parametrosExportacion()), '_blank')
+}
+
+// El .xlsx viaja como adjunto: se navega a la URL en la misma pestaña y el
+// navegador lo descarga sin abrir una pestaña en blanco.
+function exportarExcel() {
+    window.location.href = route('vehiculos.reporte.excel', parametrosExportacion())
+}
+
 async function confirmDelete(vehiculo) {
     const identificador = vehiculo.nro_placa ?? vehiculo.codigo ?? `#${vehiculo.id}`
     const confirmado = await confirm(
@@ -248,12 +272,22 @@ const tipoAsignacionBadge = (tipo) =>
 
     <!-- Tabla -->
     <div class="card custom-card">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="card-title">
                 Vehículos
                 <span class="badge bg-primary-transparent text-primary ms-2">
                     {{ vehiculos.total }} registros
                 </span>
+            </div>
+            <div class="d-flex gap-2">
+                <button v-can="'vehiculos.reporte.pdf'" type="button" class="btn btn-sm btn-primary btn-wave"
+                    :disabled="!hayVehiculos" title="Exportar el listado filtrado a PDF" @click="exportarPdf">
+                    <i class="ri-file-pdf-2-line me-1" aria-hidden="true"></i> PDF
+                </button>
+                <button v-can="'vehiculos.reporte.excel'" type="button" class="btn btn-sm btn-success btn-wave"
+                    :disabled="!hayVehiculos" title="Exportar el listado filtrado a Excel" @click="exportarExcel">
+                    <i class="ri-file-excel-2-line me-1" aria-hidden="true"></i> Excel
+                </button>
             </div>
         </div>
         <!-- Vista tabla: desktop -->

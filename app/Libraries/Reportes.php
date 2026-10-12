@@ -15,6 +15,34 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class Reportes extends exFPDF
 {
     /**
+     * Pie de página que se repite en CADA hoja (fecha + "Página x/y"). Sólo lo
+     * activan los listados que pueden ocupar varias páginas
+     * (generarListadoTabular); el resto de reportes sigue pintando su pie una
+     * única vez al final con pintarPieDePagina(), así que con null no cambia nada.
+     *
+     * @var array{uw: float, gris: array<int, int>}|null
+     */
+    private ?array $pieDePaginaRepetido = null;
+
+    /**
+     * Hook de FPDF: se invoca al cerrar cada página (incluida la última).
+     */
+    public function Footer(): void
+    {
+        if ($this->pieDePaginaRepetido === null) {
+            return;
+        }
+
+        ['uw' => $uw, 'gris' => $gris] = $this->pieDePaginaRepetido;
+
+        $this->SetY(-12);
+        $this->SetFont('Calibri', 'I', 8);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->Cell($uw / 2, 4, $this->textoCalibri('Reporte generado el: '.date('d/m/Y H:i')), 0, 0, 'L');
+        $this->Cell($uw / 2, 4, $this->textoCalibri('Página: ').$this->PageNo().'/{nb}', 0, 0, 'R');
+    }
+
+    /**
      * @param  string  $modo  Destino de salida de FPDF: 'I' (mostrar inline en el navegador,
      *                        usado por la vista web), 'D' (forzar descarga en el navegador) o
      *                        'S' (devolver el PDF como string, usado por la API para que el
@@ -1260,6 +1288,334 @@ class Reportes extends exFPDF
     }
 
     /**
+     * Listado de vehículos (Vehiculos/Index.vue) con los filtros aplicados en
+     * la vista. $listado es lo que arma VehiculoController::listadoParaReporte().
+     *
+     * @param  array{vehiculos: iterable<array<string, mixed>>, totales: array<string, int>}  $listado
+     * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
+     */
+    public function generarReporteVehiculos(array $listado, array $filtrosAplicados = [], string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $totales = ($listado['totales'] ?? []) + ['total' => 0, 'activos' => 0, 'retirados' => 0, 'vendidos' => 0];
+
+        $capacidad = function (array $vehiculo): ?string {
+            if (($vehiculo['capacidad'] ?? null) === null || $vehiculo['capacidad'] === '') {
+                return null;
+            }
+
+            $numero = rtrim(rtrim(number_format((float) $vehiculo['capacidad'], 2, ',', '.'), '0'), ',');
+
+            return trim($numero.' '.($vehiculo['capacidad_unidad'] ?? ''));
+        };
+
+        $filas = collect($listado['vehiculos'] ?? [])->values()->map(fn (array $v, int $i) => [
+            (string) ($i + 1),
+            $v['codigo'] ?? null,
+            ($v['nro_placa'] ?? null) ?: 'Sin placa',
+            trim(($v['marca'] ?? '').' '.($v['modelo'] ?? '')),
+            $v['anio'] ?? null,
+            $v['tipo_vehiculo'] ?? null,
+            $v['tipo_combustible'] ?? null,
+            $capacidad($v),
+            ($v['area'] ?? null) ?: 'Sin asignar',
+            ($v['operario'] ?? null) ?: 'Sin operario',
+            $v['estado_vehiculo'] ?? null,
+        ]);
+
+        return $this->generarListadoTabular(
+            titulo: 'LISTADO DE VEHÍCULOS',
+            subtitulo: 'Flota registrada al '.date('d/m/Y H:i'),
+            textoSinFiltros: 'Sin filtros: todos los vehículos registrados',
+            filtrosAplicados: $filtrosAplicados,
+            tarjetas: [
+                ['TOTAL VEHÍCULOS', $totales['total'], [59, 89, 152]],
+                ['ACTIVOS', $totales['activos'], [34, 177, 76]],
+                ['RETIRADOS', $totales['retirados'], [192, 110, 0]],
+                ['VENDIDOS', $totales['vendidos'], [155, 155, 155]],
+            ],
+            tituloTabla: 'VEHÍCULOS',
+            columnas: [
+                ['#', 8, 'C'], ['CÓDIGO', 22, 'L'], ['PLACA', 22, 'L'], ['MARCA / MODELO', 40, 'L'],
+                ['AÑO', 12, 'C'], ['TIPO', 30, 'L'], ['COMBUSTIBLE', 22, 'L'], ['CAPACIDAD', 20, 'R'],
+                ['ÁREA ASIGNADA', 35, 'L'], ['OPERARIO', 36, 'L'], ['ESTADO', 16, 'C'],
+            ],
+            filas: $filas,
+            mensajeVacio: 'No hay vehículos que coincidan con los filtros seleccionados.',
+            modo: $modo,
+            nombreArchivo: $nombreArchivo ?? 'listado_vehiculos.pdf',
+        );
+    }
+
+    /**
+     * Listado de conductores (Conductores/Index.vue) con los filtros aplicados
+     * en la vista, su licencia de conducir y los vehículos que tienen
+     * asignados. $listado es lo que arma ConductorController::listadoParaReporte().
+     *
+     * @param  array{conductores: iterable<array<string, mixed>>, totales: array<string, int>}  $listado
+     * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
+     */
+    public function generarReporteConductores(array $listado, array $filtrosAplicados = [], string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $totales = ($listado['totales'] ?? []) + ['total' => 0, 'activos' => 0, 'inactivos' => 0, 'retirados' => 0, 'sin_vehiculo' => 0];
+
+        $filas = collect($listado['conductores'] ?? [])->values()->map(function (array $c, int $i) {
+            $licencia = trim(($c['licencia_numero'] ?? '').(($c['licencia_categoria'] ?? null) ? ' (Cat. '.$c['licencia_categoria'].')' : ''));
+            $vencimiento = ($c['licencia_vencimiento'] ?? null)
+                ? $c['licencia_vencimiento'].(($c['licencia_vencida'] ?? false) ? ' (vencida)' : '')
+                : null;
+
+            return [
+                (string) ($i + 1),
+                $c['ci'] ?? null,
+                $c['nombre_completo'] ?? null,
+                $c['celular'] ?? null,
+                $licencia ?: 'Sin licencia',
+                $vencimiento,
+                ($c['vehiculos'] ?? null) ?: 'Sin vehículo asignado',
+                $c['estado_conductor'] ?? null,
+            ];
+        });
+
+        return $this->generarListadoTabular(
+            titulo: 'LISTADO DE CONDUCTORES',
+            subtitulo: 'Conductores registrados al '.date('d/m/Y H:i'),
+            textoSinFiltros: 'Sin filtros: todos los conductores registrados',
+            filtrosAplicados: $filtrosAplicados,
+            tarjetas: [
+                ['TOTAL CONDUCTORES', $totales['total'], [59, 89, 152]],
+                ['ACTIVOS', $totales['activos'], [34, 177, 76]],
+                ['INACTIVOS', $totales['inactivos'], [192, 110, 0]],
+                ['RETIRADOS', $totales['retirados'], [192, 0, 0]],
+                ['SIN VEHÍCULO ASIGNADO', $totales['sin_vehiculo'], [155, 155, 155]],
+            ],
+            tituloTabla: 'CONDUCTORES',
+            columnas: [
+                ['#', 8, 'C'], ['CI', 24, 'L'], ['NOMBRE COMPLETO', 58, 'L'], ['CELULAR', 24, 'L'],
+                ['LICENCIA', 32, 'L'], ['VENCE LICENCIA', 28, 'C'], ['VEHÍCULOS ASIGNADOS', 69, 'L'], ['ESTADO', 20, 'C'],
+            ],
+            filas: $filas,
+            mensajeVacio: 'No hay conductores que coincidan con los filtros seleccionados.',
+            modo: $modo,
+            nombreArchivo: $nombreArchivo ?? 'listado_conductores.pdf',
+        );
+    }
+
+    /**
+     * Listado de personas (Personas/Index.vue) con los filtros aplicados en la
+     * vista, su tipo operativo, las áreas a su cargo y su cuenta de usuario.
+     * $listado es lo que arma PersonaController::listadoParaReporte().
+     *
+     * @param  array{personas: iterable<array<string, mixed>>, totales: array<string, int>}  $listado
+     * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
+     */
+    public function generarReportePersonas(array $listado, array $filtrosAplicados = [], string $modo = 'I', ?string $nombreArchivo = null)
+    {
+        $totales = ($listado['totales'] ?? []) + ['total' => 0, 'activos' => 0, 'inactivos' => 0, 'retirados' => 0, 'con_usuario' => 0];
+
+        $filas = collect($listado['personas'] ?? [])->values()->map(fn (array $p, int $i) => [
+            (string) ($i + 1),
+            $p['ci'] ?? null,
+            $p['nombre_completo'] ?? null,
+            $p['celular'] ?? null,
+            $p['fecha_nacimiento'] ?? null,
+            $p['tipo'] ?? null,
+            $p['areas_a_cargo'] ?? null,
+            ($p['usuario'] ?? null)
+                ? $p['usuario'].(($p['estado_usuario'] ?? null) ? ' ('.$p['estado_usuario'].')' : '')
+                : 'Sin usuario',
+            $p['estado_persona'] ?? null,
+        ]);
+
+        return $this->generarListadoTabular(
+            titulo: 'LISTADO DE PERSONAS',
+            subtitulo: 'Personas registradas al '.date('d/m/Y H:i'),
+            textoSinFiltros: 'Sin filtros: todas las personas registradas',
+            filtrosAplicados: $filtrosAplicados,
+            tarjetas: [
+                ['TOTAL PERSONAS', $totales['total'], [59, 89, 152]],
+                ['ACTIVAS', $totales['activos'], [34, 177, 76]],
+                ['INACTIVAS', $totales['inactivos'], [192, 110, 0]],
+                ['RETIRADAS', $totales['retirados'], [192, 0, 0]],
+                ['CON USUARIO', $totales['con_usuario'], [155, 155, 155]],
+            ],
+            tituloTabla: 'PERSONAS',
+            columnas: [
+                ['#', 8, 'C'], ['CI', 24, 'L'], ['NOMBRE COMPLETO', 58, 'L'], ['CELULAR', 24, 'L'],
+                ['F. NACIMIENTO', 24, 'C'], ['TIPO', 24, 'L'], ['ÁREAS A CARGO', 40, 'L'], ['USUARIO', 41, 'L'],
+                ['ESTADO', 20, 'C'],
+            ],
+            filas: $filas,
+            mensajeVacio: 'No hay personas que coincidan con los filtros seleccionados.',
+            modo: $modo,
+            nombreArchivo: $nombreArchivo ?? 'listado_personas.pdf',
+        );
+    }
+
+    /**
+     * Plantilla común de los listados exportables (vehículos, conductores,
+     * personas): hoja carta horizontal con encabezado, línea de filtros,
+     * tarjetas de resumen y una tabla con el encabezado y el pie de página
+     * repetidos en cada hoja, porque un listado completo puede ocupar varias.
+     * Las celdas null o '' se muestran como "—".
+     *
+     * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
+     * @param  array<int, array{0: string, 1: int|string, 2: array<int, int>}>  $tarjetas  [etiqueta, valor, color RGB]
+     * @param  array<int, array{0: string, 1: int|float, 2: string}>  $columnas  [encabezado, ancho mm, alineación L|C|R]; los anchos suman 263
+     * @param  iterable<int, array<int, ?string>>  $filas
+     */
+    private function generarListadoTabular(
+        string $titulo,
+        string $subtitulo,
+        string $textoSinFiltros,
+        array $filtrosAplicados,
+        array $tarjetas,
+        string $tituloTabla,
+        array $columnas,
+        iterable $filas,
+        string $mensajeVacio,
+        string $modo,
+        string $nombreArchivo,
+    ) {
+        $filas = collect($filas)->values();
+
+        $azul = [39, 42, 84];
+        $grisEncabezado = [201, 201, 201];
+        $verde = [24, 125, 170];
+        $gris = [90, 90, 90];
+
+        $texto = fn ($valor): string => $this->textoCalibri(($valor === null || $valor === '') ? '—' : (string) $valor);
+
+        $parametrosEmpresa = $this->parametrosEmpresa();
+
+        $sx = 8;
+        $sy = 8;
+        $uw = 263.4;
+
+        $this->registrarFuenteCalibri();
+        $this->pieDePaginaRepetido = ['uw' => $uw, 'gris' => $gris];
+        $this->AliasNbPages();
+        $this->AddPage('L', 'Letter');
+        $this->SetMargins(8, 8, 8);
+        $this->SetAutoPageBreak(true, 15);
+
+        // ════════════════════════════════════════════════════════════════
+        // ENCABEZADO
+        // ════════════════════════════════════════════════════════════════
+        $filtros = collect($filtrosAplicados)
+            ->filter(fn ($valor) => $valor !== null && $valor !== '')
+            ->map(fn ($valor, $etiqueta) => $etiqueta.': '.$valor);
+        $lineaFiltros = $filtros->isEmpty()
+            ? $textoSinFiltros
+            : 'Filtros aplicados: '.$filtros->implode('  ·  ');
+        $h1 = 22;
+
+        $this->SetFillColor($verde[0], $verde[1], $verde[2]);
+        $this->Rect($sx, $sy, $uw, 1.2, 'F');
+
+        $this->SetLineWidth(0.5);
+        $this->SetDrawColor($azul[0], $azul[1], $azul[2]);
+        $this->Rect($sx, $sy + 1.2, $uw, $h1 - 1.2);
+
+        $this->Image($this->logoEmpresa($parametrosEmpresa), $sx + 4, $sy + 3, 35);
+
+        $this->SetFont('Calibri', 'B', 14);
+        $this->SetTextColor($azul[0], $azul[1], $azul[2]);
+        $this->SetXY($sx + 40, $sy + 1.5);
+        $this->Cell($uw - 40, 8, $this->textoCalibri($titulo), 0, 2, 'L');
+
+        $this->SetFont('Calibri', '', 9);
+        $this->SetTextColor($gris[0], $gris[1], $gris[2]);
+        $this->SetXY($sx + 40, $sy + 9.5);
+        $this->Cell($uw - 40, 6, $this->textoCalibri($subtitulo), 0, 2, 'L');
+
+        $this->SetFont('Calibri', 'BI', 8);
+        $this->SetTextColor($verde[0], $verde[1], $verde[2]);
+        $this->SetXY($sx + 40, $sy + 16);
+        $this->Cell($uw - 44, 5, $this->textoCalibri($lineaFiltros), 0, 2, 'L');
+
+        $currentY = $sy + $h1 + 2;
+        $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);
+        $currentY += 3;
+
+        // ════════════════════════════════════════════════════════════════
+        // TARJETAS DE RESUMEN
+        // ════════════════════════════════════════════════════════════════
+        $separacion = 2;
+        $cardW = ($uw - $separacion * (count($tarjetas) - 1)) / max(count($tarjetas), 1);
+        $cardH = 14;
+
+        $cardX = $sx;
+        foreach ($tarjetas as [$label, $valor, $color]) {
+            $this->SetLineWidth(0.3);
+            $this->SetDrawColor($color[0], $color[1], $color[2]);
+            $this->SetFillColor($color[0], $color[1], $color[2]);
+            $this->Rect($cardX, $currentY, $cardW, $cardH, 'FD');
+
+            $this->SetFont('Calibri', 'B', 6.5);
+            $this->SetTextColor(255, 255, 255);
+            $this->SetXY($cardX, $currentY);
+            $this->Cell($cardW, 5, $this->textoCalibri($label), 0, 1, 'C');
+
+            $this->SetFont('Calibri', 'B', 10);
+            $this->SetXY($cardX, $currentY + 5);
+            $this->Cell($cardW, 9, $this->textoCalibri((string) $valor), 0, 1, 'C');
+
+            $cardX += $cardW + $separacion;
+        }
+
+        $currentY += $cardH + 6;
+
+        // ════════════════════════════════════════════════════════════════
+        // TABLA
+        // ════════════════════════════════════════════════════════════════
+        $this->SetFillColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetDrawColor($grisEncabezado[0], $grisEncabezado[1], $grisEncabezado[2]);
+        $this->SetLineWidth(0.3);
+        $this->Rect($sx, $currentY, $uw, 8, 'FD');
+        $this->SetFont('Calibri', 'B', 9);
+        $this->SetTextColor(30, 30, 30);
+        $this->SetXY($sx, $currentY);
+        $this->Cell($uw, 8, $this->textoCalibri($tituloTabla), 0, 1, 'C');
+
+        $currentY += 8;
+
+        $this->SetXY($sx, $currentY);
+        $anchos = '{'.implode(', ', array_column($columnas, 1)).'}';
+        $tabla = new easyTable($this, $anchos, 'width:263; border:1; border-color:30,30,30; border-width:0.2; font-family:Calibri; valign:M; paddingX:1.5; min-height:6;');
+
+        $tabla->rowStyle('bgcolor:201,201,201; font-style:B; font-size:7.5; font-color:30,30,30;');
+        foreach ($columnas as [$encabezado, , $alineacion]) {
+            $tabla->easyCell($this->textoCalibri($encabezado), 'align:'.$alineacion.';');
+        }
+        $tabla->printRow(true);
+
+        if ($filas->isEmpty()) {
+            $tabla->rowStyle('font-size:8; font-color:90,90,90;');
+            $tabla->easyCell($this->textoCalibri($mensajeVacio), 'align:C; colspan:'.count($columnas).';');
+            $tabla->printRow();
+        }
+
+        foreach ($filas as $idx => $celdas) {
+            // Franjas alternadas muy claras: ayudan a seguir la fila en una
+            // tabla ancha sin gastar tinta.
+            $fondo = $idx % 2 === 1 ? ' bgcolor:244,246,250;' : '';
+            $tabla->rowStyle('font-style:; font-size:7.5; font-color:30,30,30;'.$fondo);
+
+            foreach ($columnas as $i => [, , $alineacion]) {
+                $tabla->easyCell($texto($celdas[$i] ?? null), 'align:'.$alineacion.';');
+            }
+            $tabla->printRow();
+        }
+
+        $tabla->endTable();
+
+        $contenido = $this->Output($modo, $nombreArchivo);
+        $this->pieDePaginaRepetido = null;
+
+        return $contenido;
+    }
+
+    /**
      * Detalle de un solo vehículo externo: sus fletes abiertos en el rango, el
      * desglose de viajes por material de cada uno y el resumen por material del
      * vehículo. $detalle es lo que devuelve
@@ -2051,7 +2407,9 @@ class Reportes extends exFPDF
      */
     private function textoCalibri(?string $texto): string
     {
-        if (empty($texto)) {
+        // No usar empty(): empty('0') es true y borraría cualquier "0"
+        // (tarjetas de totales en cero, cantidades, etc.) de los reportes.
+        if ($texto === null || $texto === '') {
             return '';
         }
 

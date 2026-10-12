@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\AsignacionRequest;
 use App\Http\Requests\ConductorRequest;
+use App\Libraries\Reportes;
+use App\Libraries\ReportesExcel;
 use App\Models\Asignacion;
 use App\Models\Conductor;
 use App\Models\DocumentoConductor;
 use App\Models\Persona;
 use App\Models\Vehiculo;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,10 +24,74 @@ use Inertia\Response;
 
 class ConductorController extends Controller
 {
+    /**
+     * Filtros del listado; el PDF y el Excel reciben exactamente los mismos.
+     */
+    private const FILTROS_LISTADO = ['ci', 'nombres', 'paterno', 'celular'];
+
     public function index(Request $request): Response
     {
+        $conductores = $this->consultaListado($request)
+            ->paginate(10)
+            ->withQueryString();
+
+        return inertia('Conductores/Index', [
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'conductores' => Inertia::scroll($conductores),
+            'filters' => $request->only(self::FILTROS_LISTADO),
+            'flash' => [
+                'success' => session('success'),
+                'error' => session('error'),
+            ],
+        ]);
+    }
+
+    /**
+     * Listado de conductores en PDF, con los mismos filtros y orden que la
+     * vista (todas las páginas, no sólo la visible).
+     */
+    public function reportePdf(Request $request): HttpResponse
+    {
+        $contenido = (new Reportes)->generarReporteConductores(
+            $this->listadoParaReporte($request),
+            $this->filtrosAplicados($request),
+            'S',
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="listado_conductores_'.now()->format('Y-m-d').'.pdf"',
+        ]);
+    }
+
+    /**
+     * Mismo listado que reportePdf(), en Excel (.xlsx).
+     */
+    public function reporteExcel(Request $request): HttpResponse
+    {
+        $contenido = (new ReportesExcel)->generarReporteConductores(
+            $this->listadoParaReporte($request),
+            $this->filtrosAplicados($request),
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="listado_conductores_'.now()->format('Y-m-d').'.xlsx"',
+        ]);
+    }
+
+    /**
+     * Consulta del listado con los filtros del request, compartida por la
+     * vista (paginada) y por los reportes PDF/Excel (completa). Los datos
+     * personales vienen del join con persona (comparten "id").
+     */
+    private function consultaListado(Request $request): Builder
+    {
         $query = Conductor::query()->with('asignacionesActivas')
-            ->join('persona', 'persona.id', '=', 'conductor.id'); // Cargar las asignaciones activas para cada conductor
+            ->join('persona', 'persona.id', '=', 'conductor.id');
 
         if ($request->filled('ci')) {
             $query->where('persona.ci', 'like', '%'.$request->ci.'%');
@@ -38,23 +106,69 @@ class ConductorController extends Controller
             $query->where('persona.celular', 'like', '%'.$request->celular.'%');
         }
 
-        $conductores = $query
-            ->orderBy('persona.id', 'desc')
-            ->paginate(10)
-            ->withQueryString();
+        return $query->orderBy('persona.id', 'desc');
+    }
 
-        return inertia('Conductores/Index', [
-            // Inertia::scroll() no cambia la forma del paginador (sigue
-            // trayendo data/total/from/to/links tal cual): sólo agrega la
-            // metadata de merge que usa <InfiniteScroll> en el listado de
-            // tarjetas (mobile). Ver .ai/rules/pages.md.
-            'conductores' => Inertia::scroll($conductores),
-            'filters' => $request->only(['ci', 'nombres', 'paterno', 'celular']),
-            'flash' => [
-                'success' => session('success'),
-                'error' => session('error'),
+    /**
+     * Filas ya resueltas (sin modelos) que reciben Reportes y ReportesExcel,
+     * con la licencia de conducir más reciente de cada conductor y sus
+     * vehículos vigentes, más los conteos de las tarjetas de resumen.
+     *
+     * @return array{conductores: Collection<int, array<string, mixed>>, totales: array{total: int, activos: int, inactivos: int, retirados: int, sin_vehiculo: int}}
+     */
+    private function listadoParaReporte(Request $request): array
+    {
+        $conductores = $this->consultaListado($request)
+            ->with(['documentos' => fn ($query) => $query->where('tipo_documento', 'LICENCIA_DE_CONDUCIR')])
+            ->get()
+            ->map(function (Conductor $conductor) {
+                $licencia = $conductor->documentos->sortByDesc('fecha_vencimiento')->first();
+
+                return [
+                    'ci' => $conductor->ci,
+                    'nombres' => $conductor->nombres,
+                    'paterno' => $conductor->paterno,
+                    'materno' => $conductor->materno,
+                    'nombre_completo' => trim(implode(' ', array_filter([$conductor->nombres, $conductor->paterno, $conductor->materno]))),
+                    'celular' => $conductor->celular,
+                    'licencia_numero' => $licencia?->numero_documento,
+                    'licencia_categoria' => $licencia?->categoria,
+                    'licencia_vencimiento' => $licencia?->fecha_vencimiento?->format('d/m/Y'),
+                    'licencia_vencida' => (bool) $licencia?->fecha_vencimiento?->lt(today()),
+                    'vehiculos' => $conductor->asignacionesActivas
+                        ->map(fn ($vehiculo) => implode(' — ', array_filter([$vehiculo->codigo, $vehiculo->nro_placa]))
+                            .($vehiculo->pivot->estado_asignacion === 'PROVISIONAL' ? ' (Provisional)' : ''))
+                        ->implode(', ') ?: null,
+                    'estado_conductor' => $conductor->estado_conductor,
+                ];
+            });
+
+        return [
+            'conductores' => $conductores,
+            'totales' => [
+                'total' => $conductores->count(),
+                'activos' => $conductores->where('estado_conductor', 'ACTIVO')->count(),
+                'inactivos' => $conductores->where('estado_conductor', 'INACTIVO')->count(),
+                'retirados' => $conductores->where('estado_conductor', 'RETIRADO')->count(),
+                'sin_vehiculo' => $conductores->whereNull('vehiculos')->count(),
             ],
-        ]);
+        ];
+    }
+
+    /**
+     * Filtros activos con etiqueta legible, para dejar constancia en el
+     * encabezado del reporte.
+     *
+     * @return array<string, ?string>
+     */
+    private function filtrosAplicados(Request $request): array
+    {
+        return [
+            'CI' => $request->filled('ci') ? (string) $request->ci : null,
+            'Nombres' => $request->filled('nombres') ? (string) $request->nombres : null,
+            'Apellido paterno' => $request->filled('paterno') ? (string) $request->paterno : null,
+            'Celular' => $request->filled('celular') ? (string) $request->celular : null,
+        ];
     }
 
     public function create(): Response

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\VehiculoAreaRequest;
 use App\Http\Requests\VehiculoRequest;
+use App\Libraries\Reportes;
+use App\Libraries\ReportesExcel;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\IntervaloMantenimientoTipo;
@@ -11,8 +13,11 @@ use App\Models\TipoCombustible;
 use App\Models\TipoVehiculo;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -20,7 +25,72 @@ use Inertia\Response;
 
 class VehiculoController extends Controller
 {
+    /**
+     * Filtros del listado; el PDF y el Excel reciben exactamente los mismos.
+     */
+    private const FILTROS_LISTADO = ['nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo', 'id_area'];
+
     public function index(Request $request): Response
+    {
+        $vehiculos = $this->consultaListado($request)
+            ->paginate(10)
+            ->withQueryString();
+
+        return Inertia::render('Vehiculos/Index', [
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'vehiculos' => Inertia::scroll($vehiculos),
+            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
+            'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
+            'filters' => $request->only(self::FILTROS_LISTADO),
+            'flash' => [
+                'success' => session('success'),
+                'error' => session('error'),
+            ],
+        ]);
+    }
+
+    /**
+     * Listado de vehículos en PDF, con los mismos filtros y orden que la
+     * vista (todas las páginas, no sólo la visible).
+     */
+    public function reportePdf(Request $request): HttpResponse
+    {
+        $contenido = (new Reportes)->generarReporteVehiculos(
+            $this->listadoParaReporte($request),
+            $this->filtrosAplicados($request),
+            'S',
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="listado_vehiculos_'.now()->format('Y-m-d').'.pdf"',
+        ]);
+    }
+
+    /**
+     * Mismo listado que reportePdf(), en Excel (.xlsx).
+     */
+    public function reporteExcel(Request $request): HttpResponse
+    {
+        $contenido = (new ReportesExcel)->generarReporteVehiculos(
+            $this->listadoParaReporte($request),
+            $this->filtrosAplicados($request),
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="listado_vehiculos_'.now()->format('Y-m-d').'.xlsx"',
+        ]);
+    }
+
+    /**
+     * Consulta del listado con los filtros del request, compartida por la
+     * vista (paginada) y por los reportes PDF/Excel (completa).
+     */
+    private function consultaListado(Request $request): Builder
     {
         $query = Vehiculo::with(['tipoCombustible', 'tipoVehiculo', 'conductorAsignado.persona', 'areasAsignadas']);
 
@@ -45,25 +115,63 @@ class VehiculoController extends Controller
             });
         }
 
-        $vehiculos = $query
-            ->orderBy('nro_placa')
-            ->paginate(10)
-            ->withQueryString();
+        return $query->orderBy('nro_placa');
+    }
 
-        return Inertia::render('Vehiculos/Index', [
-            // Inertia::scroll() no cambia la forma del paginador (sigue
-            // trayendo data/total/from/to/links tal cual): sólo agrega la
-            // metadata de merge que usa <InfiniteScroll> en el listado de
-            // tarjetas (mobile). Ver .ai/rules/pages.md.
-            'vehiculos' => Inertia::scroll($vehiculos),
-            'tiposVehiculo' => TipoVehiculo::where('estado_tipo_vehiculo', 'ACTIVO')->orderBy('tipo_vehiculo')->get(['id', 'tipo_vehiculo']),
-            'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
-            'filters' => $request->only(['nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo', 'id_area']),
-            'flash' => [
-                'success' => session('success'),
-                'error' => session('error'),
+    /**
+     * Filas ya resueltas (sin modelos) que reciben Reportes y ReportesExcel,
+     * más el conteo por estado para las tarjetas de resumen.
+     *
+     * @return array{vehiculos: Collection<int, array<string, mixed>>, totales: array{total: int, activos: int, retirados: int, vendidos: int}}
+     */
+    private function listadoParaReporte(Request $request): array
+    {
+        $vehiculos = $this->consultaListado($request)
+            ->get()
+            ->map(fn (Vehiculo $vehiculo) => [
+                'codigo' => $vehiculo->codigo,
+                'nro_placa' => $vehiculo->nro_placa,
+                'marca' => $vehiculo->marca,
+                'modelo' => $vehiculo->modelo,
+                'anio' => $vehiculo->anio,
+                'tipo_vehiculo' => $vehiculo->tipoVehiculo?->tipo_vehiculo,
+                'tipo_combustible' => $vehiculo->tipoCombustible?->tipo_combustible,
+                'capacidad' => $vehiculo->capacidad,
+                'capacidad_unidad' => $vehiculo->capacidad_unidad,
+                'area' => $vehiculo->areasAsignadas
+                    ->map(fn ($area) => $area->nombre_area.($area->pivot->estado_asignacion === 'PROVISIONAL' ? ' (Provisional)' : ''))
+                    ->implode(', ') ?: null,
+                'operario' => $vehiculo->conductorAsignado?->persona?->nombre_completo,
+                'estado_vehiculo' => $vehiculo->estado_vehiculo,
+            ]);
+
+        return [
+            'vehiculos' => $vehiculos,
+            'totales' => [
+                'total' => $vehiculos->count(),
+                'activos' => $vehiculos->where('estado_vehiculo', 'ACTIVO')->count(),
+                'retirados' => $vehiculos->where('estado_vehiculo', 'RETIRADO')->count(),
+                'vendidos' => $vehiculos->where('estado_vehiculo', 'VENDIDO')->count(),
             ],
-        ]);
+        ];
+    }
+
+    /**
+     * Filtros activos con etiqueta legible (nombre del tipo/área en vez del
+     * id), para dejar constancia en el encabezado del reporte.
+     *
+     * @return array<string, ?string>
+     */
+    private function filtrosAplicados(Request $request): array
+    {
+        return [
+            'Placa' => $request->filled('nro_placa') ? (string) $request->nro_placa : null,
+            'Código' => $request->filled('codigo') ? (string) $request->codigo : null,
+            'Marca' => $request->filled('marca') ? (string) $request->marca : null,
+            'Tipo' => $request->filled('id_tipo_vehiculo') ? TipoVehiculo::find($request->id_tipo_vehiculo)?->tipo_vehiculo : null,
+            'Estado' => $request->filled('estado_vehiculo') ? (string) $request->estado_vehiculo : null,
+            'Área' => $request->filled('id_area') ? Area::find($request->id_area)?->nombre_area : null,
+        ];
     }
 
     public function create(): Response

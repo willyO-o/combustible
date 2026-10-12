@@ -56,6 +56,30 @@ function clearFilters() {
     filters.value = { ci: '', nombres: '', paterno: '', celular: '' }
 }
 
+/* ------------------------------------------------------------------ *
+ * Exportar listado (PDF / Excel)
+ * Usa los filtros ya aplicados por el servidor (props.filters), no los
+ * del formulario: así lo exportado coincide exactamente con lo que se ve
+ * aunque haya un cambio de filtro todavía dentro del debounce.
+ * ------------------------------------------------------------------ */
+const hayRegistros = computed(() => (props.conductores?.total ?? 0) > 0)
+
+function parametrosExportacion() {
+    return Object.fromEntries(
+        Object.entries(props.filters ?? {}).filter(([, valor]) => valor !== null && valor !== undefined && valor !== ''),
+    )
+}
+
+function exportarPdf() {
+    window.open(route('conductores.reporte.pdf', parametrosExportacion()), '_blank')
+}
+
+// El .xlsx viaja como adjunto: se navega a la URL en la misma pestaña y el
+// navegador lo descarga sin abrir una pestaña en blanco.
+function exportarExcel() {
+    window.location.href = route('conductores.reporte.excel', parametrosExportacion())
+}
+
 // Confirmación de borrado
 const confirmDelete = async (conductor) => {
     const confirmar = await confirm(`¿Eliminar al operario ${conductor.nombres} ${conductor.paterno ?? ''}?`, "Confirmación", "Si, eliminar");
@@ -269,12 +293,22 @@ const tipoAsignacionBadge = (tipo) =>
 
         <!-- Tabla -->
         <div class="card custom-card">
-            <div class="card-header d-flex align-items-center justify-content-between">
+            <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div class="card-title">
                     Conductores
                     <span class="badge bg-primary-transparent text-primary ms-2">
                         {{ conductores.total }} registros
                     </span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button v-can="'conductores.reporte.pdf'" type="button" class="btn btn-sm btn-primary btn-wave"
+                        :disabled="!hayRegistros" title="Exportar el listado filtrado a PDF" @click="exportarPdf">
+                        <i class="ri-file-pdf-2-line me-1" aria-hidden="true"></i> PDF
+                    </button>
+                    <button v-can="'conductores.reporte.excel'" type="button" class="btn btn-sm btn-success btn-wave"
+                        :disabled="!hayRegistros" title="Exportar el listado filtrado a Excel" @click="exportarExcel">
+                        <i class="ri-file-excel-2-line me-1" aria-hidden="true"></i> Excel
+                    </button>
                 </div>
             </div>
             <!-- Vista tabla: desktop -->

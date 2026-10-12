@@ -87,6 +87,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
+    // Exportación de los listados (mismos filtros que su index). Antes de
+    // cada resource para que "reporte" nunca se interprete como {modelo}.
+    Route::get('conductores/reporte/pdf', [ConductorController::class, 'reportePdf'])->name('conductores.reporte.pdf');
+    Route::get('conductores/reporte/excel', [ConductorController::class, 'reporteExcel'])->name('conductores.reporte.excel');
+    Route::get('personas/reporte/pdf', [PersonaController::class, 'reportePdf'])->name('personas.reporte.pdf');
+    Route::get('personas/reporte/excel', [PersonaController::class, 'reporteExcel'])->name('personas.reporte.excel');
+
     Route::resource('conductores', ConductorController::class)
         ->parameters(['conductores' => 'conductor']);
     Route::post('conductores/{conductor}/asignaciones', [ConductorController::class, 'asignarVehiculo'])->name('conductores.asignaciones.asignar');
@@ -165,6 +172,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('grifos', GrifoController::class)
         ->parameters(['grifos' => 'grifo']);
 
+    // Exportación del listado (mismos filtros que vehiculos.index). Antes del
+    // resource para que "reporte" nunca se interprete como {vehiculo}.
+    Route::get('vehiculos/reporte/pdf', [VehiculoController::class, 'reportePdf'])->name('vehiculos.reporte.pdf');
+    Route::get('vehiculos/reporte/excel', [VehiculoController::class, 'reporteExcel'])->name('vehiculos.reporte.excel');
     Route::resource('vehiculos', VehiculoController::class)
         ->parameters(['vehiculos' => 'vehiculo']);
     Route::post('vehiculos/{vehiculo}/areas', [VehiculoController::class, 'asignarArea'])->name('vehiculos.areas.asignar');

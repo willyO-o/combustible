@@ -736,6 +736,239 @@ class ReportesExcel
     }
 
     /* =====================================================================
+     |  Listado de vehículos (Vehiculos/Index.vue)
+     | ================================================================== */
+
+    /**
+     * Espejo de Reportes::generarReporteVehiculos(). Marca y modelo, y
+     * capacidad y unidad, van en columnas separadas para poder filtrarlas y
+     * ordenarlas; año y capacidad se escriben como números.
+     *
+     * @param  array{vehiculos: iterable<int, array<string, mixed>>, totales: array<string, int>}  $listado
+     * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
+     */
+    public function generarReporteVehiculos(array $listado, array $filtrosAplicados = []): string
+    {
+        $vehiculos = collect($listado['vehiculos'] ?? []);
+        $totales = ($listado['totales'] ?? []) + [
+            'total' => 0,
+            'activos' => 0,
+            'retirados' => 0,
+            'vendidos' => 0,
+        ];
+
+        $libro = $this->crearLibro('Listado de vehículos');
+        $hoja = $libro->getActiveSheet();
+        $hoja->setTitle('Vehículos');
+
+        $columnas = [
+            ['label' => '#', 'ancho' => 6, 'align' => 'center', 'formato' => self::FORMATO_ENTERO],
+            ['label' => 'CÓDIGO', 'ancho' => 14, 'align' => 'left'],
+            ['label' => 'PLACA', 'ancho' => 13, 'align' => 'left'],
+            ['label' => 'MARCA', 'ancho' => 16, 'align' => 'left'],
+            ['label' => 'MODELO', 'ancho' => 16, 'align' => 'left'],
+            ['label' => 'AÑO', 'ancho' => 8, 'align' => 'center', 'formato' => '0'],
+            ['label' => 'TIPO DE VEHÍCULO', 'ancho' => 22, 'align' => 'left', 'ajustar' => true],
+            ['label' => 'COMBUSTIBLE', 'ancho' => 14, 'align' => 'left'],
+            ['label' => 'CAPACIDAD', 'ancho' => 12, 'align' => 'right', 'formato' => self::FORMATO_DECIMAL],
+            ['label' => 'UNIDAD', 'ancho' => 9, 'align' => 'center'],
+            ['label' => 'ÁREA ASIGNADA', 'ancho' => 26, 'align' => 'left', 'ajustar' => true],
+            ['label' => 'OPERARIO', 'ancho' => 28, 'align' => 'left', 'ajustar' => true],
+            ['label' => 'ESTADO', 'ancho' => 11, 'align' => 'center'],
+        ];
+
+        $lineasFiltros = $this->lineasDeFiltros($filtrosAplicados) ?: ['Sin filtros: todos los vehículos registrados'];
+
+        $fila = $this->pintarEncabezado(
+            $hoja,
+            'LISTADO DE VEHÍCULOS',
+            'Flota registrada al '.now()->format('d/m/Y H:i'),
+            $lineasFiltros,
+            count($columnas),
+        );
+
+        $fila = $this->pintarTarjetas($hoja, $fila, [
+            ['TOTAL VEHÍCULOS', (int) $totales['total'], self::FORMATO_ENTERO],
+            ['ACTIVOS', (int) $totales['activos'], self::FORMATO_ENTERO],
+            ['RETIRADOS', (int) $totales['retirados'], self::FORMATO_ENTERO],
+            ['VENDIDOS', (int) $totales['vendidos'], self::FORMATO_ENTERO],
+        ], count($columnas));
+
+        $fila = $this->pintarTituloSeccion($hoja, $fila, 'VEHÍCULOS', count($columnas));
+
+        $filas = $vehiculos->values()->map(fn ($v, $i) => [
+            $i + 1,
+            $v['codigo'] ?? '—',
+            ($v['nro_placa'] ?? null) ?: 'Sin placa',
+            $v['marca'] ?? '—',
+            $v['modelo'] ?? '—',
+            // escribirValor() lo guarda como número sólo si es numérico; un
+            // año cargado como texto (ej. "S/D") se conserva tal cual.
+            $v['anio'] ?? null,
+            $v['tipo_vehiculo'] ?? '—',
+            $v['tipo_combustible'] ?? '—',
+            $v['capacidad'] ?? null,
+            $v['capacidad_unidad'] ?? null,
+            ($v['area'] ?? null) ?: 'Sin asignar',
+            ($v['operario'] ?? null) ?: 'Sin operario',
+            $v['estado_vehiculo'] ?? '—',
+        ]);
+
+        $this->pintarTabla($hoja, $fila, $columnas, $filas, null, 'No hay vehículos que coincidan con los filtros seleccionados.');
+
+        return $this->guardar($libro);
+    }
+
+    /* =====================================================================
+     |  Listado de conductores (Conductores/Index.vue)
+     | ================================================================== */
+
+    /**
+     * Espejo de Reportes::generarReporteConductores(). Nombres y apellidos, y
+     * número y categoría de licencia, van en columnas separadas para poder
+     * filtrarlos y ordenarlos.
+     *
+     * @param  array{conductores: iterable<int, array<string, mixed>>, totales: array<string, int>}  $listado
+     * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
+     */
+    public function generarReporteConductores(array $listado, array $filtrosAplicados = []): string
+    {
+        $conductores = collect($listado['conductores'] ?? []);
+        $totales = ($listado['totales'] ?? []) + ['total' => 0, 'activos' => 0, 'inactivos' => 0, 'retirados' => 0, 'sin_vehiculo' => 0];
+
+        $libro = $this->crearLibro('Listado de conductores');
+        $hoja = $libro->getActiveSheet();
+        $hoja->setTitle('Conductores');
+
+        $columnas = [
+            ['label' => '#', 'ancho' => 6, 'align' => 'center', 'formato' => self::FORMATO_ENTERO],
+            ['label' => 'CI', 'ancho' => 13, 'align' => 'left'],
+            ['label' => 'NOMBRES', 'ancho' => 20, 'align' => 'left'],
+            ['label' => 'AP. PATERNO', 'ancho' => 16, 'align' => 'left'],
+            ['label' => 'AP. MATERNO', 'ancho' => 16, 'align' => 'left'],
+            ['label' => 'CELULAR', 'ancho' => 13, 'align' => 'left'],
+            ['label' => 'N° LICENCIA', 'ancho' => 15, 'align' => 'left'],
+            ['label' => 'CATEGORÍA', 'ancho' => 11, 'align' => 'center'],
+            ['label' => 'VENCE LICENCIA', 'ancho' => 14, 'align' => 'center'],
+            ['label' => 'LICENCIA', 'ancho' => 11, 'align' => 'center'],
+            ['label' => 'VEHÍCULOS ASIGNADOS', 'ancho' => 34, 'align' => 'left', 'ajustar' => true],
+            ['label' => 'ESTADO', 'ancho' => 11, 'align' => 'center'],
+        ];
+
+        $fila = $this->pintarEncabezado(
+            $hoja,
+            'LISTADO DE CONDUCTORES',
+            'Conductores registrados al '.now()->format('d/m/Y H:i'),
+            $this->lineasDeFiltros($filtrosAplicados) ?: ['Sin filtros: todos los conductores registrados'],
+            count($columnas),
+        );
+
+        $fila = $this->pintarTarjetas($hoja, $fila, [
+            ['TOTAL CONDUCTORES', (int) $totales['total'], self::FORMATO_ENTERO],
+            ['ACTIVOS', (int) $totales['activos'], self::FORMATO_ENTERO],
+            ['INACTIVOS', (int) $totales['inactivos'], self::FORMATO_ENTERO],
+            ['RETIRADOS', (int) $totales['retirados'], self::FORMATO_ENTERO],
+            ['SIN VEHÍCULO ASIGNADO', (int) $totales['sin_vehiculo'], self::FORMATO_ENTERO],
+        ], count($columnas));
+
+        $fila = $this->pintarTituloSeccion($hoja, $fila, 'CONDUCTORES', count($columnas));
+
+        $filas = $conductores->values()->map(fn ($c, $i) => [
+            $i + 1,
+            $c['ci'] ?? '—',
+            $c['nombres'] ?? '—',
+            $c['paterno'] ?? null,
+            $c['materno'] ?? null,
+            $c['celular'] ?? null,
+            ($c['licencia_numero'] ?? null) ?: 'Sin licencia',
+            $c['licencia_categoria'] ?? null,
+            $c['licencia_vencimiento'] ?? null,
+            ($c['licencia_vencimiento'] ?? null) ? (($c['licencia_vencida'] ?? false) ? 'Vencida' : 'Vigente') : null,
+            ($c['vehiculos'] ?? null) ?: 'Sin vehículo asignado',
+            $c['estado_conductor'] ?? '—',
+        ]);
+
+        $this->pintarTabla($hoja, $fila, $columnas, $filas, null, 'No hay conductores que coincidan con los filtros seleccionados.');
+
+        return $this->guardar($libro);
+    }
+
+    /* =====================================================================
+     |  Listado de personas (Personas/Index.vue)
+     | ================================================================== */
+
+    /**
+     * Espejo de Reportes::generarReportePersonas(). Nombres y apellidos van
+     * en columnas separadas y la edad como número, para poder ordenarlos.
+     *
+     * @param  array{personas: iterable<int, array<string, mixed>>, totales: array<string, int>}  $listado
+     * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
+     */
+    public function generarReportePersonas(array $listado, array $filtrosAplicados = []): string
+    {
+        $personas = collect($listado['personas'] ?? []);
+        $totales = ($listado['totales'] ?? []) + ['total' => 0, 'activos' => 0, 'inactivos' => 0, 'retirados' => 0, 'con_usuario' => 0];
+
+        $libro = $this->crearLibro('Listado de personas');
+        $hoja = $libro->getActiveSheet();
+        $hoja->setTitle('Personas');
+
+        $columnas = [
+            ['label' => '#', 'ancho' => 6, 'align' => 'center', 'formato' => self::FORMATO_ENTERO],
+            ['label' => 'CI', 'ancho' => 13, 'align' => 'left'],
+            ['label' => 'NOMBRES', 'ancho' => 20, 'align' => 'left'],
+            ['label' => 'AP. PATERNO', 'ancho' => 16, 'align' => 'left'],
+            ['label' => 'AP. MATERNO', 'ancho' => 16, 'align' => 'left'],
+            ['label' => 'CELULAR', 'ancho' => 13, 'align' => 'left'],
+            ['label' => 'F. NACIMIENTO', 'ancho' => 14, 'align' => 'center'],
+            ['label' => 'EDAD', 'ancho' => 8, 'align' => 'center', 'formato' => self::FORMATO_ENTERO],
+            ['label' => 'TIPO', 'ancho' => 14, 'align' => 'left'],
+            ['label' => 'ÁREAS A CARGO', 'ancho' => 24, 'align' => 'left', 'ajustar' => true],
+            ['label' => 'USUARIO', 'ancho' => 28, 'align' => 'left'],
+            ['label' => 'ESTADO USUARIO', 'ancho' => 13, 'align' => 'center'],
+            ['label' => 'ESTADO', 'ancho' => 11, 'align' => 'center'],
+        ];
+
+        $fila = $this->pintarEncabezado(
+            $hoja,
+            'LISTADO DE PERSONAS',
+            'Personas registradas al '.now()->format('d/m/Y H:i'),
+            $this->lineasDeFiltros($filtrosAplicados) ?: ['Sin filtros: todas las personas registradas'],
+            count($columnas),
+        );
+
+        $fila = $this->pintarTarjetas($hoja, $fila, [
+            ['TOTAL PERSONAS', (int) $totales['total'], self::FORMATO_ENTERO],
+            ['ACTIVAS', (int) $totales['activos'], self::FORMATO_ENTERO],
+            ['INACTIVAS', (int) $totales['inactivos'], self::FORMATO_ENTERO],
+            ['RETIRADAS', (int) $totales['retirados'], self::FORMATO_ENTERO],
+            ['CON USUARIO', (int) $totales['con_usuario'], self::FORMATO_ENTERO],
+        ], count($columnas));
+
+        $fila = $this->pintarTituloSeccion($hoja, $fila, 'PERSONAS', count($columnas));
+
+        $filas = $personas->values()->map(fn ($p, $i) => [
+            $i + 1,
+            $p['ci'] ?? '—',
+            $p['nombres'] ?? '—',
+            $p['paterno'] ?? null,
+            $p['materno'] ?? null,
+            $p['celular'] ?? null,
+            $p['fecha_nacimiento'] ?? null,
+            $p['edad'] ?? null,
+            $p['tipo'] ?? '—',
+            $p['areas_a_cargo'] ?? null,
+            ($p['usuario'] ?? null) ?: 'Sin usuario',
+            $p['estado_usuario'] ?? null,
+            $p['estado_persona'] ?? '—',
+        ]);
+
+        $this->pintarTabla($hoja, $fila, $columnas, $filas, null, 'No hay personas que coincidan con los filtros seleccionados.');
+
+        return $this->guardar($libro);
+    }
+
+    /* =====================================================================
      |  Helpers de construcción del libro
      | ================================================================== */
 

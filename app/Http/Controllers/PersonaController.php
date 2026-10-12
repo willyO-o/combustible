@@ -5,17 +5,85 @@ namespace App\Http\Controllers;
 use App\Actions\Personas\CreatePersonaAction;
 use App\Actions\Personas\UpdatePersonaAction;
 use App\Http\Requests\PersonaRequest;
+use App\Libraries\Reportes;
+use App\Libraries\ReportesExcel;
 use App\Models\Area;
 use App\Models\Persona;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PersonaController extends Controller
 {
+    /**
+     * Filtros del listado; el PDF y el Excel reciben exactamente los mismos.
+     */
+    private const FILTROS_LISTADO = ['ci', 'nombres', 'paterno', 'celular'];
+
     public function index(Request $request): Response
+    {
+        $personas = $this->consultaListado($request)
+            ->paginate(10)
+            ->withQueryString();
+
+        return Inertia::render('Personas/Index', [
+            // Inertia::scroll() no cambia la forma del paginador (sigue
+            // trayendo data/total/from/to/links tal cual): sólo agrega la
+            // metadata de merge que usa <InfiniteScroll> en el listado de
+            // tarjetas (mobile). Ver .ai/rules/pages.md.
+            'personas' => Inertia::scroll($personas),
+            'filters' => $request->only(self::FILTROS_LISTADO),
+            'flash' => [
+                'success' => session('success'),
+                'error' => session('error'),
+            ],
+        ]);
+    }
+
+    /**
+     * Listado de personas en PDF, con los mismos filtros y orden que la
+     * vista (todas las páginas, no sólo la visible).
+     */
+    public function reportePdf(Request $request): HttpResponse
+    {
+        $contenido = (new Reportes)->generarReportePersonas(
+            $this->listadoParaReporte($request),
+            $this->filtrosAplicados($request),
+            'S',
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="listado_personas_'.now()->format('Y-m-d').'.pdf"',
+        ]);
+    }
+
+    /**
+     * Mismo listado que reportePdf(), en Excel (.xlsx).
+     */
+    public function reporteExcel(Request $request): HttpResponse
+    {
+        $contenido = (new ReportesExcel)->generarReportePersonas(
+            $this->listadoParaReporte($request),
+            $this->filtrosAplicados($request),
+        );
+
+        return response($contenido, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="listado_personas_'.now()->format('Y-m-d').'.xlsx"',
+        ]);
+    }
+
+    /**
+     * Consulta del listado con los filtros del request, compartida por la
+     * vista (paginada) y por los reportes PDF/Excel (completa).
+     */
+    private function consultaListado(Request $request): Builder
     {
         $query = Persona::with(['user', 'conductor', 'encargadoAreas']);
 
@@ -32,23 +100,68 @@ class PersonaController extends Controller
             $query->where('celular', 'like', '%'.$request->celular.'%');
         }
 
-        $personas = $query
-            ->orderBy('id', 'desc')
-            ->paginate(10)
-            ->withQueryString();
+        return $query->orderBy('id', 'desc');
+    }
 
-        return Inertia::render('Personas/Index', [
-            // Inertia::scroll() no cambia la forma del paginador (sigue
-            // trayendo data/total/from/to/links tal cual): sólo agrega la
-            // metadata de merge que usa <InfiniteScroll> en el listado de
-            // tarjetas (mobile). Ver .ai/rules/pages.md.
-            'personas' => Inertia::scroll($personas),
-            'filters' => $request->only(['ci', 'nombres', 'paterno', 'celular']),
-            'flash' => [
-                'success' => session('success'),
-                'error' => session('error'),
+    /**
+     * Filas ya resueltas (sin modelos) que reciben Reportes y ReportesExcel,
+     * más los conteos de las tarjetas de resumen. El tipo se deriva de las
+     * relaciones ya cargadas con el mismo criterio que
+     * Persona::getTipoActualAttribute(), sin su consulta extra por fila.
+     *
+     * @return array{personas: Collection<int, array<string, mixed>>, totales: array{total: int, activos: int, inactivos: int, retirados: int, con_usuario: int}}
+     */
+    private function listadoParaReporte(Request $request): array
+    {
+        $personas = $this->consultaListado($request)
+            ->get()
+            ->map(fn (Persona $persona) => [
+                'ci' => $persona->ci,
+                'nombres' => $persona->nombres,
+                'paterno' => $persona->paterno,
+                'materno' => $persona->materno,
+                'nombre_completo' => trim(implode(' ', array_filter([$persona->nombres, $persona->paterno, $persona->materno]))),
+                'celular' => $persona->celular,
+                'fecha_nacimiento' => $persona->fecha_nacimiento?->format('d/m/Y'),
+                'edad' => $persona->fecha_nacimiento?->age,
+                'tipo' => match (true) {
+                    $persona->conductor !== null => 'Conductor',
+                    $persona->encargadoAreas->isNotEmpty() => 'Jefe de Área',
+                    $persona->user !== null => 'Personal',
+                    default => 'Sin asignar',
+                },
+                'areas_a_cargo' => $persona->encargadoAreas->pluck('nombre_area')->implode(', ') ?: null,
+                'usuario' => $persona->user?->email,
+                'estado_usuario' => $persona->user?->estado_usuario,
+                'estado_persona' => $persona->estado_persona,
+            ]);
+
+        return [
+            'personas' => $personas,
+            'totales' => [
+                'total' => $personas->count(),
+                'activos' => $personas->where('estado_persona', 'ACTIVO')->count(),
+                'inactivos' => $personas->where('estado_persona', 'INACTIVO')->count(),
+                'retirados' => $personas->where('estado_persona', 'RETIRADO')->count(),
+                'con_usuario' => $personas->whereNotNull('usuario')->count(),
             ],
-        ]);
+        ];
+    }
+
+    /**
+     * Filtros activos con etiqueta legible, para dejar constancia en el
+     * encabezado del reporte.
+     *
+     * @return array<string, ?string>
+     */
+    private function filtrosAplicados(Request $request): array
+    {
+        return [
+            'CI' => $request->filled('ci') ? (string) $request->ci : null,
+            'Nombres' => $request->filled('nombres') ? (string) $request->nombres : null,
+            'Apellido paterno' => $request->filled('paterno') ? (string) $request->paterno : null,
+            'Celular' => $request->filled('celular') ? (string) $request->celular : null,
+        ];
     }
 
     public function create(): Response

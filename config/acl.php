@@ -126,6 +126,8 @@ return [
                 'conductores.editar' => 'Editar',
                 'conductores.eliminar' => 'Eliminar',
                 'conductores.asignar-vehiculo' => 'Asignar vehículo',
+                'conductores.reporte.pdf' => 'Exportar listado en PDF',
+                'conductores.reporte.excel' => 'Exportar listado en Excel',
             ],
         ],
 
@@ -137,6 +139,8 @@ return [
                 'vehiculos.editar' => 'Editar',
                 'vehiculos.eliminar' => 'Eliminar',
                 'vehiculos.asignar-area' => 'Asignar área',
+                'vehiculos.reporte.pdf' => 'Exportar listado en PDF',
+                'vehiculos.reporte.excel' => 'Exportar listado en Excel',
             ],
         ],
 
@@ -262,6 +266,8 @@ return [
                 'personas.crear' => 'Crear',
                 'personas.editar' => 'Editar',
                 'personas.eliminar' => 'Eliminar',
+                'personas.reporte.pdf' => 'Exportar listado en PDF',
+                'personas.reporte.excel' => 'Exportar listado en Excel',
             ],
         ],
 

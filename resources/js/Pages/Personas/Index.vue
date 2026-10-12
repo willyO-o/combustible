@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
@@ -51,6 +51,30 @@ watch(
 
 function clearFilters() {
     filters.value = { ci: '', nombres: '', paterno: '', celular: '' }
+}
+
+/* ------------------------------------------------------------------ *
+ * Exportar listado (PDF / Excel)
+ * Usa los filtros ya aplicados por el servidor (props.filters), no los
+ * del formulario: así lo exportado coincide exactamente con lo que se ve
+ * aunque haya un cambio de filtro todavía dentro del debounce.
+ * ------------------------------------------------------------------ */
+const hayRegistros = computed(() => (props.personas?.total ?? 0) > 0)
+
+function parametrosExportacion() {
+    return Object.fromEntries(
+        Object.entries(props.filters ?? {}).filter(([, valor]) => valor !== null && valor !== undefined && valor !== ''),
+    )
+}
+
+function exportarPdf() {
+    window.open(route('personas.reporte.pdf', parametrosExportacion()), '_blank')
+}
+
+// El .xlsx viaja como adjunto: se navega a la URL en la misma pestaña y el
+// navegador lo descarga sin abrir una pestaña en blanco.
+function exportarExcel() {
+    window.location.href = route('personas.reporte.excel', parametrosExportacion())
 }
 
 const confirmDelete = async (persona) => {
@@ -156,12 +180,22 @@ const fotoUrl = (foto) => (foto ? `/storage/${foto}` : '/images/faces/1.jpg')
 
     <!-- Tabla -->
     <div class="card custom-card">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="card-title">
                 Personas
                 <span class="badge bg-primary-transparent text-primary ms-2">
                     {{ personas.total }} registros
                 </span>
+            </div>
+            <div class="d-flex gap-2">
+                <button v-can="'personas.reporte.pdf'" type="button" class="btn btn-sm btn-primary btn-wave"
+                    :disabled="!hayRegistros" title="Exportar el listado filtrado a PDF" @click="exportarPdf">
+                    <i class="ri-file-pdf-2-line me-1" aria-hidden="true"></i> PDF
+                </button>
+                <button v-can="'personas.reporte.excel'" type="button" class="btn btn-sm btn-success btn-wave"
+                    :disabled="!hayRegistros" title="Exportar el listado filtrado a Excel" @click="exportarExcel">
+                    <i class="ri-file-excel-2-line me-1" aria-hidden="true"></i> Excel
+                </button>
             </div>
         </div>
         <!-- Vista tabla: desktop -->

@@ -65,4 +65,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php, app/Http/Controllers/Api/V1/*.php,routes/api.php, app/Http/Controllers/Api/V1/*.php | .ai/rules/v1.md |
 | app/Http/Controllers/Api/V1/ValeController.php,app/Actions/Vale/ListValeAction.php | .ai/rules/vale.md |
 | app/Http/Requests/ValeRequest.php,app/Models/Vale.php,app/Http/Controllers/ValeController.php,app/Http/Controllers/Api/V1/ValeController.php,app/Http/Controllers/Api/V1/ParametrosController.php,resources/js/Pages/Vales/Create.vue | .ai/rules/vales.md |
+| app/Http/Controllers/VehiculoController.php,app/Http/Controllers/ConductorController.php,app/Http/Controllers/PersonaController.php,resources/js/Pages/Vehiculos/Index.vue,resources/js/Pages/Conductores/Index.vue,resources/js/Pages/Personas/Index.vue,app/Libraries/Reportes.php,app/Libraries/ReportesExcel.php | .ai/rules/vehiculos-libraries-libraries.md |
 | app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/Show.vue,routes/web.php | .ai/rules/vehiculos.md |

@@ -127,6 +127,8 @@ class UserSeeder extends Seeder
             'conductores.editar',
             'conductores.eliminar',
             'conductores.asignar-vehiculo',
+            'conductores.reporte.pdf',
+            'conductores.reporte.excel',
         ];
     }
 
@@ -138,6 +140,8 @@ class UserSeeder extends Seeder
             'vehiculos.editar',
             'vehiculos.eliminar',
             'vehiculos.asignar-area',
+            'vehiculos.reporte.pdf',
+            'vehiculos.reporte.excel',
         ];
     }
 
@@ -230,6 +234,8 @@ class UserSeeder extends Seeder
             'personas.crear',
             'personas.editar',
             'personas.eliminar',
+            'personas.reporte.pdf',
+            'personas.reporte.excel',
         ];
     }
 

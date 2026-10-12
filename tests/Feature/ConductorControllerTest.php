@@ -10,8 +10,10 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -427,5 +429,184 @@ class ConductorControllerTest extends TestCase
         $response->assertForbidden();
         $this->assertDatabaseCount('conductor', 0);
         $this->assertDatabaseCount('asignacion', 0);
+    }
+
+    /**
+     * Abre el .xlsx de la respuesta y devuelve sus celdas (valores crudos,
+     * sin formatear) como colección de filas.
+     *
+     * @return Collection<int, array<int, mixed>>
+     */
+    private function celdasDelExcel(string $contenido): Collection
+    {
+        $archivo = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+        file_put_contents($archivo, $contenido);
+
+        try {
+            return collect(IOFactory::load($archivo)->getActiveSheet()->toArray(null, true, false));
+        } finally {
+            @unlink($archivo);
+        }
+    }
+
+    /**
+     * Valores de las tarjetas de resumen del Excel (fila de etiquetas
+     * seguida de la fila de valores), indexados por etiqueta.
+     *
+     * @return array<string, int>
+     */
+    private function tarjetasDelExcel(Collection $celdas, string $primeraEtiqueta): array
+    {
+        $indice = $celdas->search(fn ($fila) => in_array($primeraEtiqueta, $fila, true));
+        $this->assertNotFalse($indice, "El Excel no tiene la tarjeta {$primeraEtiqueta}.");
+
+        $tarjetas = [];
+        foreach ($celdas[$indice] as $columna => $etiqueta) {
+            if ($etiqueta !== null) {
+                $tarjetas[$etiqueta] = (int) $celdas[$indice + 1][$columna];
+            }
+        }
+
+        return $tarjetas;
+    }
+
+    private function licencia(Conductor $conductor, string $numero, string $categoria, $vencimiento): DocumentoConductor
+    {
+        return DocumentoConductor::create([
+            'id_conductor' => $conductor->id,
+            'tipo_documento' => 'LICENCIA_DE_CONDUCIR',
+            'numero_documento' => $numero,
+            'categoria' => $categoria,
+            'fecha_vencimiento' => $vencimiento,
+        ]);
+    }
+
+    public function test_exporta_el_listado_de_conductores_en_pdf(): void
+    {
+        Conductor::factory()->count(3)->create();
+
+        $response = $this->actingAs($this->admin)->get(route('conductores.reporte.pdf'));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringContainsString('listado_conductores_', $response->headers->get('Content-Disposition'));
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    /**
+     * Cada fila trae la licencia MÁS RECIENTE (no la primera cargada) y los
+     * vehículos vigentes, marcando los provisionales; un documento que no es
+     * licencia (ej. CI) no debe confundirse con ella.
+     */
+    public function test_el_excel_trae_la_licencia_mas_reciente_y_los_vehiculos_asignados(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '7654321', 'nombres' => 'Juan', 'paterno' => 'Pérez', 'materno' => 'Quispe', 'celular' => '71234567']);
+        $conductor = Conductor::factory()->create(['id' => $persona->id]);
+
+        $this->licencia($conductor, 'LIC-ANTIGUA', 'B', now()->subYear());
+        $this->licencia($conductor, 'LIC-ACTUAL', 'C', now()->addYear());
+        DocumentoConductor::create([
+            'id_conductor' => $conductor->id,
+            'tipo_documento' => 'CI',
+            'numero_documento' => '7654321',
+            'fecha_vencimiento' => now()->addYears(5),
+        ]);
+
+        $volqueta = Vehiculo::factory()->create(['codigo' => 'VOL-01', 'nro_placa' => '1111AAA']);
+        $camioneta = Vehiculo::factory()->create(['codigo' => 'CAM-02', 'nro_placa' => '2222BBB']);
+        Asignacion::create(['id_vehiculo' => $volqueta->id, 'id_conductor' => $conductor->id, 'fecha_asignacion' => now(), 'estado_asignacion' => 'ACTIVO']);
+        Asignacion::create(['id_vehiculo' => $camioneta->id, 'id_conductor' => $conductor->id, 'fecha_asignacion' => now(), 'estado_asignacion' => 'PROVISIONAL']);
+
+        $response = $this->actingAs($this->admin)->get(route('conductores.reporte.excel'));
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $fila = $this->celdasDelExcel($response->getContent())->first(fn ($f) => in_array('7654321', $f, true));
+
+        $this->assertNotNull($fila, 'El Excel no contiene la fila del conductor.');
+        $this->assertSame(['7654321', 'Juan', 'Pérez', 'Quispe', '71234567'], array_slice($fila, 1, 5));
+        $this->assertSame('LIC-ACTUAL', $fila[6]);
+        $this->assertSame('C', $fila[7]);
+        $this->assertSame(now()->addYear()->format('d/m/Y'), $fila[8]);
+        $this->assertSame('Vigente', $fila[9]);
+        $this->assertStringContainsString('VOL-01 — 1111AAA', $fila[10]);
+        $this->assertStringContainsString('CAM-02 — 2222BBB (Provisional)', $fila[10]);
+        $this->assertSame('ACTIVO', $fila[11]);
+    }
+
+    public function test_el_excel_marca_la_licencia_vencida_y_los_datos_faltantes(): void
+    {
+        $conLicenciaVencida = Conductor::factory()->create();
+        $this->licencia($conLicenciaVencida, 'LIC-VENCIDA', 'A', now()->subDay());
+        $sinNada = Conductor::factory()->create();
+
+        $celdas = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('conductores.reporte.excel'))->assertOk()->getContent()
+        );
+
+        $vencida = $celdas->first(fn ($f) => in_array('LIC-VENCIDA', $f, true));
+        $this->assertSame('Vencida', $vencida[9]);
+
+        $vacia = $celdas->first(fn ($f) => in_array($sinNada->persona->ci, $f, true));
+        $this->assertSame('Sin licencia', $vacia[6]);
+        $this->assertNull($vacia[8]);
+        $this->assertSame('Sin vehículo asignado', $vacia[10]);
+
+        $this->actingAs($this->admin)->get(route('conductores.reporte.pdf'))->assertOk();
+    }
+
+    /**
+     * Lo exportado coincide con el listado filtrado (todas sus páginas) y el
+     * encabezado deja constancia del filtro; un listado sin resultados no
+     * rompe ninguno de los dos formatos.
+     */
+    public function test_los_reportes_de_conductores_respetan_los_filtros(): void
+    {
+        Conductor::factory()->create(['id' => Persona::factory()->create(['ci' => '1112223'])->id]);
+        Conductor::factory()->create(['id' => Persona::factory()->create(['ci' => '9998887'])->id]);
+
+        $celdas = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('conductores.reporte.excel', ['ci' => '111']))->assertOk()->getContent()
+        )->flatten();
+
+        $this->assertTrue($celdas->contains('1112223'));
+        $this->assertFalse($celdas->contains('9998887'), 'Un conductor fuera del filtro no debe exportarse.');
+        $this->assertTrue($celdas->contains('Filtro aplicado: CI: 111'));
+
+        $sinResultados = ['ci' => 'NO-EXISTE'];
+        $this->actingAs($this->admin)->get(route('conductores.reporte.pdf', $sinResultados))->assertOk();
+        $this->assertTrue(
+            $this->celdasDelExcel($this->actingAs($this->admin)->get(route('conductores.reporte.excel', $sinResultados))->getContent())
+                ->flatten()->contains('No hay conductores que coincidan con los filtros seleccionados.'),
+        );
+    }
+
+    public function test_el_excel_de_conductores_cuenta_por_estado_y_sin_vehiculo(): void
+    {
+        $conVehiculo = Conductor::factory()->create(['estado_conductor' => 'ACTIVO']);
+        Asignacion::create(['id_vehiculo' => Vehiculo::factory()->create()->id, 'id_conductor' => $conVehiculo->id, 'fecha_asignacion' => now(), 'estado_asignacion' => 'ACTIVO']);
+        Conductor::factory()->create(['estado_conductor' => 'ACTIVO']);
+        Conductor::factory()->create(['estado_conductor' => 'INACTIVO']);
+        Conductor::factory()->create(['estado_conductor' => 'RETIRADO']);
+
+        $celdas = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('conductores.reporte.excel'))->assertOk()->getContent()
+        );
+
+        $this->assertTrue($celdas->flatten()->contains('Sin filtros: todos los conductores registrados'));
+        $this->assertSame([
+            'TOTAL CONDUCTORES' => 4,
+            'ACTIVOS' => 2,
+            'INACTIVOS' => 1,
+            'RETIRADOS' => 1,
+            'SIN VEHÍCULO ASIGNADO' => 3,
+        ], $this->tarjetasDelExcel($celdas, 'TOTAL CONDUCTORES'));
+    }
+
+    public function test_los_reportes_de_conductores_requieren_iniciar_sesion(): void
+    {
+        $this->get(route('conductores.reporte.pdf'))->assertRedirect(route('login'));
+        $this->get(route('conductores.reporte.excel'))->assertRedirect(route('login'));
     }
 }

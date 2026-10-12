@@ -135,4 +135,39 @@ class UserSeederTest extends TestCase
             $permisos->filter(fn (string $permiso) => str_starts_with($permiso, 'operacion-diaria.')),
         );
     }
+
+    /**
+     * Exportar el listado de vehículos (PDF/Excel) acompaña a los demás
+     * permisos de vehículos: lo tienen los roles que gestionan el catálogo.
+     */
+    public function test_administrador_y_jefe_de_area_pueden_exportar_el_listado_de_vehiculos(): void
+    {
+        $this->ejecutarSeeder();
+
+        foreach (['administrador', 'super-admin', 'jefe-area'] as $rol) {
+            foreach (['vehiculos.reporte.pdf', 'vehiculos.reporte.excel'] as $permiso) {
+                $this->assertTrue(
+                    Role::findByName($rol, 'web')->hasPermissionTo($permiso),
+                    "El rol {$rol} debería tener el permiso {$permiso}",
+                );
+            }
+        }
+    }
+
+    public function test_los_permisos_de_exportar_conductores_y_personas_siguen_a_su_modulo(): void
+    {
+        $this->ejecutarSeeder();
+
+        foreach (['administrador', 'super-admin', 'jefe-area'] as $rol) {
+            foreach (['conductores.reporte.pdf', 'conductores.reporte.excel'] as $permiso) {
+                $this->assertTrue(Role::findByName($rol, 'web')->hasPermissionTo($permiso), "El rol {$rol} debería tener {$permiso}");
+            }
+        }
+
+        // Personas es un módulo sólo de administración: jefe-area no lo gestiona.
+        foreach (['personas.reporte.pdf', 'personas.reporte.excel'] as $permiso) {
+            $this->assertTrue(Role::findByName('administrador', 'web')->hasPermissionTo($permiso));
+            $this->assertFalse(Role::findByName('jefe-area', 'web')->hasPermissionTo($permiso));
+        }
+    }
 }
