@@ -6,6 +6,7 @@ import Multiselect from '@vueform/multiselect'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Modal from '@/Components/Modal.vue'; // Ajusta la ruta según tu proyecto
 import TextareaAutocomplete from '@/Components/TextareaAutocomplete.vue'
+import DateTimeInput from '@/Components/DateTimeInput.vue'
 
 
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
@@ -53,8 +54,13 @@ const esEdicion = computed(() => !!props.operacion)
 /* ------------------------------------------------------------------ */
 /*  Form                                                               */
 /* ------------------------------------------------------------------ */
-// const today = new Date().toISOString().slice(0, 16) // yyyy-MM-ddTHH:mm
-const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+// Hora de ingreso del personal: en un alta, la fecha de inicio arranca hoy a
+// esta hora (editable). También es la hora que propone el calendario si el
+// campo se vacía.
+const HORA_INGRESO = '08:30'
+// 'YYYY-MM-DDTHH:mm' en hora local (mismo formato que <input type="datetime-local">).
+const hoy = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10)
+const inicioDeJornada = `${hoy}T${HORA_INGRESO}`
 const turnoDefault = function () {
     const hour = new Date().getHours()
 
@@ -69,7 +75,7 @@ const form = useForm({
     id_vehiculo: null,
     id_conductor: (props.operacion ? props.operacion.id_conductor : null) ?? null,
     turno: (props.operacion ? props.operacion.turno : turnoDefault()) ?? turnoDefault(),
-    fecha_inicio: (props.operacion ? props.operacion.fecha_i_f : today) ?? today,
+    fecha_inicio: (props.operacion ? props.operacion.fecha_i_f : inicioDeJornada) ?? inicioDeJornada,
     fecha_fin: (props.operacion ? props.operacion.fecha_f_f : '') ?? '',
     kilometraje_inicio: (props.operacion ? props.operacion.kilometraje_inicio : '') ?? '',
     kilometraje_fin: (props.operacion ? props.operacion.kilometraje_fin : '') ?? '',
@@ -517,33 +523,24 @@ onMounted(() => {
                                         form.errors.id_conductor }}</div>
                                 </div>
 
-                                <!-- Tipo Combustible (auto-llenado) -->
+                                <!-- Fecha/hora: siempre 24 h, sin depender de la configuración
+                                     regional de la computadora (ver DateTimeInput.vue). -->
                                 <div class="col-12">
                                     <label class="form-label fw-medium">
                                         Fecha y hora inicio <span class="text-danger">*</span>
-
                                     </label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="bi bi-calendar"></i></span>
-                                        <input v-model="form.fecha_inicio" type="datetime-local" class="form-control"
-                                            :class="{ 'is-invalid': form.errors.fecha_inicio }" />
-
-                                        <div v-if="form.errors.fecha_inicio" class="invalid-feedback">{{
-                                            form.errors.fecha_inicio }}</div>
-                                    </div>
+                                    <DateTimeInput v-model="form.fecha_inicio" :invalid="!!form.errors.fecha_inicio"
+                                        :hora-sugerida="HORA_INGRESO" />
+                                    <div v-if="form.errors.fecha_inicio" class="text-danger small mt-1">{{
+                                        form.errors.fecha_inicio }}</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-medium">
                                         Fecha y hora fin <span class="text-danger">*</span>
                                     </label>
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="bi bi-calendar"></i></span>
-                                        <input v-model="form.fecha_fin" type="datetime-local" class="form-control"
-                                            :class="{ 'is-invalid': form.errors.fecha_fin }" />
-
-                                        <div v-if="form.errors.fecha_fin" class="invalid-feedback">{{
-                                            form.errors.fecha_fin }}</div>
-                                    </div>
+                                    <DateTimeInput v-model="form.fecha_fin" :invalid="!!form.errors.fecha_fin" />
+                                    <div v-if="form.errors.fecha_fin" class="text-danger small mt-1">{{
+                                        form.errors.fecha_fin }}</div>
                                 </div>
 
                                 <div v-if="tipoMedicion === 'kilometraje'" class="col-sm-6">

@@ -4,6 +4,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import SearchSelect from '@/Components/SearchSelect.vue'
 import GrifoFormModal from '@/Components/GrifoFormModal.vue'
+import DateTimeInput from '@/Components/DateTimeInput.vue'
 
 import { computed, ref, watch } from 'vue'
 import { formatDate } from '@/Utils/dateUtil'
@@ -290,9 +291,10 @@ const vehiculoSeleccionado = (vehiculo) => {
                                 <label class="form-label fw-medium">
                                     Fecha de Emisión <span class="text-danger">*</span>
                                 </label>
-                                <input v-model="form.fecha_emision" type="datetime-local" class="form-control" disabled
-                                    :class="{ 'is-invalid': form.errors.fecha_emision }" />
-                                <div v-if="form.errors.fecha_emision" class="invalid-feedback">{{
+                                <!-- Sólo lectura, en 24 h en cualquier computadora (DateTimeInput). -->
+                                <DateTimeInput v-model="form.fecha_emision" disabled
+                                    :invalid="!!form.errors.fecha_emision" />
+                                <div v-if="form.errors.fecha_emision" class="text-danger small mt-1">{{
                                     form.errors.fecha_emision }}</div>
                             </div>
 

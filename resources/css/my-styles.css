@@ -80,6 +80,60 @@
     width: 100%;
 }
 
+/* DateTimeInput.vue (resources/js/Components/DateTimeInput.vue): fecha y
+   hora en 24 h, mismo control que DateRangeFilter. Deshabilitado con
+   --dark-rgb (no --bs-*, que no conmutan con [data-theme-mode=dark]). */
+.date-time-input {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    cursor: pointer;
+    background-color: var(--custom-white);
+    font-variant-numeric: tabular-nums;
+}
+.date-time-input__texto {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.date-time-input__icono {
+    flex: none;
+    color: var(--text-muted);
+}
+.date-time-input--disabled {
+    cursor: default;
+    background-color: rgba(var(--dark-rgb), 0.05);
+}
+/* Selector de hora del calendario: horas/minutos en línea, tema claro/oscuro. */
+.daterangepicker .calendar-time {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    margin: 0.5rem auto 0;
+    color: var(--default-text-color);
+}
+.daterangepicker .calendar-time select.form-control {
+    display: inline-block;
+    width: auto;
+    min-width: 3.75rem;
+    padding: 0.25rem 0.35rem 0.25rem 0.5rem;
+    /* El tema quita la flecha a .form-control: sin ella no parece una lista. */
+    appearance: auto;
+    cursor: pointer;
+    background-color: var(--custom-white);
+    color: var(--default-text-color);
+    border-color: var(--default-border);
+    font-variant-numeric: tabular-nums;
+}
+.daterangepicker .drp-buttons {
+    border-top-color: var(--default-border);
+}
+.daterangepicker .drp-buttons .drp-selected {
+    font-variant-numeric: tabular-nums;
+}
+
 /* daterange-picker-vue3 trae sus propios colores fijos (fondo blanco, texto
    heredado) que no siguen el tema Vyzor ni se adaptan a modo oscuro -> en
    dark el texto queda del mismo color que el fondo (invisible). Se
