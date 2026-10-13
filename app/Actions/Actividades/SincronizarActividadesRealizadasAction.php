@@ -27,7 +27,9 @@ class SincronizarActividadesRealizadasAction
         $operacionDiaria->actividadesRealizadas()->detach();
 
         foreach ($actividades as $actividadData) {
-            $horas = $horasHistoricas->get($actividadData['id'] ?? null, ['hora_inicio' => null, 'hora_fin' => null]);
+            $horas = isset($actividadData['id'])
+                ? $horasHistoricas->get((int) $actividadData['id'], ['hora_inicio' => null, 'hora_fin' => null])
+                : ['hora_inicio' => null, 'hora_fin' => null];
 
             $nombreNormalizado = Str::of($actividadData['actividad'])
                 ->lower()->ascii()->trim();

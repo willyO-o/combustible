@@ -8,10 +8,12 @@ Las actividades de la operación diaria ya no registran horas. Compatible con la
 
 ### Obsoleto
 
-- `actividades_realizadas[].hora_inicio` / `hora_fin` en `POST` y `PUT /operacion-diaria`, y
-  `hora_inicio` / `hora_fin` en `POST /operacion-actividad/validar`: ya no son obligatorios. Si
-  se envían se ignoran (no se validan ni se guardan), así que las versiones anteriores de la app
-  siguen funcionando. Quitar los campos del formulario de actividad.
+- `actividades_realizadas[].hora_inicio` / `hora_fin` en `POST` y `PUT /operacion-diaria`: ya
+  no son obligatorios. Si se envían se ignoran (no se validan ni se guardan), así que las
+  versiones anteriores de la app siguen funcionando. Quitar los campos del formulario de
+  actividad.
+- `hora_inicio` / `hora_fin` en `POST /operacion-actividad/validar`: ya no son obligatorios ni se
+  validan. Si se envían se devuelven tal cual en el eco (`data`), sólo por compatibilidad.
 - En las respuestas, `actividades_realizadas[].pivot.hora_inicio` / `hora_fin` vienen `null` en
   las actividades nuevas; sólo traen valor en operaciones registradas antes de este cambio.
 
@@ -23,6 +25,16 @@ Las actividades de la operación diaria ya no registran horas. Compatible con la
 ### Cambiado
 
 - `GET /parametros`: `api_version` pasa a `1.14.0`.
+- `POST` / `PUT /operacion-diaria`: cuando falta `lugar`, `origen` o `destino` en una actividad,
+  el mensaje de error de `422` ahora sale en español ("El lugar es obligatorio.", etc.). El
+  campo con error (`actividades_realizadas.N.lugar`, …) no cambia.
+
+### Corregido
+
+- Descripción de `POST /operacion-actividad/validar`: la nota sobre `lugar` vs.
+  `origen`/`destino` describía un comportamiento antiguo. Dentro de `POST`/`PUT
+  /operacion-diaria` se exige `lugar` (horómetro) u `origen` + `destino` (kilometraje) según el
+  vehículo.
 
 
 ## 1.13.0 — 2026-10-12

@@ -207,11 +207,12 @@ class OperacionDiariaController extends Controller
             'unidad_medida' => 'required|string',
         ]);
 
-        // Agregar la actividad al arreglo de actividades_realizadas
-
+        // Las horas ya no se capturan ni se validan, pero si una versión
+        // anterior de la app las envía se devuelven en el eco tal cual, por si
+        // esa versión arma la actividad a partir de esta respuesta.
         return response()->json([
             'message' => 'Actividad agregada exitosamente.',
-            'data' => $validated,
+            'data' => $validated + $request->only(['hora_inicio', 'hora_fin']),
         ]);
     }
 }

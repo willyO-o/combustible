@@ -14,6 +14,34 @@ Este documento resume **todo lo que cambió en la API** en esta ronda. Está div
 
 ---
 
+## Actualización 2026-10-13 — Operación diaria: actividades sin horas (API 1.14.0)
+
+Las actividades de la operación diaria **ya no llevan hora de inicio ni de fin**. La app
+actual sigue funcionando sin cambios, pero conviene ajustarla.
+
+**Qué hace la API ahora**
+
+| Endpoint | Antes | Ahora |
+| --- | --- | --- |
+| `POST` / `PUT /operacion-diaria` → `actividades_realizadas[].hora_inicio` / `hora_fin` | Obligatorios (`HH:mm`) | Opcionales. Si llegan **se ignoran**: no se validan ni se guardan |
+| `POST /operacion-actividad/validar` → `hora_inicio` / `hora_fin` | Obligatorios | No se piden ni se validan. Si llegan, vuelven tal cual en `data` (sólo por compatibilidad) |
+| Respuestas → `actividades_realizadas[].pivot.hora_inicio` / `hora_fin` | Siempre con valor | **`null`** en actividades nuevas; sólo traen `"HH:mm"` en operaciones antiguas |
+
+**Nuevo campo opcional** `actividades_realizadas[].id` en `PUT /operacion-diaria/{id}`: el
+`pivot.id` de una actividad ya registrada. Reenviarlo conserva las horas de las actividades
+antiguas al editar. En actividades nuevas, omitirlo.
+
+**Checklist**
+
+- [ ] **Importante:** en el modelo Dart de la actividad, declarar `horaInicio` / `horaFin` como
+  `String?`. Si hoy son `String` no nulo, leer la respuesta de una operación nueva (con `null`)
+  puede fallar.
+- [ ] Quitar los campos de hora del formulario de actividad y dejar de enviarlos.
+- [ ] En el detalle, mostrar el horario sólo si viene con valor.
+- [ ] Al editar, reenviar cada actividad existente con su `id` (= `pivot.id`).
+
+---
+
 ## 1. Cambios que ROMPEN supuestos — `GET /parametros/colecciones`
 
 > Este endpoint es el que alimenta los `select` / catálogos de la app. Cambiaron

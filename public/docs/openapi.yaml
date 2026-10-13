@@ -1260,16 +1260,15 @@ paths:
         acumular las actividades validadas y enviarlas dentro de `actividades_realizadas` recae
         en el cliente.
 
-        **Nota técnica:** aquí la regla `lugar` OR (`origen` **y** `destino`) sí se exige de forma
-        estricta (`origen`/`destino` son `required_without:lugar`). Al enviar el mismo elemento
-        dentro del arreglo `actividades_realizadas` de `POST`/`PUT /operacion-diaria`, la regla
-        equivalente para `origen`/`destino` apunta por error a `actividades_realizadas.*.actividad`
-        en vez de a `...*.lugar`; como `actividad` siempre es obligatorio y por tanto siempre está
-        presente, esa condición nunca se activa allí — en la práctica, dentro de esas dos rutas
-        solo `lugar` queda realmente exigido (a menos que se envíe `origen`), y `destino` nunca es
-        forzado por el validador. Es decir: validar una actividad aquí puede ser más estricto que
-        enviarla directamente dentro de `actividades_realizadas`. Se documenta tal como se
-        comporta hoy.
+        **Lugar vs. origen/destino:** este endpoint no recibe el vehículo, así que sólo exige
+        `lugar` **o** el par `origen` + `destino` (cualquiera de los dos). Dentro de
+        `actividades_realizadas` de `POST`/`PUT /operacion-diaria` la regla es más precisa: se
+        exige `lugar` si el vehículo de la operación tiene `tipo_medicion = horometro`, y
+        `origen` **y** `destino` si tiene `tipo_medicion = kilometraje`.
+
+        **Horas (obsoleto desde 1.14.0):** `hora_inicio` / `hora_fin` ya no se piden ni se
+        validan. Si una versión anterior de la app las envía, se devuelven tal cual en el eco
+        (`data`) para no romper su flujo, pero al registrar la operación se ignoran.
       requestBody:
         required: true
         content:
@@ -4152,7 +4151,8 @@ components:
         describir el lugar depende del `tipo_medicion` del vehículo (`id_vehiculo`) de la
         operación: `lugar` si es `horometro`, o `origen` **y** `destino` si es `kilometraje`
         (por ejemplo, para actividades de transporte). Para `kilometraje` se acepta además
-        `id_material` (opcional) con el material trasladado.
+        `id_material` (opcional) con el material trasladado. Desde 1.14.0 las actividades ya no
+        llevan horas de inicio/fin.
       required: [actividad, cantidad, unidad_medida]
       properties:
         actividad:
@@ -4207,15 +4207,17 @@ components:
           nullable: true
           deprecated: true
           description: >-
-            **Obsoleto desde 1.14.0.** Las horas ya no se capturan: si se envía, se ignora (no
-            se valida ni se guarda). Dejar de enviarlo.
+            **Obsoleto desde 1.14.0.** Las horas ya no se capturan: si se envía no se valida ni
+            se guarda (en `POST /operacion-actividad/validar` sólo se devuelve en el eco). Dejar
+            de enviarlo.
         hora_fin:
           type: string
           nullable: true
           deprecated: true
           description: >-
-            **Obsoleto desde 1.14.0.** Las horas ya no se capturan: si se envía, se ignora (no
-            se valida ni se guarda). Dejar de enviarlo.
+            **Obsoleto desde 1.14.0.** Las horas ya no se capturan: si se envía no se valida ni
+            se guarda (en `POST /operacion-actividad/validar` sólo se devuelve en el eco). Dejar
+            de enviarlo.
 
     MantenimientoOperacionInput:
       type: object

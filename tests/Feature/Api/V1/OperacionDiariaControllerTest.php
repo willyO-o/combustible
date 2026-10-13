@@ -174,7 +174,109 @@ class OperacionDiariaControllerTest extends TestCase
             'cantidad' => 2,
             'unidad_medida' => 'viajes',
         ])->assertOk()
-            ->assertJsonMissingPath('data.hora_inicio');
+            ->assertJsonMissingPath('data.hora_inicio')
+            ->assertJsonMissingPath('data.hora_fin');
+    }
+
+    public function test_validar_actividad_devuelve_en_eco_las_horas_de_una_version_anterior_de_la_app(): void
+    {
+        [$user] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.agregar-actividad'), [
+            'actividad' => 'Transporte de material',
+            'origen' => 'Cantera',
+            'destino' => 'Planta',
+            'cantidad' => 2,
+            'unidad_medida' => 'viajes',
+            'hora_inicio' => '08:00',
+            // Ya no se valida el formato: no debe responder 422.
+            'hora_fin' => '25:99',
+        ])->assertOk()
+            ->assertJsonPath('data.actividad', 'Transporte de material')
+            ->assertJsonPath('data.hora_inicio', '08:00')
+            ->assertJsonPath('data.hora_fin', '25:99');
+    }
+
+    public function test_update_conserva_las_horas_historicas_si_se_reenvia_el_id_de_la_actividad(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo))
+            ->assertCreated();
+        $operacion = OperacionDiaria::firstOrFail();
+
+        // Actividad registrada antes del cambio, con horas.
+        $existente = ActividadRealizada::firstOrFail();
+        ActividadRealizada::whereKey($existente->id)->update(['hora_inicio' => '07:15:00', 'hora_fin' => '11:00:00']);
+
+        $payload = $this->payloadValido($conductor, $vehiculo);
+        $payload['actividades_realizadas'][0]['id'] = $existente->id;
+        $payload['actividades_realizadas'][] = [
+            'id' => null,
+            'actividad' => 'Retorno a base',
+            'origen' => 'Planta',
+            'destino' => 'Base',
+            'cantidad' => 1,
+            'unidad_medida' => 'viajes',
+            'hora_inicio' => '12:00',
+            'hora_fin' => '13:00',
+        ];
+
+        $response = $this->actingAs($user, 'api')->putJson(route('api.v1.operacion-diaria.update', $operacion), $payload);
+
+        $response->assertOk();
+        $actividades = collect($response->json('data.actividades_realizadas'))->keyBy('nombre_actividad');
+        $this->assertSame('07:15', $actividades['Transporte de material']['pivot']['hora_inicio']);
+        $this->assertSame('11:00', $actividades['Transporte de material']['pivot']['hora_fin']);
+        $this->assertNull($actividades['Retorno a base']['pivot']['hora_inicio']);
+        $this->assertNull($actividades['Retorno a base']['pivot']['hora_fin']);
+    }
+
+    public function test_update_sin_id_no_conserva_horas_y_no_falla(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo));
+        $operacion = OperacionDiaria::firstOrFail();
+        ActividadRealizada::query()->update(['hora_inicio' => '07:15:00', 'hora_fin' => '11:00:00']);
+
+        $this->actingAs($user, 'api')
+            ->putJson(route('api.v1.operacion-diaria.update', $operacion), $this->payloadValido($conductor, $vehiculo))
+            ->assertOk()
+            ->assertJsonPath('data.actividades_realizadas.0.pivot.hora_inicio', null);
+    }
+
+    public function test_store_rechaza_un_id_de_actividad_no_numerico(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $payload = $this->payloadValido($conductor, $vehiculo);
+        $payload['actividades_realizadas'][0]['id'] = 'abc';
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('actividades_realizadas.0.id');
+    }
+
+    public function test_store_devuelve_en_espanol_el_error_de_lugar_faltante_en_vehiculo_por_horometro(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado('horometro');
+
+        $payload = $this->payloadValido($conductor, $vehiculo, [
+            'kilometraje_inicio' => null,
+            'kilometraje_fin' => null,
+            'horometro_inicio' => 100,
+            'horometro_fin' => 108,
+            'actividades_realizadas' => [[
+                'actividad' => 'Nivelación de terreno',
+                'cantidad' => 8,
+                'unidad_medida' => 'horas',
+            ]],
+        ]);
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $payload)
+            ->assertUnprocessable()
+            ->assertJsonPath('errors', fn ($errores) => ($errores['actividades_realizadas.0.lugar'][0] ?? null) === 'El lugar es obligatorio.');
     }
 
     public function test_store_audita_la_actividad_realizada_sin_romper_por_auditable_id_nulo(): void
