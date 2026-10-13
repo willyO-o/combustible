@@ -433,8 +433,6 @@ class OperacionDiariaController extends Controller
             'actividad' => 'required|string|min:3',
             'cantidad' => 'required|numeric|min:1',
             'unidad_medida' => 'required|string',
-            'hora_inicio' => 'required|date_format:H:i',
-            'hora_fin' => 'required|date_format:H:i',
         ]);
 
         // Agregar la actividad al arreglo de actividades_realizadas

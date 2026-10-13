@@ -108,7 +108,7 @@ const form = useForm({
 
 
 const showErrorActividad = (idx) => {
-    //verificar si esta la palabra "actividades_realizadas" en form.errors y si tiene errores para el índice idx que viene como texto "actividades_realizadas.1.hora_fin"
+    //verificar si esta la palabra "actividades_realizadas" en form.errors y si tiene errores para el índice idx que viene como texto "actividades_realizadas.1.cantidad"
     if(form.errors && Object.keys(form.errors).some(key => key.startsWith(`actividades_realizadas.${idx}`))) {
         // convertir en array de keys solo los errores que correspondan a la actividad en el índice idx
         const actividadErrors = Object.keys(form.errors).filter(key => key.startsWith(`actividades_realizadas.${idx}`))
@@ -131,8 +131,6 @@ const formActividad = useForm({
     destino: '',
     cantidad: '',
     unidad_medida: '',
-    hora_inicio: '',
-    hora_fin: '',
     detalle: '',
 })
 
@@ -327,8 +325,6 @@ const agregarActividad = () => {
             formActividad.destino = '';
             formActividad.cantidad = '';
             formActividad.unidad_medida = '';
-            formActividad.hora_inicio = '';
-            formActividad.hora_fin = '';
             formActividad.detalle = '';
 
             // Cerrar el modal
@@ -674,7 +670,8 @@ onMounted(() => {
                                         </p>
                                     </div>
 
-                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
+                                    <!-- Horas ya no se capturan: sólo actividades antiguas las traen al editar -->
+                                    <div v-if="r.hora_inicio || r.hora_fin" class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
                                         <label class="form-label form-label-sm fw-medium mb-0">
                                             <i class="ri-map-pin-line text-info"></i>
 
@@ -912,28 +909,6 @@ onMounted(() => {
                                 formActividad.errors.unidad_medida }}</div>
 
                         </div>
-                        <div class="col-6">
-                            <label class="form-label fw-medium">
-                                Hora Inicio <span class="text-danger">*</span>
-                            </label>
-                            <input v-model="formActividad.hora_inicio" type="time" class="form-control"
-                                :class="{ 'is-invalid': formActividad.errors.hora_inicio }" placeholder="HH:MM" />
-
-                            <div v-if="formActividad.errors.hora_inicio" class="text-danger small mt-1">{{
-                                formActividad.errors.hora_inicio }}</div>
-
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label fw-medium">
-                                Hora Fin <span class="text-danger">*</span>
-                            </label>
-                            <input v-model="formActividad.hora_fin" type="time" class="form-control"
-                                :class="{ 'is-invalid': formActividad.errors.hora_fin }" placeholder="HH:MM" />
-                            <div v-if="formActividad.errors.hora_fin" class="text-danger small mt-1">{{
-                                formActividad.errors.hora_fin }}</div>
-
-                        </div>
-
 
                     </div>
 

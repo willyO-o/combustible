@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.13.0"
+  version: "1.14.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -421,7 +421,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.13.0"
+                api_version: "1.14.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -719,6 +719,9 @@ paths:
           se envía, debe existir en el catálogo `control_cargas.materiales` de
           `GET /parametros/colecciones`. Un traslado puede no llevar carga (personal, retorno
           en vacío), por eso es opcional.
+        - Las actividades ya **no llevan horas**: `actividades_realizadas[].hora_inicio` /
+          `hora_fin` son obsoletos desde 1.14.0 y se ignoran si se envían (versiones anteriores
+          de la app siguen funcionando).
         - `mantenimientos` (opcional) registra los controles de mantenimiento de la jornada
           (combustible cargado, niveles de aceite/refrigerante, etc.). Cada envío **reemplaza
           por completo** el conjunto guardado y sólo se persisten los controles que traen
@@ -775,15 +778,11 @@ paths:
                       id_material: 3
                       cantidad: 6
                       unidad_medida: viajes
-                      hora_inicio: "07:15"
-                      hora_fin: "11:00"
                     - actividad: Transporte de mineral
                       origen: Cancha de acopio
                       destino: Chancado primario
                       cantidad: 120
                       unidad_medida: m3
-                      hora_inicio: "11:30"
-                      hora_fin: "16:45"
                   mantenimientos:
                     - id_tipo_mantenimiento: 12
                       valor: 45.5
@@ -804,8 +803,6 @@ paths:
                       lugar: Plataforma norte
                       cantidad: 8
                       unidad_medida: horas
-                      hora_inicio: "19:30"
-                      hora_fin: "03:30"
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/OperacionDiariaStoreRequest'
@@ -872,8 +869,8 @@ paths:
                         lugar: null
                         cantidad: "6.00"
                         unidad_medida: viajes
-                        hora_inicio: "07:15"
-                        hora_fin: "11:00"
+                        hora_inicio: null
+                        hora_fin: null
                   mantenimientos_operacion:
                     - id: 12
                       tipo_mantenimiento: Combustible cargado
@@ -950,7 +947,7 @@ paths:
                   actividades_realizadas:
                     - id: 1
                       nombre_actividad: Acarreo de material
-                      pivot: { id_material: 3, material: { id: 3, material: Concentrado }, origen: Cancha de acopio, destino: Botadero norte, cantidad: "6.00", unidad_medida: viajes, hora_inicio: "07:15", hora_fin: "11:00" }
+                      pivot: { id_material: 3, material: { id: 3, material: Concentrado }, origen: Cancha de acopio, destino: Botadero norte, cantidad: "6.00", unidad_medida: viajes, hora_inicio: null, hora_fin: null }
                   mantenimientos_operacion:
                     - id: 12
                       tipo_mantenimiento: Combustible cargado
@@ -989,7 +986,8 @@ paths:
         - `actividades_realizadas` **reemplaza por completo** el conjunto de actividades
           previamente registradas para esta operación (se resincroniza, no se agrega de forma
           incremental) — y al ser obligatorio, debe reenviarse siempre completo, incluidas las
-          actividades que no cambiaron.
+          actividades que no cambiaron. Para no perder las horas de actividades registradas
+          antes de 1.14.0, reenviar cada actividad existente con su `id` (= `pivot.id`).
         - `mantenimientos` (opcional) también **reemplaza por completo** los controles de
           mantenimiento guardados: los que no se reenvíen se eliminan (junto con su evidencia
           fotográfica, si tenía). Omitirlo por completo deja el conjunto sin controles.
@@ -1027,8 +1025,6 @@ paths:
                   id_material: 3
                   cantidad: 6
                   unidad_medida: viajes
-                  hora_inicio: "07:15"
-                  hora_fin: "11:00"
               mantenimientos:
                 - id_tipo_mantenimiento: 13
                   realizado: SI
@@ -1087,8 +1083,8 @@ paths:
                         lugar: null
                         cantidad: "6.00"
                         unidad_medida: viajes
-                        hora_inicio: "07:15"
-                        hora_fin: "11:00"
+                        hora_inicio: null
+                        hora_fin: null
                   mantenimientos_operacion:
                     - id: 13
                       tipo_mantenimiento: Nivel de aceite
@@ -1285,8 +1281,6 @@ paths:
               lugar: Cancha de acopio
               cantidad: 6
               unidad_medida: viajes
-              hora_inicio: "07:15"
-              hora_fin: "11:00"
       responses:
         '200':
           description: Actividad válida. Se devuelven en eco los datos validados (no se persiste nada).
@@ -1301,8 +1295,6 @@ paths:
                   lugar: Cancha de acopio
                   cantidad: 6
                   unidad_medida: viajes
-                  hora_inicio: "07:15"
-                  hora_fin: "11:00"
         '422':
           description: Error de validación.
           content:
@@ -3906,7 +3898,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.13.0" }
+        api_version: { type: string, example: "1.14.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4161,7 +4153,7 @@ components:
         operación: `lugar` si es `horometro`, o `origen` **y** `destino` si es `kilometraje`
         (por ejemplo, para actividades de transporte). Para `kilometraje` se acepta además
         `id_material` (opcional) con el material trasladado.
-      required: [actividad, cantidad, unidad_medida, hora_inicio, hora_fin]
+      required: [actividad, cantidad, unidad_medida]
       properties:
         actividad:
           type: string
@@ -4202,16 +4194,28 @@ components:
         unidad_medida:
           type: string
           example: viajes
+        id:
+          type: integer
+          nullable: true
+          description: >-
+            Sólo al editar (`PUT /operacion-diaria/{id}`): el `pivot.id` de la actividad ya
+            registrada, tal como lo devolvió la API. Permite conservar las horas de inicio/fin
+            de actividades registradas antes de la versión 1.14.0. Omitirlo en actividades nuevas.
+          example: 501
         hora_inicio:
           type: string
-          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
-          description: Hora de inicio de la actividad, formato `HH:mm`.
-          example: "07:15"
+          nullable: true
+          deprecated: true
+          description: >-
+            **Obsoleto desde 1.14.0.** Las horas ya no se capturan: si se envía, se ignora (no
+            se valida ni se guarda). Dejar de enviarlo.
         hora_fin:
           type: string
-          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
-          description: Hora de fin de la actividad, formato `HH:mm`.
-          example: "11:00"
+          nullable: true
+          deprecated: true
+          description: >-
+            **Obsoleto desde 1.14.0.** Las horas ya no se capturan: si se envía, se ignora (no
+            se valida ni se guarda). Dejar de enviarlo.
 
     MantenimientoOperacionInput:
       type: object
@@ -4476,8 +4480,8 @@ components:
             lugar: { type: string, nullable: true, example: Cancha de acopio }
             cantidad: { type: string, example: "6.00" }
             unidad_medida: { type: string, example: viajes }
-            hora_inicio: { type: string, example: "07:15" }
-            hora_fin: { type: string, example: "11:00" }
+            hora_inicio: { type: string, nullable: true, deprecated: true, description: "Obsoleto desde 1.14.0: siempre null en actividades nuevas; sólo trae valor (`HH:mm`) en registros anteriores.", example: null }
+            hora_fin: { type: string, nullable: true, deprecated: true, description: "Obsoleto desde 1.14.0: siempre null en actividades nuevas; sólo trae valor (`HH:mm`) en registros anteriores.", example: null }
 
     MantenimientoOperacionRegistrado:
       type: object

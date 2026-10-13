@@ -13,9 +13,22 @@ class SincronizarActividadesRealizadasAction
         // se busca primero ver si la actividad ya existe en la base de datos verificando el nombre_normalizado, sino existe se crea una nueva actividad
         // se guard en la tabla actividad_realizada, la relacion y los detalles, verificar que no re registre 2 veces la misma actividad contodos los campos iguales
 
+        // hora_inicio/hora_fin ya no se capturan (columnas conservadas sólo
+        // por los registros anteriores). Antes del detach se leen las horas ya
+        // guardadas, keyed por el id del pivote, para no perderlas al editar
+        // una operación antigua: el cliente reenvía ese id pero nunca horas.
+        $horasHistoricas = $operacionDiaria->actividadesRealizadas()
+            ->get()
+            ->mapWithKeys(fn ($actividad) => [$actividad->pivot->id => [
+                'hora_inicio' => $actividad->pivot->getRawOriginal('hora_inicio'),
+                'hora_fin' => $actividad->pivot->getRawOriginal('hora_fin'),
+            ]]);
+
         $operacionDiaria->actividadesRealizadas()->detach();
 
         foreach ($actividades as $actividadData) {
+            $horas = $horasHistoricas->get($actividadData['id'] ?? null, ['hora_inicio' => null, 'hora_fin' => null]);
+
             $nombreNormalizado = Str::of($actividadData['actividad'])
                 ->lower()->ascii()->trim();
 
@@ -43,8 +56,8 @@ class SincronizarActividadesRealizadasAction
                 'lugar' => $actividadData['lugar'] ?? null,
                 'cantidad' => $actividadData['cantidad'],
                 'unidad_medida' => $actividadData['unidad_medida'],
-                'hora_inicio' => $actividadData['hora_inicio'],
-                'hora_fin' => $actividadData['hora_fin'],
+                'hora_inicio' => $horas['hora_inicio'],
+                'hora_fin' => $horas['hora_fin'],
             ]);
         }
 

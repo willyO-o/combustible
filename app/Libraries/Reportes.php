@@ -2648,14 +2648,24 @@ class Reportes extends exFPDF
         $this->SetXY($sx, $jornadaTitleY);
         $this->Cell($uw, 7, $this->textoCalibri('DETALLE JORNADA DIARIA DE TRABAJO'), 0, 0, 'C');
 
+        // Las horas DE/A ya no se capturan: sólo se dibujan si alguna
+        // actividad (registro anterior al cambio) todavía las tiene; si no,
+        // su ancho pasa a la columna ACTIVIDAD.
+        $conHoras = collect($actividades)->contains(fn ($a) => $a['de'] !== '' || $a['a'] !== '');
+
         if ($esKm) {
-            $anchos = [12, 12, 47, 37, 37, 34, 28];
-            $columnas = [['de', 'C'], ['a', 'C'], ['actividad', 'L'], ['origen', 'L'], ['destino', 'L'], ['material', 'L'], ['cantidad', 'C']];
-            $encabezados = ['DE', 'A', 'ACTIVIDAD', 'ORIGEN', 'DESTINO', 'MATERIAL', 'CANTIDAD'];
+            $anchos = $conHoras ? [12, 12, 47, 37, 37, 34, 28] : [71, 37, 37, 34, 28];
+            $columnas = [['actividad', 'L'], ['origen', 'L'], ['destino', 'L'], ['material', 'L'], ['cantidad', 'C']];
+            $encabezados = ['ACTIVIDAD', 'ORIGEN', 'DESTINO', 'MATERIAL', 'CANTIDAD'];
         } else {
-            $anchos = [14, 14, 105, 46, 28];
-            $columnas = [['de', 'C'], ['a', 'C'], ['actividad', 'L'], ['lugar', 'L'], ['cantidad', 'C']];
-            $encabezados = ['DE', 'A', 'ACTIVIDAD', 'LUGAR', 'CANTIDAD'];
+            $anchos = $conHoras ? [14, 14, 105, 46, 28] : [133, 46, 28];
+            $columnas = [['actividad', 'L'], ['lugar', 'L'], ['cantidad', 'C']];
+            $encabezados = ['ACTIVIDAD', 'LUGAR', 'CANTIDAD'];
+        }
+
+        if ($conHoras) {
+            array_unshift($columnas, ['de', 'C'], ['a', 'C']);
+            array_unshift($encabezados, 'DE', 'A');
         }
 
         $filas = array_merge(

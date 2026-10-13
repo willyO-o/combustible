@@ -338,8 +338,6 @@ class OperacionDiariaControllerTest extends TestCase
                     'destino' => 'Planta',
                     'cantidad' => 2,
                     'unidad_medida' => 'viajes',
-                    'hora_inicio' => '08:00',
-                    'hora_fin' => '10:00',
                 ],
             ],
         ]);
@@ -381,8 +379,6 @@ class OperacionDiariaControllerTest extends TestCase
                 'destino' => 'Planta',
                 'cantidad' => 1,
                 'unidad_medida' => 'viajes',
-                'hora_inicio' => '08:00',
-                'hora_fin' => '09:00',
             ]],
         ]);
 
@@ -418,8 +414,6 @@ class OperacionDiariaControllerTest extends TestCase
                 'destino' => 'Planta',
                 'cantidad' => 1,
                 'unidad_medida' => 'viajes',
-                'hora_inicio' => '08:00',
-                'hora_fin' => '09:00',
             ]],
         ]);
 
@@ -452,8 +446,6 @@ class OperacionDiariaControllerTest extends TestCase
                 'destino' => 'Planta',
                 'cantidad' => 1,
                 'unidad_medida' => 'viajes',
-                'hora_inicio' => '08:00',
-                'hora_fin' => '09:00',
             ]],
         ]);
 
@@ -511,8 +503,6 @@ class OperacionDiariaControllerTest extends TestCase
                 'destino' => 'Planta',
                 'cantidad' => 1,
                 'unidad_medida' => 'viajes',
-                'hora_inicio' => '08:00',
-                'hora_fin' => '09:00',
             ]],
         ], $extra);
     }
@@ -1162,6 +1152,144 @@ class OperacionDiariaControllerTest extends TestCase
         $this->actingAs($user)->delete(route('operacion-diaria.destroy', $operacion));
 
         Storage::disk('public')->assertMissing($ruta);
+    }
+
+    public function test_store_registra_las_actividades_sin_horas(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo))
+            ->assertRedirect(route('operacion-diaria.index'))
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('actividad_realizada', [
+            'id_operacion_diaria' => OperacionDiaria::firstOrFail()->id,
+            'hora_inicio' => null,
+            'hora_fin' => null,
+        ]);
+    }
+
+    public function test_store_ignora_las_horas_si_un_cliente_antiguo_las_envia(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $payload = $this->payloadOperacionValida($vehiculo);
+        $payload['actividades_realizadas'][0]['hora_inicio'] = '08:00';
+        $payload['actividades_realizadas'][0]['hora_fin'] = 'no-es-hora';
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $payload)
+            ->assertRedirect(route('operacion-diaria.index'))
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('actividad_realizada', [
+            'id_operacion_diaria' => OperacionDiaria::firstOrFail()->id,
+            'hora_inicio' => null,
+            'hora_fin' => null,
+        ]);
+    }
+
+    public function test_update_conserva_las_horas_historicas_de_las_actividades_ya_guardadas(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+        $operacion = OperacionDiaria::firstOrFail();
+
+        // Operación registrada antes del cambio: tenía horas capturadas.
+        ActividadRealizada::query()->update(['hora_inicio' => '07:15:00', 'hora_fin' => '11:00:00']);
+
+        // El formulario de edición reenvía lo precargado (incluye el id del
+        // registro) y agrega una actividad nueva, sin horas.
+        $actividadesEdit = $operacion->actividadesRealizadasEdit()->all();
+        $actividadesEdit[0]['cantidad'] = 3;
+        $actividadesEdit[] = [
+            'actividad' => 'Retorno a base',
+            'origen' => 'Planta',
+            'destino' => 'Base',
+            'cantidad' => 1,
+            'unidad_medida' => 'viajes',
+        ];
+
+        $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
+            'actividades_realizadas' => $actividadesEdit,
+        ]))->assertRedirect(route('operacion-diaria.index'));
+
+        $filas = ActividadRealizada::where('id_operacion_diaria', $operacion->id)->orderBy('id')->get();
+        $this->assertCount(2, $filas);
+        $this->assertSame('07:15', $filas[0]->hora_inicio->format('H:i'));
+        $this->assertSame('11:00', $filas[0]->hora_fin->format('H:i'));
+        $this->assertSame('3.00', $filas[0]->cantidad);
+        $this->assertNull($filas[1]->hora_inicio);
+        $this->assertNull($filas[1]->hora_fin);
+    }
+
+    public function test_update_no_copia_horas_de_actividades_de_otra_operacion(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'kilometraje_inicio' => 1100,
+            'kilometraje_fin' => 1150,
+        ]));
+        [$primera, $segunda] = OperacionDiaria::orderBy('id')->get();
+
+        $ajena = ActividadRealizada::where('id_operacion_diaria', $primera->id)->firstOrFail();
+        ActividadRealizada::whereKey($ajena->id)->update(['hora_inicio' => '07:15:00', 'hora_fin' => '11:00:00']);
+
+        $payload = $this->payloadOperacionValida($vehiculo, ['kilometraje_inicio' => 1100, 'kilometraje_fin' => 1150]);
+        $payload['actividades_realizadas'][0]['id'] = $ajena->id;
+
+        $this->actingAs($user)->put(route('operacion-diaria.update', $segunda), $payload)
+            ->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertDatabaseHas('actividad_realizada', [
+            'id_operacion_diaria' => $segunda->id,
+            'hora_inicio' => null,
+            'hora_fin' => null,
+        ]);
+    }
+
+    public function test_validar_actividad_del_modal_no_exige_horas(): void
+    {
+        [$user] = $this->crearConductorConUsuario();
+
+        $this->actingAs($user)->post(route('operacion-diaria.agregar-actividad'), [
+            'actividad' => 'Transporte de material',
+            'origen' => 'Cantera',
+            'destino' => 'Planta',
+            'cantidad' => 2,
+            'unidad_medida' => 'viajes',
+        ])->assertRedirect(route('operacion-diaria.create'))
+            ->assertSessionDoesntHaveErrors();
+    }
+
+    public function test_el_reporte_pdf_se_genera_con_actividades_historicas_con_horas(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+        ActividadRealizada::query()->update(['hora_inicio' => '07:15:00', 'hora_fin' => '11:00:00']);
+
+        $response = $this->actingAs($user)->get(route('operacion-diaria.reporte.pdf', OperacionDiaria::firstOrFail()));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', $response->getContent());
     }
 
     public function test_un_jefe_de_area_recibe_el_selector_de_conductor_con_los_asignados_al_vehiculo(): void

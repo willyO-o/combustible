@@ -159,8 +159,11 @@ class OperacionStoreRequest extends FormRequest
             'actividades_realizadas.*.id_material' => ['nullable', 'integer', Rule::exists('material', 'id')],
             'actividades_realizadas.*.cantidad' => 'required|numeric|min:1',
             'actividades_realizadas.*.unidad_medida' => 'required|string|min:1',
-            'actividades_realizadas.*.hora_inicio' => 'required|date_format:H:i',
-            'actividades_realizadas.*.hora_fin' => 'required|date_format:H:i',
+            // hora_inicio/hora_fin ya no se capturan: si un cliente antiguo
+            // las envía se ignoran. El id (del registro ya guardado, al
+            // editar) sólo sirve para conservar las horas históricas, ver
+            // SincronizarActividadesRealizadasAction.
+            'actividades_realizadas.*.id' => 'nullable|integer',
 
             // Controles de mantenimiento de operación diaria: opcionales, no
             // todos aplican a cada operación. Los tipos deben ser de ámbito
@@ -192,9 +195,6 @@ class OperacionStoreRequest extends FormRequest
             'actividades_realizadas.*.id_material.exists' => 'El material seleccionado no es válido.',
             'actividades_realizadas.*.cantidad.required' => 'La cantidad es obligatoria.',
             'actividades_realizadas.*.unidad_medida.required' => 'La unidad de medida es obligatoria.',
-            'actividades_realizadas.*.hora_inicio.required' => 'La hora de inicio es obligatoria.',
-            'actividades_realizadas.*.hora_fin.required' => 'La hora de fin es obligatoria.',
-            'actividades_realizadas.*.hora_fin.after' => 'La hora de fin debe ser posterior a la hora de inicio.',
             'mantenimientos.*.id_tipo_mantenimiento.exists' => 'El control de mantenimiento seleccionado no es válido para operación diaria.',
             'mantenimientos.*.valor.numeric' => 'El valor del control de mantenimiento debe ser numérico.',
             'mantenimientos.*.evidencia.image' => 'La evidencia debe ser una imagen.',

@@ -104,8 +104,6 @@ class OperacionDiariaControllerTest extends TestCase
                 'destino' => 'Planta',
                 'cantidad' => 2,
                 'unidad_medida' => 'viajes',
-                'hora_inicio' => '08:00',
-                'hora_fin' => '10:00',
             ]],
         ], $extra);
     }
@@ -150,6 +148,35 @@ class OperacionDiariaControllerTest extends TestCase
      * recupera el id tras el insert y el auditable_id queda null, violando
      * el NOT NULL de `audits` (ver ActividadRealizada::$incrementing).
      */
+    public function test_store_ignora_las_horas_que_envia_una_version_anterior_de_la_app(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $payload = $this->payloadValido($conductor, $vehiculo);
+        $payload['actividades_realizadas'][0]['hora_inicio'] = '08:00';
+        $payload['actividades_realizadas'][0]['hora_fin'] = '10:00';
+
+        $response = $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $payload);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.actividades_realizadas.0.pivot.hora_inicio', null);
+        $response->assertJsonPath('data.actividades_realizadas.0.pivot.hora_fin', null);
+    }
+
+    public function test_validar_actividad_no_exige_horas(): void
+    {
+        [$user] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.agregar-actividad'), [
+            'actividad' => 'Transporte de material',
+            'origen' => 'Cantera',
+            'destino' => 'Planta',
+            'cantidad' => 2,
+            'unidad_medida' => 'viajes',
+        ])->assertOk()
+            ->assertJsonMissingPath('data.hora_inicio');
+    }
+
     public function test_store_audita_la_actividad_realizada_sin_romper_por_auditable_id_nulo(): void
     {
         config(['audit.console' => true]);

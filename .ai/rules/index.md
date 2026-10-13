@@ -13,10 +13,12 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Notifications/*.php,app/Channels/*.php | .ai/rules/channels.md |
 | resources/js/Components/PageLoader.vue | .ai/rules/components.md |
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
+| app/Actions/Actividades/SincronizarActividadesRealizadasAction.php,app/Http/Requests/OperacionStoreRequest.php,resources/js/Pages/Operacion/*.vue,app/Libraries/Reportes.php,app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php | .ai/rules/controllers-api-v1.md |
 | resources/js/Pages/Conductores/**,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-requests.md |
 | app/Http/Controllers/**/*.php, app/Http/Controllers/*.php, app/Http/Controllers/DashboardController.php, app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/controllers.md |
 | resources/css/my-styles.css,resources/js/Pages/**/*.vue | .ai/rules/css-js-pages.md |
 | resources/js/Data/app.js | .ai/rules/data.md |
+| database/** | .ai/rules/database.md |
 | public/docs/openapi.yaml | .ai/rules/docs.md |
 | tests/Feature/**/*.php | .ai/rules/feature.md |
 | public/fonts/fpdf-calibri/** | .ai/rules/fpdf-calibri.md |

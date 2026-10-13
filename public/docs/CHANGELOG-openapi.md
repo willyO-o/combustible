@@ -2,6 +2,29 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.14.0 — 2026-10-13
+
+Las actividades de la operación diaria ya no registran horas. Compatible con la versión anterior.
+
+### Obsoleto
+
+- `actividades_realizadas[].hora_inicio` / `hora_fin` en `POST` y `PUT /operacion-diaria`, y
+  `hora_inicio` / `hora_fin` en `POST /operacion-actividad/validar`: ya no son obligatorios. Si
+  se envían se ignoran (no se validan ni se guardan), así que las versiones anteriores de la app
+  siguen funcionando. Quitar los campos del formulario de actividad.
+- En las respuestas, `actividades_realizadas[].pivot.hora_inicio` / `hora_fin` vienen `null` en
+  las actividades nuevas; sólo traen valor en operaciones registradas antes de este cambio.
+
+### Agregado
+
+- `actividades_realizadas[].id` (opcional, sólo en `PUT /operacion-diaria/{id}`): el `pivot.id`
+  de una actividad ya registrada. Reenviarlo conserva las horas de actividades antiguas al editar.
+
+### Cambiado
+
+- `GET /parametros`: `api_version` pasa a `1.14.0`.
+
+
 ## 1.13.0 — 2026-10-12
 
 Fecha de vencimiento elegible al emitir un vale. Compatible con la versión anterior.

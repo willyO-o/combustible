@@ -26,6 +26,12 @@ const activeTab = ref('actividades')
 // el primer caso tiene sentido la columna "Material" de la jornada.
 const esKilometraje = computed(() => props.operacion.vehiculo?.tipo_medicion === 'kilometraje')
 
+// Las horas de inicio/fin ya no se capturan: la columna sólo se muestra en
+// operaciones antiguas que todavía las tienen guardadas.
+const tieneHorario = computed(() =>
+    props.operacion.actividades_realizadas.some((act) => act.pivot.hora_inicio || act.pivot.hora_fin),
+)
+
 
 const verificarOperacion =  async () => {
 
@@ -300,7 +306,7 @@ const verificarOperacion =  async () => {
                                         </th>
                                         <th class="text-center">Cantidad</th>
                                         <th>Unidad</th>
-                                        <th>Horario</th>
+                                        <th v-if="tieneHorario">Horario</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -318,7 +324,9 @@ const verificarOperacion =  async () => {
                                         <td v-if="act.pivot.lugar">{{ act.pivot.lugar }}</td>
                                         <td class="text-center">{{ act.pivot.cantidad }}</td>
                                         <td>{{ act.pivot.unidad_medida }}</td>
-                                        <td>{{ act.pivot.hora_inicio }} - {{ act.pivot.hora_fin }}</td>
+                                        <td v-if="tieneHorario">
+                                            <span v-if="act.pivot.hora_inicio || act.pivot.hora_fin">{{ act.pivot.hora_inicio }} - {{ act.pivot.hora_fin }}</span>
+                                        </td>
 
                                     </tr>
 
