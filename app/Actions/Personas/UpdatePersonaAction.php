@@ -70,7 +70,9 @@ class UpdatePersonaAction
             $usuario = User::create([
                 'name' => trim("{$persona->nombres} {$persona->paterno}"),
                 'email' => $data['email'],
-                'password' => Hash::make($persona->ci.'#Plusmetals'),
+                // Sólo al CREAR la cuenta: a un usuario existente nunca se le
+                // cambia la contraseña desde aquí (tiene su propia pantalla).
+                'password' => Hash::make(User::contrasenaInicial($data['password'] ?? null, $persona->ci)),
                 'id_persona' => $persona->id,
                 'estado_usuario' => $data['estado_usuario'] ?? 'ACTIVO',
             ]);

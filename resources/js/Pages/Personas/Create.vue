@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
+import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -36,6 +37,8 @@ const form = useForm({
     crear_usuario: false,
     email: '',
     estado_usuario: 'ACTIVO',
+    // Se prellena con CI#Plusmetals en ContrasenaInicialInput (editable).
+    password: '',
 })
 
 const esConductor = computed(() => form.tipo === 'conductor')
@@ -309,11 +312,8 @@ function submit() {
                                 <div v-if="form.errors.estado_usuario" class="invalid-feedback">{{ form.errors.estado_usuario }}</div>
                             </div>
 
-                            <div class="col-12">
-                                <div class="alert alert-info mb-0 py-2">
-                                    <i class="ri-information-line me-1"></i>
-                                    La contraseña se generará automáticamente a partir del C.I. (formato: <code>CI#Plusmetals</code>).
-                                </div>
+                            <div class="col-sm-6 col-xl-4">
+                                <ContrasenaInicialInput v-model="form.password" :ci="form.ci" :error="form.errors.password" />
                             </div>
                         </div>
                     </div>

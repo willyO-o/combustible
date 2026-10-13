@@ -155,6 +155,8 @@ class UserController extends Controller
             ->map(fn ($p) => [
                 'id' => $p->id,
                 'label' => "{$p->ci} — {$p->nombre_completo}",
+                // Para prellenar la contraseña inicial (CI#Plusmetals) en Usuarios/Form.vue.
+                'ci' => $p->ci,
             ]);
 
         return response()->json($personas);

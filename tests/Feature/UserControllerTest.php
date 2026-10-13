@@ -7,6 +7,7 @@ use App\Models\Persona;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -193,5 +194,90 @@ class UserControllerTest extends TestCase
         $ids = collect($response->json())->pluck('id');
         $this->assertTrue($ids->contains($sinUsuario->id));
         $this->assertFalse($ids->contains($conUsuario->id));
+    }
+
+    /**
+     * Super-admin: pasa por Gate::before (crear-usuario / editar-usuario), así
+     * estos tests prueban la contraseña inicial y no la configuración de permisos.
+     */
+    private function superAdmin(): User
+    {
+        Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
+        $usuario = User::factory()->create();
+        $usuario->assignRole('super-admin');
+
+        return $usuario;
+    }
+
+    public function test_la_busqueda_de_personas_devuelve_el_ci_para_prellenar_la_contrasena(): void
+    {
+        Persona::factory()->create(['ci' => '91000001']);
+
+        $this->actingAs($this->admin)->getJson(route('search.personas-sin-usuario', ['q' => '9100']))
+            ->assertOk()
+            ->assertJsonPath('0.ci', '91000001');
+    }
+
+    public function test_crea_el_usuario_con_la_contrasena_inicial_escrita(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '91000002']);
+
+        $this->actingAs($this->superAdmin())->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'nuevo@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+            'password' => 'Personal2026',
+        ])->assertSessionHasNoErrors()->assertRedirect(route('usuarios.index'));
+
+        $usuario = User::where('email', 'nuevo@example.com')->firstOrFail();
+        $this->assertTrue(Hash::check('Personal2026', $usuario->password));
+    }
+
+    public function test_crea_el_usuario_con_el_formato_por_defecto_si_no_se_escribe_contrasena(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '91000003']);
+
+        $this->actingAs($this->superAdmin())->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'formato@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+        ])->assertSessionHasNoErrors();
+
+        $usuario = User::where('email', 'formato@example.com')->firstOrFail();
+        $this->assertTrue(Hash::check('91000003#Plusmetals', $usuario->password));
+    }
+
+    public function test_rechaza_una_contrasena_inicial_debil(): void
+    {
+        $persona = Persona::factory()->create();
+
+        $this->actingAs($this->superAdmin())->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'debil@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+            'password' => 'corta1',
+        ])->assertSessionHasErrors('password');
+
+        $this->assertDatabaseMissing('users', ['email' => 'debil@example.com']);
+    }
+
+    public function test_editar_un_usuario_nunca_cambia_su_contrasena(): void
+    {
+        $persona = Persona::factory()->create();
+        $usuario = User::factory()->create(['id_persona' => $persona->id, 'email' => 'existente@example.com']);
+        $hashAnterior = $usuario->password;
+
+        $this->actingAs($this->superAdmin())->post(route('usuarios.update', $usuario->id), [
+            '_method' => 'PUT',
+            'email' => 'existente@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+            'password' => 'x',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($hashAnterior, $usuario->fresh()->password);
     }
 }

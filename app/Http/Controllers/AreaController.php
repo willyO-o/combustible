@@ -386,7 +386,7 @@ class AreaController extends Controller
             $usuario = User::create([
                 'name' => trim("{$persona->nombres} {$persona->paterno}"),
                 'email' => $email,
-                'password' => Hash::make($persona->ci.'#Plusmetals'),
+                'password' => Hash::make(User::contrasenaPorDefecto($persona->ci)),
                 'id_persona' => $persona->id,
                 'estado_usuario' => 'ACTIVO',
             ]);

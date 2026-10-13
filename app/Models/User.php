@@ -78,6 +78,26 @@ class User extends Authenticatable implements Auditable, JWTSubject
     }
 
     /**
+     * Contraseña inicial por defecto de una cuenta nueva: "CI#Plusmetals".
+     * Única fuente del formato (Personas, Usuarios y jefes de Área la usan
+     * cuando no se escribe otra); el front la replica sólo para mostrarla en
+     * ContrasenaInicialInput.vue.
+     */
+    public static function contrasenaPorDefecto(string $ci): string
+    {
+        return trim($ci).'#Plusmetals';
+    }
+
+    /**
+     * Contraseña con la que se crea una cuenta: la escrita en el formulario
+     * o, si se dejó vacía, la de por defecto.
+     */
+    public static function contrasenaInicial(?string $escrita, string $ci): string
+    {
+        return filled($escrita) ? $escrita : self::contrasenaPorDefecto($ci);
+    }
+
+    /**
      * Si guardar $email cambiaría la credencial de acceso del usuario. Sin
      * distinguir mayúsculas ni espacios, igual que al iniciar sesión: sólo
      * cambiar mayúsculas no cuenta como cambio. Lo usan el perfil web y

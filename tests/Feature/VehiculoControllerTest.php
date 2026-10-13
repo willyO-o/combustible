@@ -206,6 +206,66 @@ class VehiculoControllerTest extends TestCase
         $this->assertDatabaseHas('vehiculo', ['codigo' => 'ACT-0100', 'nro_placa' => null]);
     }
 
+    /**
+     * Payload como lo envía el formulario real (Inertia, multipart): el año
+     * vacío llega como texto vacío.
+     */
+    public function test_el_anio_es_opcional_al_registrar_un_vehiculo(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+            'codigo' => 'SIN-ANIO',
+            'anio' => '',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
+        ])->assertSessionHasNoErrors()->assertRedirect(route('vehiculos.index'));
+
+        $this->assertDatabaseHas('vehiculo', ['codigo' => 'SIN-ANIO', 'anio' => null]);
+    }
+
+    public function test_el_anio_se_puede_vaciar_al_editar_un_vehiculo(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['codigo' => 'CON-ANIO', 'anio' => '2019']);
+
+        $this->actingAs($this->admin)->post(route('vehiculos.update', $vehiculo->id), [
+            '_method' => 'PUT',
+            'codigo' => 'CON-ANIO',
+            'anio' => '',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => $vehiculo->tipo_medicion,
+            'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+            'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+            'fotografia' => '',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($vehiculo->fresh()->anio);
+    }
+
+    public function test_el_anio_si_se_informa_debe_tener_cuatro_digitos(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        foreach (['20', '20a1', '19999'] as $anioInvalido) {
+            $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+                'codigo' => 'ANIO-MAL',
+                'anio' => $anioInvalido,
+                'estado_vehiculo' => 'ACTIVO',
+                'tipo_medicion' => 'kilometraje',
+                'id_tipo_combustible' => $tipoCombustible->id,
+                'id_tipo_vehiculo' => $tipoVehiculo->id,
+                'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
+            ])->assertSessionHasErrors(['anio' => 'El año debe tener 4 dígitos (ej. 2020) o dejarse vacío.']);
+        }
+
+        $this->assertDatabaseMissing('vehiculo', ['codigo' => 'ANIO-MAL']);
+    }
+
     public function test_fotografia_es_obligatoria_al_crear_un_vehiculo(): void
     {
         $tipoCombustible = TipoCombustible::factory()->create();

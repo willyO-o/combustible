@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
 
 class UserRequest extends FormRequest
@@ -29,6 +30,10 @@ class UserRequest extends FormRequest
             ],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'estado_usuario' => ['required', Rule::in(['ACTIVO', 'INACTIVO'])],
+            // Contraseña inicial: sólo al crear la cuenta (al editar se descarta;
+            // el cambio de contraseña tiene su propia pantalla). Vacía = formato
+            // por defecto CI#Plusmetals (User::contrasenaInicial).
+            'password' => [$isEdit ? 'exclude' : 'nullable', 'string', 'max:255', Password::min(8)->letters()->numbers()],
 
             // Un usuario puede tener varios roles a la vez. Sin roles seleccionados,
             // queda como "personal" (cuenta con acceso, sin rol operativo).
@@ -52,6 +57,7 @@ class UserRequest extends FormRequest
             'id_persona' => 'persona',
             'email' => 'correo electrónico',
             'estado_usuario' => 'estado del usuario',
+            'password' => 'contraseña inicial',
             'roles' => 'roles',
             'roles.*' => 'rol',
             'estado_conductor' => 'estado del conductor',

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class PersonaRequest extends FormRequest
 {
@@ -38,6 +39,13 @@ class PersonaRequest extends FormRequest
                 Rule::unique('users', 'email')->ignore($persona?->user?->id),
             ],
             'estado_usuario' => ['required_if:crear_usuario,true', Rule::in(['ACTIVO', 'INACTIVO'])],
+            // Contraseña inicial de la cuenta: sólo cuenta al CREARLA (sin
+            // usuario previo). Vacía = formato por defecto CI#Plusmetals
+            // (User::contrasenaInicial). Mismo mínimo que el cambio de contraseña.
+            'password' => [
+                Rule::excludeIf(fn () => ! $this->boolean('crear_usuario') || $persona?->user !== null),
+                'nullable', 'string', 'max:255', Password::min(8)->letters()->numbers(),
+            ],
 
             'estado_conductor' => ['required_if:tipo,conductor', Rule::in(['ACTIVO', 'INACTIVO', 'RETIRADO'])],
             'id_vehiculo' => ['nullable', 'exists:vehiculo,id'],
@@ -65,6 +73,7 @@ class PersonaRequest extends FormRequest
             'tipo' => 'tipo de registro',
             'email' => 'correo electrónico',
             'estado_usuario' => 'estado del usuario',
+            'password' => 'contraseña inicial',
             'estado_conductor' => 'estado del conductor',
             'id_vehiculo' => 'vehículo',
             'fecha_asignacion' => 'fecha de asignación',

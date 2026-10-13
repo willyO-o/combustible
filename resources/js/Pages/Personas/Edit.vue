@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
+import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 import { storageUrl } from '@/Utils/storageUtil'
 defineOptions({ layout: Maindashboard })
 
@@ -44,6 +45,8 @@ const form = useForm({
     crear_usuario: !!props.persona.user,
     email: props.persona.user?.email ?? '',
     estado_usuario: props.persona.user?.estado_usuario ?? 'ACTIVO',
+    // Sólo se usa si la persona aún no tiene usuario (el servidor la descarta si ya lo tiene).
+    password: '',
 })
 
 const esConductor = computed(() => form.tipo === 'conductor')
@@ -323,13 +326,13 @@ function submit() {
                                 <div v-if="form.errors.estado_usuario" class="invalid-feedback">{{ form.errors.estado_usuario }}</div>
                             </div>
 
-                            <div class="col-12">
+                            <div v-if="!tieneUsuario" class="col-sm-6 col-xl-4">
+                                <ContrasenaInicialInput v-model="form.password" :ci="form.ci" :error="form.errors.password" />
+                            </div>
+                            <div v-else class="col-12">
                                 <div class="alert alert-info mb-0 py-2">
                                     <i class="ri-information-line me-1"></i>
-                                    <span v-if="!tieneUsuario">
-                                        La contraseña se generará automáticamente a partir del C.I. (formato: <code>CI#Plusmetals</code>).
-                                    </span>
-                                    <span v-else>La contraseña no se modifica desde este formulario.</span>
+                                    La contraseña no se modifica desde este formulario.
                                 </div>
                             </div>
                         </div>

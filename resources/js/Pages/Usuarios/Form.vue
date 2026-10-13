@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
+import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 
 const props = defineProps({
     usuario: Object, // presente solo al editar
@@ -24,7 +25,8 @@ const vehiculoLabel = (v) =>
     v ? `${v.codigo ?? ''} — ${v.nro_placa ?? ''}${v.marca ? ' — ' + v.marca : ''}${v.anio ? ' (' + v.anio + ')' : ''}` : ''
 
 const form = useForm({
-    ...(esEdicion.value ? { _method: 'PUT' } : { id_persona: null }),
+    // password: contraseña inicial, sólo al crear (prellenada con CI#Plusmetals).
+    ...(esEdicion.value ? { _method: 'PUT' } : { id_persona: null, password: '' }),
     email: props.usuario?.email ?? '',
     estado_usuario: props.usuario?.estado_usuario ?? 'ACTIVO',
 
@@ -39,6 +41,9 @@ const form = useForm({
     fecha_inicio_encargo: props.areaActual?.pivot?.fecha_inicio ? props.areaActual.pivot.fecha_inicio.substring(0, 10) : today,
     motivo_encargo: props.areaActual?.pivot?.motivo ?? '',
 })
+
+// CI de la persona elegida en el buscador (search.personas-sin-usuario lo devuelve).
+const ciSeleccionado = computed(() => form.id_persona?.ci ?? '')
 
 // En edición, una cuenta de sistema sin persona vinculada no gestiona roles
 // desde aquí (solo sus datos de acceso). En registro siempre hay persona.
@@ -160,11 +165,8 @@ function submit() {
                                 <small v-if="esEdicion" class="text-muted">Un usuario INACTIVO no puede iniciar sesión.</small>
                             </div>
 
-                            <div v-if="!esEdicion" class="col-12">
-                                <div class="alert alert-info mb-0 py-2">
-                                    <i class="ri-information-line me-1"></i>
-                                    La contraseña se generará automáticamente a partir del C.I. (formato: <code>CI#Plusmetals</code>).
-                                </div>
+                            <div v-if="!esEdicion" class="col-sm-6 col-xl-4">
+                                <ContrasenaInicialInput v-model="form.password" :ci="ciSeleccionado" :error="form.errors.password" />
                             </div>
                         </div>
                     </div>

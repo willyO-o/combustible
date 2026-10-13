@@ -38,7 +38,7 @@ class CreatePersonaAction
                 $usuario = User::create([
                     'name' => trim("{$persona->nombres} {$persona->paterno}"),
                     'email' => $data['email'],
-                    'password' => Hash::make($persona->ci.'#Plusmetals'),
+                    'password' => Hash::make(User::contrasenaInicial($data['password'] ?? null, $persona->ci)),
                     'id_persona' => $persona->id,
                     'estado_usuario' => $data['estado_usuario'] ?? 'ACTIVO',
                 ]);

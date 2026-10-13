@@ -89,6 +89,116 @@ class PersonaControllerTest extends TestCase
         ]);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function payloadConductorConUsuario(array $extra = []): array
+    {
+        return array_merge([
+            'ci' => '7770001',
+            'nombres' => 'Rosa',
+            'paterno' => 'Mamani',
+            'estado_persona' => 'ACTIVO',
+            'tipo' => 'conductor',
+            'estado_conductor' => 'ACTIVO',
+            'crear_usuario' => true,
+            'email' => 'rosa.mamani@example.com',
+            'estado_usuario' => 'ACTIVO',
+        ], $extra);
+    }
+
+    public function test_crea_el_usuario_con_la_contrasena_inicial_escrita_en_el_formulario(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('personas.store'), $this->payloadConductorConUsuario(['password' => 'Clave2026segura']))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('personas.index'));
+
+        $usuario = Persona::where('ci', '7770001')->firstOrFail()->user;
+        $this->assertTrue(Hash::check('Clave2026segura', $usuario->password));
+        $this->assertFalse(Hash::check('7770001#Plusmetals', $usuario->password));
+    }
+
+    public function test_con_la_contrasena_vacia_usa_el_formato_ci_plusmetals(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('personas.store'), $this->payloadConductorConUsuario(['password' => '']))
+            ->assertSessionHasNoErrors();
+
+        $usuario = Persona::where('ci', '7770001')->firstOrFail()->user;
+        $this->assertTrue(Hash::check('7770001#Plusmetals', $usuario->password));
+    }
+
+    public function test_rechaza_una_contrasena_inicial_debil_sin_crear_nada(): void
+    {
+        foreach (['abc', 'soloLetrasSinNumero', '12345678'] as $debil) {
+            $this->actingAs($this->admin)
+                ->post(route('personas.store'), $this->payloadConductorConUsuario(['password' => $debil]))
+                ->assertSessionHasErrors('password');
+        }
+
+        $this->assertDatabaseMissing('persona', ['ci' => '7770001']);
+        $this->assertDatabaseMissing('users', ['email' => 'rosa.mamani@example.com']);
+    }
+
+    public function test_la_contrasena_se_ignora_si_no_se_crea_usuario(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('personas.store'), $this->payloadConductorConUsuario([
+                'crear_usuario' => false,
+                'email' => '',
+                // Valor que quedó en el campo oculto: no debe bloquear el guardado.
+                'password' => 'x',
+            ]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('personas.index'));
+
+        $this->assertNull(Persona::where('ci', '7770001')->firstOrFail()->user);
+    }
+
+    public function test_al_editar_una_persona_sin_usuario_crea_la_cuenta_con_la_contrasena_escrita(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '7770002', 'paterno' => 'Quispe']);
+
+        $this->actingAs($this->admin)->post(route('personas.update', $persona->id), [
+            '_method' => 'PUT',
+            'ci' => '7770002',
+            'nombres' => $persona->nombres,
+            'paterno' => 'Quispe',
+            'estado_persona' => 'ACTIVO',
+            'tipo' => 'personal',
+            'crear_usuario' => true,
+            'email' => 'personal@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'password' => 'Ingreso2026',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue(Hash::check('Ingreso2026', $persona->fresh()->user->password));
+    }
+
+    public function test_al_editar_una_persona_que_ya_tiene_usuario_no_cambia_su_contrasena(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '7770003', 'paterno' => 'Choque']);
+        $usuario = User::factory()->create(['id_persona' => $persona->id, 'email' => 'choque@example.com']);
+        $hashAnterior = $usuario->password;
+
+        $this->actingAs($this->admin)->post(route('personas.update', $persona->id), [
+            '_method' => 'PUT',
+            'ci' => '7770003',
+            'nombres' => $persona->nombres,
+            'paterno' => 'Choque',
+            'estado_persona' => 'ACTIVO',
+            'tipo' => 'personal',
+            'crear_usuario' => true,
+            'email' => 'choque@example.com',
+            'estado_usuario' => 'ACTIVO',
+            // Aunque llegue (incluso inválida), se descarta: la cuenta ya existe.
+            'password' => 'x',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($hashAnterior, $usuario->fresh()->password);
+    }
+
     public function test_crea_una_persona_jefe_de_area_con_encargo(): void
     {
         $area = Area::factory()->create();

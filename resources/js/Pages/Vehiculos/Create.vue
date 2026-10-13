@@ -203,10 +203,12 @@ function submit() {
 
                                 <!-- Año -->
                                 <div class="col-sm-4">
-                                    <label class="form-label fw-medium">Año</label>
+                                    <label class="form-label fw-medium">Año <span class="text-muted fw-normal">(opcional)</span></label>
                                     <input
                                         v-model="form.anio"
+                                        v-entero
                                         type="text"
+                                        inputmode="numeric"
                                         class="form-control"
                                         :class="{ 'is-invalid': form.errors.anio }"
                                         placeholder="Ej: 2020"

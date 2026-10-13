@@ -37,6 +37,19 @@ class VehiculoRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            // El año es opcional: el mensaje genérico ("formato inválido")
+            // hacía pensar que era obligatorio.
+            'anio.regex' => 'El año debe tener 4 dígitos (ej. 2020) o dejarse vacío.',
+            'anio.max' => 'El año debe tener 4 dígitos (ej. 2020) o dejarse vacío.',
+        ];
+    }
+
     public function attributes(): array
     {
         return [
