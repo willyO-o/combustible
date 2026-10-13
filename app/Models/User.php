@@ -76,4 +76,19 @@ class User extends Authenticatable implements Auditable, JWTSubject
     {
         return $this->hasRole('conductor') && ! $this->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
     }
+
+    /**
+     * Si guardar $email cambiaría la credencial de acceso del usuario. Sin
+     * distinguir mayúsculas ni espacios, igual que al iniciar sesión: sólo
+     * cambiar mayúsculas no cuenta como cambio. Lo usan el perfil web y
+     * PUT /api/v1/auth/me para exigir la contraseña actual.
+     */
+    public function cambiaraElCorreoA(mixed $email): bool
+    {
+        if (! is_string($email) || trim($email) === '') {
+            return false;
+        }
+
+        return mb_strtolower(trim($email)) !== mb_strtolower((string) $this->email);
+    }
 }

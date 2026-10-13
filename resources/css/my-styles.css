@@ -183,6 +183,103 @@
     background-color: var(--primary01);
 }
 
+/* Lecturas calculadas del formulario de operación diaria
+   (resources/js/Pages/Operacion/Create.vue): horas trabajadas + recorrido u
+   horas de horómetro, lado a lado en una franja con divisor fino (sin
+   tarjetas). Celda calculada = tinte primario; --danger cuando la lectura
+   final no supera a la inicial; --warning cuando el horómetro supera la
+   jornada. Sólo tokens del tema -> claro y oscuro sin reglas aparte. */
+.op-calc {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    border: 1px solid var(--default-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.op-calc__item {
+    --op-calc-rgb: var(--primary-rgb);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    padding: 0.65rem 0.9rem 0.7rem;
+    transition: background-color 0.2s ease;
+}
+
+/* Divisor entre celdas: sombra de 1px a la izquierda y arriba. La que cae
+   fuera del contenedor la recorta su overflow:hidden, así que lado a lado se
+   ve la vertical y, apiladas en pantallas angostas, la horizontal. */
+.op-calc__item + .op-calc__item {
+    box-shadow: -1px 0 0 var(--default-border), 0 -1px 0 var(--default-border);
+}
+
+.op-calc__item--ok {
+    background-color: rgba(var(--op-calc-rgb), 0.05);
+}
+
+.op-calc__item--warning {
+    --op-calc-rgb: var(--warning-rgb);
+    background-color: rgba(var(--op-calc-rgb), 0.08);
+}
+
+.op-calc__item--danger {
+    --op-calc-rgb: var(--danger-rgb);
+    background-color: rgba(var(--op-calc-rgb), 0.06);
+}
+
+/* El ámbar y el coral del tema no llegan a 4.5:1 como texto sobre fondo
+   claro: se mezclan con el color de texto (oscurece en claro, aclara en
+   oscuro). Respaldo sin color-mix: el color de texto normal. */
+.op-calc__item--warning,
+.op-calc__item--danger {
+    --op-calc-tinta: var(--default-text-color);
+    --op-calc-tinta: color-mix(in srgb, rgb(var(--op-calc-rgb)) 50%, var(--default-text-color));
+}
+
+.op-calc__label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.op-calc__value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.op-calc__item--ok .op-calc__value {
+    color: rgb(var(--op-calc-rgb));
+}
+
+.op-calc__item--warning .op-calc__value {
+    color: var(--op-calc-tinta);
+}
+
+.op-calc__unit {
+    margin-inline-start: 0.2rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.op-calc__hint {
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--text-muted);
+}
+
+.op-calc__item--warning .op-calc__hint,
+.op-calc__item--danger .op-calc__hint {
+    color: var(--op-calc-tinta);
+    font-weight: 500;
+}
+
 /* Sección "Controles de mantenimiento" del formulario de operación diaria
    (resources/js/Pages/Operacion/Create.vue). Checklist de tipo_mantenimiento
    de ámbito operacion_diaria: una fila por control, con separadores finos en

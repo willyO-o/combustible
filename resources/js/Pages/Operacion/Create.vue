@@ -162,6 +162,55 @@ watch(horasTrabajadasCalculadas, (val) => {
     form.horas_trabajadas = val ?? ''
 }, { immediate: true })
 
+// Lecturas: '' / null (sin cargar) -> null; el resto ya llega saneado por
+// v-decimal ("1050.5") o desde el backend ("1050.50").
+const numeroONulo = (valor) => {
+    if (valor === '' || valor === null || valor === undefined) return null
+    const numero = Number(valor)
+    return Number.isFinite(numero) ? numero : null
+}
+
+// Recorrido (km) u horas de horómetro de la jornada, según el tipo_medicion
+// del vehículo: lectura final - inicial. Sólo de referencia, no se envía (el
+// backend valida que la final sea mayor que la inicial).
+// estado: 'pendiente' (falta una lectura) | 'invalido' (final <= inicial) | 'ok'.
+const lecturaCalculada = computed(() => {
+    if (!tipoMedicion.value) return null
+
+    const esKilometraje = tipoMedicion.value === 'kilometraje'
+    const inicio = numeroONulo(esKilometraje ? form.kilometraje_inicio : form.horometro_inicio)
+    const fin = numeroONulo(esKilometraje ? form.kilometraje_fin : form.horometro_fin)
+    const base = {
+        esKilometraje,
+        etiqueta: esKilometraje ? 'Recorrido' : 'Horas de horómetro',
+        unidad: esKilometraje ? 'km' : 'h',
+        icono: esKilometraje ? 'bi-speedometer2' : 'bi-stopwatch',
+        origen: esKilometraje ? 'Kilometraje final − inicial' : 'Horómetro final − inicial',
+    }
+
+    if (inicio === null || fin === null) return { ...base, estado: 'pendiente', valor: null }
+    if (fin <= inicio) return { ...base, estado: 'invalido', valor: null }
+
+    // Lecturas con 1 decimal: se redondea para no arrastrar errores de coma
+    // flotante (1221.5 - 1210.2 = 11.299999...).
+    return { ...base, estado: 'ok', valor: Math.round((fin - inicio) * 10) / 10 }
+})
+
+// Horómetro vs. jornada: qué parte de las horas trabajadas estuvo el equipo
+// en marcha. Si el horómetro supera la jornada (con 0.1 h de tolerancia) casi
+// siempre es una lectura mal tipeada.
+const usoDeJornada = computed(() => {
+    const lectura = lecturaCalculada.value
+    const horas = horasTrabajadasCalculadas.value
+
+    if (!lectura || lectura.esKilometraje || lectura.estado !== 'ok' || !horas) return null
+
+    return {
+        porcentaje: Math.round((lectura.valor / horas) * 100),
+        excede: lectura.valor > horas + 0.1,
+    }
+})
+
 // Conductores activos/provisionales del vehículo seleccionado (sólo viene
 // poblado desde el backend cuando mostrarSelectorConductor es true).
 const conductoresDelVehiculo = computed(() => {
@@ -526,7 +575,7 @@ onMounted(() => {
                                 </div>
 
                                 <div v-if="tipoMedicion === 'horometro'" class="col-sm-6">
-                                    <label class="form-label fw-medium">Horometro</label>
+                                    <label class="form-label fw-medium">Horómetro inicial</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-clock"></i></span>
 
@@ -542,7 +591,7 @@ onMounted(() => {
                                 </div>
 
                                 <div v-if="tipoMedicion === 'horometro'" class="col-sm-6">
-                                    <label class="form-label fw-medium">Horometro</label>
+                                    <label class="form-label fw-medium">Horómetro final</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-clock"></i></span>
 
@@ -557,17 +606,57 @@ onMounted(() => {
 
                                 </div>
 
+                                <!-- Lecturas calculadas en vivo (sólo referencia): horas de la
+                                     jornada y, según el vehículo, recorrido u horas de horómetro. -->
                                 <div class="col-12">
-                                    <label class="form-label fw-medium mb-1">
-                                        Horas trabajadas
-                                    </label>
-                                    <div>
-                                        <span class="badge bg-primary-transparent fs-14 px-3 py-2">
-                                            <i class="bi bi-clock me-1"></i>
-                                            {{ horasTrabajadasCalculadas !== null ? horasTrabajadasCalculadas.toFixed(2) : '—' }} horas
-                                        </span>
+                                    <div class="op-calc" aria-live="polite">
+                                        <div class="op-calc__item"
+                                            :class="{ 'op-calc__item--ok': horasTrabajadasCalculadas !== null }">
+                                            <span class="op-calc__label">
+                                                <i class="bi bi-clock" aria-hidden="true"></i>
+                                                Horas trabajadas
+                                            </span>
+                                            <span class="op-calc__value">
+                                                <template v-if="horasTrabajadasCalculadas !== null">
+                                                    {{ horasTrabajadasCalculadas.toFixed(2) }}<span class="op-calc__unit">h</span>
+                                                </template>
+                                                <template v-else>—</template>
+                                            </span>
+                                            <span class="op-calc__hint">Fecha y hora fin − inicio</span>
+                                        </div>
+
+                                        <div v-if="lecturaCalculada" class="op-calc__item" :class="{
+                                            'op-calc__item--ok': lecturaCalculada.estado === 'ok' && !usoDeJornada?.excede,
+                                            'op-calc__item--warning': usoDeJornada?.excede,
+                                            'op-calc__item--danger': lecturaCalculada.estado === 'invalido',
+                                        }">
+                                            <span class="op-calc__label">
+                                                <i class="bi" :class="lecturaCalculada.icono" aria-hidden="true"></i>
+                                                {{ lecturaCalculada.etiqueta }}
+                                            </span>
+                                            <span class="op-calc__value">
+                                                <template v-if="lecturaCalculada.estado === 'ok'">
+                                                    {{ lecturaCalculada.valor.toFixed(1) }}<span class="op-calc__unit">{{ lecturaCalculada.unidad }}</span>
+                                                </template>
+                                                <template v-else>—</template>
+                                            </span>
+                                            <span v-if="lecturaCalculada.estado === 'invalido'" class="op-calc__hint">
+                                                <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+                                                La lectura final debe ser mayor a la inicial
+                                            </span>
+                                            <span v-else-if="usoDeJornada?.excede" class="op-calc__hint">
+                                                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                                                Supera las {{ horasTrabajadasCalculadas.toFixed(2) }} h de la jornada; revisa las lecturas
+                                            </span>
+                                            <span v-else-if="lecturaCalculada.estado === 'pendiente'" class="op-calc__hint">
+                                                Completa la lectura inicial y final
+                                            </span>
+                                            <span v-else class="op-calc__hint">
+                                                {{ lecturaCalculada.origen }}<template v-if="usoDeJornada"> · {{ usoDeJornada.porcentaje }} % de la jornada</template>
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div class="form-text">Se calcula automáticamente a partir de la fecha/hora de inicio y fin.</div>
+                                    <div class="form-text">Se calculan automáticamente con las fechas y las lecturas cargadas.</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-medium">

@@ -18,6 +18,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/VehiculoController.php,app/Http/Controllers/ConductorController.php,app/Http/Controllers/PersonaController.php,app/Libraries/Reportes.php,app/Libraries/ReportesExcel.php | .ai/rules/controllers-libraries-libraries.md |
 | app/Http/Controllers/**/*.php, app/Http/Controllers/*.php, app/Http/Controllers/DashboardController.php, app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/controllers.md |
 | resources/css/my-styles.css,resources/js/Pages/**/*.vue | .ai/rules/css-js-pages.md |
+| resources/js/Pages/Operacion/Create.vue,resources/css/my-styles.css | .ai/rules/css.md |
 | resources/js/Data/app.js | .ai/rules/data.md |
 | database/** | .ai/rules/database.md |
 | public/docs/openapi.yaml | .ai/rules/docs.md |
@@ -51,6 +52,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/CargasCombustibleReportController.php,app/Libraries/Reportes.php,resources/js/Pages/Reportes/CargasCombustibleReporte.vue | .ai/rules/pages-reportes.md |
 | app/Http/Requests/VehiculoRequest.php,resources/js/Pages/Vehiculos/Create.vue,resources/js/Pages/Vehiculos/Index.vue | .ai/rules/pages-vehiculos.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
+| app/Http/Controllers/ProfileController.php,app/Http/Requests/ProfileUpdateRequest.php,resources/js/Pages/Profile/Edit.vue | .ai/rules/profile.md |
 | app/Http/Controllers/ControlCargasReportController.php,resources/js/Pages/Reportes/ControlCargasReporte.vue,app/Libraries/Reportes.php, app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php | .ai/rules/reportes-libraries.md |
 | resources/js/Pages/Reportes/OperacionDiariaReporte.vue,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue | .ai/rules/reportes.md |
 | app/Http/Controllers/**/*.php,app/Http/Requests/**/*.php,app/Actions/**/*.php | .ai/rules/requests-actions.md |

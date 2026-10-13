@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
@@ -18,12 +18,20 @@ const fotoInput = ref(null)
 const form = useForm({
     _method: 'PATCH',
     name: props.usuario.name,
-    // El correo no es editable desde el perfil (ver ProfileUpdateRequest /
-    // ProfileController), por eso no forma parte de este formulario.
+    email: props.usuario.email,
+    // Sólo se pide (y se envía con valor) cuando cambia el correo: es la
+    // credencial de acceso, ver ProfileUpdateRequest.
+    current_password: '',
     celular: props.usuario.persona?.celular ?? '',
     direccion: props.usuario.persona?.direccion ?? '',
     foto: null,
 })
+
+// Mismo criterio que el servidor: sin espacios y sin distinguir mayúsculas.
+// Compara contra props.usuario, que se refresca tras guardar.
+const correoCambiado = computed(
+    () => form.email.trim().toLowerCase() !== (props.usuario.email ?? '').toLowerCase(),
+)
 
 function onFotoChange(e) {
     const file = e.target.files[0]
@@ -34,11 +42,24 @@ function onFotoChange(e) {
     reader.readAsDataURL(file)
 }
 
+const currentPasswordEmailInput = ref(null)
+
 function submitPerfil() {
-    form.post(route('profile.update'), {
+    form.transform((data) => ({
+        ...data,
+        current_password: correoCambiado.value ? data.current_password : '',
+    })).post(route('profile.update'), {
         preserveScroll: true,
         onSuccess: () => {
             form.foto = null
+            form.reset('current_password')
+            form.email = props.usuario.email
+        },
+        onError: () => {
+            if (form.errors.current_password) {
+                form.reset('current_password')
+                currentPasswordEmailInput.value?.focus()
+            }
         },
     })
 }
@@ -126,9 +147,28 @@ function submitPassword() {
                                     </div>
 
                                     <div class="col-sm-6">
-                                        <label class="form-label fw-medium">Correo electrónico</label>
-                                        <input :value="usuario.email" type="email" class="form-control" disabled readonly />
-                                        <small class="text-muted">No editable desde aquí; contacta a un administrador para cambiarlo.</small>
+                                        <label for="perfil-email" class="form-label fw-medium">Correo electrónico <span class="text-danger">*</span></label>
+                                        <input id="perfil-email" v-model="form.email" type="email" class="form-control"
+                                            :class="{ 'is-invalid': form.errors.email }" maxlength="255"
+                                            autocomplete="email" inputmode="email" />
+                                        <InputError :message="form.errors.email" class="mt-1" />
+                                        <small v-if="!form.errors.email" class="text-muted">Es el usuario con el que inicias sesión.</small>
+                                    </div>
+
+                                    <!-- Sólo al cambiar el correo: confirma la identidad antes de
+                                         cambiar la credencial de acceso. -->
+                                    <div v-if="correoCambiado" class="col-sm-6">
+                                        <label for="perfil-email-password" class="form-label fw-medium">
+                                            Contraseña actual <span class="text-danger">*</span>
+                                        </label>
+                                        <input id="perfil-email-password" ref="currentPasswordEmailInput"
+                                            v-model="form.current_password" type="password" class="form-control"
+                                            :class="{ 'is-invalid': form.errors.current_password }"
+                                            autocomplete="current-password" />
+                                        <InputError :message="form.errors.current_password" class="mt-1" />
+                                        <small v-if="!form.errors.current_password" class="text-muted">
+                                            Para cambiar tu correo confirma tu contraseña.
+                                        </small>
                                     </div>
 
                                     <div class="col-sm-6">

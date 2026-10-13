@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.14.0"
+  version: "1.15.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -284,12 +284,28 @@ paths:
         **actualización parcial**: solo se modifican los campos enviados en el
         cuerpo de la petición; los que se omiten conservan su valor actual.
 
-        Solo se pueden actualizar **`name`** (puede usarse como apodo), **`celular`**,
-        **`direccion`** y **`foto`** — el correo y la contraseña no se gestionan desde
+        Solo se pueden actualizar **`name`** (puede usarse como apodo), **`email`**,
+        **`celular`**, **`direccion`** y **`foto`** — la contraseña no se gestiona desde
         este endpoint. `celular`/`direccion` se guardan en la persona vinculada a la
         cuenta (`users.id_persona` -> `persona`): si la cuenta no tiene una persona
         vinculada, esos dos campos simplemente no se actualizan (no se produce
         ningún error). Al reemplazar `foto`, la foto anterior se elimina.
+
+        ## Cambio de correo electrónico
+
+        El correo es la credencial con la que se inicia sesión, así que para
+        cambiarlo hay que enviar también **`current_password`** (la contraseña actual
+        de la cuenta). Reglas:
+        - Si `email` es distinto al actual, `current_password` es obligatorio y debe ser
+          correcto; si falta o es incorrecto responde `422` con el error en
+          `current_password` y **no se guarda ningún campo** de la petición.
+        - El nuevo correo debe tener formato válido y no estar registrado por otra
+          cuenta (`422` con el error en `email`).
+        - Enviar el **mismo** correo actual (aunque cambien mayúsculas o haya espacios
+          alrededor) no cuenta como cambio y no pide contraseña.
+        - El token actual **sigue siendo válido** después del cambio: no hace falta
+          volver a iniciar sesión. Los siguientes inicios de sesión usan el correo nuevo.
+        - `current_password` sólo se usa para confirmar; nunca cambia la contraseña.
 
         Acepta tanto `PUT` como `PATCH`.
 
@@ -308,10 +324,18 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ActualizarPerfilRequest'
-            example:
-              name: Juanito
-              celular: "77712345"
-              direccion: "Av. Siempre Viva 123"
+            examples:
+              datos_personales:
+                summary: Nombre, celular y dirección
+                value:
+                  name: Juanito
+                  celular: "77712345"
+                  direccion: "Av. Siempre Viva 123"
+              cambio_de_correo:
+                summary: Cambio de correo (requiere la contraseña actual)
+                value:
+                  email: juan.perez@empresa.com
+                  current_password: "mi-contraseña-actual"
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/ActualizarPerfilRequest'
@@ -329,7 +353,12 @@ paths:
                 type: object
                 properties:
                   success: { type: boolean, example: true }
-                  message: { type: string, example: Perfil actualizado exitosamente. }
+                  message:
+                    type: string
+                    description: >-
+                      "Perfil actualizado exitosamente." o, si cambió el correo,
+                      "Perfil actualizado. Desde ahora inicia sesión con {correo}."
+                    example: Perfil actualizado exitosamente.
                   data: { $ref: '#/components/schemas/UsuarioAutenticado' }
               example:
                 success: true
@@ -354,11 +383,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-              example:
-                success: false
-                message: Datos de entrada inválidos.
-                errors:
-                  celular: ["El campo celular no debe ser mayor que 20 caracteres."]
+              examples:
+                campo_invalido:
+                  summary: Campo con formato o longitud inválida
+                  value:
+                    success: false
+                    message: Datos de entrada inválidos.
+                    errors:
+                      celular: ["El campo celular no debe ser mayor que 20 caracteres."]
+                falta_contrasena:
+                  summary: Cambio de correo sin la contraseña actual
+                  value:
+                    success: false
+                    message: Datos de entrada inválidos.
+                    errors:
+                      current_password: ["Ingresa tu contraseña actual para cambiar el correo electrónico."]
+                contrasena_incorrecta:
+                  summary: Contraseña actual incorrecta
+                  value:
+                    success: false
+                    message: Datos de entrada inválidos.
+                    errors:
+                      current_password: ["La contraseña actual no es correcta."]
+                correo_ocupado:
+                  summary: El correo ya pertenece a otra cuenta
+                  value:
+                    success: false
+                    message: Datos de entrada inválidos.
+                    errors:
+                      email: ["Este correo electrónico ya está registrado por otro usuario."]
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -421,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.14.0"
+                api_version: "1.15.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -3867,6 +3920,25 @@ components:
           maxLength: 255
           description: Nombre de la cuenta (puede usarse como apodo).
           example: Juanito
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: |
+            Nuevo correo de la cuenta (con el que se inicia sesión). Debe tener formato
+            válido y no pertenecer a otra cuenta. Si es distinto al actual exige
+            `current_password`. No puede enviarse vacío ni `null`; para no cambiarlo,
+            omitirlo (o reenviar el mismo).
+          example: juan.perez@empresa.com
+        current_password:
+          type: string
+          format: password
+          nullable: true
+          description: |
+            Contraseña actual de la cuenta. **Obligatoria sólo cuando `email` cambia**;
+            en cualquier otro caso se ignora. Sólo confirma la identidad: no cambia la
+            contraseña.
+          example: "mi-contraseña-actual"
         celular:
           type: string
           nullable: true
@@ -3897,7 +3969,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.14.0" }
+        api_version: { type: string, example: "1.15.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }

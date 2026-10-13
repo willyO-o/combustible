@@ -57,17 +57,144 @@ class AuthControllerTest extends TestCase
         $this->assertSame('Calle Original', $persona->fresh()->direccion);
     }
 
-    public function test_update_me_ignora_email_y_otros_campos_no_permitidos(): void
+    public function test_update_me_ignora_la_contrasena_y_otros_campos_no_permitidos(): void
     {
-        $user = User::factory()->create(['email' => 'original@example.com']);
+        $user = User::factory()->create(['email' => 'original@example.com', 'estado_usuario' => 'ACTIVO']);
+        $hashAnterior = $user->password;
 
         $response = $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
-            'email' => 'nuevo@example.com',
             'password' => 'nueva-clave',
+            'estado_usuario' => 'INACTIVO',
         ]);
 
         $response->assertOk();
+        $this->assertSame($hashAnterior, $user->fresh()->password);
+        $this->assertSame('ACTIVO', $user->fresh()->estado_usuario);
+    }
+
+    public function test_update_me_cambia_el_correo_confirmando_la_contrasena_actual(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+        $hashAnterior = $user->password;
+
+        $response = $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'email' => ' nuevo@example.com ',
+            'current_password' => 'password',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('message', 'Perfil actualizado. Desde ahora inicia sesión con nuevo@example.com.')
+            ->assertJsonPath('data.email', 'nuevo@example.com');
+
+        $this->assertSame('nuevo@example.com', $user->fresh()->email);
+        // current_password sólo valida: la contraseña no cambia.
+        $this->assertSame($hashAnterior, $user->fresh()->password);
+    }
+
+    public function test_despues_de_cambiar_el_correo_la_app_inicia_sesion_con_el_nuevo(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'email' => 'nuevo@example.com',
+            'current_password' => 'password',
+        ])->assertOk();
+
+        $this->postJson(route('api.v1.auth.login'), ['email' => 'original@example.com', 'password' => 'password'])
+            ->assertUnauthorized();
+
+        $this->postJson(route('api.v1.auth.login'), ['email' => 'nuevo@example.com', 'password' => 'password'])
+            ->assertOk()
+            ->assertJsonPath('user.email', 'nuevo@example.com');
+    }
+
+    public function test_update_me_exige_la_contrasena_actual_para_cambiar_el_correo(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'email' => 'nuevo@example.com',
+        ])->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('errors.current_password.0', 'Ingresa tu contraseña actual para cambiar el correo electrónico.');
+
         $this->assertSame('original@example.com', $user->fresh()->email);
+    }
+
+    public function test_update_me_rechaza_una_contrasena_incorrecta_sin_guardar_nada(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com', 'name' => 'Original']);
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'name' => 'Otro',
+            'email' => 'nuevo@example.com',
+            'current_password' => 'incorrecta',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.current_password.0', 'La contraseña actual no es correcta.');
+
+        $this->assertSame('original@example.com', $user->fresh()->email);
+        $this->assertSame('Original', $user->fresh()->name);
+    }
+
+    public function test_update_me_no_permite_el_correo_de_otro_usuario(): void
+    {
+        User::factory()->create(['email' => 'ocupado@example.com']);
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'email' => 'ocupado@example.com',
+            'current_password' => 'password',
+        ])->assertUnprocessable()
+            ->assertJsonPath('errors.email.0', 'Este correo electrónico ya está registrado por otro usuario.');
+
+        $this->assertSame('original@example.com', $user->fresh()->email);
+    }
+
+    public function test_update_me_rechaza_un_correo_invalido_o_vacio(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        foreach (['no-es-un-correo', '', null] as $email) {
+            $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+                'email' => $email,
+                'current_password' => 'password',
+            ])->assertUnprocessable()->assertJsonValidationErrors('email');
+        }
+
+        $this->assertSame('original@example.com', $user->fresh()->email);
+    }
+
+    /**
+     * Compatibilidad con la versión instalada de la app: si reenvía el mismo
+     * correo junto con el resto del perfil, no se le pide contraseña.
+     */
+    public function test_update_me_con_el_mismo_correo_no_pide_contrasena(): void
+    {
+        $user = User::factory()->create(['email' => 'original@example.com']);
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'name' => 'Apodo',
+            'email' => 'ORIGINAL@example.com',
+        ])->assertOk()
+            ->assertJsonPath('message', 'Perfil actualizado exitosamente.');
+
+        $this->assertSame('Apodo', $user->fresh()->name);
+    }
+
+    public function test_el_token_sigue_siendo_valido_despues_de_cambiar_el_correo(): void
+    {
+        User::factory()->create(['email' => 'original@example.com']);
+        $token = $this->postJson(route('api.v1.auth.login'), ['email' => 'original@example.com', 'password' => 'password'])
+            ->json('access_token');
+
+        $this->withToken($token)->putJson(route('api.v1.auth.me.update'), [
+            'email' => 'nuevo@example.com',
+            'current_password' => 'password',
+        ])->assertOk();
+
+        $this->withToken($token)->getJson(route('api.v1.auth.me'))
+            ->assertOk()
+            ->assertJsonPath('data.email', 'nuevo@example.com');
     }
 
     public function test_update_me_no_actualiza_celular_ni_direccion_sin_persona_vinculada(): void

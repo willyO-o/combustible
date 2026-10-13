@@ -14,6 +14,36 @@ Este documento resume **todo lo que cambió en la API** en esta ronda. Está div
 
 ---
 
+## Actualización 2026-10-13 — Cambio de correo desde el perfil (API 1.15.0)
+
+El usuario ya puede cambiar su correo en `PUT /auth/me` (o `PATCH`). Como el correo es con
+lo que inicia sesión, hay que pedirle **su contraseña actual**.
+
+```json
+{ "email": "juan.perez@empresa.com", "current_password": "mi-contraseña-actual" }
+```
+
+| Caso | Respuesta |
+| --- | --- |
+| Correo distinto + contraseña correcta | `200`, `data.email` con el correo nuevo y `message` "Perfil actualizado. Desde ahora inicia sesión con …" |
+| Correo distinto sin `current_password` | `422`, `errors.current_password`: "Ingresa tu contraseña actual para cambiar el correo electrónico." |
+| Contraseña incorrecta | `422`, `errors.current_password`: "La contraseña actual no es correcta." (no se guarda nada de la petición) |
+| Correo de otra cuenta | `422`, `errors.email`: "Este correo electrónico ya está registrado por otro usuario." |
+| Mismo correo actual | Sin cambio, no pide contraseña (la app actual sigue funcionando igual) |
+
+El token **sigue siendo válido** después del cambio: no hay que cerrar sesión. Solo los
+siguientes inicios de sesión usan el correo nuevo.
+
+**Checklist**
+
+- [ ] En "Mi perfil", hacer editable el correo.
+- [ ] Mostrar el campo "Contraseña actual" solo cuando el correo cambió, y enviarlo como `current_password`.
+- [ ] Mostrar los errores de `errors.email` / `errors.current_password` bajo cada campo.
+- [ ] Tras el `200`, actualizar el correo guardado localmente con `data.email` (por ejemplo para "recordar usuario" en el login).
+- [ ] No enviar `email` vacío ni `null`: si no cambia, omitirlo.
+
+---
+
 ## Actualización 2026-10-13 — Operación diaria: actividades sin horas (API 1.14.0)
 
 Las actividades de la operación diaria **ya no llevan hora de inicio ni de fin**. La app

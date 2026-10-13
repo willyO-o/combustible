@@ -22,14 +22,13 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's profile information (foto, nombre, celular, dirección).
-     * No gestiona el correo ni el nombre de la persona, ni permite eliminar la
+     * Update the user's profile information (foto, nombre, correo, celular,
+     * dirección). No gestiona el nombre de la persona ni permite eliminar la
      * cuenta: eso se hace desde el módulo de Personas/Usuarios (administradores).
      *
-     * `email` no es editable desde el perfil (ProfileUpdateRequest ya no lo
-     * valida, así que nunca llega en $data), pero igual se omite
-     * explícitamente aquí por seguridad ante cualquier cambio futuro en las
-     * reglas de validación.
+     * `email` sí es editable; ProfileUpdateRequest exige `current_password`
+     * cuando cambia (es la credencial de acceso). La contraseña sólo se usa
+     * para validar, nunca se guarda. El cambio queda en la auditoría de User.
      *
      * `celular`/`direccion` se guardan en persona a través de la relación
      * users.id_persona -> persona (no existen columnas propias en users): si
@@ -40,8 +39,11 @@ class ProfileController extends Controller
     {
         $usuario = $request->user();
 
+        // Antes de guardar: después, el usuario ya tiene el correo nuevo.
+        $cambiaElCorreo = $request->cambiaElCorreo();
+
         $data = $request->validated();
-        unset($data['email']);
+        unset($data['current_password']);
 
         $datosPersona = [
             'celular' => $data['celular'] ?? null,
@@ -65,6 +67,8 @@ class ProfileController extends Controller
         }
 
         return redirect()->route('profile.edit')
-            ->with('success', 'Perfil actualizado exitosamente.');
+            ->with('success', $cambiaElCorreo
+                ? 'Perfil actualizado. Desde ahora inicia sesión con '.$usuario->email.'.'
+                : 'Perfil actualizado exitosamente.');
     }
 }

@@ -2,6 +2,29 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.15.0 — 2026-10-13
+
+El usuario puede cambiar su correo desde la app. Compatible con la versión anterior.
+
+### Agregado
+
+- `PUT` / `PATCH /auth/me`: nuevos campos `email` y `current_password`. Si `email` es distinto
+  al actual, `current_password` (la contraseña actual) es obligatorio; si falta o es incorrecto
+  responde `422` con el error en `current_password` y no se guarda ningún campo. El correo debe
+  tener formato válido y no estar registrado por otra cuenta (`422` en `email`).
+- El token actual sigue siendo válido después de cambiar el correo; los siguientes inicios de
+  sesión usan el correo nuevo.
+
+### Cambiado
+
+- `PUT` / `PATCH /auth/me`: antes un `email` enviado se ignoraba. Reenviar el **mismo** correo
+  (aunque cambien mayúsculas o espacios) sigue sin efecto y no pide contraseña, así que la app
+  actual no se ve afectada. `email` vacío o `null` ahora responde `422`: para no cambiarlo,
+  omitirlo.
+- Si cambió el correo, `message` es "Perfil actualizado. Desde ahora inicia sesión con {correo}."
+- `GET /parametros`: `api_version` pasa a `1.15.0`.
+
+
 ## 1.14.0 — 2026-10-13
 
 Las actividades de la operación diaria ya no registran horas. Compatible con la versión anterior.

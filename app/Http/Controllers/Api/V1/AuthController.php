@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
@@ -67,9 +68,12 @@ class AuthController extends Controller
     /**
      * Actualiza los datos editables del perfil del usuario autenticado.
      *
-     * Solo se pueden actualizar `name` (puede usarse como apodo), `celular`,
-     * `direccion` y `foto`. El correo y la contraseña no se gestionan desde
-     * este endpoint. `celular`/`direccion` se guardan en la persona vinculada
+     * Solo se pueden actualizar `name` (puede usarse como apodo), `email`,
+     * `celular`, `direccion` y `foto`; la contraseña no se gestiona aquí.
+     * `email` es la credencial de acceso: cambiarlo exige `current_password`
+     * (mismo criterio que el perfil web, ver User::cambiaraElCorreoA()); el
+     * token JWT sigue siendo válido porque identifica al usuario por su id.
+     * `celular`/`direccion` se guardan en la persona vinculada
      * al usuario (`users.id_persona` -> `persona`): si el usuario no tiene
      * una persona vinculada, esos dos campos simplemente no se actualizan
      * (no es un error).
@@ -82,11 +86,30 @@ class AuthController extends Controller
      */
     public function updateMe(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $user = auth('api')->user();
+
+        $entrada = $request->all();
+        if (is_string($entrada['email'] ?? null)) {
+            $entrada['email'] = trim($entrada['email']);
+        }
+
+        // Antes de guardar: después, el usuario ya tiene el correo nuevo.
+        $cambiaElCorreo = $user->cambiaraElCorreoA($entrada['email'] ?? null);
+
+        $validator = Validator::make($entrada, [
             'name' => ['sometimes', 'string', 'max:255'],
+            'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'current_password' => [Rule::requiredIf($cambiaElCorreo), 'nullable', 'current_password:api'],
             'celular' => ['sometimes', 'nullable', 'string', 'max:20'],
             'direccion' => ['sometimes', 'nullable', 'string', 'max:250'],
             'foto' => ['sometimes', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:2048'],
+        ], [
+            'email.unique' => 'Este correo electrónico ya está registrado por otro usuario.',
+            'current_password.required' => 'Ingresa tu contraseña actual para cambiar el correo electrónico.',
+            'current_password.current_password' => 'La contraseña actual no es correcta.',
+        ], [
+            'email' => 'correo electrónico',
+            'current_password' => 'contraseña actual',
         ]);
 
         if ($validator->fails()) {
@@ -98,9 +121,9 @@ class AuthController extends Controller
         }
 
         $data = $validator->validated();
-        $user = auth('api')->user();
 
-        $datosUsuario = array_intersect_key($data, array_flip(['name']));
+        // current_password sólo valida, nunca se guarda.
+        $datosUsuario = array_intersect_key($data, array_flip(['name', 'email']));
 
         if ($request->hasFile('foto')) {
             if ($user->foto) {
@@ -123,7 +146,9 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Perfil actualizado exitosamente.',
+            'message' => $cambiaElCorreo
+                ? 'Perfil actualizado. Desde ahora inicia sesión con '.$user->email.'.'
+                : 'Perfil actualizado exitosamente.',
             'data' => $this->userData($user),
         ]);
     }
