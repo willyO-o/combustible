@@ -9,6 +9,7 @@ use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -22,12 +23,82 @@ class UserControllerTest extends TestCase
     {
         parent::setUp();
 
-        Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
+        $administrador = Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
 
+        // Como en producción: el administrador tiene los permisos del módulo
+        // Usuarios (UserSeeder::todosLosPermisos()).
+        foreach (['usuarios.ver', 'usuarios.crear', 'usuarios.editar', 'usuarios.eliminar', 'usuarios.contrasena.cambiar'] as $permiso) {
+            Permission::firstOrCreate(['name' => $permiso, 'guard_name' => 'web']);
+        }
+        $administrador->givePermissionTo(['usuarios.ver', 'usuarios.crear', 'usuarios.editar', 'usuarios.eliminar', 'usuarios.contrasena.cambiar']);
+
         $this->admin = User::factory()->create();
         $this->admin->assignRole('administrador');
+    }
+
+    /**
+     * Un rol sin permisos del módulo Usuarios (ej. jefe de área) no puede
+     * crear, editar ni activar/inactivar usuarios desde el backend, aunque
+     * llame a las rutas directamente.
+     */
+    public function test_sin_permisos_de_usuarios_no_puede_crear_editar_ni_cambiar_estado(): void
+    {
+        $jefe = User::factory()->create();
+        $jefe->assignRole('jefe-area');
+        $persona = Persona::factory()->create();
+        $otro = User::factory()->create(['email' => 'otro@example.com', 'estado_usuario' => 'ACTIVO']);
+
+        $this->actingAs($jefe)->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'nuevo@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+        ])->assertForbidden();
+
+        $this->actingAs($jefe)->put(route('usuarios.update', $otro->id), [
+            'email' => 'cambiado@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+        ])->assertForbidden();
+
+        $this->actingAs($jefe)->patch(route('usuarios.estado', $otro->id), [
+            'estado_usuario' => 'INACTIVO',
+        ])->assertForbidden();
+
+        $this->assertDatabaseMissing('users', ['email' => 'nuevo@example.com']);
+        $this->assertSame('otro@example.com', $otro->fresh()->email);
+        $this->assertSame('ACTIVO', $otro->fresh()->estado_usuario);
+    }
+
+    public function test_el_permiso_de_cada_accion_es_el_mismo_que_usa_la_vista(): void
+    {
+        $soloCrear = User::factory()->create();
+        $soloCrear->givePermissionTo('usuarios.crear');
+        $persona = Persona::factory()->create();
+        $otro = User::factory()->create(['estado_usuario' => 'ACTIVO']);
+
+        // Con usuarios.crear puede crear...
+        $this->actingAs($soloCrear)->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'creado@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+        ])->assertRedirect(route('usuarios.index'));
+
+        // ...pero no editar (usuarios.editar) ni inactivar (usuarios.eliminar).
+        $this->actingAs($soloCrear)->put(route('usuarios.update', $otro->id), [
+            'email' => $otro->email,
+            'estado_usuario' => 'ACTIVO',
+            'roles' => [],
+        ])->assertForbidden();
+
+        $this->actingAs($soloCrear)->patch(route('usuarios.estado', $otro->id), [
+            'estado_usuario' => 'INACTIVO',
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('users', ['email' => 'creado@example.com']);
     }
 
     public function test_no_existe_ruta_de_eliminar_usuario(): void

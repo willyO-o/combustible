@@ -60,8 +60,9 @@ class UserController extends Controller
 
     public function store(UserRequest $request, UpdatePersonaAction $action): RedirectResponse
     {
-        // validar por permiso no por rol
-        if (! $request->user()->can('crear-usuario')) {
+        // Validar por permiso, no por rol. Nombres reales del ACL (UserSeeder /
+        // config/acl.php), los mismos que usa v-can en Usuarios/Index.vue.
+        if (! $request->user()->can('usuarios.crear')) {
             abort(403);
         }
 
@@ -96,7 +97,7 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $usuario, UpdatePersonaAction $action): RedirectResponse
     {
-        if (! $request->user()->can('editar-usuario')) {
+        if (! $request->user()->can('usuarios.editar')) {
             abort(403);
         }
 
@@ -121,7 +122,9 @@ class UserController extends Controller
 
     public function cambiarEstado(Request $request, User $usuario): RedirectResponse
     {
-        if (! $request->user()->can('cambiar-estado-usuario')) {
+        // Los usuarios no se eliminan, se inactivan: el botón de la vista usa
+        // el permiso usuarios.eliminar para esta acción.
+        if (! $request->user()->can('usuarios.eliminar')) {
             abort(403);
         }
 
