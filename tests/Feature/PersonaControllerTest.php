@@ -199,6 +199,94 @@ class PersonaControllerTest extends TestCase
         $this->assertSame($hashAnterior, $usuario->fresh()->password);
     }
 
+    public function test_verificar_ci_responde_que_no_existe(): void
+    {
+        $this->actingAs($this->admin)
+            ->getJson(route('search.persona-por-ci', ['ci' => '5550001']))
+            ->assertOk()
+            ->assertExactJson(['existe' => false]);
+    }
+
+    public function test_verificar_ci_avisa_si_ya_existe_con_sus_datos(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '5550002', 'nombres' => 'Ana', 'paterno' => 'Rojas', 'materno' => null]);
+        User::factory()->create(['id_persona' => $persona->id]);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('search.persona-por-ci', ['ci' => ' 5550002 ']))
+            ->assertOk()
+            ->assertJsonPath('existe', true)
+            ->assertJsonPath('persona.id', $persona->id)
+            ->assertJsonPath('persona.nombre_completo', 'Ana Rojas')
+            ->assertJsonPath('persona.tipo', 'Personal')
+            ->assertJsonPath('persona.eliminada', false)
+            ->assertJsonPath('persona.url', route('personas.edit', $persona->id));
+    }
+
+    public function test_verificar_ci_de_un_conductor_enlaza_a_su_ficha(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $conductor->persona->update(['ci' => '5550003']);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('search.persona-por-ci', ['ci' => '5550003']))
+            ->assertJsonPath('persona.tipo', 'Conductor')
+            ->assertJsonPath('persona.url', route('conductores.show', $conductor->id));
+    }
+
+    public function test_verificar_ci_ignora_a_la_persona_que_se_esta_editando(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '5550004']);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('search.persona-por-ci', ['ci' => '5550004', 'ignorar' => $persona->id]))
+            ->assertExactJson(['existe' => false]);
+    }
+
+    /**
+     * El CI es único en la base aun con borrado lógico: una persona eliminada
+     * también impide volver a registrarlo, y hay que avisarlo.
+     */
+    public function test_verificar_ci_avisa_si_pertenece_a_una_persona_eliminada(): void
+    {
+        $persona = Persona::factory()->create(['ci' => '5550005']);
+        $persona->delete();
+
+        $this->actingAs($this->admin)
+            ->getJson(route('search.persona-por-ci', ['ci' => '5550005']))
+            ->assertJsonPath('existe', true)
+            ->assertJsonPath('persona.eliminada', true)
+            ->assertJsonPath('persona.url', null);
+
+        // Y efectivamente el alta con ese CI se rechaza.
+        $this->actingAs($this->admin)->post(route('personas.store'), [
+            'ci' => '5550005',
+            'nombres' => 'Otro',
+            'paterno' => 'Nombre',
+            'estado_persona' => 'ACTIVO',
+            'tipo' => 'personal',
+            'crear_usuario' => false,
+        ])->assertSessionHasErrors('ci');
+    }
+
+    /**
+     * Rutas web: los errores no se responden en JSON (bootstrap/app.php sólo
+     * lo hace para api/*), igual que el resto de buscadores. CiInput.vue
+     * nunca envía un CI vacío y, ante cualquier respuesta inesperada, no avisa
+     * ni bloquea (el servidor valida al guardar).
+     */
+    public function test_verificar_ci_exige_el_ci(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('search.persona-por-ci'))
+            ->assertSessionHasErrors('ci');
+    }
+
+    public function test_verificar_ci_requiere_iniciar_sesion(): void
+    {
+        $this->get(route('search.persona-por-ci', ['ci' => '123']))->assertRedirect(route('login'));
+    }
+
     public function test_crea_una_persona_jefe_de_area_con_encargo(): void
     {
         $area = Area::factory()->create();
@@ -508,14 +596,19 @@ class PersonaControllerTest extends TestCase
 
     /**
      * Texto impreso en el PDF: FPDF comprime cada stream con zlib y escribe
-     * el texto como "(...) Tj"; se ignoran los streams de imagen (logo).
+     * el texto como "(...) Tj" en los streams de contenido de página. Se
+     * descartan las fuentes incrustadas (/Length1) y las imágenes: son
+     * binarias y, según los caracteres usados (nombres aleatorios de las
+     * factories), a veces contienen bytes que parecen "(...) Tj" y daban
+     * falsos positivos intermitentes (ej. el byte \x97 de la raya).
      */
     private function textoDelPdf(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+        preg_match_all('/<<([^<>]*(?:<<[^<>]*>>[^<>]*)*)>>\s*stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams, PREG_SET_ORDER);
 
-        return collect($streams[1])
-            ->map(fn (string $stream) => @gzuncompress($stream) ?: $stream)
+        return collect($streams)
+            ->reject(fn (array $stream) => preg_match('#/Length1|/Subtype\s*/Image|/Type\s*/XObject#', $stream[1]) === 1)
+            ->map(fn (array $stream) => @gzuncompress($stream[2]) ?: $stream[2])
             ->flatMap(fn (string $contenido) => preg_match_all('/\((.*?)(?<!\\\\)\)\s*Tj/s', $contenido, $textos) ? $textos[1] : [])
             ->implode("\n");
     }

@@ -32,6 +32,15 @@ export const showError = (errors)=>{
     });
 }
 
+export const showWarning = (title, html) => {
+    return Swal.fire({
+        title,
+        html,
+        icon: 'warning',
+        confirmButtonText: 'Entendido',
+    });
+};
+
 export const confirm = async (
     message = "¿Está seguro?",
     title = "Confirmación",

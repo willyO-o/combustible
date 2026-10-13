@@ -10,6 +10,7 @@ use App\Models\Asignacion;
 use App\Models\Conductor;
 use App\Models\DocumentoConductor;
 use App\Models\Persona;
+use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +19,7 @@ use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -206,6 +208,12 @@ class ConductorController extends Controller
     {
         $this->autorizarAsignacionSiCorresponde($request);
 
+        // Crear la cuenta de acceso requiere el mismo permiso que el módulo
+        // de Usuarios (el front sólo muestra la opción con v-can).
+        if ($request->boolean('crear_usuario') && ! $request->user()->can('usuarios.crear')) {
+            abort(403, 'No tienes permiso para crear usuarios.');
+        }
+
         DB::transaction(function () use ($request) {
             // Los datos personales (ci, nombres, foto, etc.) viven en la
             // tabla persona; el conductor sólo agrega estado_conductor
@@ -214,6 +222,7 @@ class ConductorController extends Controller
                 'estado_conductor', 'foto', 'documentos',
                 'id_vehiculo', 'estado_asignacion', 'fecha_asignacion',
                 'fecha_culminacion', 'detalle', 'kilometraje_inicial', 'horometro_inicial',
+                'crear_usuario', 'email', 'estado_usuario', 'password',
             ]);
 
             if ($request->hasFile('foto')) {
@@ -232,10 +241,16 @@ class ConductorController extends Controller
             if ($request->filled('id_vehiculo')) {
                 $this->registrarAsignacionVehiculo($conductor, $this->datosAsignacion($request));
             }
+
+            if ($request->boolean('crear_usuario')) {
+                $this->crearCuentaDeConductor($persona, $request);
+            }
         });
 
         return redirect()->route('conductores.index')
-            ->with('success', 'Conductor registrado exitosamente.');
+            ->with('success', $request->boolean('crear_usuario')
+                ? 'Conductor registrado exitosamente, con su usuario de acceso.'
+                : 'Conductor registrado exitosamente.');
     }
 
     public function show(Conductor $conductor): Response
@@ -325,6 +340,23 @@ class ConductorController extends Controller
      * nuevo); los que no tienen "id" se crean; los que ya no vienen en el
      * arreglo (removidos por el usuario) se eliminan junto a su archivo.
      */
+    /**
+     * Cuenta de acceso del operario recién registrado, sólo con el rol
+     * conductor. Contraseña: la escrita o, si se dejó vacía, CI#Plusmetals.
+     */
+    private function crearCuentaDeConductor(Persona $persona, ConductorRequest $request): void
+    {
+        $usuario = User::create([
+            'name' => trim("{$persona->nombres} {$persona->paterno}"),
+            'email' => $request->validated('email'),
+            'password' => Hash::make(User::contrasenaInicial($request->validated('password'), $persona->ci)),
+            'id_persona' => $persona->id,
+            'estado_usuario' => $request->validated('estado_usuario', 'ACTIVO'),
+        ]);
+
+        $usuario->assignRole('conductor');
+    }
+
     private function guardarDocumentos(Conductor $conductor, ConductorRequest $request): void
     {
         $documentos = $request->validated('documentos') ?? [];

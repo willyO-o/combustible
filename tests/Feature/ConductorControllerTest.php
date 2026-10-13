@@ -14,9 +14,11 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -88,6 +90,145 @@ class ConductorControllerTest extends TestCase
             ->has('conductor.asignaciones_activas', 0)
             ->has('historialAsignaciones', 0)
         );
+    }
+
+    /**
+     * Usuario con permiso para crear cuentas (el administrador real lo tiene
+     * vía todosLosPermisos()).
+     */
+    private function adminConPermisoDeUsuarios(): User
+    {
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'usuarios.crear', 'guard_name' => 'web']);
+        $this->admin->givePermissionTo('usuarios.crear');
+
+        return $this->admin;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payloadConductorConCuenta(array $extra = []): array
+    {
+        return array_merge([
+            'ci' => '6660001',
+            'nombres' => 'Mario',
+            'paterno' => 'Flores',
+            'estado_conductor' => 'ACTIVO',
+            'crear_usuario' => '1',
+            'email' => 'mario.flores@example.com',
+            'estado_usuario' => 'ACTIVO',
+        ], $extra);
+    }
+
+    public function test_store_crea_el_usuario_del_conductor_con_rol_conductor_y_contrasena_escrita(): void
+    {
+        $this->actingAs($this->adminConPermisoDeUsuarios())
+            ->post(route('conductores.store'), $this->payloadConductorConCuenta(['password' => 'Operario2026']))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('conductores.index'))
+            ->assertSessionHas('success', 'Conductor registrado exitosamente, con su usuario de acceso.');
+
+        $persona = Persona::where('ci', '6660001')->firstOrFail();
+        $usuario = User::where('id_persona', $persona->id)->firstOrFail();
+
+        $this->assertSame('mario.flores@example.com', $usuario->email);
+        $this->assertSame('ACTIVO', $usuario->estado_usuario);
+        $this->assertSame(['conductor'], $usuario->getRoleNames()->all());
+        $this->assertTrue(Hash::check('Operario2026', $usuario->password));
+        $this->assertDatabaseHas('conductor', ['id' => $persona->id]);
+    }
+
+    public function test_store_con_contrasena_vacia_usa_el_formato_ci_plusmetals(): void
+    {
+        $this->actingAs($this->adminConPermisoDeUsuarios())
+            ->post(route('conductores.store'), $this->payloadConductorConCuenta(['password' => '']))
+            ->assertSessionHasNoErrors();
+
+        $usuario = User::where('email', 'mario.flores@example.com')->firstOrFail();
+        $this->assertTrue(Hash::check('6660001#Plusmetals', $usuario->password));
+    }
+
+    public function test_store_sin_marcar_crear_usuario_no_crea_cuenta_aunque_lleguen_datos(): void
+    {
+        $this->actingAs($this->adminConPermisoDeUsuarios())
+            ->post(route('conductores.store'), $this->payloadConductorConCuenta([
+                'crear_usuario' => '0',
+                'email' => 'no-es-correo',
+                'password' => 'x',
+            ]))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Conductor registrado exitosamente.');
+
+        $persona = Persona::where('ci', '6660001')->firstOrFail();
+        $this->assertNull(User::where('id_persona', $persona->id)->first());
+    }
+
+    public function test_store_valida_la_cuenta_sin_crear_nada_si_hay_errores(): void
+    {
+        User::factory()->create(['email' => 'ocupado@example.com']);
+        $admin = $this->adminConPermisoDeUsuarios();
+
+        $casos = [
+            ['email' => ''],
+            ['email' => 'no-es-correo'],
+            ['email' => 'ocupado@example.com'],
+            ['password' => 'corta1'],
+            ['estado_usuario' => 'OTRO'],
+        ];
+
+        foreach ($casos as $caso) {
+            $this->actingAs($admin)
+                ->post(route('conductores.store'), $this->payloadConductorConCuenta($caso))
+                ->assertSessionHasErrors(array_key_first($caso));
+        }
+
+        $this->assertDatabaseMissing('persona', ['ci' => '6660001']);
+    }
+
+    public function test_store_sin_permiso_de_usuarios_no_puede_crear_la_cuenta(): void
+    {
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+
+        $this->actingAs($this->admin)
+            ->post(route('conductores.store'), $this->payloadConductorConCuenta())
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('persona', ['ci' => '6660001']);
+        $this->assertDatabaseMissing('users', ['email' => 'mario.flores@example.com']);
+    }
+
+    public function test_store_no_deja_el_conductor_a_medias_si_falla_la_cuenta(): void
+    {
+        // Sin el rol "conductor" la asignación del rol falla: toda la
+        // transacción se revierte (ni persona, ni conductor, ni usuario).
+        Permission::firstOrCreate(['name' => 'usuarios.crear', 'guard_name' => 'web']);
+        $this->admin->givePermissionTo('usuarios.crear');
+        Exceptions::fake();
+
+        $this->actingAs($this->admin)
+            ->post(route('conductores.store'), $this->payloadConductorConCuenta());
+
+        $this->assertDatabaseMissing('persona', ['ci' => '6660001']);
+        $this->assertDatabaseMissing('users', ['email' => 'mario.flores@example.com']);
+    }
+
+    public function test_editar_un_conductor_no_crea_ni_toca_cuentas(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $this->adminConPermisoDeUsuarios();
+
+        $this->actingAs($this->admin)->post(route('conductores.update', $conductor->id), [
+            '_method' => 'PUT',
+            'ci' => $conductor->persona->ci,
+            'nombres' => $conductor->persona->nombres,
+            'paterno' => $conductor->persona->paterno ?? 'Apellido',
+            'estado_conductor' => 'ACTIVO',
+            'crear_usuario' => '1',
+            'email' => 'intento@example.com',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('users', ['email' => 'intento@example.com']);
     }
 
     public function test_store_crea_la_persona_y_el_conductor_asociado(): void
@@ -612,14 +753,19 @@ class ConductorControllerTest extends TestCase
 
     /**
      * Texto impreso en el PDF: FPDF comprime cada stream con zlib y escribe
-     * el texto como "(...) Tj"; se ignoran los streams de imagen (logo).
+     * el texto como "(...) Tj" en los streams de contenido de página. Se
+     * descartan las fuentes incrustadas (/Length1) y las imágenes: son
+     * binarias y, según los caracteres usados (nombres aleatorios de las
+     * factories), a veces contienen bytes que parecen "(...) Tj" y daban
+     * falsos positivos intermitentes (ej. el byte \x97 de la raya).
      */
     private function textoDelPdf(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+        preg_match_all('/<<([^<>]*(?:<<[^<>]*>>[^<>]*)*)>>\s*stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams, PREG_SET_ORDER);
 
-        return collect($streams[1])
-            ->map(fn (string $stream) => @gzuncompress($stream) ?: $stream)
+        return collect($streams)
+            ->reject(fn (array $stream) => preg_match('#/Length1|/Subtype\s*/Image|/Type\s*/XObject#', $stream[1]) === 1)
+            ->map(fn (array $stream) => @gzuncompress($stream[2]) ?: $stream[2])
             ->flatMap(fn (string $contenido) => preg_match_all('/\((.*?)(?<!\\\\)\)\s*Tj/s', $contenido, $textos) ? $textos[1] : [])
             ->implode("\n");
     }

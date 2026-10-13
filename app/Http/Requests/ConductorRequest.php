@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class ConductorRequest extends FormRequest
 {
@@ -50,6 +51,26 @@ class ConductorRequest extends FormRequest
             // operario. Al editar, la (re)asignación se hace desde el listado
             // de operarios, por lo que estas reglas no aplican en update().
             ...($conductor ? [] : $this->reglasAsignacionVehiculo()),
+            ...($conductor ? [] : $this->reglasCuentaDeUsuario()),
+        ];
+    }
+
+    /**
+     * Cuenta de usuario opcional al registrar el operario (rol conductor).
+     * Sin `crear_usuario` todo el bloque se descarta, aunque lleguen valores.
+     * Contraseña vacía = formato CI#Plusmetals (User::contrasenaInicial).
+     *
+     * @return array<string, mixed>
+     */
+    private function reglasCuentaDeUsuario(): array
+    {
+        $sinCuenta = fn () => ! $this->boolean('crear_usuario');
+
+        return [
+            'crear_usuario' => ['sometimes', 'boolean'],
+            'email' => [Rule::excludeIf($sinCuenta), 'required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'estado_usuario' => [Rule::excludeIf($sinCuenta), 'required', Rule::in(['ACTIVO', 'INACTIVO'])],
+            'password' => [Rule::excludeIf($sinCuenta), 'nullable', 'string', 'max:255', Password::min(8)->letters()->numbers()],
         ];
     }
 
@@ -95,6 +116,9 @@ class ConductorRequest extends FormRequest
     {
         return [
             'ci' => 'carnet de identidad',
+            'email' => 'correo electrónico',
+            'estado_usuario' => 'estado del usuario',
+            'password' => 'contraseña inicial',
             'nombres' => 'nombres',
             'paterno' => 'apellido paterno',
             'materno' => 'apellido materno',

@@ -825,14 +825,19 @@ class VehiculoControllerTest extends TestCase
 
     /**
      * Texto impreso en el PDF: FPDF comprime cada stream con zlib y escribe
-     * el texto como "(...) Tj"; se ignoran los streams de imagen (logo).
+     * el texto como "(...) Tj" en los streams de contenido de página. Se
+     * descartan las fuentes incrustadas (/Length1) y las imágenes: son
+     * binarias y, según los caracteres usados (nombres aleatorios de las
+     * factories), a veces contienen bytes que parecen "(...) Tj" y daban
+     * falsos positivos intermitentes (ej. el byte \x97 de la raya).
      */
     private function textoDelPdf(string $pdf): string
     {
-        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+        preg_match_all('/<<([^<>]*(?:<<[^<>]*>>[^<>]*)*)>>\s*stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams, PREG_SET_ORDER);
 
-        return collect($streams[1])
-            ->map(fn (string $stream) => @gzuncompress($stream) ?: $stream)
+        return collect($streams)
+            ->reject(fn (array $stream) => preg_match('#/Length1|/Subtype\s*/Image|/Type\s*/XObject#', $stream[1]) === 1)
+            ->map(fn (array $stream) => @gzuncompress($stream[2]) ?: $stream[2])
             ->flatMap(fn (string $contenido) => preg_match_all('/\((.*?)(?<!\\\\)\)\s*Tj/s', $contenido, $textos) ? $textos[1] : [])
             ->implode("\n");
     }

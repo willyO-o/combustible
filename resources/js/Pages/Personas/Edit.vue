@@ -4,6 +4,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
+import CiInput from '@/Components/CiInput.vue'
 import { storageUrl } from '@/Utils/storageUtil'
 defineOptions({ layout: Maindashboard })
 
@@ -130,10 +131,7 @@ function submit() {
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-sm-6 col-xl-4">
-                                <label class="form-label fw-medium">Carnet de Identidad <span class="text-danger">*</span></label>
-                                <input v-model="form.ci" type="text" class="form-control" :class="{ 'is-invalid': form.errors.ci }"
-                                    placeholder="Ej: 12345678" maxlength="20" />
-                                <div v-if="form.errors.ci" class="invalid-feedback">{{ form.errors.ci }}</div>
+                                <CiInput v-model="form.ci" :error="form.errors.ci" :ignorar-id="persona.id" />
                             </div>
 
                             <div class="col-sm-6 col-xl-8">

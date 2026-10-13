@@ -10,6 +10,7 @@ use App\Libraries\ReportesExcel;
 use App\Models\Area;
 use App\Models\Persona;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -185,6 +186,55 @@ class PersonaController extends Controller
             'Apellido paterno' => $request->filled('paterno') ? (string) $request->paterno : null,
             'Celular' => $request->filled('celular') ? (string) $request->celular : null,
         ];
+    }
+
+    /**
+     * Verifica si el CI ya pertenece a otra persona, para avisarlo en el
+     * formulario apenas se escribe (CiInput.vue). Incluye personas
+     * eliminadas: el CI es único en la base aun con borrado lógico, así que
+     * también bloquean un nuevo registro. `ignorar` = id de la persona que se
+     * está editando. La validación definitiva sigue en PersonaRequest /
+     * ConductorRequest (unique) al guardar.
+     */
+    public function verificarCi(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'ci' => ['required', 'string', 'max:20'],
+            'ignorar' => ['nullable', 'integer'],
+        ]);
+
+        $persona = Persona::withTrashed()
+            ->with(['conductor', 'user', 'encargadoAreas'])
+            ->where('ci', trim($datos['ci']))
+            ->when($datos['ignorar'] ?? null, fn ($query, $id) => $query->whereKeyNot($id))
+            ->first();
+
+        if (! $persona) {
+            return response()->json(['existe' => false]);
+        }
+
+        $eliminada = $persona->trashed();
+
+        return response()->json([
+            'existe' => true,
+            'persona' => [
+                'id' => $persona->id,
+                'ci' => $persona->ci,
+                'nombre_completo' => trim(implode(' ', array_filter([$persona->nombres, $persona->paterno, $persona->materno]))),
+                'tipo' => match (true) {
+                    $persona->conductor !== null => 'Conductor',
+                    $persona->encargadoAreas->isNotEmpty() => 'Jefe de Área',
+                    $persona->user !== null => 'Personal',
+                    default => null,
+                },
+                'estado_persona' => $persona->estado_persona,
+                'eliminada' => $eliminada,
+                // Conductores: su ficha es accesible para más roles que Personas.
+                'url' => $eliminada ? null : ($persona->conductor
+                    ? route('conductores.show', $persona->id)
+                    : route('personas.edit', $persona->id)),
+            ],
+        ]);
     }
 
     public function create(): Response

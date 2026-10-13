@@ -102,6 +102,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('personas', PersonaController::class)
         ->parameters(['personas' => 'persona'])
         ->except(['show']);
+    // ¿Ya existe una persona con este CI? (alta/edición de personas y conductores).
+    Route::get('/search/persona-por-ci', [PersonaController::class, 'verificarCi'])->name('search.persona-por-ci');
 
     Route::resource('areas', AreaController::class)
         ->only(['index', 'show', 'store', 'update', 'destroy']);

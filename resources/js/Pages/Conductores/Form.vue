@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Multiselect from '@vueform/multiselect'
+import CiInput from '@/Components/CiInput.vue'
+import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 
 defineOptions({ layout: Maindashboard })
 
@@ -58,7 +60,15 @@ const form = useForm({
     detalle: '',
     kilometraje_inicial: '',
     horometro_inicial: '',
+
+    // --- Cuenta de usuario opcional (sólo al registrar, rol conductor) ----
+    crear_usuario: false,
+    email: '',
+    estado_usuario: 'ACTIVO',
+    password: '', // ContrasenaInicialInput la prellena con CI#Plusmetals
 })
+
+const CAMPOS_CUENTA = ['crear_usuario', 'email', 'estado_usuario', 'password']
 
 /* ---------------------------------------------------------------- *
  * Foto
@@ -170,9 +180,15 @@ function submit() {
             const payload = { ...data }
 
             if (esEdicion.value) {
-                // Al editar, la asignación de vehículo no se toca desde aquí.
+                // Al editar, ni la asignación de vehículo ni la cuenta de
+                // usuario se tocan desde aquí.
                 CAMPOS_ASIGNACION.forEach((campo) => delete payload[campo])
+                CAMPOS_CUENTA.forEach((campo) => delete payload[campo])
                 return payload
+            }
+
+            if (!data.crear_usuario) {
+                CAMPOS_CUENTA.filter((campo) => campo !== 'crear_usuario').forEach((campo) => delete payload[campo])
             }
 
             if (!data.id_vehiculo) {
@@ -268,18 +284,7 @@ function submit() {
                         <div class="row g-3">
                             <!-- CI -->
                             <div class="col-sm-6 col-xl-4">
-                                <label class="form-label fw-medium">
-                                    Carnet de Identidad <span class="text-danger">*</span>
-                                </label>
-                                <input
-                                    v-model="form.ci"
-                                    type="text"
-                                    class="form-control"
-                                    :class="{ 'is-invalid': form.errors.ci }"
-                                    placeholder="Ej: 12345678"
-                                    maxlength="20"
-                                />
-                                <div v-if="form.errors.ci" class="invalid-feedback">{{ form.errors.ci }}</div>
+                                <CiInput v-model="form.ci" :error="form.errors.ci" :ignorar-id="conductor?.id ?? null" />
                             </div>
 
                             <!-- Nombres -->
@@ -780,6 +785,49 @@ function submit() {
                                 {{ form.errors[`documentos.${idx}.observacion`] }}
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cuenta de usuario (sólo al registrar; requiere permiso para crear usuarios) -->
+        <div v-if="!esEdicion" v-can="'usuarios.crear'" class="card custom-card mt-4">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="ri-shield-user-line me-2 text-muted"></i>Cuenta de Usuario
+                    <span class="text-muted fw-normal">(opcional)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="form-check mb-3">
+                    <input id="crearUsuarioConductor" v-model="form.crear_usuario" class="form-check-input" type="checkbox" />
+                    <label class="form-check-label" for="crearUsuarioConductor">
+                        Crear usuario de acceso con el rol <strong>Conductor</strong>
+                    </label>
+                </div>
+
+                <div v-if="form.crear_usuario" class="row g-3">
+                    <div class="col-sm-6 col-xl-4">
+                        <label for="emailConductor" class="form-label fw-medium">Correo electrónico <span class="text-danger">*</span></label>
+                        <input id="emailConductor" v-model="form.email" type="email" class="form-control"
+                            :class="{ 'is-invalid': form.errors.email }" placeholder="correo@ejemplo.com" maxlength="255"
+                            autocomplete="off" />
+                        <div v-if="form.errors.email" class="invalid-feedback">{{ form.errors.email }}</div>
+                    </div>
+
+                    <div class="col-sm-6 col-xl-4">
+                        <label for="estadoUsuarioConductor" class="form-label fw-medium">Estado del usuario <span class="text-danger">*</span></label>
+                        <select id="estadoUsuarioConductor" v-model="form.estado_usuario" class="form-select"
+                            :class="{ 'is-invalid': form.errors.estado_usuario }">
+                            <option value="ACTIVO">ACTIVO</option>
+                            <option value="INACTIVO">INACTIVO</option>
+                        </select>
+                        <div v-if="form.errors.estado_usuario" class="invalid-feedback">{{ form.errors.estado_usuario }}</div>
+                    </div>
+
+                    <div class="col-sm-6 col-xl-4">
+                        <ContrasenaInicialInput v-model="form.password" :ci="form.ci" :error="form.errors.password"
+                            id="passwordConductor" />
                     </div>
                 </div>
             </div>

@@ -15,6 +15,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/Components/PageLoader.vue | .ai/rules/components.md |
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
 | app/Actions/Actividades/SincronizarActividadesRealizadasAction.php,app/Http/Requests/OperacionStoreRequest.php,resources/js/Pages/Operacion/*.vue,app/Libraries/Reportes.php,app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php | .ai/rules/controllers-api-v1.md |
+| resources/js/Components/CiInput.vue,resources/js/Pages/Personas/*.vue,resources/js/Pages/Conductores/Form.vue,app/Http/Controllers/PersonaController.php,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-controllers-http-requests.md |
 | resources/js/Pages/Conductores/**,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-requests.md |
 | app/Http/Controllers/VehiculoController.php,app/Http/Controllers/ConductorController.php,app/Http/Controllers/PersonaController.php,app/Libraries/Reportes.php,app/Libraries/ReportesExcel.php | .ai/rules/controllers-libraries-libraries.md |
 | app/Http/Controllers/**/*.php, app/Http/Controllers/*.php, app/Http/Controllers/DashboardController.php, app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/controllers.md |
