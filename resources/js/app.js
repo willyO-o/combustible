@@ -28,6 +28,7 @@ import Entero from '@/Directives/Entero';
 import MaxLength from '@/Directives/MaxLength';
 import PageLoader from '@/Components/PageLoader.vue';
 import InstallPwaPrompt from '@/Components/InstallPwaPrompt.vue';
+import ConexionAviso from '@/Components/ConexionAviso.vue';
 import { registerSW } from 'virtual:pwa-register';
 import { showToast } from '@/Utils/alertUtil';
 import { APP_NAME } from '@/Data/app';
@@ -73,10 +74,11 @@ createInertiaApp({
             return Object.isFrozen(pagina) ? { ...pagina } : pagina;
         }),
     setup({ el, App, props, plugin }) {
-        // PageLoader e InstallPwaPrompt se montan como hermanos de <App>, fuera
-        // de cualquier layout de página: así funcionan igual sin importar si la
-        // navegación entra o sale de un layout distinto (p.ej. Login -> Dashboard).
-        return createApp({ render: () => [h(App, props), h(PageLoader), h(InstallPwaPrompt)] })
+        // PageLoader, InstallPwaPrompt y ConexionAviso se montan como hermanos
+        // de <App>, fuera de cualquier layout de página: así funcionan igual sin
+        // importar si la navegación entra o sale de un layout distinto (p.ej.
+        // Login -> Dashboard).
+        return createApp({ render: () => [h(App, props), h(PageLoader), h(InstallPwaPrompt), h(ConexionAviso)] })
             .use(plugin)
             .use(ZiggyVue)
             .use(createPinia())
