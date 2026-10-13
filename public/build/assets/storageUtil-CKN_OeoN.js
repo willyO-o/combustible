@@ -1,0 +1,1 @@
+import{o as e}from"./index.esm-DY0t3cbe.js";function t(t){if(!t)return null;let n=String(t);return/^(https?:)?\/\//i.test(n)||n.startsWith(`data:`)||n.startsWith(`blob:`)?n:`${e().props?.storage_url||`/storage`}/${n.replace(/^\/+/,``).replace(/^storage\//,``)}`}export{t};

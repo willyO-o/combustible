@@ -1,0 +1,1 @@
+import{F as e,V as t}from"./index.esm-DY0t3cbe.js";import{n}from"./Maindashboard-BgNE_y2A.js";e();function r(){let e=null;function r(t){return e||=new n(t),e}function i(e){r(e).show()}function a(){e?.hide()}return t(()=>{e?.dispose()}),{obtener:r,mostrar:i,ocultar:a}}export{r as t};
