@@ -1311,14 +1311,14 @@ class Reportes extends exFPDF
         $filas = collect($listado['vehiculos'] ?? [])->values()->map(fn (array $v, int $i) => [
             (string) ($i + 1),
             $v['codigo'] ?? null,
-            ($v['nro_placa'] ?? null) ?: 'Sin placa',
+            $v['nro_placa'] ?? null,
             trim(($v['marca'] ?? '').' '.($v['modelo'] ?? '')),
             $v['anio'] ?? null,
             $v['tipo_vehiculo'] ?? null,
             $v['tipo_combustible'] ?? null,
             $capacidad($v),
-            ($v['area'] ?? null) ?: 'Sin asignar',
-            ($v['operario'] ?? null) ?: 'Sin operario',
+            $v['area'] ?? null,
+            $v['operario'] ?? null,
             $v['estado_vehiculo'] ?? null,
         ]);
 
@@ -1369,9 +1369,9 @@ class Reportes extends exFPDF
                 $c['ci'] ?? null,
                 $c['nombre_completo'] ?? null,
                 $c['celular'] ?? null,
-                $licencia ?: 'Sin licencia',
+                $licencia,
                 $vencimiento,
-                ($c['vehiculos'] ?? null) ?: 'Sin vehículo asignado',
+                $c['vehiculos'] ?? null,
                 $c['estado_conductor'] ?? null,
             ];
         });
@@ -1422,7 +1422,7 @@ class Reportes extends exFPDF
             $p['areas_a_cargo'] ?? null,
             ($p['usuario'] ?? null)
                 ? $p['usuario'].(($p['estado_usuario'] ?? null) ? ' ('.$p['estado_usuario'].')' : '')
-                : 'Sin usuario',
+                : null,
             $p['estado_persona'] ?? null,
         ]);
 
@@ -1456,7 +1456,7 @@ class Reportes extends exFPDF
      * personas): hoja carta horizontal con encabezado, línea de filtros,
      * tarjetas de resumen y una tabla con el encabezado y el pie de página
      * repetidos en cada hoja, porque un listado completo puede ocupar varias.
-     * Las celdas null o '' se muestran como "—".
+     * Las celdas null o '' quedan en blanco.
      *
      * @param  array<string, ?string>  $filtrosAplicados  etiqueta => valor (null = filtro no usado)
      * @param  array<int, array{0: string, 1: int|string, 2: array<int, int>}>  $tarjetas  [etiqueta, valor, color RGB]
@@ -1483,7 +1483,7 @@ class Reportes extends exFPDF
         $verde = [24, 125, 170];
         $gris = [90, 90, 90];
 
-        $texto = fn ($valor): string => $this->textoCalibri(($valor === null || $valor === '') ? '—' : (string) $valor);
+        $texto = fn ($valor): string => $this->textoCalibri($valor === null ? null : (string) $valor);
 
         $parametrosEmpresa = $this->parametrosEmpresa();
 
@@ -2413,7 +2413,18 @@ class Reportes extends exFPDF
             return '';
         }
 
-        return iconv('UTF-8', 'CP1252//TRANSLIT', $texto);
+        // Un dato mal codificado (bytes UTF-8 inválidos) o un caracter que
+        // iconv no sabe aproximar (emoji, otro alfabeto; depende de la
+        // implementación de iconv del servidor) hacía que iconv devolviera
+        // false + un notice, y eso tumbaba el PDF completo con un 500. Se
+        // limpian los bytes inválidos y, si iconv igual falla, mbstring
+        // convierte reemplazando lo irrepresentable por "?".
+        $texto = mb_scrub($texto, 'UTF-8');
+        $convertido = @iconv('UTF-8', 'CP1252//TRANSLIT', $texto);
+
+        return $convertido !== false
+            ? $convertido
+            : (string) mb_convert_encoding($texto, 'Windows-1252', 'UTF-8');
     }
 
     protected function drawCircle(float $cx, float $cy, float $r, string $style = 'D'): void

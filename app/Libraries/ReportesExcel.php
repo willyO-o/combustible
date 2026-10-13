@@ -7,6 +7,7 @@ use App\Models\Vehiculo;
 use App\Models\VehiculoExterno;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Shared\StringHelper;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -798,20 +799,20 @@ class ReportesExcel
 
         $filas = $vehiculos->values()->map(fn ($v, $i) => [
             $i + 1,
-            $v['codigo'] ?? '—',
-            ($v['nro_placa'] ?? null) ?: 'Sin placa',
-            $v['marca'] ?? '—',
-            $v['modelo'] ?? '—',
+            $v['codigo'] ?? null,
+            $v['nro_placa'] ?? null,
+            $v['marca'] ?? null,
+            $v['modelo'] ?? null,
             // escribirValor() lo guarda como número sólo si es numérico; un
             // año cargado como texto (ej. "S/D") se conserva tal cual.
             $v['anio'] ?? null,
-            $v['tipo_vehiculo'] ?? '—',
-            $v['tipo_combustible'] ?? '—',
+            $v['tipo_vehiculo'] ?? null,
+            $v['tipo_combustible'] ?? null,
             $v['capacidad'] ?? null,
             $v['capacidad_unidad'] ?? null,
-            ($v['area'] ?? null) ?: 'Sin asignar',
-            ($v['operario'] ?? null) ?: 'Sin operario',
-            $v['estado_vehiculo'] ?? '—',
+            $v['area'] ?? null,
+            $v['operario'] ?? null,
+            $v['estado_vehiculo'] ?? null,
         ]);
 
         $this->pintarTabla($hoja, $fila, $columnas, $filas, null, 'No hay vehículos que coincidan con los filtros seleccionados.');
@@ -875,17 +876,17 @@ class ReportesExcel
 
         $filas = $conductores->values()->map(fn ($c, $i) => [
             $i + 1,
-            $c['ci'] ?? '—',
-            $c['nombres'] ?? '—',
+            $c['ci'] ?? null,
+            $c['nombres'] ?? null,
             $c['paterno'] ?? null,
             $c['materno'] ?? null,
             $c['celular'] ?? null,
-            ($c['licencia_numero'] ?? null) ?: 'Sin licencia',
+            $c['licencia_numero'] ?? null,
             $c['licencia_categoria'] ?? null,
             $c['licencia_vencimiento'] ?? null,
             ($c['licencia_vencimiento'] ?? null) ? (($c['licencia_vencida'] ?? false) ? 'Vencida' : 'Vigente') : null,
-            ($c['vehiculos'] ?? null) ?: 'Sin vehículo asignado',
-            $c['estado_conductor'] ?? '—',
+            $c['vehiculos'] ?? null,
+            $c['estado_conductor'] ?? null,
         ]);
 
         $this->pintarTabla($hoja, $fila, $columnas, $filas, null, 'No hay conductores que coincidan con los filtros seleccionados.');
@@ -949,18 +950,18 @@ class ReportesExcel
 
         $filas = $personas->values()->map(fn ($p, $i) => [
             $i + 1,
-            $p['ci'] ?? '—',
-            $p['nombres'] ?? '—',
+            $p['ci'] ?? null,
+            $p['nombres'] ?? null,
             $p['paterno'] ?? null,
             $p['materno'] ?? null,
             $p['celular'] ?? null,
             $p['fecha_nacimiento'] ?? null,
             $p['edad'] ?? null,
-            $p['tipo'] ?? '—',
+            $p['tipo'] ?? null,
             $p['areas_a_cargo'] ?? null,
-            ($p['usuario'] ?? null) ?: 'Sin usuario',
+            $p['usuario'] ?? null,
             $p['estado_usuario'] ?? null,
-            $p['estado_persona'] ?? '—',
+            $p['estado_persona'] ?? null,
         ]);
 
         $this->pintarTabla($hoja, $fila, $columnas, $filas, null, 'No hay personas que coincidan con los filtros seleccionados.');
@@ -1008,16 +1009,18 @@ class ReportesExcel
         $logo->setCoordinates('A1');
         $logo->setWorksheet($hoja);
 
+        // Texto explícito (nunca fórmula): el subtítulo, la línea de la
+        // empresa y los filtros traen datos cargados por usuarios.
         $hoja->mergeCells('A2:'.$ultima.'2');
-        $hoja->setCellValue('A2', $titulo);
+        $hoja->setCellValueExplicit('A2', $this->textoSeguro($titulo), DataType::TYPE_STRING);
         $hoja->getStyle('A2')->getFont()->setBold(true)->setSize(15)->getColor()->setRGB(self::AZUL);
 
         $hoja->mergeCells('A3:'.$ultima.'3');
-        $hoja->setCellValue('A3', $subtitulo);
+        $hoja->setCellValueExplicit('A3', $this->textoSeguro($subtitulo), DataType::TYPE_STRING);
         $hoja->getStyle('A3')->getFont()->setSize(10)->getColor()->setRGB(self::GRIS_TEXTO);
 
         $hoja->mergeCells('A4:'.$ultima.'4');
-        $hoja->setCellValue('A4', $this->lineaEmpresa());
+        $hoja->setCellValueExplicit('A4', $this->textoSeguro($this->lineaEmpresa()), DataType::TYPE_STRING);
         $hoja->getStyle('A4')->getFont()->setSize(8)->getColor()->setRGB(self::GRIS_TEXTO);
 
         $hoja->getStyle('A2:'.$ultima.'4')
@@ -1028,7 +1031,7 @@ class ReportesExcel
         $fila = 5;
         foreach ($lineasExtra as $linea) {
             $hoja->mergeCells('A'.$fila.':'.$ultima.$fila);
-            $hoja->setCellValue('A'.$fila, $linea);
+            $hoja->setCellValueExplicit('A'.$fila, $this->textoSeguro($linea), DataType::TYPE_STRING);
             $hoja->getStyle('A'.$fila)->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB(self::CELESTE);
             $hoja->getStyle('A'.$fila)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $fila++;
@@ -1256,7 +1259,17 @@ class ReportesExcel
             return;
         }
 
-        $hoja->setCellValueExplicit($celda, (string) $valor, DataType::TYPE_STRING);
+        $hoja->setCellValueExplicit($celda, $this->textoSeguro((string) $valor), DataType::TYPE_STRING);
+    }
+
+    /**
+     * PhpSpreadsheet no limpia los bytes UTF-8 inválidos: un dato mal
+     * codificado en la base se escribiría tal cual en el XML del .xlsx y
+     * Excel rechazaría el archivo como dañado. Se reemplazan por "�".
+     */
+    private function textoSeguro(string $texto): string
+    {
+        return StringHelper::sanitizeUTF8($texto);
     }
 
     private function pintarBordes(Worksheet $hoja, string $rango): void

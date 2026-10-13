@@ -8,9 +8,12 @@ use App\Models\DocumentoConductor;
 use App\Models\Persona;
 use App\Models\User;
 use App\Models\Vehiculo;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -549,9 +552,12 @@ class ConductorControllerTest extends TestCase
         $this->assertSame('Vencida', $vencida[9]);
 
         $vacia = $celdas->first(fn ($f) => in_array($sinNada->persona->ci, $f, true));
-        $this->assertSame('Sin licencia', $vacia[6]);
+        // Sin licencia ni vehículo: celdas en blanco, sin textos de relleno.
+        $this->assertNull($vacia[6]);
+        $this->assertNull($vacia[7]);
         $this->assertNull($vacia[8]);
-        $this->assertSame('Sin vehículo asignado', $vacia[10]);
+        $this->assertNull($vacia[9]);
+        $this->assertNull($vacia[10]);
 
         $this->actingAs($this->admin)->get(route('conductores.reporte.pdf'))->assertOk();
     }
@@ -602,6 +608,79 @@ class ConductorControllerTest extends TestCase
             'RETIRADOS' => 1,
             'SIN VEHÍCULO ASIGNADO' => 3,
         ], $this->tarjetasDelExcel($celdas, 'TOTAL CONDUCTORES'));
+    }
+
+    /**
+     * Texto impreso en el PDF: FPDF comprime cada stream con zlib y escribe
+     * el texto como "(...) Tj"; se ignoran los streams de imagen (logo).
+     */
+    private function textoDelPdf(string $pdf): string
+    {
+        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+
+        return collect($streams[1])
+            ->map(fn (string $stream) => @gzuncompress($stream) ?: $stream)
+            ->flatMap(fn (string $contenido) => preg_match_all('/\((.*?)(?<!\\\\)\)\s*Tj/s', $contenido, $textos) ? $textos[1] : [])
+            ->implode("\n");
+    }
+
+    public function test_el_pdf_de_conductores_deja_en_blanco_lo_que_no_tiene_registros_ligados(): void
+    {
+        $sinNada = Conductor::factory()->create();
+        $sinNada->persona->update(['celular' => null]);
+
+        $texto = $this->textoDelPdf(
+            $this->actingAs($this->admin)->get(route('conductores.reporte.pdf'))->assertOk()->getContent()
+        );
+
+        $this->assertStringContainsString((string) $sinNada->persona->ci, $texto, 'No se pudo leer el texto del PDF.');
+        foreach (['Sin licencia', "Sin veh\xEDculo asignado", "\x97"] as $relleno) {
+            $this->assertStringNotContainsString($relleno, $texto);
+        }
+    }
+
+    public function test_un_conductor_con_vehiculo_no_cuenta_como_sin_vehiculo_aunque_falte_el_codigo_y_la_placa(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $vehiculo = Vehiculo::factory()->create(['codigo' => 'TMP', 'nro_placa' => null]);
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        // Dato incompleto cargado antes de que el código fuera obligatorio.
+        Vehiculo::whereKey($vehiculo->id)->update(['codigo' => '']);
+
+        $celdas = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('conductores.reporte.excel'))->assertOk()->getContent()
+        );
+
+        $fila = $celdas->first(fn ($f) => in_array($conductor->persona->ci, $f, true));
+        $this->assertNull($fila[10], 'Sin código ni placa la celda queda en blanco, sin comas sueltas.');
+
+        $etiqueta = $celdas->search(fn ($f) => in_array('SIN VEHÍCULO ASIGNADO', $f, true));
+        $columna = array_search('SIN VEHÍCULO ASIGNADO', $celdas[$etiqueta], true);
+        $this->assertSame(0, (int) $celdas[$etiqueta + 1][$columna]);
+    }
+
+    public function test_si_falla_un_reporte_de_conductores_vuelve_al_listado_con_un_aviso(): void
+    {
+        Exceptions::fake();
+        $conductor = Conductor::factory()->create();
+        DB::statement('ALTER TABLE documento_conductor RENAME TO documento_conductor_no_disponible');
+
+        $filtros = ['ci' => $conductor->persona->ci];
+
+        $this->actingAs($this->admin)->get(route('conductores.reporte.pdf', $filtros))
+            ->assertRedirect(route('conductores.index', $filtros))
+            ->assertSessionHas('error');
+
+        $this->actingAs($this->admin)->get(route('conductores.reporte.excel'))
+            ->assertRedirect(route('conductores.index'))
+            ->assertSessionHas('error', 'No se pudo generar el reporte en Excel. Intente nuevamente o contacte al administrador.');
+
+        Exceptions::assertReported(QueryException::class);
     }
 
     public function test_los_reportes_de_conductores_requieren_iniciar_sesion(): void

@@ -34,4 +34,24 @@ class ReportesTest extends TestCase
     {
         $this->assertSame(iconv('UTF-8', 'CP1252', 'VEHÍCULOS — Diésel'), $this->textoCalibri('VEHÍCULOS — Diésel'));
     }
+
+    /**
+     * Regresión: con bytes UTF-8 inválidos iconv devolvía false y, como el
+     * método promete un string, el PDF completo caía con un error 500.
+     */
+    public function test_texto_calibri_no_falla_con_bytes_utf8_invalidos(): void
+    {
+        $resultado = $this->textoCalibri("Volvo\xFF \xC3\x28 FH");
+
+        $this->assertStringStartsWith('Volvo', $resultado);
+        $this->assertStringEndsWith('FH', $resultado);
+    }
+
+    public function test_texto_calibri_no_falla_con_caracteres_fuera_de_cp1252(): void
+    {
+        $resultado = $this->textoCalibri('Placa 🚛 中文 — Ñandú');
+
+        $this->assertStringStartsWith('Placa ', $resultado);
+        $this->assertStringContainsString(iconv('UTF-8', 'CP1252', '— Ñandú'), $resultado);
+    }
 }

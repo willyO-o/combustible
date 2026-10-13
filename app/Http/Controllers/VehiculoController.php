@@ -56,34 +56,56 @@ class VehiculoController extends Controller
      * Listado de vehículos en PDF, con los mismos filtros y orden que la
      * vista (todas las páginas, no sólo la visible).
      */
-    public function reportePdf(Request $request): HttpResponse
+    public function reportePdf(Request $request): HttpResponse|RedirectResponse
     {
-        $contenido = (new Reportes)->generarReporteVehiculos(
-            $this->listadoParaReporte($request),
-            $this->filtrosAplicados($request),
-            'S',
-        );
+        try {
+            $contenido = (new Reportes)->generarReporteVehiculos(
+                $this->listadoParaReporte($request),
+                $this->filtrosAplicados($request),
+                'S',
+            );
 
-        return response($contenido, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="listado_vehiculos_'.now()->format('Y-m-d').'.pdf"',
-        ]);
+            return response($contenido, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="listado_vehiculos_'.now()->format('Y-m-d').'.pdf"',
+            ]);
+        } catch (\Throwable $e) {
+            return $this->errorAlGenerarReporte($request, $e, 'PDF');
+        }
     }
 
     /**
      * Mismo listado que reportePdf(), en Excel (.xlsx).
      */
-    public function reporteExcel(Request $request): HttpResponse
+    public function reporteExcel(Request $request): HttpResponse|RedirectResponse
     {
-        $contenido = (new ReportesExcel)->generarReporteVehiculos(
-            $this->listadoParaReporte($request),
-            $this->filtrosAplicados($request),
-        );
+        try {
+            $contenido = (new ReportesExcel)->generarReporteVehiculos(
+                $this->listadoParaReporte($request),
+                $this->filtrosAplicados($request),
+            );
 
-        return response($contenido, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="listado_vehiculos_'.now()->format('Y-m-d').'.xlsx"',
-        ]);
+            return response($contenido, 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="listado_vehiculos_'.now()->format('Y-m-d').'.xlsx"',
+            ]);
+        } catch (\Throwable $e) {
+            return $this->errorAlGenerarReporte($request, $e, 'Excel');
+        }
+    }
+
+    /**
+     * Si un reporte falla (dato inesperado, falta de memoria, etc.) se
+     * registra el error y se vuelve al listado con los mismos filtros y un
+     * aviso, en vez de dejar al usuario frente a una pantalla de error 500.
+     */
+    private function errorAlGenerarReporte(Request $request, \Throwable $e, string $formato): RedirectResponse
+    {
+        report($e);
+
+        return redirect()
+            ->route('vehiculos.index', $request->only(self::FILTROS_LISTADO))
+            ->with('error', "No se pudo generar el reporte en {$formato}. Intente nuevamente o contacte al administrador.");
     }
 
     /**
@@ -139,9 +161,14 @@ class VehiculoController extends Controller
                 'capacidad' => $vehiculo->capacidad,
                 'capacidad_unidad' => $vehiculo->capacidad_unidad,
                 'area' => $vehiculo->areasAsignadas
-                    ->map(fn ($area) => $area->nombre_area.($area->pivot->estado_asignacion === 'PROVISIONAL' ? ' (Provisional)' : ''))
+                    ->map(fn ($area) => trim($area->nombre_area.($area->pivot?->estado_asignacion === 'PROVISIONAL' ? ' (Provisional)' : '')))
+                    ->filter()
                     ->implode(', ') ?: null,
-                'operario' => $vehiculo->conductorAsignado?->persona?->nombre_completo,
+                // Sin el accessor nombre_completo: ese deja espacios sobrantes
+                // cuando falta un apellido.
+                'operario' => ($persona = $vehiculo->conductorAsignado?->persona)
+                    ? (trim(implode(' ', array_filter([$persona->nombres, $persona->paterno, $persona->materno]))) ?: null)
+                    : null,
                 'estado_vehiculo' => $vehiculo->estado_vehiculo,
             ]);
 

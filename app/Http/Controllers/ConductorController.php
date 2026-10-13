@@ -53,34 +53,56 @@ class ConductorController extends Controller
      * Listado de conductores en PDF, con los mismos filtros y orden que la
      * vista (todas las páginas, no sólo la visible).
      */
-    public function reportePdf(Request $request): HttpResponse
+    public function reportePdf(Request $request): HttpResponse|RedirectResponse
     {
-        $contenido = (new Reportes)->generarReporteConductores(
-            $this->listadoParaReporte($request),
-            $this->filtrosAplicados($request),
-            'S',
-        );
+        try {
+            $contenido = (new Reportes)->generarReporteConductores(
+                $this->listadoParaReporte($request),
+                $this->filtrosAplicados($request),
+                'S',
+            );
 
-        return response($contenido, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="listado_conductores_'.now()->format('Y-m-d').'.pdf"',
-        ]);
+            return response($contenido, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="listado_conductores_'.now()->format('Y-m-d').'.pdf"',
+            ]);
+        } catch (\Throwable $e) {
+            return $this->errorAlGenerarReporte($request, $e, 'PDF');
+        }
     }
 
     /**
      * Mismo listado que reportePdf(), en Excel (.xlsx).
      */
-    public function reporteExcel(Request $request): HttpResponse
+    public function reporteExcel(Request $request): HttpResponse|RedirectResponse
     {
-        $contenido = (new ReportesExcel)->generarReporteConductores(
-            $this->listadoParaReporte($request),
-            $this->filtrosAplicados($request),
-        );
+        try {
+            $contenido = (new ReportesExcel)->generarReporteConductores(
+                $this->listadoParaReporte($request),
+                $this->filtrosAplicados($request),
+            );
 
-        return response($contenido, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="listado_conductores_'.now()->format('Y-m-d').'.xlsx"',
-        ]);
+            return response($contenido, 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="listado_conductores_'.now()->format('Y-m-d').'.xlsx"',
+            ]);
+        } catch (\Throwable $e) {
+            return $this->errorAlGenerarReporte($request, $e, 'Excel');
+        }
+    }
+
+    /**
+     * Si un reporte falla (dato inesperado, falta de memoria, etc.) se
+     * registra el error y se vuelve al listado con los mismos filtros y un
+     * aviso, en vez de dejar al usuario frente a una pantalla de error 500.
+     */
+    private function errorAlGenerarReporte(Request $request, \Throwable $e, string $formato): RedirectResponse
+    {
+        report($e);
+
+        return redirect()
+            ->route('conductores.index', $request->only(self::FILTROS_LISTADO))
+            ->with('error', "No se pudo generar el reporte en {$formato}. Intente nuevamente o contacte al administrador.");
     }
 
     /**
@@ -129,16 +151,18 @@ class ConductorController extends Controller
                     'nombres' => $conductor->nombres,
                     'paterno' => $conductor->paterno,
                     'materno' => $conductor->materno,
-                    'nombre_completo' => trim(implode(' ', array_filter([$conductor->nombres, $conductor->paterno, $conductor->materno]))),
+                    'nombre_completo' => trim(implode(' ', array_filter([$conductor->nombres, $conductor->paterno, $conductor->materno]))) ?: null,
                     'celular' => $conductor->celular,
                     'licencia_numero' => $licencia?->numero_documento,
                     'licencia_categoria' => $licencia?->categoria,
                     'licencia_vencimiento' => $licencia?->fecha_vencimiento?->format('d/m/Y'),
                     'licencia_vencida' => (bool) $licencia?->fecha_vencimiento?->lt(today()),
                     'vehiculos' => $conductor->asignacionesActivas
-                        ->map(fn ($vehiculo) => implode(' — ', array_filter([$vehiculo->codigo, $vehiculo->nro_placa]))
-                            .($vehiculo->pivot->estado_asignacion === 'PROVISIONAL' ? ' (Provisional)' : ''))
+                        ->map(fn ($vehiculo) => trim(implode(' — ', array_filter([$vehiculo->codigo, $vehiculo->nro_placa]))
+                            .($vehiculo->pivot?->estado_asignacion === 'PROVISIONAL' ? ' (Provisional)' : '')))
+                        ->filter()
                         ->implode(', ') ?: null,
+                    'tiene_vehiculo' => $conductor->asignacionesActivas->isNotEmpty(),
                     'estado_conductor' => $conductor->estado_conductor,
                 ];
             });
@@ -150,7 +174,7 @@ class ConductorController extends Controller
                 'activos' => $conductores->where('estado_conductor', 'ACTIVO')->count(),
                 'inactivos' => $conductores->where('estado_conductor', 'INACTIVO')->count(),
                 'retirados' => $conductores->where('estado_conductor', 'RETIRADO')->count(),
-                'sin_vehiculo' => $conductores->whereNull('vehiculos')->count(),
+                'sin_vehiculo' => $conductores->where('tiene_vehiculo', false)->count(),
             ],
         ];
     }

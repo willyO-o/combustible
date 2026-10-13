@@ -9,8 +9,11 @@ use App\Models\EncargadoArea;
 use App\Models\Persona;
 use App\Models\User;
 use App\Models\Vehiculo;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
@@ -340,10 +343,13 @@ class PersonaControllerTest extends TestCase
         $this->assertSame('Conductor', $filaDe('5550002')[8]);
 
         $filaSinNada = $filaDe('5550003');
-        $this->assertSame('Sin asignar', $filaSinNada[8]);
+        // Sin relaciones ligadas: celdas en blanco, sin textos de relleno.
+        $this->assertNull($filaSinNada[8]);
+        $this->assertNull($filaSinNada[9]);
         $this->assertNull($filaSinNada[6]);
         $this->assertNull($filaSinNada[7]);
-        $this->assertSame('Sin usuario', $filaSinNada[10]);
+        $this->assertNull($filaSinNada[10]);
+        $this->assertNull($filaSinNada[11]);
 
         $this->actingAs($this->admin)->get(route('personas.reporte.pdf'))->assertOk();
     }
@@ -388,6 +394,51 @@ class PersonaControllerTest extends TestCase
             'RETIRADAS' => 1,
             'CON USUARIO' => 1,
         ], $this->tarjetasDelExcel($celdas, 'TOTAL PERSONAS'));
+    }
+
+    /**
+     * Texto impreso en el PDF: FPDF comprime cada stream con zlib y escribe
+     * el texto como "(...) Tj"; se ignoran los streams de imagen (logo).
+     */
+    private function textoDelPdf(string $pdf): string
+    {
+        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+
+        return collect($streams[1])
+            ->map(fn (string $stream) => @gzuncompress($stream) ?: $stream)
+            ->flatMap(fn (string $contenido) => preg_match_all('/\((.*?)(?<!\\\\)\)\s*Tj/s', $contenido, $textos) ? $textos[1] : [])
+            ->implode("\n");
+    }
+
+    public function test_el_pdf_de_personas_deja_en_blanco_lo_que_no_tiene_registros_ligados(): void
+    {
+        $sinNada = Persona::factory()->create(['ci' => '7770001', 'celular' => null, 'fecha_nacimiento' => null]);
+
+        $texto = $this->textoDelPdf(
+            $this->actingAs($this->admin)->get(route('personas.reporte.pdf'))->assertOk()->getContent()
+        );
+
+        $this->assertStringContainsString($sinNada->ci, $texto, 'No se pudo leer el texto del PDF.');
+        foreach (['Sin asignar', 'Sin usuario', "\x97"] as $relleno) {
+            $this->assertStringNotContainsString($relleno, $texto);
+        }
+    }
+
+    public function test_si_falla_un_reporte_de_personas_vuelve_al_listado_con_un_aviso(): void
+    {
+        Exceptions::fake();
+        Persona::factory()->create(['paterno' => 'Mamani']);
+        DB::statement('ALTER TABLE encargado_area RENAME TO encargado_area_no_disponible');
+
+        $this->actingAs($this->admin)->get(route('personas.reporte.pdf', ['paterno' => 'Mamani']))
+            ->assertRedirect(route('personas.index', ['paterno' => 'Mamani']))
+            ->assertSessionHas('error', 'No se pudo generar el reporte en PDF. Intente nuevamente o contacte al administrador.');
+
+        $this->actingAs($this->admin)->get(route('personas.reporte.excel', ['paterno' => 'Mamani']))
+            ->assertRedirect(route('personas.index', ['paterno' => 'Mamani']))
+            ->assertSessionHas('error');
+
+        Exceptions::assertReported(QueryException::class);
     }
 
     public function test_los_reportes_de_personas_requieren_iniciar_sesion(): void

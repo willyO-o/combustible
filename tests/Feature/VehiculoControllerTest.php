@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Libraries\Reportes;
+use App\Libraries\ReportesExcel;
 use App\Models\Area;
 use App\Models\Asignacion;
 use App\Models\Conductor;
@@ -12,9 +14,12 @@ use App\Models\TipoVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -642,6 +647,131 @@ class VehiculoControllerTest extends TestCase
         $this->assertSame(2, $valorDe('ACTIVOS'));
         $this->assertSame(0, $valorDe('RETIRADOS'));
         $this->assertSame(1, $valorDe('VENDIDOS'));
+    }
+
+    /**
+     * Texto impreso en el PDF: FPDF comprime cada stream con zlib y escribe
+     * el texto como "(...) Tj"; se ignoran los streams de imagen (logo).
+     */
+    private function textoDelPdf(string $pdf): string
+    {
+        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf, $streams);
+
+        return collect($streams[1])
+            ->map(fn (string $stream) => @gzuncompress($stream) ?: $stream)
+            ->flatMap(fn (string $contenido) => preg_match_all('/\((.*?)(?<!\\\\)\)\s*Tj/s', $contenido, $textos) ? $textos[1] : [])
+            ->implode("\n");
+    }
+
+    private function vehiculoSinDatosNiRelaciones(): Vehiculo
+    {
+        return Vehiculo::factory()->create([
+            'codigo' => 'VACIO-01',
+            'nro_placa' => null,
+            'marca' => null,
+            'modelo' => null,
+            'anio' => null,
+            'capacidad' => null,
+            'capacidad_unidad' => null,
+        ]);
+    }
+
+    public function test_el_excel_deja_en_blanco_los_datos_vacios_y_las_relaciones_inexistentes(): void
+    {
+        $this->vehiculoSinDatosNiRelaciones();
+
+        $fila = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('vehiculos.reporte.excel'))->assertOk()->getContent()
+        )->first(fn ($f) => in_array('VACIO-01', $f, true));
+
+        $this->assertNotNull($fila);
+        // placa, marca, modelo, año, capacidad, unidad, área y operario.
+        foreach ([2, 3, 4, 5, 8, 9, 10, 11] as $columna) {
+            $this->assertNull($fila[$columna], "La columna {$columna} debería quedar en blanco.");
+        }
+    }
+
+    public function test_el_pdf_no_imprime_textos_de_relleno_para_los_datos_vacios(): void
+    {
+        $this->vehiculoSinDatosNiRelaciones();
+
+        $texto = $this->textoDelPdf(
+            $this->actingAs($this->admin)->get(route('vehiculos.reporte.pdf'))->assertOk()->getContent()
+        );
+
+        $this->assertStringContainsString('VACIO-01', $texto, 'No se pudo leer el texto del PDF.');
+        foreach (['Sin placa', 'Sin asignar', 'Sin operario', "\x97"] as $relleno) {
+            $this->assertStringNotContainsString($relleno, $texto);
+        }
+    }
+
+    public function test_el_operario_sale_sin_espacios_sobrantes_si_le_falta_un_apellido(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['codigo' => 'OPE-01']);
+        $conductor = Conductor::factory()->create();
+        $conductor->persona->update(['nombres' => 'Juan', 'paterno' => 'Quispe', 'materno' => null]);
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $fila = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('vehiculos.reporte.excel'))->assertOk()->getContent()
+        )->first(fn ($f) => in_array('OPE-01', $f, true));
+
+        $this->assertSame('Juan Quispe', $fila[11]);
+    }
+
+    /**
+     * Un dato mal codificado (bytes UTF-8 inválidos) o caracteres fuera de
+     * Windows-1252 (emoji) no deben tumbar ninguno de los dos formatos.
+     */
+    public function test_los_reportes_toleran_texto_mal_codificado_o_con_emojis(): void
+    {
+        $listado = [
+            'vehiculos' => collect([[
+                'codigo' => "COD-\xC3\x28-01",
+                'nro_placa' => 'ABC 🚛 123',
+                'marca' => "Volvo\xFF",
+                'modelo' => 'FH — 中文',
+                'operario' => '=SUMA(A1:A2)',
+                'estado_vehiculo' => 'ACTIVO',
+            ]]),
+            'totales' => ['total' => 1, 'activos' => 1],
+        ];
+
+        $pdf = (new Reportes)->generarReporteVehiculos($listado, [], 'S');
+        $this->assertStringStartsWith('%PDF-', $pdf);
+
+        $celdas = $this->celdasDelExcel((new ReportesExcel)->generarReporteVehiculos($listado, ['Placa' => "=1+1\xFF"]));
+        $fila = $celdas->first(fn ($f) => in_array('ABC 🚛 123', $f, true));
+
+        $this->assertNotNull($fila, 'El Excel debe abrirse y conservar el texto válido.');
+        // Se guarda como texto, nunca como fórmula.
+        $this->assertSame('=SUMA(A1:A2)', $fila[11]);
+    }
+
+    public function test_si_falla_un_reporte_vuelve_al_listado_con_los_filtros_y_un_aviso(): void
+    {
+        Exceptions::fake();
+        Vehiculo::factory()->create(['marca' => 'Volvo']);
+        // Falla real de base de datos al armar el listado (la consulta carga
+        // el tipo de vehículo de cada fila).
+        DB::statement('ALTER TABLE tipo_vehiculo RENAME TO tipo_vehiculo_no_disponible');
+
+        $filtros = ['marca' => 'Volvo'];
+
+        $this->actingAs($this->admin)->get(route('vehiculos.reporte.pdf', $filtros))
+            ->assertRedirect(route('vehiculos.index', $filtros))
+            ->assertSessionHas('error', 'No se pudo generar el reporte en PDF. Intente nuevamente o contacte al administrador.');
+
+        $this->actingAs($this->admin)->get(route('vehiculos.reporte.excel', $filtros))
+            ->assertRedirect(route('vehiculos.index', $filtros))
+            ->assertSessionHas('error', 'No se pudo generar el reporte en Excel. Intente nuevamente o contacte al administrador.');
+
+        Exceptions::assertReported(QueryException::class);
     }
 
     public function test_los_reportes_requieren_iniciar_sesion(): void
