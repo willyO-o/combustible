@@ -210,6 +210,67 @@ class AuthControllerTest extends TestCase
         $this->assertNull($user->fresh()->persona);
     }
 
+    /**
+     * Una app que reenvía el perfil completo puede mandar `foto: null` (JSON)
+     * o el campo vacío (multipart). Antes respondía 422 "debe ser una imagen";
+     * ahora se ignora y se conserva la foto actual.
+     */
+    public function test_update_me_con_foto_nula_conserva_la_actual(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create(['foto' => 'usuarios/actual.jpg', 'name' => 'Original']);
+        Storage::disk('public')->put('usuarios/actual.jpg', 'contenido');
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'name' => 'Apodo',
+            'foto' => null,
+        ])->assertOk();
+
+        $this->assertSame('Apodo', $user->fresh()->name);
+        $this->assertSame('usuarios/actual.jpg', $user->fresh()->foto);
+        Storage::disk('public')->assertExists('usuarios/actual.jpg');
+    }
+
+    public function test_update_me_multipart_con_foto_vacia_conserva_la_actual(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create(['foto' => 'usuarios/actual.jpg']);
+        Storage::disk('public')->put('usuarios/actual.jpg', 'contenido');
+
+        $this->actingAs($user, 'api')->post(route('api.v1.auth.me.update'), [
+            '_method' => 'PUT',
+            'name' => 'Apodo',
+            'foto' => '',
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $this->assertSame('usuarios/actual.jpg', $user->fresh()->foto);
+        Storage::disk('public')->assertExists('usuarios/actual.jpg');
+    }
+
+    public function test_update_me_sigue_rechazando_un_archivo_que_no_es_imagen(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create(['foto' => 'usuarios/actual.jpg']);
+
+        $this->actingAs($user, 'api')->post(route('api.v1.auth.me.update'), [
+            '_method' => 'PUT',
+            'foto' => UploadedFile::fake()->create('documento.pdf', 10, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('foto');
+
+        $this->assertSame('usuarios/actual.jpg', $user->fresh()->foto);
+    }
+
+    public function test_update_me_sigue_rechazando_una_foto_que_no_es_archivo(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user, 'api')->putJson(route('api.v1.auth.me.update'), [
+            'foto' => 'no-es-un-archivo',
+        ])->assertUnprocessable()->assertJsonValidationErrors('foto');
+    }
+
     public function test_update_me_actualiza_la_foto_y_borra_la_anterior(): void
     {
         Storage::fake('public');

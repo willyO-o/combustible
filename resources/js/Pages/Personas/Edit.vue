@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
+import { storageUrl } from '@/Utils/storageUtil'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -49,7 +50,7 @@ const esConductor = computed(() => form.tipo === 'conductor')
 const esJefeArea = computed(() => form.tipo === 'jefe-area')
 const tieneUsuario = computed(() => !!props.persona.user)
 
-const fotoPreview = ref(props.persona.foto ? `/storage/${props.persona.foto}` : null)
+const fotoPreview = ref(storageUrl(props.persona.foto))
 
 function onFotoChange(e) {
     const file = e.target.files[0]

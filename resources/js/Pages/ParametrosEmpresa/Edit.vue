@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { storageUrl } from '@/Utils/storageUtil'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -44,7 +45,7 @@ const form = useForm({
     estado: props.parametrosEmpresa?.estado ?? 'ACTIVO',
 })
 
-const logoPreview = ref(props.parametrosEmpresa?.logo_empresa ? `/storage/${props.parametrosEmpresa.logo_empresa}` : null)
+const logoPreview = ref(storageUrl(props.parametrosEmpresa?.logo_empresa))
 
 function onLogoChange(e) {
     const file = e.target.files[0]

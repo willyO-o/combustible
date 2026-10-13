@@ -102,7 +102,9 @@ class AuthController extends Controller
             'current_password' => [Rule::requiredIf($cambiaElCorreo), 'nullable', 'current_password:api'],
             'celular' => ['sometimes', 'nullable', 'string', 'max:20'],
             'direccion' => ['sometimes', 'nullable', 'string', 'max:250'],
-            'foto' => ['sometimes', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:2048'],
+            // nullable: `foto: null` (JSON) o vacía (multipart) se ignora y
+            // conserva la actual — sólo un archivo nuevo la reemplaza (hasFile()).
+            'foto' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:2048'],
         ], [
             'email.unique' => 'Este correo electrónico ya está registrado por otro usuario.',
             'current_password.required' => 'Ingresa tu contraseña actual para cambiar el correo electrónico.',

@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import axios from 'axios'
 
 import { formatDate, getExpirationStatus } from '@/Utils/dateUtil'
+import { storageUrl } from '@/Utils/storageUtil'
 
 const props = defineProps({
     cargaId: { type: Number, default: null },
@@ -53,7 +54,7 @@ const valeEstadoBadgeClass = (estado) => {
     return map[estado] ?? 'bg-secondary text-fixed-white'
 }
 
-const respaldoUrl = (ruta) => `/storage/${ruta}`
+const respaldoUrl = (ruta) => storageUrl(ruta)
 
 const fmt = (val, decimals = 2) =>
     val !== null && val !== undefined ? Number(val).toFixed(decimals) : '—'

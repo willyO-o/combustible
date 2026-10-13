@@ -44,9 +44,8 @@ watch(
     },
 )
 
-const fotoPreview = ref(
-    props.vehiculo?.fotografia ? `/storage/${props.vehiculo.fotografia}` : null,
-)
+// URL completa desde el modelo (Vehiculo::getUrlFotografiaAttribute()).
+const fotoPreview = ref(props.vehiculo?.url_fotografia ?? null)
 
 function onFotoChange(e) {
     const file = e.target.files[0]

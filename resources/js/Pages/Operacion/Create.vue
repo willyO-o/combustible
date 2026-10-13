@@ -10,6 +10,7 @@ import DateTimeInput from '@/Components/DateTimeInput.vue'
 
 
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
+import { storageUrl } from '@/Utils/storageUtil'
 
 defineOptions({ layout: Maindashboard })
 
@@ -313,14 +314,14 @@ function submit() {
 /*  Mantenimiento (operación diaria)                                   */
 /* ------------------------------------------------------------------ */
 // Vista previa de la evidencia de cada control (clave = id_tipo_mantenimiento).
-// Arranca con las ya guardadas (edición, como URL /storage/...); al elegir un
+// Arranca con las ya guardadas (edición, como URL pública vía storageUrl()); al elegir un
 // archivo nuevo se reemplaza por su data-URL (mismo patrón que la fotografía
 // del vehículo en Vehiculos/Create.vue). Quitar la evidencia borra la clave.
 const evidenciaPreview = ref(
     Object.fromEntries(
         form.mantenimientos
             .filter((m) => m.evidencia_actual)
-            .map((m) => [m.id_tipo_mantenimiento, `/storage/${m.evidencia_actual}`]),
+            .map((m) => [m.id_tipo_mantenimiento, storageUrl(m.evidencia_actual)]),
     ),
 )
 // Referencias a los <input type=file> de cada fila (no necesita ser

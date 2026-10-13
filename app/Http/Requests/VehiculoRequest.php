@@ -27,10 +27,11 @@ class VehiculoRequest extends FormRequest
             'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
             'id_tipo_vehiculo' => ['required', 'integer', 'exists:tipo_vehiculo,id'],
             // Obligatoria al registrar (POST); al editar (PUT/_method spoofed)
-            // se deja "sometimes" para no forzar resubir la foto si no cambia
-            // (VehiculoController::update() conserva la actual cuando no
-            // llega un archivo nuevo).
-            'fotografia' => [$this->method() === 'POST' ? 'required' : 'sometimes', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:2048'],
+            // es opcional: sin archivo nuevo VehiculoController::update()
+            // conserva la actual. "nullable" y no sólo "sometimes": el
+            // formulario (Inertia, multipart) SIEMPRE envía la clave, vacía si
+            // no se cambió la foto -> llega null y "image" la rechazaba.
+            'fotografia' => [$this->method() === 'POST' ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp,avif', 'max:2048'],
             'capacidad' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             'capacidad_unidad' => ['nullable', 'string', 'max:20', 'required_with:capacidad'],
         ];

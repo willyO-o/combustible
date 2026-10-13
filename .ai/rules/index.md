@@ -40,6 +40,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Libraries/Reportes.php,app/Http/Controllers/CargaCombustibleController.php | .ai/rules/libraries-http-controllers.md |
 | app/Libraries/Reportes.php,app/Libraries/ReportesExcel.php | .ai/rules/libraries-libraries.md |
 | app/Libraries/*.php, app/Libraries/Reportes.php | .ai/rules/libraries.md |
+| app/Http/Requests/**/*.php,resources/js/Pages/**/*.vue,resources/js/Utils/storageUtil.js,app/Http/Middleware/HandleInertiaRequests.php | .ai/rules/middleware.md |
 | database/migrations/*.php | .ai/rules/migrations.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Models/CargaMaterial.php,app/Models/Viaje.php | .ai/rules/models-models.md |
 | app/Models/**, app/Models/*.php, app/Models/CargaCombustible.php | .ai/rules/models.md |

@@ -8,6 +8,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 
 import axios from 'axios'
+import { storageUrl } from '@/Utils/storageUtil'
 
 
 const props = defineProps({
@@ -258,7 +259,7 @@ function marcarEliminar(respaldoId) {
     }
 }
 
-const respaldoUrl = (ruta) => `/storage/${ruta}`
+const respaldoUrl = (ruta) => storageUrl(ruta)
 
 /* ------------------------------------------------------------------ */
 /*  Resumen de monto total                                             */

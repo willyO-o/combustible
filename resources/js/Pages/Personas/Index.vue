@@ -6,6 +6,7 @@ defineOptions({ layout: Maindashboard })
 
 import { showToast, confirm } from '@/Utils/alertUtil.js'
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
+import { storageUrl } from '@/Utils/storageUtil'
 
 const props = defineProps({
     personas: Object,
@@ -110,7 +111,7 @@ const tipoBadge = (tipo) => ({
     personal: 'bg-secondary-transparent text-secondary',
 }[tipo] ?? 'bg-light text-muted')
 
-const fotoUrl = (foto) => (foto ? `/storage/${foto}` : '/images/faces/1.jpg')
+const fotoUrl = (foto) => storageUrl(foto) ?? '/images/faces/1.jpg'
 </script>
 
 <template>

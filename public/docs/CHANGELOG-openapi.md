@@ -2,6 +2,18 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.15.1 — 2026-10-13
+
+Corrección compatible con la versión anterior.
+
+### Corregido
+
+- `PUT` / `PATCH /auth/me`: enviar `foto` como `null` (JSON) o vacía (`multipart/form-data`)
+  respondía `422` ("debe ser una imagen"). Ahora se ignora y se conserva la foto actual, igual
+  que si se omite. Un valor que no sea una imagen sigue respondiendo `422`.
+- `GET /parametros`: `api_version` pasa a `1.15.1`.
+
+
 ## 1.15.0 — 2026-10-13
 
 El usuario puede cambiar su correo desde la app. Compatible con la versión anterior.

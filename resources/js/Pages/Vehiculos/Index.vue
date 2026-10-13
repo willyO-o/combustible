@@ -106,8 +106,6 @@ const estadoBadge = (estado) => {
     return map[estado] ?? 'bg-secondary-transparent text-secondary'
 }
 
-const fotoUrl = (foto) => foto ? `/storage/${foto}` : null
-
 const capacidadTexto = (v) => (v.capacidad ? `${v.capacidad} ${v.capacidad_unidad ?? ''}`.trim() : '—')
 
 
@@ -318,7 +316,7 @@ const tipoAsignacionBadge = (tipo) =>
                                 <div class="d-flex align-items-center gap-3 position-relative">
                                     <div class="lh-1">
                                         <span class="avatar avatar-lg bg-light">
-                                            <img v-if="fotoUrl(vehiculo.fotografia)" :src="fotoUrl(vehiculo.fotografia)"
+                                            <img v-if="vehiculo.url_fotografia" :src="vehiculo.url_fotografia"
                                                 :alt="vehiculo.nro_placa" class="rounded"
                                                 style="width:36px;height:36px;object-fit:cover;" />
                                             <span v-else
@@ -418,7 +416,7 @@ const tipoAsignacionBadge = (tipo) =>
 
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <span class="avatar avatar-md bg-light">
-                            <img v-if="fotoUrl(vehiculo.fotografia)" :src="fotoUrl(vehiculo.fotografia)"
+                            <img v-if="vehiculo.url_fotografia" :src="vehiculo.url_fotografia"
                                 :alt="vehiculo.nro_placa" class="rounded" style="width:36px;height:36px;object-fit:cover;" />
                             <span v-else class="avatar avatar-sm avatar-rounded bg-light text-muted d-flex align-items-center justify-content-center">
                                 <i class="ri-car-line"></i>

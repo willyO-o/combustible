@@ -9,6 +9,7 @@ import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
+import { storageUrl } from '@/Utils/storageUtil'
 
 const props = defineProps({
     conductores: Object,
@@ -109,7 +110,7 @@ const estadoBadge = (estado) => {
 }
 
 const fotoUrl = (foto) =>
-    foto ? `/storage/${foto}` : '/images/faces/1.jpg'
+    storageUrl(foto) ?? '/images/faces/1.jpg'
 
 
 const cambiarEstado = async (conductorId, nuevoEstado) => {

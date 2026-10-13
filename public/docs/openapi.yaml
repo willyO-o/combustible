@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.15.0"
+  version: "1.15.1"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.15.0"
+                api_version: "1.15.1"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -3963,13 +3963,15 @@ components:
           description: |
             Reemplaza la foto de perfil (la anterior se elimina). Solo válido si la
             petición se envía como `multipart/form-data` (ver la descripción de
-            `PUT /auth/me` para el detalle de cómo enviarla).
+            `PUT /auth/me` para el detalle de cómo enviarla). Enviarla como `null`
+            o vacía se ignora y conserva la foto actual (no la borra); un valor que no
+            sea una imagen responde `422`.
 
     # ── Parámetros ────────────────────────────────────────────────────
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.15.0" }
+        api_version: { type: string, example: "1.15.1" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }

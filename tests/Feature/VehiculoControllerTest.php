@@ -241,6 +241,120 @@ class VehiculoControllerTest extends TestCase
         $this->assertDatabaseHas('vehiculo', ['id' => $vehiculo->id, 'codigo' => 'ACT-0021']);
     }
 
+    /**
+     * Lo que envía de verdad el formulario de edición (Inertia, multipart con
+     * _method=PUT): si no se cambia la foto, manda `fotografia` como texto
+     * vacío. Antes eso fallaba con "La fotografía debe ser una imagen".
+     */
+    public function test_editar_sin_cambiar_la_foto_como_lo_envia_el_formulario_conserva_la_actual(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['codigo' => 'ACT-0030', 'fotografia' => 'vehiculos/actual.jpg']);
+        Storage::disk('public')->put('vehiculos/actual.jpg', 'contenido');
+
+        $response = $this->actingAs($this->admin)->post(route('vehiculos.update', $vehiculo->id), [
+            '_method' => 'PUT',
+            'nro_placa' => $vehiculo->nro_placa,
+            'codigo' => 'ACT-0031',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => $vehiculo->tipo_medicion,
+            'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+            'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+            'fotografia' => '',
+        ]);
+
+        $response->assertSessionDoesntHaveErrors();
+        $response->assertRedirect(route('vehiculos.index'));
+        $this->assertSame('ACT-0031', $vehiculo->fresh()->codigo);
+        $this->assertSame('vehiculos/actual.jpg', $vehiculo->fresh()->fotografia);
+        Storage::disk('public')->assertExists('vehiculos/actual.jpg');
+    }
+
+    /**
+     * Las URLs de imágenes salen del host real de la petición (ej. el
+     * servidor en la red local con puerto), no de APP_URL.
+     */
+    public function test_las_urls_de_imagenes_usan_el_host_real_del_servidor(): void
+    {
+        config(['app.url' => 'http://localhost']);
+        $vehiculo = Vehiculo::factory()->create(['fotografia' => 'vehiculos/foto.jpg']);
+
+        $this->actingAs($this->admin)
+            ->get('http://192.168.0.200:8443/vehiculos')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('storage_url', 'http://192.168.0.200:8443/storage')
+                ->where('vehiculos.data.0.url_fotografia', 'http://192.168.0.200:8443/storage/vehiculos/foto.jpg')
+            );
+
+        $this->actingAs($this->admin)
+            ->get('http://192.168.0.200:8443/vehiculos/'.$vehiculo->id.'/edit')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vehiculo.url_fotografia', 'http://192.168.0.200:8443/storage/vehiculos/foto.jpg')
+            );
+    }
+
+    public function test_vehiculo_sin_foto_no_tiene_url_de_fotografia(): void
+    {
+        Vehiculo::factory()->create(['fotografia' => null]);
+
+        $this->actingAs($this->admin)->get(route('vehiculos.index'))
+            ->assertInertia(fn (Assert $page) => $page->where('vehiculos.data.0.url_fotografia', null));
+    }
+
+    public function test_editar_con_una_foto_nueva_reemplaza_la_anterior(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['fotografia' => 'vehiculos/anterior.jpg']);
+        Storage::disk('public')->put('vehiculos/anterior.jpg', 'contenido');
+
+        $this->actingAs($this->admin)->post(route('vehiculos.update', $vehiculo->id), [
+            '_method' => 'PUT',
+            'nro_placa' => $vehiculo->nro_placa,
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => $vehiculo->tipo_medicion,
+            'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+            'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+            'fotografia' => UploadedFile::fake()->image('nueva.jpg'),
+        ])->assertSessionDoesntHaveErrors();
+
+        $nueva = $vehiculo->fresh()->fotografia;
+        $this->assertNotSame('vehiculos/anterior.jpg', $nueva);
+        Storage::disk('public')->assertMissing('vehiculos/anterior.jpg');
+        Storage::disk('public')->assertExists($nueva);
+    }
+
+    public function test_editar_rechaza_un_archivo_que_no_es_imagen(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+
+        $this->actingAs($this->admin)->post(route('vehiculos.update', $vehiculo->id), [
+            '_method' => 'PUT',
+            'nro_placa' => $vehiculo->nro_placa,
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => $vehiculo->tipo_medicion,
+            'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+            'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+            'fotografia' => UploadedFile::fake()->create('documento.pdf', 10, 'application/pdf'),
+        ])->assertSessionHasErrors('fotografia');
+    }
+
+    public function test_crear_con_fotografia_vacia_como_la_envia_el_formulario_la_exige(): void
+    {
+        $tipoCombustible = TipoCombustible::factory()->create();
+        $tipoVehiculo = TipoVehiculo::factory()->create();
+
+        $this->actingAs($this->admin)->post(route('vehiculos.store'), [
+            'codigo' => 'SIN-FOTO',
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => $tipoCombustible->id,
+            'id_tipo_vehiculo' => $tipoVehiculo->id,
+            'fotografia' => '',
+        ])->assertSessionHasErrors('fotografia');
+
+        $this->assertDatabaseMissing('vehiculo', ['codigo' => 'SIN-FOTO']);
+    }
+
     public function test_show_incluye_el_historial_de_asignaciones_y_el_conductor_actual(): void
     {
         $vehiculo = Vehiculo::factory()->create();

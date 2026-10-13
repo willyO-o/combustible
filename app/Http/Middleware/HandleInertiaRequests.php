@@ -47,6 +47,11 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+            // Base pública de los archivos subidos (disco "public"), armada con
+            // el host y la subcarpeta reales de la petición — no con APP_URL ni
+            // con un "/storage" fijo, que falla si el sistema se publica dentro
+            // de una subcarpeta. El front la usa vía storageUrl() (Utils/storageUtil.js).
+            'storage_url' => rtrim(asset('storage'), '/'),
             'notificaciones' => [
                 'no_leidas' => fn () => $request->user()?->unreadNotifications()->count() ?? 0,
                 'items' => fn () => $request->user()

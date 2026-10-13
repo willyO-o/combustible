@@ -4,6 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import { confirm , showToast} from '@/Utils/alertUtil'
+import { storageUrl } from '@/Utils/storageUtil'
 
 const props = defineProps({
     operacion: Object,
@@ -431,10 +432,10 @@ const verificarOperacion =  async () => {
                                         </span>
                                         <span v-else class="text-muted fs-12">—</span>
 
-                                        <a v-if="m.pivot.evidencia" :href="`/storage/${m.pivot.evidencia}`"
+                                        <a v-if="m.pivot.evidencia" :href="storageUrl(m.pivot.evidencia)"
                                             target="_blank" class="mant-evidencia-btn ms-2"
                                             title="Ver evidencia fotográfica">
-                                            <img :src="`/storage/${m.pivot.evidencia}`" class="mant-evidencia-thumb"
+                                            <img :src="storageUrl(m.pivot.evidencia)" class="mant-evidencia-thumb"
                                                 alt="Evidencia" />
                                         </a>
                                     </span>
