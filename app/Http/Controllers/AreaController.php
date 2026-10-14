@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Areas\ListHistorialVehiculosAreaAction;
+use App\Actions\Areas\ListVehiculosVigentesAreaAction;
 use App\Http\Requests\AreaRequest;
 use App\Http\Requests\EncargadoAreaRequest;
 use App\Http\Requests\VehiculoAreaRequest;
@@ -69,8 +71,11 @@ class AreaController extends Controller
      * (estado ACTIVO/PROVISIONAL y sin culminar, mismo criterio que
      * Area::vehiculosActivos()); el histórico completo va aparte.
      */
-    public function show(Area $area): Response
-    {
+    public function show(
+        Area $area,
+        ListVehiculosVigentesAreaAction $listVehiculosVigentes,
+        ListHistorialVehiculosAreaAction $listHistorialVehiculos,
+    ): Response {
         $fmt = fn ($fecha): ?string => $fecha ? Carbon::parse($fecha)->format('d/m/Y') : null;
 
         // Encargados: primero los vigentes (titular antes que suplente), luego
@@ -97,72 +102,8 @@ class AreaController extends Controller
                         || Carbon::parse($persona->pivot->fecha_fin)->greaterThanOrEqualTo(today())),
             ]);
 
-        // Vehículos con asignación vigente al área, con su conductor actual.
-        $vehiculos = $area->vehiculosActivos()
-            ->with([
-                'tipoVehiculo:id,tipo_vehiculo',
-                'tipoCombustible:id,tipo_combustible',
-                'conductorAsignado.persona',
-            ])
-            ->get()
-            ->map(fn (Vehiculo $vehiculo): array => [
-                'id' => $vehiculo->id,
-                'codigo' => $vehiculo->codigo,
-                'nro_placa' => $vehiculo->nro_placa,
-                'marca' => $vehiculo->marca,
-                'modelo' => $vehiculo->modelo,
-                'anio' => $vehiculo->anio,
-                'estado_vehiculo' => $vehiculo->estado_vehiculo,
-                'tipo_medicion' => $vehiculo->tipo_medicion,
-                'url_fotografia' => $vehiculo->url_fotografia,
-                'tipo_vehiculo' => $vehiculo->tipoVehiculo?->tipo_vehiculo,
-                'tipo_combustible' => $vehiculo->tipoCombustible?->tipo_combustible,
-                'conductor' => $vehiculo->conductorAsignado?->persona ? [
-                    'nombre_completo' => $vehiculo->conductorAsignado->persona->nombre_completo,
-                    'ci' => $vehiculo->conductorAsignado->persona->ci,
-                    'celular' => $vehiculo->conductorAsignado->persona->celular,
-                ] : null,
-                'id_asignacion' => $vehiculo->pivot->id,
-                'estado_asignacion' => $vehiculo->pivot->estado_asignacion,
-                'fecha_asignacion' => $fmt($vehiculo->pivot->fecha_asignacion),
-                'fecha_culminacion' => $fmt($vehiculo->pivot->fecha_culminacion),
-                'motivo_asignacion' => $vehiculo->pivot->motivo_asignacion,
-            ]);
-
-        // Histórico completo de asignaciones de vehículos al área (incluye
-        // REASIGNADO/CULMINADO). Se resuelve con query builder para traer una
-        // fila por asignación (belongsToMany deduplicaría por vehículo).
-        $historialVehiculos = DB::table('vehiculo_area as va')
-            ->join('vehiculo as v', 'v.id', '=', 'va.id_vehiculo')
-            ->where('va.id_area', $area->id)
-            ->orderByDesc('va.fecha_asignacion')
-            ->orderByDesc('va.id')
-            ->get([
-                'va.id',
-                'va.id_vehiculo',
-                'va.estado_asignacion',
-                'va.fecha_asignacion',
-                'va.fecha_reasignacion',
-                'va.fecha_culminacion',
-                'va.motivo_asignacion',
-                'v.codigo',
-                'v.nro_placa',
-                'v.marca',
-                'v.modelo',
-            ])
-            ->map(fn ($fila): array => [
-                'id' => $fila->id,
-                'id_vehiculo' => $fila->id_vehiculo,
-                'codigo' => $fila->codigo,
-                'nro_placa' => $fila->nro_placa,
-                'marca' => $fila->marca,
-                'modelo' => $fila->modelo,
-                'estado_asignacion' => $fila->estado_asignacion,
-                'fecha_asignacion' => $fmt($fila->fecha_asignacion),
-                'fecha_reasignacion' => $fmt($fila->fecha_reasignacion),
-                'fecha_culminacion' => $fmt($fila->fecha_culminacion),
-                'motivo_asignacion' => $fila->motivo_asignacion,
-            ]);
+        $vehiculos = $listVehiculosVigentes->execute($area);
+        $historialVehiculos = $listHistorialVehiculos->execute($area);
 
         return Inertia::render('Areas/Show', [
             'area' => [

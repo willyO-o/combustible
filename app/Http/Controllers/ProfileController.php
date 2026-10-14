@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Areas\ListHistorialVehiculosAreaAction;
+use App\Actions\Areas\ListVehiculosVigentesAreaAction;
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,12 +17,94 @@ class ProfileController extends Controller
 {
     /**
      * Display the user's profile form.
+     *
+     * `usuario` alimenta el formulario editable (sin cambios); `ficha` es
+     * sólo lectura: los datos de la persona vinculada, sus roles y lo que
+     * implica cada uno (vehículos y licencia si es conductor; áreas a cargo,
+     * con sus vehículos vigentes e historial de asignaciones, si es jefe de
+     * área — las mismas Actions que la ficha del área, AreaController::show).
      */
-    public function edit(Request $request): Response
-    {
+    public function edit(
+        Request $request,
+        ListVehiculosVigentesAreaAction $listVehiculosVigentes,
+        ListHistorialVehiculosAreaAction $listHistorialVehiculos,
+    ): Response {
         return Inertia::render('Profile/Edit', [
             'usuario' => $request->user()->load('persona'),
+            'ficha' => $this->ficha($request->user(), $listVehiculosVigentes, $listHistorialVehiculos),
         ]);
+    }
+
+    /**
+     * @return array{
+     *     roles: array<int, string>,
+     *     estado_usuario: ?string,
+     *     usuario_desde: ?string,
+     *     persona: ?array<string, mixed>,
+     *     conductor: ?array{estado: string, licencia: ?array<string, mixed>, vehiculos: array<int, array<string, mixed>>},
+     *     areas: array<int, array{id: int, nombre_area: string, tipo_encargo: ?string, desde: ?string, vehiculos: array<int, array<string, mixed>>, historial: array<int, array<string, mixed>>}>
+     * }
+     */
+    private function ficha(
+        User $usuario,
+        ListVehiculosVigentesAreaAction $listVehiculosVigentes,
+        ListHistorialVehiculosAreaAction $listHistorialVehiculos,
+    ): array {
+        // Consulta aparte (no ->load() sobre $request->user()): si no, estas
+        // relaciones también viajarían dentro del prop `usuario`.
+        $usuario = User::with([
+            'roles',
+            'persona.conductor.asignacionesActivas',
+            'persona.encargadoAreas',
+        ])->findOrFail($usuario->id);
+
+        $persona = $usuario->persona;
+        $conductor = $persona?->conductor;
+        $licencia = $conductor?->licenciaConducir();
+        // Las fechas de los pivots llegan como texto crudo (pivot genérico).
+        $fecha = fn ($valor) => $valor ? Carbon::parse($valor)->format('d/m/Y') : null;
+
+        return [
+            'roles' => $usuario->roles->pluck('name')->values()->all(),
+            'estado_usuario' => $usuario->estado_usuario,
+            'usuario_desde' => $usuario->created_at?->format('d/m/Y'),
+            'persona' => $persona ? [
+                'ci' => $persona->ci,
+                'nombres' => $persona->nombres,
+                'paterno' => $persona->paterno,
+                'materno' => $persona->materno,
+                'nombre_completo' => trim($persona->nombre_completo),
+                'fecha_nacimiento' => $persona->f_nacimiento_formatted,
+                'edad' => $persona->edad,
+                'estado_persona' => $persona->estado_persona,
+            ] : null,
+            'conductor' => $conductor ? [
+                'estado' => $conductor->estado_conductor,
+                'licencia' => $licencia ? [
+                    'numero' => $licencia->numero_documento,
+                    'categoria' => $licencia->categoria,
+                    'vencimiento' => $licencia->fecha_vencimiento?->format('d/m/Y'),
+                    'vencida' => (bool) $licencia->fecha_vencimiento?->isPast(),
+                ] : null,
+                'vehiculos' => $conductor->asignacionesActivas->map(fn ($vehiculo) => [
+                    'id' => $vehiculo->id,
+                    'codigo' => $vehiculo->codigo,
+                    'nro_placa' => $vehiculo->nro_placa,
+                    'descripcion' => trim("{$vehiculo->marca} {$vehiculo->modelo}"),
+                    'anio' => $vehiculo->anio,
+                    'estado_asignacion' => $vehiculo->pivot->estado_asignacion,
+                    'desde' => $fecha($vehiculo->pivot->fecha_asignacion),
+                ])->values()->all(),
+            ] : null,
+            'areas' => ($persona?->encargadoAreas ?? collect())->map(fn ($area) => [
+                'id' => $area->id,
+                'nombre_area' => $area->nombre_area,
+                'tipo_encargo' => $area->pivot->tipo_encargo,
+                'desde' => $fecha($area->pivot->fecha_inicio),
+                'vehiculos' => $listVehiculosVigentes->execute($area)->values()->all(),
+                'historial' => $listHistorialVehiculos->execute($area)->values()->all(),
+            ])->values()->all(),
+        ];
     }
 
     /**

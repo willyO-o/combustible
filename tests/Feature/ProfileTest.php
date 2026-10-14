@@ -2,12 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Models\Area;
+use App\Models\Asignacion;
+use App\Models\Conductor;
+use App\Models\DocumentoConductor;
 use App\Models\Persona;
 use App\Models\User;
+use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -234,5 +241,105 @@ class ProfileTest extends TestCase
         // /profile existe (GET, PATCH), pero ya no acepta DELETE: 405, no 404.
         $response->assertMethodNotAllowed();
         $this->assertNotNull($user->fresh());
+    }
+
+    public function test_el_perfil_muestra_los_datos_de_la_persona_y_sus_roles(): void
+    {
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+
+        $persona = Persona::factory()->create([
+            'ci' => '6543210',
+            'nombres' => 'Marta',
+            'paterno' => 'Choque',
+            'materno' => 'Lima',
+            'fecha_nacimiento' => '1990-05-20',
+            'estado_persona' => 'ACTIVO',
+        ]);
+        $conductor = Conductor::factory()->create(['id' => $persona->id, 'estado_conductor' => 'ACTIVO']);
+        $user = User::factory()->create(['id_persona' => $persona->id]);
+        $user->assignRole(['conductor', 'jefe-area']);
+
+        $vehiculo = Vehiculo::factory()->create(['codigo' => 'V-01', 'nro_placa' => '1234-ABC']);
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => '2026-01-15',
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        DocumentoConductor::create([
+            'id_conductor' => $conductor->id,
+            'tipo_documento' => 'LICENCIA_DE_CONDUCIR',
+            'numero_documento' => 'LIC-999',
+            'categoria' => 'C',
+            'fecha_vencimiento' => now()->subDay()->format('Y-m-d'),
+        ]);
+
+        $area = Area::factory()->create(['nombre_area' => 'Mina Norte']);
+        $area->encargados()->attach($persona->id, [
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => '2026-02-01',
+            'estado_encargo' => 'ACTIVO',
+        ]);
+
+        $vehiculoDelArea = Vehiculo::factory()->create(['nro_placa' => '5555-XYZ']);
+        $area->vehiculos()->attach($vehiculoDelArea->id, [
+            'fecha_asignacion' => '2026-03-01',
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        $vehiculoAnterior = Vehiculo::factory()->create(['nro_placa' => '7777-OLD']);
+        $area->vehiculos()->attach($vehiculoAnterior->id, [
+            'fecha_asignacion' => '2025-06-01',
+            'fecha_culminacion' => '2025-12-31',
+            'estado_asignacion' => 'CULMINADO',
+        ]);
+
+        $this->actingAs($user)->get('/profile')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/Edit')
+                // Vehículos a cargo: sólo los vigentes; el historial trae ambos.
+                ->has('ficha.areas.0.vehiculos', 1)
+                ->where('ficha.areas.0.vehiculos.0.nro_placa', '5555-XYZ')
+                ->has('ficha.areas.0.historial', 2)
+                ->where('ficha.areas.0.historial.1.nro_placa', '7777-OLD')
+                ->where('ficha.areas.0.historial.1.estado_asignacion', 'CULMINADO')
+                ->where('ficha.areas.0.id', $area->id)
+                ->where('ficha.roles', fn ($roles) => collect($roles)->sort()->values()->all() === ['conductor', 'jefe-area'])
+                ->where('ficha.persona.ci', '6543210')
+                ->where('ficha.persona.nombre_completo', 'Marta Choque Lima')
+                ->where('ficha.persona.fecha_nacimiento', '20/05/1990')
+                ->where('ficha.persona.estado_persona', 'ACTIVO')
+                ->where('ficha.conductor.estado', 'ACTIVO')
+                ->where('ficha.conductor.licencia.numero', 'LIC-999')
+                ->where('ficha.conductor.licencia.vencida', true)
+                ->has('ficha.conductor.vehiculos', 1)
+                ->where('ficha.conductor.vehiculos.0.nro_placa', '1234-ABC')
+                ->where('ficha.conductor.vehiculos.0.desde', '15/01/2026')
+                ->has('ficha.areas', 1)
+                ->where('ficha.areas.0.nombre_area', 'Mina Norte')
+                ->where('ficha.areas.0.tipo_encargo', 'TITULAR')
+                ->where('ficha.areas.0.desde', '01/02/2026')
+                // El prop del formulario no cambia de forma: no arrastra las
+                // relaciones de la ficha.
+                ->missing('usuario.persona.encargado_areas')
+                ->missing('usuario.persona.conductor.asignaciones_activas')
+                ->where('usuario.persona.id', $persona->id)
+            );
+    }
+
+    public function test_el_perfil_de_una_cuenta_sin_persona_no_falla(): void
+    {
+        $user = User::factory()->create(['id_persona' => null]);
+
+        $this->actingAs($user)->get('/profile')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('ficha.persona', null)
+                ->where('ficha.conductor', null)
+                ->where('ficha.areas', [])
+                ->where('ficha.roles', [])
+            );
     }
 }

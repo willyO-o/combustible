@@ -1709,3 +1709,193 @@
 .vale-vencimiento-sugerida i {
     color: rgb(var(--success-rgb));
 }
+
+/* ------------------------------------------------------------------ */
+/*  Mi Perfil (resources/js/Pages/Profile/Edit.vue)                    */
+/* ------------------------------------------------------------------ */
+.perfil-avatar {
+    width: 120px;
+    height: 120px;
+    background-color: var(--bs-secondary-bg);
+}
+
+.perfil-avatar img {
+    object-fit: cover;
+}
+
+.perfil-avatar__vacio {
+    font-size: 3rem;
+}
+
+.perfil-avatar__boton {
+    width: 34px;
+    height: 34px;
+    right: 0;
+    bottom: 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.perfil-foto-pendiente {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid rgba(var(--primary-rgb), 0.25);
+    border-radius: 0.5rem;
+    background-color: rgba(var(--primary-rgb), 0.06);
+    color: var(--default-text-color);
+}
+
+.perfil-datos li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--default-border);
+}
+
+.perfil-datos li:last-child {
+    border-bottom: 0;
+}
+
+/* Fechas, C.I. y números de licencia alineados (dígitos de igual ancho). */
+.perfil-numero,
+.perfil-campos dd {
+    font-variant-numeric: tabular-nums;
+}
+
+.perfil-campos dt {
+    margin-bottom: 0.125rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.perfil-campos dd {
+    margin-bottom: 0;
+    font-weight: 500;
+    color: var(--default-text-color);
+    overflow-wrap: anywhere;
+}
+
+.perfil-campos dd.perfil-vacio {
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.perfil-sin-persona {
+    padding: 1.5rem 1rem;
+}
+
+.perfil-sin-persona > i {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 2rem;
+    color: var(--text-muted);
+}
+
+.perfil-seccion {
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--default-border);
+}
+
+.perfil-licencia {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--default-text-color);
+}
+
+.perfil-lista {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.perfil-lista li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--default-border);
+}
+
+.perfil-lista li:first-child {
+    padding-top: 0;
+}
+
+.perfil-lista li:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.perfil-lista__texto {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.perfil-lista__icono {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    font-size: 1.125rem;
+}
+
+.perfil-lista__icono--conductor {
+    background-color: rgba(var(--primary-rgb), 0.1);
+    color: var(--primary-color);
+}
+
+.perfil-lista__icono--area {
+    background-color: rgba(var(--info-rgb), 0.12);
+    color: rgb(var(--info-rgb));
+}
+
+/* Pestañas de "Vehículos a mi Cargo" en Mi Perfil (patrón de Operacion/Show.vue,
+   con tokens del tema para claro/oscuro). */
+.perfil-tabs {
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--default-border);
+}
+
+.perfil-tabs .nav-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.625rem 0.875rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background-color: transparent;
+    color: var(--text-muted);
+    font-weight: 500;
+    transition: color 0.15s ease-out, border-color 0.15s ease-out;
+}
+
+.perfil-tabs .nav-link:hover {
+    color: var(--primary-color);
+}
+
+.perfil-tabs .nav-link.active {
+    border-bottom-color: var(--primary-color);
+    background-color: transparent;
+    color: var(--primary-color);
+}
+
+.perfil-tabs .nav-link:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+}
+
+@media (max-width: 575.98px) {
+    .perfil-tabs .nav-link {
+        padding: 0.5rem 0.625rem;
+        font-size: 0.8125rem;
+    }
+}

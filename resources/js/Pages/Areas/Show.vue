@@ -6,6 +6,9 @@ defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import { confirm as confirmSwal } from '@/Utils/alertUtil.js'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
+import VehiculosAreaTabla from '@/Components/VehiculosAreaTabla.vue'
+import HistorialVehiculosAreaTabla from '@/Components/HistorialVehiculosAreaTabla.vue'
+import { estadoAsignacionBadge, nombreVehiculo, codigoPlaca } from '@/Utils/asignacionVehiculoUtil'
 
 const props = defineProps({
     area: Object,
@@ -27,28 +30,11 @@ const encargadosHistoricos = computed(() => props.encargados.filter((e) => !e.vi
 const estadoAreaBadge = (estado) =>
     estado === 'ACTIVO' ? 'bg-success-transparent text-success' : 'bg-danger-transparent text-danger'
 
-const estadoVehiculoBadge = (estado) =>
-    ({
-        ACTIVO: 'bg-success-transparent text-success',
-        RETIRADO: 'bg-warning-transparent text-warning',
-        VENDIDO: 'bg-secondary-transparent text-secondary',
-    })[estado] ?? 'bg-secondary-transparent text-secondary'
-
-const estadoAsignacionBadge = (estado) =>
-    ({
-        ACTIVO: 'bg-success-transparent text-success',
-        PROVISIONAL: 'bg-info-transparent text-info',
-        REASIGNADO: 'bg-warning-transparent text-warning',
-        CULMINADO: 'bg-secondary-transparent text-secondary',
-    })[estado] ?? 'bg-secondary-transparent text-secondary'
-
 const encargoBadge = (tipo) =>
     tipo === 'TITULAR' ? 'bg-primary-transparent text-primary' : 'bg-info-transparent text-info'
 
 const tipoMedicionLabel = (tipo) => (tipo === 'horometro' ? 'Horómetro' : 'Kilometraje')
 
-const nombreVehiculo = (v) => [v.marca, v.modelo].filter(Boolean).join(' ') || '—'
-const codigoPlaca = (v) => [v.codigo, v.nro_placa].filter(Boolean).join(' · ') || '—'
 
 /* ------------------------------------------------------------------ *
  * Modal: cambiar asignación del vehículo (reasignar / finalizar)
@@ -276,82 +262,8 @@ async function finalizarAsignacion(v) {
             <span class="badge bg-primary-transparent text-primary">{{ vehiculos.length }} vigente(s)</span>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 48px">#</th>
-                            <th>Vehículo</th>
-                            <th>Tipo</th>
-                            <th>Combustible</th>
-                            <th>Conductor Actual</th>
-                            <th>Asignación</th>
-                            <th>Desde</th>
-                            <th>Culminación</th>
-                            <th class="text-center" style="width: 96px">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(v, index) in vehiculos" :key="v.id">
-                            <td class="text-muted">{{ index + 1 }}</td>
-                            <td style="min-width: 200px">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="avatar avatar-sm rounded d-flex align-items-center justify-content-center"
-                                        style="background: #f8f9fa">
-                                        <img v-if="v.url_fotografia" :src="v.url_fotografia" :alt="v.nro_placa"
-                                            class="rounded" style="width: 100%; height: 100%; object-fit: cover" />
-                                        <i v-else class="ri-car-line text-muted"></i>
-                                    </span>
-                                    <div>
-                                        <span class="fw-semibold d-block">{{ nombreVehiculo(v) }}</span>
-                                        <small class="text-muted d-block">{{ codigoPlaca(v) }}</small>
-                                        <span class="badge" :class="estadoVehiculoBadge(v.estado_vehiculo)">
-                                            {{ v.estado_vehiculo }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>{{ v.tipo_vehiculo ?? '—' }}</td>
-                            <td>
-                                <span class="badge bg-info-transparent text-info">{{ v.tipo_combustible ?? '—' }}</span>
-                            </td>
-                            <td>
-                                <span v-if="v.conductor" class="fw-medium">
-                                    <i class="ri-user-line me-1"></i>{{ v.conductor.nombre_completo }}
-                                </span>
-                                <span v-else class="text-muted">Sin conductor</span>
-                            </td>
-                            <td>
-                                <span class="badge" :class="estadoAsignacionBadge(v.estado_asignacion)">
-                                    {{ v.estado_asignacion }}
-                                </span>
-                            </td>
-                            <td>{{ v.fecha_asignacion ?? '—' }}</td>
-                            <td>{{ v.fecha_culminacion ?? 'Indefinida' }}</td>
-                            <td>
-                                <div class="d-flex gap-1 justify-content-center">
-                                    <Link :href="route('vehiculos.show', v.id)"
-                                        class="btn btn-sm btn-icon btn-primary-light" title="Ver vehículo">
-                                        <i class="ri-eye-line"></i>
-                                    </Link>
-                                    <button v-can="'vehiculos.asignar-area'" type="button"
-                                        class="btn btn-sm btn-icon btn-light" title="Cambiar asignación"
-                                        @click="abrirCambiarAsignacion(v)">
-                                        <i class="ri-exchange-line"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-
-                        <tr v-if="vehiculos.length === 0">
-                            <td colspan="9" class="p-5 text-center text-muted">
-                                <i class="ri-car-line fs-3 d-block mb-2"></i>
-                                Esta área no tiene vehículos asignados actualmente.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <VehiculosAreaTabla :vehiculos="vehiculos" permitir-cambiar-asignacion
+                @cambiar-asignacion="abrirCambiarAsignacion" />
         </div>
     </div>
 
@@ -364,45 +276,7 @@ async function finalizarAsignacion(v) {
             <span class="badge bg-primary-transparent text-primary">{{ historialVehiculos.length }} registro(s)</span>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 48px">#</th>
-                            <th>Vehículo</th>
-                            <th>Estado</th>
-                            <th>Asignación</th>
-                            <th>Reasignación</th>
-                            <th>Culminación</th>
-                            <th>Motivo</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="(h, index) in historialVehiculos" :key="h.id">
-                            <td class="text-muted">{{ index + 1 }}</td>
-                            <td style="min-width: 180px">
-                                <span class="fw-semibold d-block">{{ nombreVehiculo(h) }}</span>
-                                <small class="text-muted">{{ codigoPlaca(h) }}</small>
-                            </td>
-                            <td>
-                                <span class="badge" :class="estadoAsignacionBadge(h.estado_asignacion)">
-                                    {{ h.estado_asignacion }}
-                                </span>
-                            </td>
-                            <td>{{ h.fecha_asignacion ?? '—' }}</td>
-                            <td>{{ h.fecha_reasignacion ?? '—' }}</td>
-                            <td>{{ h.fecha_culminacion ?? '—' }}</td>
-                            <td style="min-width: 200px">{{ h.motivo_asignacion || '—' }}</td>
-                        </tr>
-
-                        <tr v-if="historialVehiculos.length === 0">
-                            <td colspan="7" class="p-5 text-center text-muted">
-                                No hay historial de asignaciones de vehículos para esta área.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <HistorialVehiculosAreaTabla :historial="historialVehiculos" />
         </div>
     </div>
 
