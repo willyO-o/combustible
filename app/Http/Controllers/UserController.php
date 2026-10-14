@@ -68,12 +68,10 @@ class UserController extends Controller
 
         $persona = Persona::findOrFail($request->id_persona);
 
+        // UpdatePersonaAction sincroniza el conjunto completo de roles
+        // seleccionado (puede incluir varios a la vez) y los registros de
+        // conductor/jefe de área de cada uno.
         $persona = $action->execute($persona, $this->datosPersonaParaAction($persona, $request));
-
-        // UpdatePersonaAction solo asigna, como máximo, el rol de conductor o
-        // jefe de área (ver tipoDesdeRoles). Aquí se sincroniza el conjunto
-        // completo de roles seleccionado, que puede incluir varios a la vez.
-        $persona->user->syncRoles($request->validated('roles', []));
 
         return redirect()->route('usuarios.index')
             ->with('success', "Usuario para {$persona->nombres} creado exitosamente.");
@@ -89,7 +87,12 @@ class UserController extends Controller
             'usuario' => $usuario,
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
             'roles' => $this->rolesAsignables(),
-            'rolesAsignados' => $usuario->getRoleNames(),
+            // Mismo criterio que Personas/Edit (Persona::rolesParaFormulario):
+            // si no, quien conserva un vehículo o un área sin tener el rol en
+            // su cuenta aparecía desmarcado y, al guardar, se le cerraban.
+            // Una cuenta de sistema sin persona: sus roles, sin los ocultos.
+            'rolesAsignados' => $persona?->rolesParaFormulario()
+                ?? $usuario->getRoleNames()->diff(config('acl.roles_ocultos'))->values()->all(),
             'vehiculoActual' => $persona?->conductor?->asignacionesActivas->first(),
             'areaActual' => $persona?->encargadoAreas->first(),
         ]);
@@ -105,8 +108,6 @@ class UserController extends Controller
 
         if ($persona) {
             $action->execute($persona, $this->datosPersonaParaAction($persona, $request));
-
-            $usuario->syncRoles($request->validated('roles', []));
         } else {
             // Cuentas de sistema sin persona vinculada (ej. administradores sembrados
             // directamente): solo se gestionan sus datos propios de usuario.
@@ -185,7 +186,7 @@ class UserController extends Controller
     /**
      * Construye el array que UpdatePersonaAction espera, partiendo de los
      * datos ya guardados de la persona (que este formulario no vuelve a
-     * pedir) y superponiendo los campos de usuario/tipo que sí envía.
+     * pedir) y superponiendo los campos de usuario/roles que sí envía.
      *
      * @return array<string, mixed>
      */
@@ -202,27 +203,8 @@ class UserController extends Controller
             'estado_persona' => $persona->estado_persona,
         ], $request->validated(), [
             'crear_usuario' => true,
-            'tipo' => $this->tipoDesdeRoles($request->validated('roles', [])),
+            'roles' => $request->validated('roles', []),
         ]);
-    }
-
-    /**
-     * UpdatePersonaAction (compartida con PersonaController) sigue decidiendo
-     * qué registros de dominio gestionar (conductor + asignación, o jefe de
-     * área + encargo) a partir de un único "tipo". Con múltiples roles, se
-     * deriva ese tipo dando prioridad a conductor y luego a jefe-area —
-     * igual que Persona::tipo_actual — sin que eso limite los demás roles,
-     * que se sincronizan aparte con el conjunto completo seleccionado.
-     *
-     * @param  array<int, string>  $roles
-     */
-    private function tipoDesdeRoles(array $roles): string
-    {
-        return match (true) {
-            in_array('conductor', $roles, true) => 'conductor',
-            in_array('jefe-area', $roles, true) => 'jefe-area',
-            default => 'personal',
-        };
     }
 
     /**

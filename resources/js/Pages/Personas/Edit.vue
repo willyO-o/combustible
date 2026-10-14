@@ -5,6 +5,8 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 import CiInput from '@/Components/CiInput.vue'
+import RolesSelector from '@/Components/RolesSelector.vue'
+import { etiquetaRol } from '@/Utils/rolUtil'
 import { storageUrl } from '@/Utils/storageUtil'
 defineOptions({ layout: Maindashboard })
 
@@ -13,6 +15,8 @@ const props = defineProps({
     areas: Array,
     vehiculoActual: Object,
     areaActual: Object,
+    roles: Array, // [{ id, name }] roles asignables (todos salvo los ocultos)
+    rolesAsignados: Array, // roles actuales: los de su cuenta + los deducidos de sus registros
 })
 
 const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10)
@@ -32,7 +36,8 @@ const form = useForm({
     fecha_nacimiento: props.persona.fecha_nacimiento ? props.persona.fecha_nacimiento.substring(0, 10) : '',
     estado_persona: props.persona.estado_persona,
 
-    tipo: props.persona.tipo_actual ?? '',
+    // Uno o varios roles (nombres). Vacío = "personal".
+    roles: [...(props.rolesAsignados ?? [])],
 
     estado_conductor: props.persona.conductor?.estado_conductor ?? 'ACTIVO',
     id_vehiculo: props.vehiculoActual ? { id: props.vehiculoActual.id, label: vehiculoLabel(props.vehiculoActual) } : null,
@@ -50,8 +55,25 @@ const form = useForm({
     password: '',
 })
 
-const esConductor = computed(() => form.tipo === 'conductor')
-const esJefeArea = computed(() => form.tipo === 'jefe-area')
+const esConductor = computed(() => form.roles.includes('conductor'))
+const esJefeArea = computed(() => form.roles.includes('jefe-area'))
+
+// Conductor y Jefe de Área crean sus propios registros aunque no haya cuenta;
+// el resto de roles sólo existe en la cuenta de usuario (el servidor lo valida).
+const ROLES_CON_REGISTRO_PROPIO = ['conductor', 'jefe-area']
+const rolesSinUsuario = computed(() =>
+    form.crear_usuario
+        ? []
+        : form.roles.filter((rol) => !ROLES_CON_REGISTRO_PROPIO.includes(rol)).map(etiquetaRol),
+)
+
+// Quitar Conductor o Jefe de Área cierra sus registros activos (asignación de
+// vehículo / encargo de área); se avisa antes de guardar.
+const rolesConRegistroQuitados = computed(() =>
+    ROLES_CON_REGISTRO_PROPIO.filter(
+        (rol) => (props.rolesAsignados ?? []).includes(rol) && !form.roles.includes(rol),
+    ).map(etiquetaRol),
+)
 const tieneUsuario = computed(() => !!props.persona.user)
 
 const fotoPreview = ref(storageUrl(props.persona.foto))
@@ -189,31 +211,29 @@ function submit() {
                 </div>
             </div>
 
-            <!-- Tipo de registro -->
+            <!-- Roles -->
             <div class="col-12">
                 <div class="card custom-card">
-                    <div class="card-header"><div class="card-title">Tipo de Registro</div></div>
+                    <div class="card-header"><div class="card-title"><i class="ri-shield-user-line me-2"></i>Roles</div></div>
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <div class="d-flex flex-wrap gap-4">
-                                    <div class="form-check">
-                                        <input v-model="form.tipo" class="form-check-input" type="radio" value="conductor" id="tipoConductor" />
-                                        <label class="form-check-label" for="tipoConductor">Conductor</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input v-model="form.tipo" class="form-check-input" type="radio" value="jefe-area" id="tipoJefeArea" />
-                                        <label class="form-check-label" for="tipoJefeArea">Jefe de Área</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input v-model="form.tipo" class="form-check-input" type="radio" value="personal" id="tipoPersonal" />
-                                        <label class="form-check-label" for="tipoPersonal">Personal</label>
-                                    </div>
-                                </div>
-                                <div v-if="form.errors.tipo" class="text-danger small mt-1">{{ form.errors.tipo }}</div>
-                                <small v-if="persona.tipo_actual && persona.tipo_actual !== form.tipo" class="text-warning d-block mt-1">
+                                <RolesSelector v-model="form.roles" :roles="props.roles" :error="form.errors.roles"
+                                    :errores="form.errors" />
+                                <small class="text-muted d-block mt-1">
+                                    Puede seleccionar uno o varios roles. Sin ninguno, la persona queda como
+                                    <strong>Personal</strong>. <strong>Conductor</strong> y <strong>Jefe de Área</strong>
+                                    habilitan las secciones de abajo; los demás roles requieren crear el usuario de acceso.
+                                </small>
+                                <small v-if="rolesSinUsuario.length" class="text-warning d-block mt-1">
                                     <i class="ri-error-warning-line"></i>
-                                    Cambiar el tipo cerrará los registros activos del tipo anterior.
+                                    {{ rolesSinUsuario.join(', ') }}: marque "Crear usuario de acceso al sistema" para asignar
+                                    {{ rolesSinUsuario.length === 1 ? 'este rol' : 'estos roles' }}.
+                                </small>
+                                <small v-if="rolesConRegistroQuitados.length" class="text-warning d-block mt-1">
+                                    <i class="ri-error-warning-line"></i>
+                                    Quitar {{ rolesConRegistroQuitados.join(' y ') }} cerrará sus registros activos
+                                    (asignación de vehículo o encargo de área).
                                 </small>
                             </div>
                         </div>

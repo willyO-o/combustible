@@ -18,6 +18,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Permission\Models\Role;
 
 class PersonaController extends Controller
 {
@@ -241,6 +242,7 @@ class PersonaController extends Controller
     {
         return Inertia::render('Personas/Create', [
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
+            'roles' => $this->rolesAsignables(),
         ]);
     }
 
@@ -271,7 +273,20 @@ class PersonaController extends Controller
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
             'vehiculoActual' => $persona->conductor?->asignacionesActivas->first(),
             'areaActual' => $persona->encargadoAreas->first(),
+            'roles' => $this->rolesAsignables(),
+            'rolesAsignados' => $persona->rolesParaFormulario(),
         ]);
+    }
+
+    /**
+     * Roles que pueden asignarse desde el formulario: los mismos que en el
+     * módulo de Usuarios (todos salvo los ocultos, ver config/acl.php).
+     */
+    private function rolesAsignables(): Collection
+    {
+        return Role::whereNotIn('name', config('acl.roles_ocultos'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     public function update(PersonaRequest $request, Persona $persona, UpdatePersonaAction $action): RedirectResponse

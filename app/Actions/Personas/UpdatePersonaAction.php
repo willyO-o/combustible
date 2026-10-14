@@ -14,15 +14,21 @@ class UpdatePersonaAction
 {
     /**
      * Actualiza una persona y sincroniza su cuenta de usuario y sus
-     * registros de conductor/jefe de área según el tipo recibido,
-     * cerrando los registros del tipo anterior si cambió.
+     * registros de conductor/jefe de área según los roles recibidos (una
+     * persona puede tener varios a la vez). Cada rol se trata por separado:
+     * quitar conductor cierra sus asignaciones activas y quitar jefe-area
+     * cierra su encargo, sin afectar a los demás roles.
      *
      * @param  array<string, mixed>  $data
      */
     public function execute(Persona $persona, array $data): Persona
     {
         return DB::transaction(function () use ($persona, $data) {
-            $tipoAnterior = $persona->tipo_actual;
+            $roles = $data['roles'] ?? [];
+            $esConductor = in_array('conductor', $roles, true);
+            $esJefeArea = in_array('jefe-area', $roles, true);
+            $eraConductor = $persona->conductor()->exists();
+            $eraJefeArea = $persona->encargadoAreas()->exists();
 
             $persona->update([
                 'ci' => $data['ci'],
@@ -36,21 +42,21 @@ class UpdatePersonaAction
                 'estado_persona' => $data['estado_persona'],
             ]);
 
-            $this->sincronizarUsuario($persona, $data);
+            $this->sincronizarUsuario($persona, $data, $roles);
 
-            if ($tipoAnterior === 'conductor' && $data['tipo'] !== 'conductor') {
+            if ($eraConductor && ! $esConductor) {
                 $this->cerrarAsignacionesActivas($persona);
             }
 
-            if ($data['tipo'] === 'conductor') {
+            if ($esConductor) {
                 $this->sincronizarConductor($persona, $data);
             }
 
-            if ($tipoAnterior === 'jefe-area' && $data['tipo'] !== 'jefe-area') {
+            if ($eraJefeArea && ! $esJefeArea) {
                 $this->cerrarEncargoActivo($persona);
             }
 
-            if ($data['tipo'] === 'jefe-area' && ! empty($data['id_area'])) {
+            if ($esJefeArea && ! empty($data['id_area'])) {
                 $this->sincronizarEncargoArea($persona, $data);
             }
 
@@ -58,7 +64,10 @@ class UpdatePersonaAction
         });
     }
 
-    private function sincronizarUsuario(Persona $persona, array $data): void
+    /**
+     * @param  array<int, string>  $roles
+     */
+    private function sincronizarUsuario(Persona $persona, array $data, array $roles): void
     {
         if (empty($data['crear_usuario'])) {
             return;
@@ -83,13 +92,14 @@ class UpdatePersonaAction
             ]);
         }
 
-        $usuario->syncRoles(array_filter([
-            match ($data['tipo']) {
-                'conductor' => 'conductor',
-                'jefe-area' => 'jefe-area',
-                default => null,
-            },
-        ]));
+        // Los roles ocultos (super-admin) no se muestran en ningún
+        // formulario, así que nunca llegan en $roles: se conservan para no
+        // quitárselos a una cuenta de sistema al editarla.
+        $rolesOcultos = $usuario->getRoleNames()
+            ->intersect(config('acl.roles_ocultos'))
+            ->all();
+
+        $usuario->syncRoles(array_values(array_unique(array_merge($roles, $rolesOcultos))));
     }
 
     private function cerrarAsignacionesActivas(Persona $persona): void

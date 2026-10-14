@@ -38,7 +38,7 @@ class UserRequest extends FormRequest
             // Un usuario puede tener varios roles a la vez. Sin roles seleccionados,
             // queda como "personal" (cuenta con acceso, sin rol operativo).
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string', Rule::in($rolesAsignables)],
+            'roles.*' => ['string', 'distinct', Rule::in($rolesAsignables)],
 
             'estado_conductor' => [Rule::requiredIf(fn () => $tieneRol('conductor')), Rule::in(['ACTIVO', 'INACTIVO', 'RETIRADO'])],
             'id_vehiculo' => ['nullable', 'exists:vehiculo,id'],

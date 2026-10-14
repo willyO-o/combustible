@@ -5,10 +5,13 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 import CiInput from '@/Components/CiInput.vue'
+import RolesSelector from '@/Components/RolesSelector.vue'
+import { etiquetaRol } from '@/Utils/rolUtil'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     areas: Array,
+    roles: Array, // [{ id, name }] roles asignables (todos salvo los ocultos)
 })
 
 const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10)
@@ -24,7 +27,8 @@ const form = useForm({
     fecha_nacimiento: '',
     estado_persona: 'ACTIVO',
 
-    tipo: '',
+    // Uno o varios roles (nombres). Vacío = "personal".
+    roles: [],
 
     estado_conductor: 'ACTIVO',
     id_vehiculo: null,
@@ -35,15 +39,26 @@ const form = useForm({
     fecha_inicio_encargo: today,
     motivo_encargo: '',
 
-    crear_usuario: false,
+    // Marcada por defecto: lo habitual es registrar a la persona con su
+    // cuenta de acceso (se puede desmarcar, p.ej. un operario sin sistema).
+    crear_usuario: true,
     email: '',
     estado_usuario: 'ACTIVO',
     // Se prellena con CI#Plusmetals en ContrasenaInicialInput (editable).
     password: '',
 })
 
-const esConductor = computed(() => form.tipo === 'conductor')
-const esJefeArea = computed(() => form.tipo === 'jefe-area')
+const esConductor = computed(() => form.roles.includes('conductor'))
+const esJefeArea = computed(() => form.roles.includes('jefe-area'))
+
+// Conductor y Jefe de Área crean sus propios registros aunque no haya cuenta;
+// el resto de roles sólo existe en la cuenta de usuario (el servidor lo valida).
+const ROLES_CON_REGISTRO_PROPIO = ['conductor', 'jefe-area']
+const rolesSinUsuario = computed(() =>
+    form.crear_usuario
+        ? []
+        : form.roles.filter((rol) => !ROLES_CON_REGISTRO_PROPIO.includes(rol)).map(etiquetaRol),
+)
 
 const fotoPreview = ref(null)
 
@@ -177,28 +192,25 @@ function submit() {
                 </div>
             </div>
 
-            <!-- Tipo de registro -->
+            <!-- Roles -->
             <div class="col-12">
                 <div class="card custom-card">
-                    <div class="card-header"><div class="card-title">Tipo de Registro</div></div>
+                    <div class="card-header"><div class="card-title"><i class="ri-shield-user-line me-2"></i>Roles</div></div>
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <div class="d-flex flex-wrap gap-4">
-                                    <div class="form-check">
-                                        <input v-model="form.tipo" class="form-check-input" type="radio" value="conductor" id="tipoConductor" />
-                                        <label class="form-check-label" for="tipoConductor">Conductor</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input v-model="form.tipo" class="form-check-input" type="radio" value="jefe-area" id="tipoJefeArea" />
-                                        <label class="form-check-label" for="tipoJefeArea">Jefe de Área</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input v-model="form.tipo" class="form-check-input" type="radio" value="personal" id="tipoPersonal" />
-                                        <label class="form-check-label" for="tipoPersonal">Personal</label>
-                                    </div>
-                                </div>
-                                <div v-if="form.errors.tipo" class="text-danger small mt-1">{{ form.errors.tipo }}</div>
+                                <RolesSelector v-model="form.roles" :roles="props.roles" :error="form.errors.roles"
+                                    :errores="form.errors" />
+                                <small class="text-muted d-block mt-1">
+                                    Puede seleccionar uno o varios roles. Sin ninguno, la persona queda como
+                                    <strong>Personal</strong>. <strong>Conductor</strong> y <strong>Jefe de Área</strong>
+                                    habilitan las secciones de abajo; los demás roles requieren crear el usuario de acceso.
+                                </small>
+                                <small v-if="rolesSinUsuario.length" class="text-warning d-block mt-1">
+                                    <i class="ri-error-warning-line"></i>
+                                    {{ rolesSinUsuario.join(', ') }}: marque "Crear usuario de acceso al sistema" para asignar
+                                    {{ rolesSinUsuario.length === 1 ? 'este rol' : 'estos roles' }}.
+                                </small>
                             </div>
                         </div>
                     </div>

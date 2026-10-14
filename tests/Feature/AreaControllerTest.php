@@ -345,7 +345,7 @@ class AreaControllerTest extends TestCase
         $this->assertTrue($usuario->hasRole('jefe-area'));
     }
 
-    public function test_asignar_encargado_con_persona_que_ya_tiene_usuario_solo_sincroniza_el_rol(): void
+    public function test_asignar_encargado_con_persona_que_ya_tiene_usuario_le_agrega_el_rol_y_conserva_los_demas(): void
     {
         Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
 
@@ -365,7 +365,24 @@ class AreaControllerTest extends TestCase
         $usuario->refresh();
         $this->assertSame('existente@example.com', $usuario->email);
         $this->assertTrue($usuario->hasRole('jefe-area'));
-        $this->assertFalse($usuario->hasRole('conductor'));
+        // Un jefe de área también puede ser conductor: designarlo no le
+        // quita su rol (antes syncRoles(['jefe-area']) se lo borraba).
+        $this->assertTrue($usuario->hasRole('conductor'));
+    }
+
+    public function test_asignar_como_encargado_a_un_administrador_no_le_quita_el_rol_administrador(): void
+    {
+        $area = Area::factory()->create();
+        $persona = Persona::factory()->create(['estado_persona' => 'ACTIVO']);
+        $usuario = User::factory()->create(['id_persona' => $persona->id]);
+        $usuario->assignRole('administrador');
+
+        $this->post(route('areas.encargados.asignar', $area->id), [
+            'id_persona' => $persona->id,
+            'tipo_encargo' => 'TITULAR',
+        ])->assertRedirect(route('areas.index'));
+
+        $this->assertTrue($usuario->fresh()->hasAllRoles(['administrador', 'jefe-area']));
     }
 
     public function test_asignar_un_nuevo_titular_inactiva_al_titular_anterior_del_area(): void

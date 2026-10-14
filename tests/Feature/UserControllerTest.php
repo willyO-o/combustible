@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Area;
+use App\Models\Asignacion;
+use App\Models\Conductor;
 use App\Models\Persona;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -350,5 +352,112 @@ class UserControllerTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $this->assertSame($hashAnterior, $usuario->fresh()->password);
+    }
+
+    public function test_agregar_el_rol_conductor_a_un_jefe_de_area_no_le_cierra_su_encargo(): void
+    {
+        $area = Area::factory()->create();
+        $persona = Persona::factory()->create();
+
+        $this->actingAs($this->admin)->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'jefe@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => ['jefe-area'],
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+        ])->assertRedirect(route('usuarios.index'));
+
+        $usuario = User::where('email', 'jefe@example.com')->firstOrFail();
+
+        $this->actingAs($this->admin)->post(route('usuarios.update', $usuario->id), [
+            '_method' => 'PUT',
+            'email' => 'jefe@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => ['jefe-area', 'conductor'],
+            'estado_conductor' => 'ACTIVO',
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+        ])->assertRedirect(route('usuarios.index'));
+
+        $usuario->refresh();
+        $this->assertTrue($usuario->hasAllRoles(['jefe-area', 'conductor']));
+        $this->assertDatabaseHas('conductor', ['id' => $persona->id]);
+        $this->assertDatabaseHas('encargado_area', [
+            'id_persona' => $persona->id,
+            'id_area' => $area->id,
+            'estado_encargo' => 'ACTIVO',
+        ]);
+    }
+
+    public function test_crear_un_usuario_conductor_y_jefe_de_area_registra_ambos(): void
+    {
+        $area = Area::factory()->create();
+        $persona = Persona::factory()->create();
+
+        $this->actingAs($this->admin)->post(route('usuarios.store'), [
+            'id_persona' => $persona->id,
+            'email' => 'doble@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => ['conductor', 'jefe-area'],
+            'estado_conductor' => 'ACTIVO',
+            'id_area' => $area->id,
+            'tipo_encargo' => 'TITULAR',
+        ])->assertRedirect(route('usuarios.index'));
+
+        $this->assertDatabaseHas('conductor', ['id' => $persona->id]);
+        $this->assertDatabaseHas('encargado_area', [
+            'id_persona' => $persona->id,
+            'id_area' => $area->id,
+            'estado_encargo' => 'ACTIVO',
+        ]);
+    }
+
+    public function test_editar_un_usuario_conserva_el_rol_oculto_super_admin(): void
+    {
+        Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
+        $persona = Persona::factory()->create();
+        $usuario = User::factory()->create(['id_persona' => $persona->id, 'email' => 'root@example.com']);
+        $usuario->assignRole(['super-admin', 'administrador']);
+
+        $this->actingAs($this->admin)->post(route('usuarios.update', $usuario->id), [
+            '_method' => 'PUT',
+            'email' => 'root@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => ['administrador'],
+        ])->assertRedirect(route('usuarios.index'));
+
+        $this->assertTrue($usuario->fresh()->hasRole('super-admin'));
+    }
+
+    public function test_editar_un_super_admin_no_precarga_el_rol_oculto_en_el_formulario(): void
+    {
+        Role::firstOrCreate(['name' => 'super-admin', 'guard_name' => 'web']);
+        $persona = Persona::factory()->create();
+        $usuario = User::factory()->create(['id_persona' => $persona->id]);
+        $usuario->assignRole(['super-admin', 'administrador']);
+
+        $this->actingAs($this->admin)->get(route('usuarios.edit', $usuario->id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('rolesAsignados', ['administrador']));
+    }
+
+    public function test_editar_usuario_marca_conductor_si_conserva_un_vehiculo_asignado_sin_el_rol(): void
+    {
+        $persona = Persona::factory()->create();
+        $conductor = Conductor::factory()->create(['id' => $persona->id]);
+        $usuario = User::factory()->create(['id_persona' => $persona->id]);
+        $usuario->assignRole('jefe-area');
+        $vehiculo = Vehiculo::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $this->actingAs($this->admin)->get(route('usuarios.edit', $usuario->id))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('rolesAsignados', fn ($roles) => collect($roles)->sort()->values()->all() === ['conductor', 'jefe-area']));
     }
 }

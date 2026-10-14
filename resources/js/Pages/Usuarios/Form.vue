@@ -6,6 +6,7 @@ defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
+import RolesSelector from '@/Components/RolesSelector.vue'
 
 const props = defineProps({
     usuario: Object, // presente solo al editar
@@ -51,13 +52,6 @@ const mostrarRoles = computed(() => !esEdicion.value || !!persona.value)
 
 const esConductor = computed(() => form.roles.includes('conductor'))
 const esJefeArea = computed(() => form.roles.includes('jefe-area'))
-
-const rolLabel = (rol) => ({
-    administrador: 'Administrador',
-    conductor: 'Conductor',
-    'jefe-area': 'Jefe de Área',
-    'tecnico-mantenimiento': 'Técnico de Mantenimiento',
-}[rol] ?? rol)
 
 function submit() {
     form
@@ -179,13 +173,8 @@ function submit() {
                     <div class="card custom-card">
                         <div class="card-header"><div class="card-title"><i class="ri-shield-user-line me-2"></i>Roles</div></div>
                         <div class="card-body">
-                            <div class="d-flex flex-wrap gap-4">
-                                <div class="form-check" v-for="rol in props.roles" :key="rol.id">
-                                    <input v-model="form.roles" class="form-check-input" type="checkbox" :value="rol.name" :id="`rol-${rol.id}`" />
-                                    <label class="form-check-label" :for="`rol-${rol.id}`">{{ rolLabel(rol.name) }}</label>
-                                </div>
-                            </div>
-                            <InputError :message="form.errors.roles" class="mt-1" />
+                            <RolesSelector v-model="form.roles" :roles="props.roles" :error="form.errors.roles"
+                                :errores="form.errors" />
                             <small class="text-muted d-block mt-1">
                                 Puede seleccionar varios roles. Sin ninguno seleccionado, el usuario queda como
                                 personal (con acceso, sin rol operativo). Los roles <strong>Conductor</strong> y

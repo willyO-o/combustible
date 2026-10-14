@@ -283,8 +283,9 @@ class AreaController extends Controller
      * Asigna un encargado (titular o suplente) a un área. La asignación
      * anterior del mismo tipo de encargo para esta área (si sigue activa)
      * se inactiva automáticamente. Además sincroniza la cuenta de usuario
-     * de la persona (la crea si no existe) y le asigna el rol jefe-area
-     * como único rol.
+     * de la persona (la crea si no existe) y le agrega el rol jefe-area,
+     * conservando los que ya tenga (un jefe de área puede ser también
+     * conductor, administrador, etc.).
      */
     public function asignarEncargado(EncargadoAreaRequest $request, Area $area): RedirectResponse
     {
@@ -392,6 +393,6 @@ class AreaController extends Controller
             ]);
         }
 
-        $usuario->syncRoles(['jefe-area']);
+        $usuario->assignRole('jefe-area');
     }
 }

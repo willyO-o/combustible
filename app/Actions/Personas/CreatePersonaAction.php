@@ -14,14 +14,19 @@ class CreatePersonaAction
 {
     /**
      * Registra una persona y, según los datos recibidos, su cuenta de
-     * usuario y los registros de dominio correspondientes a su tipo
-     * (conductor + asignación de vehículo, o jefe de área + encargo).
+     * usuario y los registros de dominio de cada rol elegido (una persona
+     * puede tener varios a la vez): conductor -> conductor + asignación de
+     * vehículo; jefe-area -> encargo de área. El resto de roles
+     * (administrador, técnico de mantenimiento, ...) sólo se asignan a la
+     * cuenta de usuario.
      *
      * @param  array<string, mixed>  $data
      */
     public function execute(array $data): Persona
     {
         return DB::transaction(function () use ($data) {
+            $roles = $data['roles'] ?? [];
+
             $persona = Persona::create([
                 'ci' => $data['ci'],
                 'nombres' => $data['nombres'],
@@ -43,10 +48,10 @@ class CreatePersonaAction
                     'estado_usuario' => $data['estado_usuario'] ?? 'ACTIVO',
                 ]);
 
-                $this->asignarRol($usuario, $data['tipo']);
+                $usuario->syncRoles($roles);
             }
 
-            if ($data['tipo'] === 'conductor') {
+            if (in_array('conductor', $roles, true)) {
                 Conductor::create([
                     'id' => $persona->id,
                     'estado_conductor' => $data['estado_conductor'] ?? 'ACTIVO',
@@ -63,7 +68,7 @@ class CreatePersonaAction
                 }
             }
 
-            if ($data['tipo'] === 'jefe-area' && ! empty($data['id_area'])) {
+            if (in_array('jefe-area', $roles, true) && ! empty($data['id_area'])) {
                 EncargadoArea::create([
                     'id_persona' => $persona->id,
                     'id_area' => $data['id_area'],
@@ -76,14 +81,5 @@ class CreatePersonaAction
 
             return $persona;
         });
-    }
-
-    private function asignarRol(User $usuario, string $tipo): void
-    {
-        match ($tipo) {
-            'conductor' => $usuario->assignRole('conductor'),
-            'jefe-area' => $usuario->assignRole('jefe-area'),
-            default => null,
-        };
     }
 }

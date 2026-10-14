@@ -79,6 +79,34 @@ class Persona extends Model implements Auditable
         return null;
     }
 
+    /**
+     * Roles con que se precargan los formularios de edición (Personas y
+     * Usuarios): los de su cuenta de usuario, sin los ocultos (super-admin:
+     * no son asignables desde ahí y la validación los rechazaría; la Action
+     * los conserva igual), más los que se deducen de sus registros VIGENTES
+     * para personas sin cuenta o cuya cuenta no los refleja (p.ej. un jefe
+     * al que Áreas le quitó antes el rol conductor).
+     *
+     * Conductor se deduce sólo si no tiene cuenta o si conserva un vehículo
+     * asignado: a quien se le quitó el rol, el registro de conductor queda
+     * (con sus asignaciones cerradas) y no debe volver a marcarse solo.
+     *
+     * @return array<int, string>
+     */
+    public function rolesParaFormulario(): array
+    {
+        $esConductorVigente = $this->conductor
+            && (! $this->user || $this->conductor->asignacionesActivas->isNotEmpty());
+
+        return collect($this->user?->getRoleNames() ?? [])
+            ->diff(config('acl.roles_ocultos'))
+            ->when($esConductorVigente, fn ($roles) => $roles->push('conductor'))
+            ->when($this->encargadoAreas->isNotEmpty(), fn ($roles) => $roles->push('jefe-area'))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function user()
     {
         return $this->hasOne(User::class, 'id_persona');
