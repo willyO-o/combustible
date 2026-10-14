@@ -134,6 +134,11 @@ const tipoDocumentoLabel = (tipo) => {
                                 <span class="fw-medium">{{ persona.ci ?? 'N/A' }}</span>
                             </li>
                             <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                                <span class="text-muted fs-13">Cargo</span>
+                                <span v-if="persona.cargo" class="fw-medium text-end">{{ persona.cargo.cargo }}</span>
+                                <span v-else class="text-muted">Sin cargo</span>
+                            </li>
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
                                 <span class="text-muted fs-13">Celular</span>
                                 <a :href="`tel:${persona.celular}`" class="text-decoration-none fw-medium">
                                     {{ persona.celular ?? 'N/A' }}

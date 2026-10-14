@@ -37,6 +37,7 @@ class CreatePersonaAction
                 'direccion' => $data['direccion'] ?? null,
                 'fecha_nacimiento' => $data['fecha_nacimiento'] ?? null,
                 'estado_persona' => $data['estado_persona'],
+                'id_cargo' => $data['id_cargo'] ?? null,
             ]);
 
             if (! empty($data['crear_usuario'])) {

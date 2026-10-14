@@ -1369,6 +1369,7 @@ class Reportes extends exFPDF
                 $c['ci'] ?? null,
                 $c['nombre_completo'] ?? null,
                 $c['celular'] ?? null,
+                $c['cargo'] ?? null,
                 $licencia,
                 $vencimiento,
                 $c['vehiculos'] ?? null,
@@ -1390,8 +1391,8 @@ class Reportes extends exFPDF
             ],
             tituloTabla: 'CONDUCTORES',
             columnas: [
-                ['#', 8, 'C'], ['CI', 24, 'L'], ['NOMBRE COMPLETO', 58, 'L'], ['CELULAR', 24, 'L'],
-                ['LICENCIA', 32, 'L'], ['VENCE LICENCIA', 28, 'C'], ['VEHÍCULOS ASIGNADOS', 69, 'L'], ['ESTADO', 20, 'C'],
+                ['#', 8, 'C'], ['CI', 24, 'L'], ['NOMBRE COMPLETO', 50, 'L'], ['CELULAR', 24, 'L'], ['CARGO', 26, 'L'],
+                ['LICENCIA', 32, 'L'], ['VENCE LICENCIA', 28, 'C'], ['VEHÍCULOS ASIGNADOS', 51, 'L'], ['ESTADO', 20, 'C'],
             ],
             filas: $filas,
             mensajeVacio: 'No hay conductores que coincidan con los filtros seleccionados.',
@@ -1402,7 +1403,8 @@ class Reportes extends exFPDF
 
     /**
      * Listado de personas (Personas/Index.vue) con los filtros aplicados en la
-     * vista, su tipo operativo, las áreas a su cargo y su cuenta de usuario.
+     * vista, su cargo, su tipo operativo, las áreas a su cargo y su cuenta de
+     * usuario.
      * $listado es lo que arma PersonaController::listadoParaReporte().
      *
      * @param  array{personas: iterable<array<string, mixed>>, totales: array<string, int>}  $listado
@@ -1418,6 +1420,7 @@ class Reportes extends exFPDF
             $p['nombre_completo'] ?? null,
             $p['celular'] ?? null,
             $p['fecha_nacimiento'] ?? null,
+            $p['cargo'] ?? null,
             $p['tipo'] ?? null,
             $p['areas_a_cargo'] ?? null,
             ($p['usuario'] ?? null)
@@ -1440,9 +1443,9 @@ class Reportes extends exFPDF
             ],
             tituloTabla: 'PERSONAS',
             columnas: [
-                ['#', 8, 'C'], ['CI', 24, 'L'], ['NOMBRE COMPLETO', 58, 'L'], ['CELULAR', 24, 'L'],
-                ['F. NACIMIENTO', 24, 'C'], ['TIPO', 24, 'L'], ['ÁREAS A CARGO', 40, 'L'], ['USUARIO', 41, 'L'],
-                ['ESTADO', 20, 'C'],
+                ['#', 8, 'C'], ['CI', 24, 'L'], ['NOMBRE COMPLETO', 50, 'L'], ['CELULAR', 24, 'L'],
+                ['F. NACIMIENTO', 22, 'C'], ['CARGO', 28, 'L'], ['TIPO', 20, 'L'], ['ÁREAS A CARGO', 32, 'L'],
+                ['USUARIO', 35, 'L'], ['ESTADO', 20, 'C'],
             ],
             filas: $filas,
             mensajeVacio: 'No hay personas que coincidan con los filtros seleccionados.',

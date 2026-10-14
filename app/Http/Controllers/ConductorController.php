@@ -7,6 +7,7 @@ use App\Http\Requests\ConductorRequest;
 use App\Libraries\Reportes;
 use App\Libraries\ReportesExcel;
 use App\Models\Asignacion;
+use App\Models\Cargo;
 use App\Models\Conductor;
 use App\Models\DocumentoConductor;
 use App\Models\Persona;
@@ -114,8 +115,14 @@ class ConductorController extends Controller
      */
     private function consultaListado(Request $request): Builder
     {
+        // select explícito = el mismo resultado que el "*" de antes (columnas
+        // de conductor y luego las de persona) más el nombre del cargo. El
+        // cargo va por join y no como relación persona.cargo: eso cargaría la
+        // persona entera por fila, con sus appends (consultas extra).
         $query = Conductor::query()->with('asignacionesActivas')
-            ->join('persona', 'persona.id', '=', 'conductor.id');
+            ->join('persona', 'persona.id', '=', 'conductor.id')
+            ->leftJoin('cargo', 'cargo.id', '=', 'persona.id_cargo')
+            ->select('conductor.*', 'persona.*', 'cargo.cargo as nombre_cargo');
 
         if ($request->filled('ci')) {
             $query->where('persona.ci', 'like', '%'.$request->ci.'%');
@@ -155,6 +162,7 @@ class ConductorController extends Controller
                     'materno' => $conductor->materno,
                     'nombre_completo' => trim(implode(' ', array_filter([$conductor->nombres, $conductor->paterno, $conductor->materno]))) ?: null,
                     'celular' => $conductor->celular,
+                    'cargo' => $conductor->nombre_cargo,
                     'licencia_numero' => $licencia?->numero_documento,
                     'licencia_categoria' => $licencia?->categoria,
                     'licencia_vencimiento' => $licencia?->fecha_vencimiento?->format('d/m/Y'),
@@ -201,6 +209,7 @@ class ConductorController extends Controller
     {
         return Inertia::render('Conductores/Form', [
             'vehiculos' => $this->vehiculosParaAsignar(),
+            'cargos' => Cargo::seleccionables(),
         ]);
     }
 
@@ -256,7 +265,7 @@ class ConductorController extends Controller
     public function show(Conductor $conductor): Response
     {
         $conductor->load([
-            'persona',
+            'persona.cargo:id,cargo',
             'asignacionesActivas.tipoVehiculo',
             'asignacionesActivas.tipoCombustible',
             'documentos',
@@ -300,6 +309,7 @@ class ConductorController extends Controller
 
         return Inertia::render('Conductores/Form', [
             'conductor' => $conductor,
+            'cargos' => Cargo::seleccionables($conductor->persona?->id_cargo),
             // Sólo informativo: la asignación de vehículo se gestiona desde el
             // listado de operarios, no desde este formulario.
             'asignacionActual' => $this->asignacionActual($conductor),

@@ -11,6 +11,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/AreaController.php,resources/js/Pages/Areas/**,routes/web.php | .ai/rules/areas.md |
 | app/Actions/CargaCombustible/ListCargaCombustibleAction.php | .ai/rules/carga-combustible.md |
 | app/Notifications/*.php,app/Channels/*.php | .ai/rules/channels.md |
+| app/Http/Requests/**/*.php,resources/js/Components/*FormModal.vue,resources/js/Components/CargoSelect.vue,bootstrap/app.php | .ai/rules/components-js-components.md |
 | resources/js/Components/DateTimeInput.vue,resources/js/Pages/**/*.vue | .ai/rules/components-js-pages.md |
 | resources/js/Components/ConexionAviso.vue,resources/js/app.js | .ai/rules/components-js.md |
 | resources/js/Components/PageLoader.vue | .ai/rules/components.md |
@@ -61,6 +62,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/CargasCombustibleReportController.php,app/Libraries/Reportes.php,resources/js/Pages/Reportes/CargasCombustibleReporte.vue | .ai/rules/pages-reportes.md |
 | app/Http/Requests/VehiculoRequest.php,resources/js/Pages/Vehiculos/Create.vue,resources/js/Pages/Vehiculos/Index.vue | .ai/rules/pages-vehiculos.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
+| app/Models/Cargo.php,app/Http/Controllers/CargoController.php,app/Http/Requests/CargoRequest.php,resources/js/Pages/Cargos/**,resources/js/Components/CargoSelect.vue,app/Http/Requests/PersonaRequest.php,app/Http/Requests/ConductorRequest.php,app/Actions/Personas/*.php,database/migrations/2026_10_14_* | .ai/rules/personas-migrations.md |
 | app/Http/Controllers/ProfileController.php,app/Http/Requests/ProfileUpdateRequest.php,resources/js/Pages/Profile/Edit.vue | .ai/rules/profile.md |
 | app/Http/Controllers/ControlCargasReportController.php,resources/js/Pages/Reportes/ControlCargasReporte.vue,app/Libraries/Reportes.php, app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue,app/Libraries/Reportes.php | .ai/rules/reportes-libraries.md |
 | resources/js/Pages/Reportes/OperacionDiariaReporte.vue,resources/js/Pages/Reportes/OperacionDiariaDetalle.vue | .ai/rules/reportes.md |

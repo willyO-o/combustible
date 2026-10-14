@@ -271,6 +271,16 @@ return [
             ],
         ],
 
+        'cargos' => [
+            'label' => 'Cargos',
+            'permisos' => [
+                'cargos.ver' => 'Ver',
+                'cargos.crear' => 'Crear',
+                'cargos.editar' => 'Editar',
+                'cargos.eliminar' => 'Eliminar',
+            ],
+        ],
+
         'roles' => [
             'label' => 'Roles y Permisos',
             'permisos' => [

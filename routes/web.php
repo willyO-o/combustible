@@ -5,6 +5,7 @@ use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\CargaCombustibleController;
 use App\Http\Controllers\CargaMaterialController;
 use App\Http\Controllers\CargasCombustibleReportController;
+use App\Http\Controllers\CargoController;
 use App\Http\Controllers\ConductorController;
 use App\Http\Controllers\ControlCargasReportController;
 use App\Http\Controllers\DashboardController;
@@ -121,6 +122,13 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('grupos-vehiculo', GrupoVehiculoController::class)
         ->parameters(['grupos-vehiculo' => 'grupoVehiculo'])
+        ->only(['index', 'store', 'update', 'destroy']);
+
+    // Cargos del personal. El alta rápida (JSON, desde el selector de cargo
+    // de Personas/Conductores) va antes del resource.
+    Route::post('cargos/rapido', [CargoController::class, 'storeRapido'])->name('cargos.store-rapido');
+    Route::resource('cargos', CargoController::class)
+        ->parameters(['cargos' => 'cargo'])
         ->only(['index', 'store', 'update', 'destroy']);
 
     Route::resource('tipos-vehiculo', TipoVehiculoController::class)

@@ -6,12 +6,14 @@ import SearchSelect from '@/Components/SearchSelect.vue'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 import CiInput from '@/Components/CiInput.vue'
 import RolesSelector from '@/Components/RolesSelector.vue'
+import CargoSelect from '@/Components/CargoSelect.vue'
 import { etiquetaRol } from '@/Utils/rolUtil'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     areas: Array,
     roles: Array, // [{ id, name }] roles asignables (todos salvo los ocultos)
+    cargos: { type: Array, default: () => [] }, // [{ id, cargo, estado_cargo }] Cargo::seleccionables()
 })
 
 const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10)
@@ -26,6 +28,9 @@ const form = useForm({
     direccion: '',
     fecha_nacimiento: '',
     estado_persona: 'ACTIVO',
+
+    // Cargo del personal (opcional, independiente de los roles).
+    id_cargo: '',
 
     // Uno o varios roles (nombres). Vacío = "personal".
     roles: [],
@@ -179,6 +184,10 @@ function submit() {
                                     <option value="RETIRADO">RETIRADO</option>
                                 </select>
                                 <div v-if="form.errors.estado_persona" class="invalid-feedback">{{ form.errors.estado_persona }}</div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-4">
+                                <CargoSelect v-model="form.id_cargo" :cargos="props.cargos" :error="form.errors.id_cargo" />
                             </div>
 
                             <div class="col-12">

@@ -7,6 +7,8 @@ use Illuminate\Validation\Rule;
 
 class MaterialRequest extends FormRequest
 {
+    use RespondeErroresEnJson;
+
     public function authorize(): bool
     {
         return true;

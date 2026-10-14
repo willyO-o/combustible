@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Area;
 use App\Models\Asignacion;
+use App\Models\Cargo;
 use App\Models\Conductor;
 use App\Models\EncargadoArea;
 use App\Models\Persona;
@@ -15,6 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
+use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -533,21 +535,22 @@ class PersonaControllerTest extends TestCase
         $this->assertSame(now()->subYears(40)->subDay()->format('d/m/Y'), $filaJefe[6]);
         $this->assertSame(40, (int) $filaJefe[7]);
         $this->assertIsNumeric($filaJefe[7], 'La edad debe escribirse como número.');
-        $this->assertSame('Jefe de Área', $filaJefe[8]);
-        $this->assertSame('Mina Norte', $filaJefe[9]);
-        $this->assertSame('ana.rojas@empresa.com', $filaJefe[10]);
-        $this->assertSame('ACTIVO', $filaJefe[11]);
+        $this->assertSame('Jefe de Área', $filaJefe[9]);
+        $this->assertSame('Mina Norte', $filaJefe[10]);
+        $this->assertSame('ana.rojas@empresa.com', $filaJefe[11]);
+        $this->assertSame('ACTIVO', $filaJefe[12]);
 
-        $this->assertSame('Conductor', $filaDe('5550002')[8]);
+        $this->assertSame('Conductor', $filaDe('5550002')[9]);
 
         $filaSinNada = $filaDe('5550003');
         // Sin relaciones ligadas: celdas en blanco, sin textos de relleno.
-        $this->assertNull($filaSinNada[8]);
+        $this->assertNull($filaSinNada[8], 'Sin cargo asignado: la celda CARGO queda en blanco.');
         $this->assertNull($filaSinNada[9]);
+        $this->assertNull($filaSinNada[10]);
         $this->assertNull($filaSinNada[6]);
         $this->assertNull($filaSinNada[7]);
-        $this->assertNull($filaSinNada[10]);
         $this->assertNull($filaSinNada[11]);
+        $this->assertNull($filaSinNada[12]);
 
         $this->actingAs($this->admin)->get(route('personas.reporte.pdf'))->assertOk();
     }
@@ -917,5 +920,156 @@ class PersonaControllerTest extends TestCase
         $this->actingAs($this->admin)->get(route('personas.edit', $persona))
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('rolesAsignados', ['conductor']));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payloadPersonaConCargo(array $extra = []): array
+    {
+        return array_merge([
+            'ci' => '9990001',
+            'nombres' => 'Lucía',
+            'paterno' => 'Vargas',
+            'estado_persona' => 'ACTIVO',
+            'roles' => [],
+            'crear_usuario' => false,
+        ], $extra);
+    }
+
+    public function test_registra_la_persona_con_su_cargo(): void
+    {
+        $cargo = Cargo::where('cargo', 'Analista')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->post(route('personas.store'), $this->payloadPersonaConCargo(['id_cargo' => $cargo->id]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('personas.index'));
+
+        $this->assertSame($cargo->id, Persona::where('ci', '9990001')->value('id_cargo'));
+    }
+
+    public function test_el_cargo_es_opcional(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('personas.store'), $this->payloadPersonaConCargo(['id_cargo' => '']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull(Persona::where('ci', '9990001')->value('id_cargo'));
+    }
+
+    public function test_no_permite_asignar_un_cargo_inactivo(): void
+    {
+        $inactivo = Cargo::factory()->inactivo()->create();
+
+        $this->actingAs($this->admin)
+            ->post(route('personas.store'), $this->payloadPersonaConCargo(['id_cargo' => $inactivo->id]))
+            ->assertSessionHasErrors(['id_cargo' => 'El cargo seleccionado no existe o está inactivo.']);
+
+        $this->assertDatabaseMissing('persona', ['ci' => '9990001']);
+    }
+
+    public function test_al_editar_conserva_el_cargo_actual_aunque_se_haya_desactivado(): void
+    {
+        $cargo = Cargo::factory()->create(['cargo' => 'Cadenero']);
+        $persona = Persona::factory()->create(['id_cargo' => $cargo->id, 'estado_persona' => 'ACTIVO']);
+        $cargo->update(['estado_cargo' => 'INACTIVO']);
+
+        $this->actingAs($this->admin)->get(route('personas.edit', $persona))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('cargos', fn ($cargos) => collect($cargos)->pluck('cargo')->contains('Cadenero'))
+            );
+
+        $this->actingAs($this->admin)->post(route('personas.update', $persona), [
+            '_method' => 'PUT',
+            'ci' => $persona->ci,
+            'nombres' => 'Nombre corregido',
+            'paterno' => $persona->paterno ?? 'Perez',
+            'estado_persona' => 'ACTIVO',
+            'roles' => [],
+            'id_cargo' => $cargo->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($cargo->id, $persona->fresh()->id_cargo);
+        $this->assertSame('Nombre corregido', $persona->fresh()->nombres);
+    }
+
+    public function test_al_editar_se_puede_quitar_el_cargo(): void
+    {
+        $persona = Persona::factory()->create([
+            'id_cargo' => Cargo::where('cargo', 'Supervisor')->value('id'),
+            'estado_persona' => 'ACTIVO',
+        ]);
+
+        $this->actingAs($this->admin)->post(route('personas.update', $persona), [
+            '_method' => 'PUT',
+            'ci' => $persona->ci,
+            'nombres' => $persona->nombres,
+            'paterno' => $persona->paterno ?? 'Perez',
+            'estado_persona' => 'ACTIVO',
+            'roles' => [],
+            'id_cargo' => '',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($persona->fresh()->id_cargo);
+    }
+
+    public function test_create_ofrece_solo_los_cargos_activos(): void
+    {
+        Cargo::factory()->inactivo()->create(['cargo' => 'Desactivado']);
+
+        $this->actingAs($this->admin)->get(route('personas.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('cargos', fn ($cargos) => collect($cargos)->pluck('cargo')->contains('Técnico')
+                    && ! collect($cargos)->pluck('cargo')->contains('Desactivado'))
+            );
+    }
+
+    public function test_el_listado_muestra_y_filtra_por_cargo(): void
+    {
+        $tecnico = Cargo::where('cargo', 'Técnico')->firstOrFail();
+        Persona::factory()->create(['ci' => '8000001', 'id_cargo' => $tecnico->id]);
+        Persona::factory()->create(['ci' => '8000002', 'id_cargo' => null]);
+
+        $this->actingAs($this->admin)->get(route('personas.index', ['id_cargo' => $tecnico->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('personas.data', 1)
+                ->where('personas.data.0.ci', '8000001')
+                ->where('personas.data.0.cargo.cargo', 'Técnico')
+                ->where('filters.id_cargo', (string) $tecnico->id)
+                ->has('cargos')
+            );
+
+        $this->actingAs($this->admin)->get(route('personas.index', ['id_cargo' => 'ninguno']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('personas.data', fn ($personas) => collect($personas)->pluck('ci')->contains('8000002')
+                    && ! collect($personas)->pluck('ci')->contains('8000001'))
+            );
+    }
+
+    public function test_los_reportes_de_personas_traen_el_cargo_y_respetan_su_filtro(): void
+    {
+        $supervisor = Cargo::where('cargo', 'Supervisor')->firstOrFail();
+        Persona::factory()->create(['ci' => '8100001', 'id_cargo' => $supervisor->id]);
+        Persona::factory()->create(['ci' => '8100002']);
+
+        $celdas = $this->celdasDelExcel(
+            $this->actingAs($this->admin)
+                ->get(route('personas.reporte.excel', ['id_cargo' => $supervisor->id]))
+                ->assertOk()
+                ->getContent()
+        );
+
+        $fila = $celdas->first(fn ($f) => in_array('8100001', $f, true));
+        $this->assertSame('Supervisor', $fila[8]);
+        $this->assertNull($celdas->first(fn ($f) => in_array('8100002', $f, true)));
+        // El encabezado deja constancia del filtro por cargo.
+        $this->assertNotNull($celdas->first(fn ($f) => collect($f)->contains(fn ($v) => is_string($v) && str_contains($v, 'Cargo: Supervisor'))));
+
+        $this->actingAs($this->admin)->get(route('personas.reporte.pdf', ['id_cargo' => $supervisor->id]))->assertOk();
     }
 }

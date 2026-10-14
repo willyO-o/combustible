@@ -137,6 +137,7 @@ const camposPersona = computed(() => {
 
     return [
         { etiqueta: 'C.I.', valor: p.ci },
+        { etiqueta: 'Cargo', valor: p.cargo },
         { etiqueta: 'Nombres', valor: p.nombres },
         { etiqueta: 'Apellido paterno', valor: p.paterno },
         { etiqueta: 'Apellido materno', valor: p.materno },
@@ -225,6 +226,9 @@ const totalVehiculosACargo = computed(() =>
 
                     <div class="w-100">
                         <h2 class="fs-16 fw-semibold mb-1 text-break">{{ nombreVisible }}</h2>
+                        <span v-if="persona?.cargo" class="d-block fs-13 fw-medium perfil-cargo mb-1">
+                            <i class="ri-briefcase-line me-1" aria-hidden="true"></i>{{ persona.cargo }}
+                        </span>
                         <span class="text-muted fs-13 text-break">{{ usuario.email }}</span>
                     </div>
 

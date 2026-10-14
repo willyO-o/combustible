@@ -8,6 +8,7 @@ use App\Http\Requests\PersonaRequest;
 use App\Libraries\Reportes;
 use App\Libraries\ReportesExcel;
 use App\Models\Area;
+use App\Models\Cargo;
 use App\Models\Persona;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +26,12 @@ class PersonaController extends Controller
     /**
      * Filtros del listado; el PDF y el Excel reciben exactamente los mismos.
      */
-    private const FILTROS_LISTADO = ['ci', 'nombres', 'paterno', 'celular'];
+    private const FILTROS_LISTADO = ['ci', 'nombres', 'paterno', 'celular', 'id_cargo'];
+
+    /**
+     * Valor del filtro de cargo para "personas sin cargo asignado".
+     */
+    private const SIN_CARGO = 'ninguno';
 
     public function index(Request $request): Response
     {
@@ -40,6 +46,9 @@ class PersonaController extends Controller
             // tarjetas (mobile). Ver .ai/rules/pages.md.
             'personas' => Inertia::scroll($personas),
             'filters' => $request->only(self::FILTROS_LISTADO),
+            // Todos (también los inactivos): sirve para filtrar personas que
+            // aún tienen un cargo ya desactivado.
+            'cargos' => Cargo::orderBy('cargo')->get(['id', 'cargo', 'estado_cargo']),
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),
@@ -109,7 +118,7 @@ class PersonaController extends Controller
      */
     private function consultaListado(Request $request): Builder
     {
-        $query = Persona::with(['user', 'conductor', 'encargadoAreas']);
+        $query = Persona::with(['user', 'conductor', 'encargadoAreas', 'cargo:id,cargo']);
 
         if ($request->filled('ci')) {
             $query->where('ci', 'like', '%'.$request->ci.'%');
@@ -122,6 +131,11 @@ class PersonaController extends Controller
         }
         if ($request->filled('celular')) {
             $query->where('celular', 'like', '%'.$request->celular.'%');
+        }
+        if ($request->filled('id_cargo')) {
+            $request->input('id_cargo') === self::SIN_CARGO
+                ? $query->whereNull('id_cargo')
+                : $query->where('id_cargo', (int) $request->input('id_cargo'));
         }
 
         return $query->orderBy('id', 'desc');
@@ -146,6 +160,7 @@ class PersonaController extends Controller
                 'materno' => $persona->materno,
                 'nombre_completo' => trim(implode(' ', array_filter([$persona->nombres, $persona->paterno, $persona->materno]))) ?: null,
                 'celular' => $persona->celular,
+                'cargo' => $persona->cargo?->cargo,
                 'fecha_nacimiento' => $persona->fecha_nacimiento?->format('d/m/Y'),
                 'edad' => $persona->fecha_nacimiento?->age,
                 'tipo' => match (true) {
@@ -186,6 +201,11 @@ class PersonaController extends Controller
             'Nombres' => $request->filled('nombres') ? (string) $request->nombres : null,
             'Apellido paterno' => $request->filled('paterno') ? (string) $request->paterno : null,
             'Celular' => $request->filled('celular') ? (string) $request->celular : null,
+            'Cargo' => match (true) {
+                ! $request->filled('id_cargo') => null,
+                $request->input('id_cargo') === self::SIN_CARGO => 'Sin cargo asignado',
+                default => Cargo::whereKey((int) $request->input('id_cargo'))->value('cargo'),
+            },
         ];
     }
 
@@ -243,6 +263,7 @@ class PersonaController extends Controller
         return Inertia::render('Personas/Create', [
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
             'roles' => $this->rolesAsignables(),
+            'cargos' => Cargo::seleccionables(),
         ]);
     }
 
@@ -275,6 +296,7 @@ class PersonaController extends Controller
             'areaActual' => $persona->encargadoAreas->first(),
             'roles' => $this->rolesAsignables(),
             'rolesAsignados' => $persona->rolesParaFormulario(),
+            'cargos' => Cargo::seleccionables($persona->id_cargo),
         ]);
     }
 

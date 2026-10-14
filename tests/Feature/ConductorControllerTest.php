@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Asignacion;
+use App\Models\Cargo;
 use App\Models\Conductor;
 use App\Models\DocumentoConductor;
 use App\Models\Persona;
@@ -670,13 +671,14 @@ class ConductorControllerTest extends TestCase
 
         $this->assertNotNull($fila, 'El Excel no contiene la fila del conductor.');
         $this->assertSame(['7654321', 'Juan', 'Pérez', 'Quispe', '71234567'], array_slice($fila, 1, 5));
-        $this->assertSame('LIC-ACTUAL', $fila[6]);
-        $this->assertSame('C', $fila[7]);
-        $this->assertSame(now()->addYear()->format('d/m/Y'), $fila[8]);
-        $this->assertSame('Vigente', $fila[9]);
-        $this->assertStringContainsString('VOL-01 — 1111AAA', $fila[10]);
-        $this->assertStringContainsString('CAM-02 — 2222BBB (Provisional)', $fila[10]);
-        $this->assertSame('ACTIVO', $fila[11]);
+        $this->assertNull($fila[6], 'Sin cargo asignado: la celda CARGO queda en blanco.');
+        $this->assertSame('LIC-ACTUAL', $fila[7]);
+        $this->assertSame('C', $fila[8]);
+        $this->assertSame(now()->addYear()->format('d/m/Y'), $fila[9]);
+        $this->assertSame('Vigente', $fila[10]);
+        $this->assertStringContainsString('VOL-01 — 1111AAA', $fila[11]);
+        $this->assertStringContainsString('CAM-02 — 2222BBB (Provisional)', $fila[11]);
+        $this->assertSame('ACTIVO', $fila[12]);
     }
 
     public function test_el_excel_marca_la_licencia_vencida_y_los_datos_faltantes(): void
@@ -690,15 +692,16 @@ class ConductorControllerTest extends TestCase
         );
 
         $vencida = $celdas->first(fn ($f) => in_array('LIC-VENCIDA', $f, true));
-        $this->assertSame('Vencida', $vencida[9]);
+        $this->assertSame('Vencida', $vencida[10]);
 
         $vacia = $celdas->first(fn ($f) => in_array($sinNada->persona->ci, $f, true));
-        // Sin licencia ni vehículo: celdas en blanco, sin textos de relleno.
+        // Sin cargo, licencia ni vehículo: celdas en blanco, sin textos de relleno.
         $this->assertNull($vacia[6]);
         $this->assertNull($vacia[7]);
         $this->assertNull($vacia[8]);
         $this->assertNull($vacia[9]);
         $this->assertNull($vacia[10]);
+        $this->assertNull($vacia[11]);
 
         $this->actingAs($this->admin)->get(route('conductores.reporte.pdf'))->assertOk();
     }
@@ -833,5 +836,88 @@ class ConductorControllerTest extends TestCase
     {
         $this->get(route('conductores.reporte.pdf'))->assertRedirect(route('login'));
         $this->get(route('conductores.reporte.excel'))->assertRedirect(route('login'));
+    }
+
+    public function test_store_registra_el_cargo_del_conductor(): void
+    {
+        $cargo = Cargo::where('cargo', 'Técnico')->firstOrFail();
+
+        $this->actingAs($this->admin)->post(route('conductores.store'), [
+            'ci' => '6670001',
+            'nombres' => 'Pablo',
+            'paterno' => 'Cruz',
+            'estado_conductor' => 'ACTIVO',
+            'id_cargo' => $cargo->id,
+        ])->assertSessionHasNoErrors()->assertRedirect(route('conductores.index'));
+
+        $this->assertSame($cargo->id, Persona::where('ci', '6670001')->value('id_cargo'));
+    }
+
+    public function test_store_rechaza_un_cargo_inactivo(): void
+    {
+        $inactivo = Cargo::factory()->inactivo()->create();
+
+        $this->actingAs($this->admin)->post(route('conductores.store'), [
+            'ci' => '6670002',
+            'nombres' => 'Pablo',
+            'paterno' => 'Cruz',
+            'estado_conductor' => 'ACTIVO',
+            'id_cargo' => $inactivo->id,
+        ])->assertSessionHasErrors('id_cargo');
+
+        $this->assertDatabaseMissing('persona', ['ci' => '6670002']);
+    }
+
+    public function test_update_sin_id_cargo_no_borra_el_cargo_y_con_valor_lo_cambia(): void
+    {
+        $tecnico = Cargo::where('cargo', 'Técnico')->firstOrFail();
+        $analista = Cargo::where('cargo', 'Analista')->firstOrFail();
+        $conductor = Conductor::factory()->create();
+        $conductor->persona->update(['id_cargo' => $tecnico->id]);
+
+        $datos = [
+            'ci' => $conductor->persona->ci,
+            'nombres' => 'Nombre',
+            'paterno' => 'Apellido',
+            'estado_conductor' => 'ACTIVO',
+        ];
+
+        $this->actingAs($this->admin)->put(route('conductores.update', $conductor->id), $datos)->assertSessionHasNoErrors();
+        $this->assertSame($tecnico->id, $conductor->persona->fresh()->id_cargo);
+
+        $this->actingAs($this->admin)->put(route('conductores.update', $conductor->id), $datos + ['id_cargo' => $analista->id])
+            ->assertSessionHasNoErrors();
+        $this->assertSame($analista->id, $conductor->persona->fresh()->id_cargo);
+    }
+
+    public function test_listado_ficha_formulario_y_excel_muestran_el_cargo(): void
+    {
+        $supervisor = Cargo::where('cargo', 'Supervisor')->firstOrFail();
+        $conductor = Conductor::factory()->create();
+        $conductor->persona->update(['ci' => '6680001', 'id_cargo' => $supervisor->id]);
+
+        $this->actingAs($this->admin)->get(route('conductores.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('conductores.data.0.nombre_cargo', 'Supervisor')
+                // El join con cargo no pisa el id del conductor.
+                ->where('conductores.data.0.id', $conductor->id)
+            );
+
+        $this->actingAs($this->admin)->get(route('conductores.show', $conductor->id))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('conductor.persona.cargo.cargo', 'Supervisor'));
+
+        $this->actingAs($this->admin)->get(route('conductores.edit', $conductor->id))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('conductor.persona.id_cargo', $supervisor->id)
+                ->where('cargos', fn ($cargos) => collect($cargos)->pluck('id')->contains($supervisor->id))
+            );
+
+        $fila = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('conductores.reporte.excel'))->assertOk()->getContent()
+        )->first(fn ($f) => in_array('6680001', $f, true));
+        $this->assertSame('Supervisor', $fila[6]);
     }
 }

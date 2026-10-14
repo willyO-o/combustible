@@ -322,6 +322,7 @@ const tipoAsignacionBadge = (tipo) =>
                                 <th>Foto</th>
                                 <th>CI</th>
                                 <th>Nombre Completo</th>
+                                <th>Cargo</th>
                                 <th>Celular</th>
                                 <th>Vehiculos Asignados</th>
                                 <th>Estado</th>
@@ -330,7 +331,7 @@ const tipoAsignacionBadge = (tipo) =>
                         </thead>
                         <tbody>
                             <tr v-if="conductores.data.length === 0">
-                                <td colspan="8" class="text-center py-4 text-muted">
+                                <td colspan="9" class="text-center py-4 text-muted">
                                     <i class="ri-user-search-line fs-3 d-block mb-2"></i>
                                     No se encontraron conductores
                                 </td>
@@ -346,6 +347,10 @@ const tipoAsignacionBadge = (tipo) =>
                                 <td><span class="fw-medium">{{ conductor.ci }}</span></td>
                                 <td>{{ conductor.nombres }} {{ conductor.paterno ?? '—' }} {{ conductor.materno ?? '—'
                                 }}</td>
+                                <td>
+                                    <span v-if="conductor.nombre_cargo" class="fw-medium">{{ conductor.nombre_cargo }}</span>
+                                    <span v-else class="text-muted">Sin cargo</span>
+                                </td>
                                 <td> {{ conductor.celular ?? '—' }} </td>
 
                                 <td>
@@ -445,6 +450,11 @@ const tipoAsignacionBadge = (tipo) =>
                             <div class="col-6">
                                 <span class="text-muted d-block">Celular</span>
                                 <span>{{ conductor.celular ?? '—' }}</span>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Cargo</span>
+                                <span v-if="conductor.nombre_cargo" class="fw-medium">{{ conductor.nombre_cargo }}</span>
+                                <span v-else class="text-muted">Sin cargo</span>
                             </div>
                             <div class="col-6">
                                 <span class="text-muted d-block">Vehículo(s) asignado(s)</span>

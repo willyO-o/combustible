@@ -143,4 +143,41 @@ class MaterialControllerTest extends TestCase
         $response->assertRedirect(route('materiales.index'));
         $this->assertDatabaseHas('material', ['id' => $material->id]);
     }
+
+    /**
+     * MaterialFormModal.vue y el alta rápida de ControlCargas/Show.vue envían
+     * por axios: ante un nombre repetido deben recibir 422 con el error en
+     * JSON. Antes recibían un redirect (las rutas web no respondían JSON),
+     * axios lo seguía y el modal se cerraba como si hubiera guardado.
+     */
+    public function test_el_modal_recibe_el_error_de_nombre_repetido_en_json(): void
+    {
+        Material::factory()->create(['material' => 'Broza']);
+
+        $this->postJson(route('materiales.store'), ['material' => 'Broza'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['material']);
+
+        $this->assertSame(1, Material::where('material', 'Broza')->count());
+    }
+
+    public function test_editar_desde_el_modal_tambien_recibe_los_errores_en_json(): void
+    {
+        Material::factory()->create(['material' => 'Cola']);
+        $otro = Material::factory()->create(['material' => 'Concentrado']);
+
+        $this->putJson(route('materiales.update', $otro), ['material' => 'Cola'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['material']);
+
+        $this->assertSame('Concentrado', $otro->fresh()->material);
+    }
+
+    public function test_un_formulario_normal_sigue_recibiendo_redirect_con_errores(): void
+    {
+        $this->from(route('materiales.index'))
+            ->post(route('materiales.store'), ['material' => ''])
+            ->assertRedirect(route('materiales.index'))
+            ->assertSessionHasErrors('material');
+    }
 }

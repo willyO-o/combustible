@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Area;
 use App\Models\Asignacion;
+use App\Models\Cargo;
 use App\Models\Conductor;
 use App\Models\DocumentoConductor;
 use App\Models\Persona;
@@ -249,6 +250,7 @@ class ProfileTest extends TestCase
         Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
 
         $persona = Persona::factory()->create([
+            'id_cargo' => Cargo::where('cargo', 'Supervisor')->value('id'),
             'ci' => '6543210',
             'nombres' => 'Marta',
             'paterno' => 'Choque',
@@ -311,6 +313,7 @@ class ProfileTest extends TestCase
                 ->where('ficha.persona.nombre_completo', 'Marta Choque Lima')
                 ->where('ficha.persona.fecha_nacimiento', '20/05/1990')
                 ->where('ficha.persona.estado_persona', 'ACTIVO')
+                ->where('ficha.persona.cargo', 'Supervisor')
                 ->where('ficha.conductor.estado', 'ACTIVO')
                 ->where('ficha.conductor.licencia.numero', 'LIC-999')
                 ->where('ficha.conductor.licencia.vencida', true)

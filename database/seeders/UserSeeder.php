@@ -240,6 +240,21 @@ class UserSeeder extends Seeder
     }
 
     /**
+     * Administración (App\Http\Controllers\CargoController): catálogo de
+     * cargos del personal que se elige al registrar personas y conductores.
+     * Igual que Personas, sólo para el administrador (todosLosPermisos()).
+     */
+    private function permisosCargos(): array
+    {
+        return [
+            'cargos.ver',
+            'cargos.crear',
+            'cargos.editar',
+            'cargos.eliminar',
+        ];
+    }
+
+    /**
      * Control de Cargas (App\Http\Controllers\MaterialController): catálogo
      * de materiales usado por el módulo de control de cargas.
      */
@@ -407,6 +422,7 @@ class UserSeeder extends Seeder
             ...$this->permisosUsuarios(),
             ...$this->permisosAreas(),
             ...$this->permisosPersonas(),
+            ...$this->permisosCargos(),
             ...$this->permisosMateriales(),
             ...$this->permisosVehiculosExternos(),
             ...$this->permisosControlCargas(),

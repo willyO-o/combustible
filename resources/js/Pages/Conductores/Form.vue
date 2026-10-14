@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Multiselect from '@vueform/multiselect'
 import CiInput from '@/Components/CiInput.vue'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
+import CargoSelect from '@/Components/CargoSelect.vue'
 
 defineOptions({ layout: Maindashboard })
 
@@ -14,6 +15,11 @@ const props = defineProps({
     asignacionActual: Object,
     // Vehículos activos para el selector de asignación (sólo al registrar).
     vehiculos: {
+        type: Array,
+        default: () => [],
+    },
+    // [{ id, cargo, estado_cargo }] Cargo::seleccionables() (alta y edición).
+    cargos: {
         type: Array,
         default: () => [],
     },
@@ -39,6 +45,8 @@ const form = useForm({
         ? persona.value.fecha_nacimiento.substring(0, 10)
         : '',
     estado_conductor: props.conductor?.estado_conductor ?? 'ACTIVO',
+    // Cargo del personal (opcional; vive en persona como el resto de datos personales).
+    id_cargo: persona.value.id_cargo ?? '',
     documentos: (props.conductor?.documentos ?? []).map((documento) => ({
         id: documento.id,
         tipo_documento: documento.tipo_documento,
@@ -375,6 +383,11 @@ function submit() {
                                     <option value="RETIRADO">RETIRADO</option>
                                 </select>
                                 <div v-if="form.errors.estado_conductor" class="invalid-feedback">{{ form.errors.estado_conductor }}</div>
+                            </div>
+
+                            <!-- Cargo -->
+                            <div class="col-sm-6 col-xl-4">
+                                <CargoSelect v-model="form.id_cargo" :cargos="props.cargos" :error="form.errors.id_cargo" />
                             </div>
 
                             <!-- Dirección -->

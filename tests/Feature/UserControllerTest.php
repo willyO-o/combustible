@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Area;
 use App\Models\Asignacion;
+use App\Models\Cargo;
 use App\Models\Conductor;
 use App\Models\Persona;
 use App\Models\User;
@@ -459,5 +460,21 @@ class UserControllerTest extends TestCase
         $this->actingAs($this->admin)->get(route('usuarios.edit', $usuario->id))
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('rolesAsignados', fn ($roles) => collect($roles)->sort()->values()->all() === ['conductor', 'jefe-area']));
+    }
+
+    public function test_editar_un_usuario_no_borra_el_cargo_de_su_persona(): void
+    {
+        $cargo = Cargo::where('cargo', 'Analista')->firstOrFail();
+        $persona = Persona::factory()->create(['id_cargo' => $cargo->id]);
+        $usuario = User::factory()->create(['id_persona' => $persona->id, 'email' => 'cargo@example.com']);
+
+        $this->actingAs($this->admin)->post(route('usuarios.update', $usuario->id), [
+            '_method' => 'PUT',
+            'email' => 'cargo@example.com',
+            'estado_usuario' => 'ACTIVO',
+            'roles' => ['administrador'],
+        ])->assertRedirect(route('usuarios.index'));
+
+        $this->assertSame($cargo->id, $persona->fresh()->id_cargo);
     }
 }

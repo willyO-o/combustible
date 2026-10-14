@@ -54,6 +54,7 @@ class ProfileController extends Controller
         // relaciones también viajarían dentro del prop `usuario`.
         $usuario = User::with([
             'roles',
+            'persona.cargo:id,cargo',
             'persona.conductor.asignacionesActivas',
             'persona.encargadoAreas',
         ])->findOrFail($usuario->id);
@@ -77,6 +78,7 @@ class ProfileController extends Controller
                 'fecha_nacimiento' => $persona->f_nacimiento_formatted,
                 'edad' => $persona->edad,
                 'estado_persona' => $persona->estado_persona,
+                'cargo' => $persona->cargo?->cargo,
             ] : null,
             'conductor' => $conductor ? [
                 'estado' => $conductor->estado_conductor,

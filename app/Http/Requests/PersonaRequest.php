@@ -41,6 +41,16 @@ class PersonaRequest extends FormRequest
             'direccion' => ['nullable', 'string', 'max:250'],
             'fecha_nacimiento' => ['nullable', 'date'],
             'estado_persona' => ['required', Rule::in(['ACTIVO', 'INACTIVO', 'RETIRADO'])],
+            // Cargo del personal (opcional). Sólo cargos ACTIVOS; al editar
+            // también se acepta el que ya tiene aunque luego se haya
+            // desactivado, para no bloquear la edición de otros datos.
+            'id_cargo' => [
+                'nullable',
+                'integer',
+                Rule::exists('cargo', 'id')->where(fn ($query) => $query->where(
+                    fn ($query) => $query->where('estado_cargo', 'ACTIVO')->orWhere('id', $persona?->id_cargo)
+                )),
+            ],
 
             // Una persona puede tener varios roles a la vez (mismo catálogo
             // que el módulo de Usuarios: todos salvo los ocultos). Sin roles,
@@ -97,6 +107,7 @@ class PersonaRequest extends FormRequest
             'direccion' => 'dirección',
             'fecha_nacimiento' => 'fecha de nacimiento',
             'estado_persona' => 'estado',
+            'id_cargo' => 'cargo',
             'roles' => 'roles',
             'roles.*' => 'rol',
             'email' => 'correo electrónico',
@@ -109,6 +120,13 @@ class PersonaRequest extends FormRequest
             'tipo_encargo' => 'tipo de encargo',
             'fecha_inicio_encargo' => 'fecha de inicio del encargo',
             'motivo_encargo' => 'motivo',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'id_cargo.exists' => 'El cargo seleccionado no existe o está inactivo.',
         ];
     }
 

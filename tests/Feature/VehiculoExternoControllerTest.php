@@ -142,4 +142,20 @@ class VehiculoExternoControllerTest extends TestCase
         $response->assertRedirect(route('vehiculos-externos.index'));
         $this->assertDatabaseHas('vehiculo_externo', ['id' => $vehiculoExterno->id]);
     }
+
+    /**
+     * VehiculoExternoFormModal.vue envía por axios: ante una placa repetida
+     * debe recibir 422 con el error en JSON (antes, un redirect que el modal
+     * tomaba como éxito).
+     */
+    public function test_el_modal_recibe_el_error_de_placa_repetida_en_json(): void
+    {
+        VehiculoExterno::factory()->create(['nro_placa' => '1234ABC']);
+
+        $this->postJson(route('vehiculos-externos.store'), ['nro_placa' => '1234ABC'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['nro_placa']);
+
+        $this->assertSame(1, VehiculoExterno::where('nro_placa', '1234ABC')->count());
+    }
 }

@@ -12,6 +12,8 @@ const props = defineProps({
     personas: Object,
     filters: Object,
     flash: Object,
+    // [{ id, cargo, estado_cargo }] todos los cargos, para el filtro.
+    cargos: { type: Array, default: () => [] },
 })
 
 // Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
@@ -26,6 +28,8 @@ const filters = ref({
     nombres: props.filters?.nombres ?? '',
     paterno: props.filters?.paterno ?? '',
     celular: props.filters?.celular ?? '',
+    // id del cargo, 'ninguno' (sin cargo) o '' (todos). Ver PersonaController::SIN_CARGO.
+    id_cargo: props.filters?.id_cargo ?? '',
 })
 
 // Debounce para no hacer petición en cada tecla
@@ -42,6 +46,7 @@ watch(
                     nombres: val.nombres || undefined,
                     paterno: val.paterno || undefined,
                     celular: val.celular || undefined,
+                    id_cargo: val.id_cargo || undefined,
                 },
                 { preserveState: true, replace: true },
             )
@@ -51,7 +56,7 @@ watch(
 )
 
 function clearFilters() {
-    filters.value = { ci: '', nombres: '', paterno: '', celular: '' }
+    filters.value = { ci: '', nombres: '', paterno: '', celular: '', id_cargo: '' }
 }
 
 /* ------------------------------------------------------------------ *
@@ -170,6 +175,16 @@ const fotoUrl = (foto) => storageUrl(foto) ?? '/images/faces/1.jpg'
                     <label class="form-label">Celular</label>
                     <input v-model="filters.celular" type="text" class="form-control" placeholder="Buscar por celular..." />
                 </div>
+                <div class="col-sm-6 col-xl-3">
+                    <label for="filtro-cargo" class="form-label">Cargo</label>
+                    <select id="filtro-cargo" v-model="filters.id_cargo" class="form-select">
+                        <option value="">Todos los cargos</option>
+                        <option value="ninguno">Sin cargo asignado</option>
+                        <option v-for="cargo in props.cargos" :key="cargo.id" :value="String(cargo.id)">
+                            {{ cargo.cargo }}{{ cargo.estado_cargo === 'INACTIVO' ? ' (inactivo)' : '' }}
+                        </option>
+                    </select>
+                </div>
             </div>
             <div class="mt-3 d-flex justify-content-end">
                 <button type="button" class="btn btn-outline-secondary btn-wave" @click="clearFilters">
@@ -209,6 +224,7 @@ const fotoUrl = (foto) => storageUrl(foto) ?? '/images/faces/1.jpg'
                             <th>Foto</th>
                             <th>CI</th>
                             <th>Nombre Completo</th>
+                            <th>Cargo</th>
                             <th>Celular</th>
                             <th>Tipo</th>
                             <th>Estado</th>
@@ -218,7 +234,7 @@ const fotoUrl = (foto) => storageUrl(foto) ?? '/images/faces/1.jpg'
                     </thead>
                     <tbody>
                         <tr v-if="personas.data.length === 0">
-                            <td colspan="9" class="text-center py-4 text-muted">
+                            <td colspan="10" class="text-center py-4 text-muted">
                                 <i class="ri-user-search-line fs-3 d-block mb-2"></i>
                                 No se encontraron personas
                             </td>
@@ -233,6 +249,10 @@ const fotoUrl = (foto) => storageUrl(foto) ?? '/images/faces/1.jpg'
                             </td>
                             <td><span class="fw-medium">{{ persona.ci }}</span></td>
                             <td>{{ persona.nombres }} {{ persona.paterno ?? '—' }} {{ persona.materno ?? '—' }}</td>
+                            <td>
+                                <span v-if="persona.cargo" class="fw-medium">{{ persona.cargo.cargo }}</span>
+                                <span v-else class="text-muted">Sin cargo</span>
+                            </td>
                             <td>{{ persona.celular ?? '—' }}</td>
                             <td>
                                 <span class="badge" :class="tipoBadge(persona.tipo_actual)">
@@ -292,6 +312,11 @@ const fotoUrl = (foto) => storageUrl(foto) ?? '/images/faces/1.jpg'
                         <div class="col-6">
                             <span class="text-muted d-block">Celular</span>
                             <span>{{ persona.celular ?? '—' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Cargo</span>
+                            <span v-if="persona.cargo" class="fw-medium">{{ persona.cargo.cargo }}</span>
+                            <span v-else class="text-muted">Sin cargo</span>
                         </div>
                         <div class="col-6">
                             <span class="text-muted d-block">Tipo</span>

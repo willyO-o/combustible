@@ -31,6 +31,10 @@ class UpdatePersonaAction
             $eraJefeArea = $persona->encargadoAreas()->exists();
 
             $persona->update([
+                // El cargo sólo se toca si viene en los datos: el módulo de
+                // Usuarios también usa esta Action y no lo envía, y no debe
+                // borrarlo al editar una cuenta.
+                ...(array_key_exists('id_cargo', $data) ? ['id_cargo' => $data['id_cargo']] : []),
                 'ci' => $data['ci'],
                 'nombres' => $data['nombres'],
                 'paterno' => $data['paterno'] ?? null,

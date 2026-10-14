@@ -1899,3 +1899,99 @@
         font-size: 0.8125rem;
     }
 }
+
+.perfil-cargo {
+    color: var(--primary-color);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Cargos (resources/js/Pages/Cargos/Index.vue)                       */
+/* ------------------------------------------------------------------ */
+.cargos-filtros .input-group {
+    width: 14rem;
+}
+
+.cargos-filtros .form-select {
+    width: auto;
+}
+
+/* Alta en línea: franja entre el encabezado y la tabla. */
+.cargos-alta {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--default-border);
+    background-color: rgba(var(--primary-rgb), 0.04);
+}
+
+.cargos-alta .form-control {
+    max-width: 32rem;
+}
+
+.cargos-alta kbd {
+    padding: 0.05rem 0.35rem;
+    border: 1px solid var(--default-border);
+    border-radius: 0.25rem;
+    background-color: var(--custom-white);
+    color: var(--default-text-color);
+    font-size: 0.75rem;
+    box-shadow: 0 1px 0 var(--default-border);
+}
+
+.cargos-edicion {
+    max-width: 28rem;
+}
+
+.cargos-numero {
+    font-variant-numeric: tabular-nums;
+}
+
+/* El badge de estado es un botón: un clic lo alterna. */
+.cargos-estado {
+    cursor: pointer;
+    transition: filter 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+.cargos-estado:hover:not(:disabled) {
+    filter: brightness(0.95);
+}
+
+.cargos-estado:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.cargos-estado:disabled {
+    cursor: progress;
+    opacity: 0.7;
+}
+
+/* Fila recién agregada: un destello breve para ubicarla en la tabla. */
+.cargos-fila--nueva > td,
+.cargos-fila--nueva.list-card-mobile {
+    animation: cargos-destello 1.6s ease-out;
+}
+
+@keyframes cargos-destello {
+    from {
+        background-color: rgba(var(--success-rgb), 0.18);
+    }
+
+    to {
+        background-color: transparent;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cargos-fila--nueva > td,
+    .cargos-fila--nueva.list-card-mobile {
+        animation: none;
+        background-color: rgba(var(--success-rgb), 0.1);
+    }
+}
+
+@media (max-width: 575.98px) {
+    .cargos-filtros,
+    .cargos-filtros .input-group,
+    .cargos-filtros .form-select {
+        width: 100%;
+    }
+}

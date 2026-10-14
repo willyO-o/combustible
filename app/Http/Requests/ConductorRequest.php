@@ -30,6 +30,16 @@ class ConductorRequest extends FormRequest
             // fecha nacimiento si se ingreso debe ser anterior a 17 años
             'fecha_nacimiento' => ['nullable', 'date', Rule::date()->before(now()->subYears(17))],
             'estado_conductor' => ['required', Rule::in(['ACTIVO', 'INACTIVO', 'RETIRADO'])],
+            // Cargo del personal (opcional). Sólo cargos ACTIVOS; al editar
+            // también se acepta el que ya tiene aunque luego se haya
+            // desactivado, para no bloquear la edición de otros datos.
+            'id_cargo' => [
+                'nullable',
+                'integer',
+                Rule::exists('cargo', 'id')->where(fn ($query) => $query->where(
+                    fn ($query) => $query->where('estado_cargo', 'ACTIVO')->orWhere('id', $conductor?->persona?->id_cargo)
+                )),
+            ],
 
             // Documentos del conductor: adicionales y opcionales.
             'documentos' => ['sometimes', 'array'],
@@ -116,6 +126,7 @@ class ConductorRequest extends FormRequest
     {
         return [
             'ci' => 'carnet de identidad',
+            'id_cargo' => 'cargo',
             'email' => 'correo electrónico',
             'estado_usuario' => 'estado del usuario',
             'password' => 'contraseña inicial',
@@ -150,6 +161,7 @@ class ConductorRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'id_cargo.exists' => 'El cargo seleccionado no existe o está inactivo.',
             'documentos.*.tipo_documento.required' => 'Cada documento debe indicar su tipo.',
             'documentos.*.id.exists' => 'Uno de los documentos enviados no pertenece a este conductor.',
             'fecha_nacimiento.before' => 'El conductor debe tener al menos 17 años.',

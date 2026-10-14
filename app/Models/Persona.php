@@ -18,6 +18,7 @@ use OwenIt\Auditing\Contracts\Auditable;
     'direccion',
     'fecha_nacimiento',
     'estado_persona',
+    'id_cargo',
 ])]
 
 class Persona extends Model implements Auditable
@@ -105,6 +106,11 @@ class Persona extends Model implements Auditable
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function cargo()
+    {
+        return $this->belongsTo(Cargo::class, 'id_cargo');
     }
 
     public function user()

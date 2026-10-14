@@ -6,6 +6,7 @@ import SearchSelect from '@/Components/SearchSelect.vue'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 import CiInput from '@/Components/CiInput.vue'
 import RolesSelector from '@/Components/RolesSelector.vue'
+import CargoSelect from '@/Components/CargoSelect.vue'
 import { etiquetaRol } from '@/Utils/rolUtil'
 import { storageUrl } from '@/Utils/storageUtil'
 defineOptions({ layout: Maindashboard })
@@ -16,6 +17,7 @@ const props = defineProps({
     vehiculoActual: Object,
     areaActual: Object,
     roles: Array, // [{ id, name }] roles asignables (todos salvo los ocultos)
+    cargos: { type: Array, default: () => [] }, // [{ id, cargo, estado_cargo }] Cargo::seleccionables()
     rolesAsignados: Array, // roles actuales: los de su cuenta + los deducidos de sus registros
 })
 
@@ -35,6 +37,9 @@ const form = useForm({
     direccion: props.persona.direccion ?? '',
     fecha_nacimiento: props.persona.fecha_nacimiento ? props.persona.fecha_nacimiento.substring(0, 10) : '',
     estado_persona: props.persona.estado_persona,
+
+    // Cargo del personal (opcional, independiente de los roles).
+    id_cargo: props.persona.id_cargo ?? '',
 
     // Uno o varios roles (nombres). Vacío = "personal".
     roles: [...(props.rolesAsignados ?? [])],
@@ -198,6 +203,10 @@ function submit() {
                                     <option value="RETIRADO">RETIRADO</option>
                                 </select>
                                 <div v-if="form.errors.estado_persona" class="invalid-feedback">{{ form.errors.estado_persona }}</div>
+                            </div>
+
+                            <div class="col-sm-6 col-xl-4">
+                                <CargoSelect v-model="form.id_cargo" :cargos="props.cargos" :error="form.errors.id_cargo" />
                             </div>
 
                             <div class="col-12">
