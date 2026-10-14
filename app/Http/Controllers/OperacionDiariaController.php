@@ -45,8 +45,9 @@ class OperacionDiariaController extends Controller
         $conductores = [];
 
         // Mismo criterio que ListOperacionesDiariasAction: administrador ve
-        // todos los conductores; jefe-area, los de sus áreas; conductor puro,
-        // ninguno (no filtra por conductor, sólo ve lo suyo).
+        // todos los conductores; jefe-area, los de sus áreas (más él mismo si
+        // también es conductor); conductor puro, ninguno (no filtra por
+        // conductor, sólo ve lo suyo).
         $areas = [];
         $user = $request->user();
 
@@ -58,12 +59,25 @@ class OperacionDiariaController extends Controller
             }
         }
 
-        $conductores = Area::conductores($areas)?->map(function ($conductor) {
+        $conductores = Area::conductores($areas);
+
+        // Jefe de área que además es conductor: su listado incluye sus propias
+        // operaciones (aunque su vehículo sea de otra área), así que también
+        // debe poder filtrar por sí mismo.
+        $conductorPropio = $user->hasRole('jefe-area') && $user->hasRole('conductor')
+            ? $user->persona?->conductor?->load('persona')
+            : null;
+
+        if ($conductorPropio && ! $conductores->contains('id', $conductorPropio->id)) {
+            $conductores->push($conductorPropio);
+        }
+
+        $conductores = $conductores->map(function ($conductor) {
             return [
                 'id' => $conductor->id,
                 'label' => "{$conductor->persona->nombre_completo} (CI: {$conductor->persona->ci})",
             ];
-        })->toArray();
+        })->values()->toArray();
 
         return inertia('Operacion/Index', [
             // Inertia::scroll() no cambia la forma del paginador (sigue
@@ -97,7 +111,7 @@ class OperacionDiariaController extends Controller
             'actividadesSugeridas' => $this->actividadesSugeridas($user),
             'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
-            'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
+            'mostrarSelectorConductor' => ! $user->esConductorPuro(),
         ]);
     }
 
@@ -126,17 +140,19 @@ class OperacionDiariaController extends Controller
     }
 
     /**
-     * El combo de conductor sólo se muestra en el formulario a quien no
-     * tiene el rol conductor (un conductor siempre opera su propio vehículo
-     * asignado, sin ambigüedad, así que no elige nada): se completa aquí con
-     * su propio id de conductor antes de pasarlo a la Action.
+     * El combo de conductor sólo se oculta al conductor puro (un conductor
+     * sin rol de gestión siempre opera su propio vehículo asignado, sin
+     * ambigüedad, así que no elige nada): se completa aquí con su propio id
+     * de conductor antes de pasarlo a la Action. Un jefe-area/administrador
+     * que además tiene el rol conductor registra operaciones de su equipo,
+     * así que se respeta el id_conductor que eligió (User::esConductorPuro()).
      */
     private function datosConConductorResuelto(OperacionStoreRequest $request): array
     {
         $datos = $request->validated();
         $user = $request->user();
 
-        if ($user->hasRole('conductor') && $user->persona?->conductor) {
+        if ($user->esConductorPuro() && $user->persona?->conductor) {
             $datos['id_conductor'] = $user->persona->conductor->id;
         }
 
@@ -162,6 +178,11 @@ class OperacionDiariaController extends Controller
      */
     public function edit(OperacionDiaria $operacionDiaria)
     {
+        if ($operacionDiaria->estado === 'VERIFICADO') {
+            return redirect()->route('operacion-diaria.show', $operacionDiaria)
+                ->with('error', 'No se puede editar una operación diaria que ya ha sido verificada.');
+        }
+
         $user = request()->user();
 
         $operacionDiaria->actividades_realizadas_edit = $operacionDiaria->actividadesRealizadasEdit();
@@ -171,13 +192,52 @@ class OperacionDiariaController extends Controller
             // Se asegura que el vehículo ya asignado a la operación aparezca en
             // el listado aunque ya no cumpla el filtro por rol (p.ej. fue
             // reasignado de área/conductor después de crear la operación).
-            'vehiculosAsignados' => $this->vehiculosDisponibles($user, $operacionDiaria->vehiculo),
+            'vehiculosAsignados' => $this->incluirConductorDeLaOperacion(
+                $this->vehiculosDisponibles($user, $operacionDiaria->vehiculo),
+                $operacionDiaria,
+                $user
+            ),
             'operacion' => $operacionDiaria->load(['vehiculo', 'area']),
             'actividadesSugeridas' => $this->actividadesSugeridas($user),
             'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
-            'mostrarSelectorConductor' => ! $user->hasRole('conductor'),
+            'mostrarSelectorConductor' => ! $user->esConductorPuro(),
         ]);
+    }
+
+    /**
+     * Agrega el conductor de la operación a las opciones del combo de su
+     * vehículo si ya no figura entre los asignados (fue reasignado después
+     * de registrarla). Sin esto, el formulario de edición lo descartaba y la
+     * operación terminaba guardándose con otro conductor o sin ninguno.
+     *
+     * @param  array<int, array{id: int, label: string, meta: array}>  $vehiculos
+     * @return array<int, array{id: int, label: string, meta: array}>
+     */
+    private function incluirConductorDeLaOperacion(array $vehiculos, OperacionDiaria $operacionDiaria, User $user): array
+    {
+        if ($user->esConductorPuro()) {
+            return $vehiculos;
+        }
+
+        $persona = $operacionDiaria->conductor?->persona;
+
+        foreach ($vehiculos as $indice => $vehiculo) {
+            if ($vehiculo['id'] !== $operacionDiaria->id_vehiculo) {
+                continue;
+            }
+
+            $yaIncluido = collect($vehiculo['meta']['conductoresAsignados'])->contains('id', $operacionDiaria->id_conductor);
+
+            if (! $yaIncluido && $persona) {
+                $vehiculos[$indice]['meta']['conductoresAsignados'][] = [
+                    'id' => $operacionDiaria->id_conductor,
+                    'label' => "{$persona->nombre_completo} (CI: {$persona->ci}) — ya no asignado",
+                ];
+            }
+        }
+
+        return $vehiculos;
     }
 
     /**
@@ -203,8 +263,9 @@ class OperacionDiariaController extends Controller
      *   (Persona::encargadoAreas + vehiculo_area con asignación ACTIVO/PROVISIONAL
      *   y fecha_culminacion nula o futura).
      * - un usuario con ambos roles ve la unión de los dos listados, sin duplicar.
-     * - cualquier otro rol (administrador, super-admin, técnico de mantenimiento,
-     *   etc.): sin filtro, todos los vehículos activos.
+     * - administrador/super-admin (aunque además sea conductor o jefe-area) y
+     *   cualquier otro rol (técnico de mantenimiento, etc.): sin filtro, todos
+     *   los vehículos activos.
      *
      * $incluirSiFalta permite garantizar que el vehículo ya asignado a una
      * operación existente (edit()) aparezca en el listado aunque ya no
@@ -213,10 +274,11 @@ class OperacionDiariaController extends Controller
     private function vehiculosDisponibles(User $user, ?Vehiculo $incluirSiFalta = null): array
     {
         $persona = $user->persona;
+        $esAdministrador = $user->hasAnyRole(['administrador', 'super-admin']);
         $esConductor = $user->hasRole('conductor') && $persona?->conductor;
         $esJefeArea = $user->hasRole('jefe-area') && $persona;
 
-        if (! $esConductor && ! $esJefeArea) {
+        if ($esAdministrador || (! $esConductor && ! $esJefeArea)) {
             $vehiculos = Vehiculo::select($this->columnasVehiculoOpt())
                 ->where('estado_vehiculo', 'ACTIVO')
                 ->get();
@@ -259,12 +321,12 @@ class OperacionDiariaController extends Controller
 
         $vehiculos = $vehiculos->sortBy('nro_placa')->values();
 
-        // El combo para elegir conductor sólo se muestra a quien no tiene el
-        // rol conductor (ver mostrarSelectorConductor en create()/edit()):
-        // sólo en ese caso vale la pena resolver, en una única consulta
-        // agrupada por vehículo (evita el N+1 de un conductoresAsignados()
-        // por vehículo, relevante con ~200 vehículos para administrador).
-        $conductoresPorVehiculo = $user->hasRole('conductor')
+        // El combo para elegir conductor se oculta sólo al conductor puro
+        // (ver mostrarSelectorConductor en create()/edit()): en los demás
+        // casos se resuelve, en una única consulta agrupada por vehículo
+        // (evita el N+1 de un conductoresAsignados() por vehículo, relevante
+        // con ~200 vehículos para administrador).
+        $conductoresPorVehiculo = $user->esConductorPuro()
             ? collect()
             : $this->conductoresAsignadosPorVehiculo($vehiculos->pluck('id'));
 
@@ -345,12 +407,17 @@ class OperacionDiariaController extends Controller
     /**
      * Actividades sugeridas por área, con el mismo criterio de rol que
      * vehiculosDisponibles(): conductor -> sus áreas; jefe-area -> las áreas
-     * a su cargo; cualquier otro rol -> sin filtro (todas las actividades).
+     * a su cargo; administrador/super-admin o cualquier otro rol -> sin
+     * filtro (todas las actividades).
      */
     private function actividadesSugeridas(User $user)
     {
         $persona = $user->persona;
         $idsArea = collect();
+
+        if ($user->hasAnyRole(['administrador', 'super-admin'])) {
+            return Actividad::select('id', 'nombre_actividad', 'unidad_medida')->get();
+        }
 
         if ($user->hasRole('conductor') && $persona?->conductor) {
             $idsArea = $idsArea->merge($persona->conductor->areas()->pluck('id'));
@@ -374,6 +441,10 @@ class OperacionDiariaController extends Controller
      */
     public function update(OperacionStoreRequest $request, OperacionDiaria $operacionDiaria, UpdateOperacionDiariaAction $action)
     {
+        if ($operacionDiaria->estado === 'VERIFICADO') {
+            return redirect()->back()->with('error', 'No se puede editar una operación diaria que ya ha sido verificada.');
+        }
+
         try {
             $operacionDiaria = $action->execute($operacionDiaria, $this->datosConConductorResuelto($request));
 

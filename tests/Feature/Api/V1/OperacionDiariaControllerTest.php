@@ -632,4 +632,42 @@ class OperacionDiariaControllerTest extends TestCase
         $response->assertJsonPath('message', 'El conductor seleccionado no está asignado actualmente a este vehículo.');
         $this->assertDatabaseCount('operacion_diaria', 0);
     }
+
+    public function test_index_de_un_jefe_conductor_incluye_su_propio_vehiculo_aunque_sea_de_otra_area(): void
+    {
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
+
+        $areaJefe = Area::factory()->create();
+
+        // El jefe es además conductor titular de un vehículo de OTRA área.
+        [$user, $conductorJefe, $vehiculoPropio] = $this->usuarioConVehiculoAsignado();
+        $user->assignRole('jefe-area');
+        $areaJefe->encargados()->attach($user->id_persona, [
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now()->subMonth(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+
+        // Un operario con un vehículo del área del jefe.
+        [, $operario, $vehiculoArea] = $this->usuarioConVehiculoAsignado();
+        $vehiculoArea->areas()->sync([$areaJefe->id => [
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]]);
+
+        // Otro operario de otra área: el jefe no debe ver su operación.
+        [$usuarioAjeno, $ajeno, $vehiculoAjeno] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductorJefe, $vehiculoPropio))->assertCreated();
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($operario, $vehiculoArea))->assertCreated();
+        $this->actingAs($usuarioAjeno, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($ajeno, $vehiculoAjeno))->assertCreated();
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.operacion-diaria.index'));
+
+        $response->assertOk();
+        $this->assertEqualsCanonicalizing(
+            [$vehiculoPropio->id, $vehiculoArea->id],
+            collect($response->json('data'))->pluck('id_vehiculo')->all()
+        );
+    }
 }

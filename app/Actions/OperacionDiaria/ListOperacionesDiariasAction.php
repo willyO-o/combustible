@@ -44,8 +44,9 @@ class ListOperacionesDiariasAction
 
     /**
      * Precedencia (mismo criterio que ListValeAction): administrador/super-admin
-     * (sin restricción) > jefe-area (operaciones de sus áreas a cargo) >
-     * conductor (sólo sus propias operaciones).
+     * (sin restricción) > jefe-area (operaciones de sus áreas a cargo, más las
+     * suyas propias si también es conductor) > conductor (sólo sus propias
+     * operaciones).
      */
     private function aplicarRestriccionesPorRol($query, User $user): void
     {
@@ -54,7 +55,19 @@ class ListOperacionesDiariasAction
         }
 
         if ($user->hasRole('jefe-area')) {
-            $query->whereIn('id_area', $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? []);
+            $idsArea = $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? [];
+
+            // Un jefe de área que además es conductor también registra las
+            // operaciones de su propio vehículo aunque esté en otra área
+            // (ver OperacionDiariaController::vehiculosDisponibles()): debe
+            // seguir viéndolas en su listado.
+            $query->where(function ($query) use ($idsArea, $user) {
+                $query->whereIn('id_area', $idsArea);
+
+                if ($user->hasRole('conductor')) {
+                    $query->orWhere('id_conductor', $user->id_persona);
+                }
+            });
 
             return;
         }

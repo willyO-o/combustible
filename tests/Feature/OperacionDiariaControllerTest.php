@@ -1311,4 +1311,354 @@ class OperacionDiariaControllerTest extends TestCase
             ->where('vehiculosAsignados.0.meta.conductoresAsignados.0.id', $conductorDelVehiculo->id)
         );
     }
+
+    /**
+     * Jefe de área que además tiene el rol conductor (y su propio registro
+     * de conductor), a cargo de $area.
+     *
+     * @return array{0: User, 1: Conductor}
+     */
+    private function crearJefeAreaQueTambienEsConductor(Area $area): array
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $user->assignRole('jefe-area');
+
+        $area->encargados()->attach($user->id_persona, [
+            'tipo_encargo' => 'TITULAR',
+            'fecha_inicio' => now()->subMonth(),
+            'estado_encargo' => 'ACTIVO',
+        ]);
+
+        return [$user, $conductor];
+    }
+
+    public function test_un_jefe_de_area_que_tambien_es_conductor_recibe_el_selector_con_los_operarios_del_vehiculo(): void
+    {
+        $area = Area::factory()->create();
+        [$jefeArea] = $this->crearJefeAreaQueTambienEsConductor($area);
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAConductor($vehiculo, $operario);
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        $response = $this->actingAs($jefeArea)->get(route('operacion-diaria.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('mostrarSelectorConductor', true)
+            ->has('vehiculosAsignados', 1)
+            ->where('vehiculosAsignados.0.id', $vehiculo->id)
+            ->has('vehiculosAsignados.0.meta.conductoresAsignados', 1)
+            ->where('vehiculosAsignados.0.meta.conductoresAsignados.0.id', $operario->id)
+        );
+    }
+
+    public function test_un_administrador_que_tambien_es_conductor_ve_todos_los_vehiculos_y_el_selector_de_conductor(): void
+    {
+        [$admin, $conductorPropio] = $this->crearConductorConUsuario();
+        $admin->assignRole('administrador');
+
+        $vehiculoPropio = Vehiculo::factory()->create(['nro_placa' => 'AAA-001']);
+        $this->asignarVehiculoAConductor($vehiculoPropio, $conductorPropio);
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculoDeOperario = Vehiculo::factory()->create(['nro_placa' => 'BBB-002']);
+        $this->asignarVehiculoAConductor($vehiculoDeOperario, $operario);
+
+        $response = $this->actingAs($admin)->get(route('operacion-diaria.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('mostrarSelectorConductor', true)
+            ->has('vehiculosAsignados', 2)
+            ->where('vehiculosAsignados.1.id', $vehiculoDeOperario->id)
+            ->where('vehiculosAsignados.1.meta.conductoresAsignados.0.id', $operario->id)
+        );
+    }
+
+    public function test_store_de_un_jefe_de_area_que_tambien_es_conductor_respeta_el_operario_elegido(): void
+    {
+        $area = Area::factory()->create();
+        [$jefeArea] = $this->crearJefeAreaQueTambienEsConductor($area);
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $operario);
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        // Antes se le forzaba id_conductor = su propio registro de conductor
+        // (no asignado a este vehículo) y la Action rechazaba la operación.
+        $response = $this->actingAs($jefeArea)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id])
+        );
+
+        $response->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion = OperacionDiaria::first();
+        $this->assertNotNull($operacion);
+        $this->assertSame($operario->id, $operacion->id_conductor);
+        $this->assertSame($area->id, $operacion->id_area);
+    }
+
+    public function test_store_de_un_jefe_de_area_que_tambien_es_conductor_exige_elegir_el_operario(): void
+    {
+        $area = Area::factory()->create();
+        [$jefeArea] = $this->crearJefeAreaQueTambienEsConductor($area);
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $operario);
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        $response = $this->actingAs($jefeArea)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo)
+        );
+
+        $response->assertSessionHasErrors('id_conductor');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    /**
+     * Registra (vía el propio endpoint) una operación del vehículo hecha por
+     * $operario, a cargo del jefe de $area, y luego le quita la asignación al
+     * operario y le asigna $nuevoOperario (reasignación de conductor).
+     *
+     * @return array{0: User, 1: OperacionDiaria, 2: Conductor, 3: Conductor, 4: Vehiculo}
+     */
+    private function crearOperacionYReasignarConductor(): array
+    {
+        $area = Area::factory()->create();
+        $jefeArea = $this->crearJefeAreaConUsuario($area);
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $operario);
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        $this->actingAs($jefeArea)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id])
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        Asignacion::where('id_conductor', $operario->id)->update([
+            'estado_asignacion' => 'INACTIVO',
+            'fecha_culminacion' => now()->subDay(),
+        ]);
+
+        [, $nuevoOperario] = $this->crearConductorConUsuario();
+        $this->asignarVehiculoAConductor($vehiculo, $nuevoOperario);
+
+        return [$jefeArea, OperacionDiaria::firstOrFail(), $operario, $nuevoOperario, $vehiculo];
+    }
+
+    public function test_update_conserva_el_conductor_original_aunque_ya_no_este_asignado_al_vehiculo(): void
+    {
+        [$jefeArea, $operacion, $operario, , $vehiculo] = $this->crearOperacionYReasignarConductor();
+
+        $this->actingAs($jefeArea)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id, 'observaciones' => 'Lectura corregida por el jefe'])
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion->refresh();
+        $this->assertSame($operario->id, $operacion->id_conductor);
+        $this->assertSame('Lectura corregida por el jefe', $operacion->observaciones);
+    }
+
+    public function test_update_sin_id_conductor_conserva_el_conductor_de_la_operacion(): void
+    {
+        [$jefeArea, $operacion, $operario, , $vehiculo] = $this->crearOperacionYReasignarConductor();
+
+        $this->actingAs($jefeArea)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => '', 'observaciones' => 'Lectura corregida por el jefe'])
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion->refresh();
+        $this->assertSame($operario->id, $operacion->id_conductor);
+        $this->assertSame('Lectura corregida por el jefe', $operacion->observaciones);
+    }
+
+    public function test_update_permite_cambiar_a_otro_conductor_asignado_pero_no_a_uno_ajeno(): void
+    {
+        [$jefeArea, $operacion, , $nuevoOperario, $vehiculo] = $this->crearOperacionYReasignarConductor();
+        [, $conductorAjeno] = $this->crearConductorConUsuario();
+
+        $this->actingAs($jefeArea)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $conductorAjeno->id])
+        )->assertSessionHas('error');
+        $this->assertNotSame($conductorAjeno->id, $operacion->fresh()->id_conductor);
+
+        $this->actingAs($jefeArea)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $nuevoOperario->id])
+        )->assertRedirect(route('operacion-diaria.index'));
+        $this->assertSame($nuevoOperario->id, $operacion->fresh()->id_conductor);
+    }
+
+    public function test_un_conductor_puede_editar_su_operacion_aunque_ya_no_tenga_el_vehiculo_asignado(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+        $operacion = OperacionDiaria::firstOrFail();
+
+        Asignacion::where('id_conductor', $conductor->id)->update([
+            'estado_asignacion' => 'INACTIVO',
+            'fecha_culminacion' => now()->subDay(),
+        ]);
+
+        $this->actingAs($user)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['observaciones' => 'Lectura corregida por el jefe'])
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertSame('Lectura corregida por el jefe', $operacion->fresh()->observaciones);
+        $this->assertSame($conductor->id, $operacion->fresh()->id_conductor);
+    }
+
+    public function test_edit_incluye_al_conductor_original_entre_las_opciones_del_vehiculo(): void
+    {
+        [$jefeArea, $operacion, $operario, $nuevoOperario] = $this->crearOperacionYReasignarConductor();
+
+        $response = $this->actingAs($jefeArea)->get(route('operacion-diaria.edit', $operacion));
+
+        $esperados = collect([$operario->id, $nuevoOperario->id])->sort()->values()->all();
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('vehiculosAsignados', 1)
+            ->has('vehiculosAsignados.0.meta.conductoresAsignados', 2)
+            ->where('vehiculosAsignados.0.meta.conductoresAsignados', fn ($opciones) => collect($opciones)->pluck('id')->sort()->values()->all() === $esperados)
+        );
+    }
+
+    public function test_no_se_puede_editar_ni_actualizar_una_operacion_verificada(): void
+    {
+        [$jefeArea, $operacion, $operario, , $vehiculo] = $this->crearOperacionYReasignarConductor();
+        $operacion->update(['estado' => 'VERIFICADO']);
+
+        $this->actingAs($jefeArea)->get(route('operacion-diaria.edit', $operacion))
+            ->assertRedirect(route('operacion-diaria.show', $operacion));
+
+        $this->actingAs($jefeArea)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id, 'observaciones' => 'Cambio no permitido'])
+        )->assertSessionHas('error');
+
+        $this->assertNull($operacion->fresh()->observaciones);
+    }
+
+    /**
+     * Jefe del área A que además es conductor titular de un vehículo que
+     * pertenece al área B (que no tiene a su cargo), y un operario que maneja
+     * un vehículo del área A.
+     *
+     * @return array{jefe: User, conductorJefe: Conductor, operario: Conductor, vehiculoArea: Vehiculo, vehiculoPropio: Vehiculo, areaJefe: Area, otraArea: Area}
+     */
+    private function escenarioJefeConductorConVehiculoEnOtraArea(): array
+    {
+        $areaJefe = Area::factory()->create();
+        $otraArea = Area::factory()->create();
+        [$jefe, $conductorJefe] = $this->crearJefeAreaQueTambienEsConductor($areaJefe);
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculoArea = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje', 'nro_placa' => 'AAA-111']);
+        $this->asignarVehiculoAConductor($vehiculoArea, $operario);
+        $this->asignarVehiculoAArea($vehiculoArea, $areaJefe);
+
+        $vehiculoPropio = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje', 'nro_placa' => 'BBB-222']);
+        $this->asignarVehiculoAConductor($vehiculoPropio, $conductorJefe);
+        $this->asignarVehiculoAArea($vehiculoPropio, $otraArea);
+
+        return compact('jefe', 'conductorJefe', 'operario', 'vehiculoArea', 'vehiculoPropio', 'areaJefe', 'otraArea');
+    }
+
+    public function test_jefe_conductor_ve_los_vehiculos_de_su_area_y_su_propio_vehiculo_de_otra_area(): void
+    {
+        $e = $this->escenarioJefeConductorConVehiculoEnOtraArea();
+
+        // Vehículo de un área ajena que no conduce: no debe aparecer.
+        $ajeno = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($ajeno, $e['otraArea']);
+
+        $response = $this->actingAs($e['jefe'])->get(route('operacion-diaria.create'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('mostrarSelectorConductor', true)
+            ->has('vehiculosAsignados', 2)
+            ->where('vehiculosAsignados.0.id', $e['vehiculoArea']->id)
+            ->where('vehiculosAsignados.0.meta.conductoresAsignados.0.id', $e['operario']->id)
+            ->where('vehiculosAsignados.1.id', $e['vehiculoPropio']->id)
+            ->where('vehiculosAsignados.1.meta.conductoresAsignados.0.id', $e['conductorJefe']->id)
+        );
+    }
+
+    public function test_jefe_conductor_registra_operaciones_de_su_area_y_de_su_propio_vehiculo_y_las_ve_en_el_listado(): void
+    {
+        $e = $this->escenarioJefeConductorConVehiculoEnOtraArea();
+
+        $this->actingAs($e['jefe'])->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($e['vehiculoArea'], ['id_conductor' => $e['operario']->id])
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->actingAs($e['jefe'])->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($e['vehiculoPropio'], ['id_conductor' => $e['conductorJefe']->id])
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $deSuArea = OperacionDiaria::where('id_vehiculo', $e['vehiculoArea']->id)->firstOrFail();
+        $propia = OperacionDiaria::where('id_vehiculo', $e['vehiculoPropio']->id)->firstOrFail();
+
+        $this->assertSame($e['operario']->id, $deSuArea->id_conductor);
+        $this->assertSame($e['areaJefe']->id, $deSuArea->id_area);
+        $this->assertSame($e['conductorJefe']->id, $propia->id_conductor);
+        $this->assertSame($e['otraArea']->id, $propia->id_area);
+
+        // Una operación de otra área y de otro conductor: no debe verla.
+        [, $otroOperario] = $this->crearConductorConUsuario();
+        $vehiculoAjeno = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculoAjeno, $otroOperario);
+        $this->asignarVehiculoAArea($vehiculoAjeno, $e['otraArea']);
+        $this->actingAs($otroOperario->persona->user)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculoAjeno)
+        )->assertRedirect(route('operacion-diaria.index'));
+        $ajena = OperacionDiaria::where('id_vehiculo', $vehiculoAjeno->id)->firstOrFail();
+
+        $response = $this->actingAs($e['jefe'])->get(route('operacion-diaria.index'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->has('actividades.data', 2)
+            ->where('actividades.data', fn ($operaciones) => collect($operaciones)->pluck('id')->sort()->values()->all()
+                === collect([$deSuArea->id, $propia->id])->sort()->values()->all())
+            ->where('conductores', fn ($conductores) => collect($conductores)->pluck('id')->contains($e['conductorJefe']->id)
+                && collect($conductores)->pluck('id')->contains($e['operario']->id)
+                && ! collect($conductores)->pluck('id')->contains($otroOperario->id))
+        );
+
+        $this->assertNotNull($ajena);
+    }
+
+    public function test_jefe_conductor_no_puede_registrar_su_vehiculo_de_otra_area_a_nombre_de_otro_conductor(): void
+    {
+        $e = $this->escenarioJefeConductorConVehiculoEnOtraArea();
+
+        $this->actingAs($e['jefe'])->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($e['vehiculoPropio'], ['id_conductor' => $e['operario']->id])
+        )->assertSessionHas('error');
+
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
 }

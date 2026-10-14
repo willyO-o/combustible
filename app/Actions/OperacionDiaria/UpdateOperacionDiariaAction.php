@@ -20,11 +20,14 @@ class UpdateOperacionDiariaAction
     {
         return DB::transaction(function () use ($operacionDiaria, $datos) {
 
-            // Si viene un id_conductor explícito (combo mostrado a roles
-            // distintos de conductor), verificar que siga siendo un
-            // conductor realmente asignado al vehículo (el actual o el
-            // nuevo, si también se cambió).
-            if (! empty($datos['id_conductor'])) {
+            // Sin id_conductor (p.ej. el combo quedó vacío) se conserva el
+            // de la operación: la columna no admite null. Conservar el mismo
+            // conductor siempre es válido aunque ya no esté asignado al
+            // vehículo (operaciones históricas tras una reasignación); sólo
+            // un CAMBIO de conductor exige que el nuevo esté asignado hoy.
+            if (empty($datos['id_conductor'])) {
+                unset($datos['id_conductor']);
+            } elseif ((int) $datos['id_conductor'] !== (int) $operacionDiaria->id_conductor) {
                 $vehiculo = Vehiculo::find($datos['id_vehiculo'] ?? $operacionDiaria->id_vehiculo);
 
                 if (! $vehiculo || ! $vehiculo->conductoresAsignados->contains('id', $datos['id_conductor'])) {

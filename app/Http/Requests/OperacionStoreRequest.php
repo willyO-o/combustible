@@ -111,13 +111,14 @@ class OperacionStoreRequest extends FormRequest
         // dd($this->method());
         return [
             'id_vehiculo' => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id'],
-            // El combo de conductor sólo se muestra en el formulario a quien
-            // no tiene el rol conductor (un conductor siempre es él mismo);
-            // para esos roles es obligatorio al crear, ya que un vehículo
-            // puede tener varios conductores asignados a la vez (titular +
-            // provisionales). El controller lo completa automáticamente con
-            // el conductor autenticado cuando sí tiene el rol conductor.
-            'id_conductor' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => ! $this->user()?->hasRole('conductor')) : 'sometimes', 'nullable', 'exists:conductor,id'],
+            // El combo de conductor se oculta sólo al conductor puro (sin
+            // rol de gestión, siempre es él mismo); para cualquier otro rol
+            // (incluido jefe-area/administrador que además es conductor) es
+            // obligatorio al crear, ya que un vehículo puede tener varios
+            // conductores asignados a la vez (titular + provisionales). El
+            // controller lo completa con el conductor autenticado cuando es
+            // conductor puro (User::esConductorPuro()).
+            'id_conductor' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => ! $this->user()?->esConductorPuro()) : 'sometimes', 'nullable', 'exists:conductor,id'],
             'turno' => 'required|in:DIA,NOCHE',
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',

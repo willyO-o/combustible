@@ -28,6 +28,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | tests/Feature/**/*.php | .ai/rules/feature.md |
 | public/fonts/fpdf-calibri/** | .ai/rules/fpdf-calibri.md |
 | app/Actions/OperacionDiaria/SincronizarMantenimientosOperacionAction.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/OperacionDiaria.php,app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php,resources/js/Pages/Operacion/*.vue,app/Helpers/helpers.php | .ai/rules/helpers.md |
+| app/Actions/OperacionDiaria/ListOperacionesDiariasAction.php,app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php | .ai/rules/http-controllers-api-v1.md |
 | app/Http/Controllers/OrdenTrabajoController.php,app/Http/Requests/OrdenTrabajoRequest.php | .ai/rules/http-controllers-http-requests.md |
 | app/Models/OrdenTrabajo.php,app/Models/DetalleMantenimiento.php,app/Http/Controllers/OrdenTrabajoController.php | .ai/rules/http-controllers.md |
 | app/Http/Controllers/ConductorController.php,app/Models/Conductor.php,app/Http/Requests/ConductorRequest.php | .ai/rules/http-requests.md |
@@ -36,6 +37,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/Vehiculo.php,app/Models/TipoVehiculo.php,app/Http/Requests/VehiculoRequest.php,app/Http/Requests/TipoVehiculoRequest.php,app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/**,resources/js/Pages/TiposVehiculo/**,resources/js/Components/UnidadCapacidadSelect.vue | .ai/rules/js-components.md |
 | resources/js/app.js,resources/js/Pages/**/*.vue,vite.config.js | .ai/rules/js-js-pages.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Libraries/Reportes.php,resources/js/Pages/ControlCargas/*.vue | .ai/rules/js-pages-control-cargas.md |
+| app/Actions/OperacionDiaria/*.php,app/Http/Controllers/OperacionDiariaController.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/js-pages-operacion.md |
 | app/Libraries/ReportesExcel.php,app/Http/Controllers/CargasCombustibleReportController.php,app/Http/Controllers/ControlCargasReportController.php,app/Http/Controllers/OperacionDiariaReportController.php,resources/js/Pages/Reportes/** | .ai/rules/js-pages-reportes.md |
 | app/Models/IntervaloMantenimientoTipo.php,app/Http/Controllers/DashboardController.php,app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/Show.vue,resources/js/Pages/Dashboard.vue | .ai/rules/js-pages.md |
 | resources/js/**/*.vue | .ai/rules/js.md |
