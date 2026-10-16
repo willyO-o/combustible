@@ -6,17 +6,21 @@ use App\Libraries\Reportes;
 use App\Models\ActividadRealizada;
 use App\Models\Area;
 use App\Models\Asignacion;
+use App\Models\CargaCombustible;
 use App\Models\Conductor;
+use App\Models\Grifo;
 use App\Models\MantenimientoOperacionDiaria;
 use App\Models\Material;
 use App\Models\OperacionDiaria;
 use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
+use App\Models\TipoCombustible;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -354,7 +358,7 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertSame($area->id, $operacion->id_area);
     }
 
-    public function test_store_falla_si_el_vehiculo_no_tiene_conductor_asignado(): void
+    public function test_store_permite_un_operario_activo_aunque_el_vehiculo_no_tenga_conductor_asignado(): void
     {
         $area = Area::factory()->create();
         $jefeArea = $this->crearJefeAreaConUsuario($area);
@@ -363,9 +367,8 @@ class OperacionDiariaControllerTest extends TestCase
         $this->asignarVehiculoAArea($vehiculo, $area);
         // Sin ninguna asignación a un conductor.
 
-        // Un conductor real mero (pasa la validación exists:conductor,id)
-        // pero no asignado a este vehículo: la regla de negocio debe fallar
-        // igual, ya que el vehículo no tiene ningún conductor asignado.
+        // La asignación conductor-vehículo todavía no es confiable: cualquier
+        // operario activo vale aunque el vehículo no tenga ninguno asignado.
         [, $conductorSinAsignar] = $this->crearConductorConUsuario();
 
         $response = $this->actingAs($jefeArea)->post(route('operacion-diaria.store'), [
@@ -386,11 +389,11 @@ class OperacionDiariaControllerTest extends TestCase
             ]],
         ]);
 
-        $response->assertRedirect();
-        $this->assertDatabaseCount('operacion_diaria', 0);
+        $response->assertRedirect(route('operacion-diaria.index'));
+        $this->assertSame($conductorSinAsignar->id, OperacionDiaria::firstOrFail()->id_conductor);
     }
 
-    public function test_store_falla_si_el_conductor_elegido_no_esta_asignado_al_vehiculo(): void
+    public function test_store_permite_un_operario_no_asignado_al_vehiculo_pero_no_uno_inactivo(): void
     {
         $area = Area::factory()->create();
         $jefeArea = $this->crearJefeAreaConUsuario($area);
@@ -402,6 +405,14 @@ class OperacionDiariaControllerTest extends TestCase
 
         // Otro conductor cualquiera, no asignado a este vehículo.
         [, $conductorAjeno] = $this->crearConductorConUsuario();
+        [, $conductorInactivo] = $this->crearConductorConUsuario();
+        $conductorInactivo->update(['estado_conductor' => 'INACTIVO']);
+
+        $this->actingAs($jefeArea)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $conductorInactivo->id])
+        )->assertSessionHasErrors('id_conductor');
+        $this->assertDatabaseCount('operacion_diaria', 0);
 
         $response = $this->actingAs($jefeArea)->post(route('operacion-diaria.store'), [
             'id_vehiculo' => $vehiculo->id,
@@ -421,8 +432,8 @@ class OperacionDiariaControllerTest extends TestCase
             ]],
         ]);
 
-        $response->assertRedirect();
-        $this->assertDatabaseCount('operacion_diaria', 0);
+        $response->assertRedirect(route('operacion-diaria.index'));
+        $this->assertSame($conductorAjeno->id, OperacionDiaria::firstOrFail()->id_conductor);
     }
 
     public function test_store_de_un_conductor_no_requiere_elegir_conductor_y_se_autoasigna(): void
@@ -472,7 +483,7 @@ class OperacionDiariaControllerTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->where('mostrarSelectorConductor', false)
-            ->where('vehiculosAsignados.0.meta.conductoresAsignados', [])
+            ->where('operarios', [])
         );
     }
 
@@ -1243,17 +1254,22 @@ class OperacionDiariaControllerTest extends TestCase
         $this->asignarVehiculoAConductor($vehiculo, $conductor);
         $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
 
-        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
-        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+        // Sólo se permite una operación por vehículo y por día: la segunda es de ayer.
+        $datosSegunda = [
+            'fecha_inicio' => now()->subDay()->setTime(8, 0)->format('Y-m-d\TH:i'),
+            'fecha_fin' => now()->subDay()->setTime(18, 0)->format('Y-m-d\TH:i'),
             'kilometraje_inicio' => 1100,
             'kilometraje_fin' => 1150,
-        ]));
+        ];
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo));
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, $datosSegunda));
         [$primera, $segunda] = OperacionDiaria::orderBy('id')->get();
 
         $ajena = ActividadRealizada::where('id_operacion_diaria', $primera->id)->firstOrFail();
         ActividadRealizada::whereKey($ajena->id)->update(['hora_inicio' => '07:15:00', 'hora_fin' => '11:00:00']);
 
-        $payload = $this->payloadOperacionValida($vehiculo, ['kilometraje_inicio' => 1100, 'kilometraje_fin' => 1150]);
+        $payload = $this->payloadOperacionValida($vehiculo, $datosSegunda);
         $payload['actividades_realizadas'][0]['id'] = $ajena->id;
 
         $this->actingAs($user)->put(route('operacion-diaria.update', $segunda), $payload)
@@ -1280,6 +1296,60 @@ class OperacionDiariaControllerTest extends TestCase
             ->assertSessionDoesntHaveErrors();
     }
 
+    public function test_validar_actividad_del_modal_no_exige_cantidad_ni_unidad_de_medida(): void
+    {
+        [$user] = $this->crearConductorConUsuario();
+
+        $this->actingAs($user)->post(route('operacion-diaria.agregar-actividad'), [
+            'actividad' => 'Transporte de material',
+            'origen' => 'Cantera',
+            'destino' => 'Planta',
+            'cantidad' => '',
+            'unidad_medida' => '',
+        ])->assertRedirect(route('operacion-diaria.create'))
+            ->assertSessionDoesntHaveErrors();
+    }
+
+    public function test_store_guarda_actividades_sin_cantidad_ni_unidad_de_medida_y_genera_el_pdf(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'actividades_realizadas' => [
+                ['actividad' => 'Traslado de personal', 'origen' => 'Base', 'destino' => 'Mina', 'cantidad' => '', 'unidad_medida' => ''],
+                // Un cliente que directamente omite ambos campos.
+                ['actividad' => 'Retorno a base', 'origen' => 'Mina', 'destino' => 'Base'],
+            ],
+        ]))->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $filas = ActividadRealizada::where('id_operacion_diaria', $operacion->id)->get();
+
+        $this->assertCount(2, $filas);
+        $this->assertTrue($filas->every(fn ($fila) => $fila->cantidad === null && $fila->unidad_medida === null));
+
+        $this->actingAs($user)->get(route('operacion-diaria.reporte.pdf', $operacion))->assertOk();
+    }
+
+    public function test_store_rechaza_una_cantidad_no_numerica_o_menor_a_uno(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'actividades_realizadas' => [
+                ['actividad' => 'Transporte de material', 'origen' => 'Cantera', 'destino' => 'Planta', 'cantidad' => 0, 'unidad_medida' => 'viajes'],
+            ],
+        ]))->assertSessionHasErrors('actividades_realizadas.0.cantidad');
+
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
     public function test_el_reporte_pdf_se_genera_con_actividades_historicas_con_horas(): void
     {
         [$user, $conductor] = $this->crearConductorConUsuario();
@@ -1296,7 +1366,7 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertStringStartsWith('%PDF', $response->getContent());
     }
 
-    public function test_un_jefe_de_area_recibe_el_selector_de_conductor_con_los_asignados_al_vehiculo(): void
+    public function test_un_jefe_de_area_recibe_el_selector_con_todos_los_operarios_activos(): void
     {
         $area = Area::factory()->create();
         $jefeArea = $this->crearJefeAreaConUsuario($area);
@@ -1306,6 +1376,11 @@ class OperacionDiariaControllerTest extends TestCase
         $this->asignarVehiculoAConductor($vehiculo, $conductorDelVehiculo);
         $this->asignarVehiculoAArea($vehiculo, $area);
 
+        // Un operario sin vehículo (debe aparecer) y uno inactivo (no).
+        [, $operarioSinVehiculo] = $this->crearConductorConUsuario();
+        [, $operarioInactivo] = $this->crearConductorConUsuario();
+        $operarioInactivo->update(['estado_conductor' => 'INACTIVO']);
+
         $response = $this->actingAs($jefeArea)->get(route('operacion-diaria.create'));
 
         $response->assertOk();
@@ -1313,6 +1388,8 @@ class OperacionDiariaControllerTest extends TestCase
             ->where('mostrarSelectorConductor', true)
             ->has('vehiculosAsignados.0.meta.conductoresAsignados', 1)
             ->where('vehiculosAsignados.0.meta.conductoresAsignados.0.id', $conductorDelVehiculo->id)
+            ->where('operarios', fn ($operarios) => collect($operarios)->pluck('id')->sort()->values()->all()
+                === collect([$conductorDelVehiculo->id, $operarioSinVehiculo->id])->sort()->values()->all())
         );
     }
 
@@ -1486,22 +1563,37 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertSame('Lectura corregida por el jefe', $operacion->observaciones);
     }
 
-    public function test_update_permite_cambiar_a_otro_conductor_asignado_pero_no_a_uno_ajeno(): void
+    public function test_update_permite_cambiar_a_cualquier_operario_activo_pero_no_a_uno_inactivo(): void
     {
-        [$jefeArea, $operacion, , $nuevoOperario, $vehiculo] = $this->crearOperacionYReasignarConductor();
+        [$jefeArea, $operacion, , , $vehiculo] = $this->crearOperacionYReasignarConductor();
         [, $conductorAjeno] = $this->crearConductorConUsuario();
+        [, $conductorInactivo] = $this->crearConductorConUsuario();
+        $conductorInactivo->update(['estado_conductor' => 'INACTIVO']);
+
+        $this->actingAs($jefeArea)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $conductorInactivo->id])
+        )->assertSessionHas('error');
+        $this->assertNotSame($conductorInactivo->id, $operacion->fresh()->id_conductor);
 
         $this->actingAs($jefeArea)->put(
             route('operacion-diaria.update', $operacion),
             $this->payloadOperacionValida($vehiculo, ['id_conductor' => $conductorAjeno->id])
-        )->assertSessionHas('error');
-        $this->assertNotSame($conductorAjeno->id, $operacion->fresh()->id_conductor);
+        )->assertRedirect(route('operacion-diaria.index'));
+        $this->assertSame($conductorAjeno->id, $operacion->fresh()->id_conductor);
+    }
+
+    public function test_update_conserva_el_operario_original_aunque_ya_no_este_activo(): void
+    {
+        [$jefeArea, $operacion, $operario, , $vehiculo] = $this->crearOperacionYReasignarConductor();
+        $operario->update(['estado_conductor' => 'INACTIVO']);
 
         $this->actingAs($jefeArea)->put(
             route('operacion-diaria.update', $operacion),
-            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $nuevoOperario->id])
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id, 'observaciones' => 'Lectura corregida por el jefe'])
         )->assertRedirect(route('operacion-diaria.index'));
-        $this->assertSame($nuevoOperario->id, $operacion->fresh()->id_conductor);
+
+        $this->assertSame($operario->id, $operacion->fresh()->id_conductor);
     }
 
     public function test_un_conductor_puede_editar_su_operacion_aunque_ya_no_tenga_el_vehiculo_asignado(): void
@@ -1528,9 +1620,10 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertSame($conductor->id, $operacion->fresh()->id_conductor);
     }
 
-    public function test_edit_incluye_al_conductor_original_entre_las_opciones_del_vehiculo(): void
+    public function test_edit_incluye_al_operario_original_entre_las_opciones_aunque_este_inactivo(): void
     {
         [$jefeArea, $operacion, $operario, $nuevoOperario] = $this->crearOperacionYReasignarConductor();
+        $operario->update(['estado_conductor' => 'INACTIVO']);
 
         $response = $this->actingAs($jefeArea)->get(route('operacion-diaria.edit', $operacion));
 
@@ -1539,8 +1632,8 @@ class OperacionDiariaControllerTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->has('vehiculosAsignados', 1)
-            ->has('vehiculosAsignados.0.meta.conductoresAsignados', 2)
-            ->where('vehiculosAsignados.0.meta.conductoresAsignados', fn ($opciones) => collect($opciones)->pluck('id')->sort()->values()->all() === $esperados)
+            ->where('operarios', fn ($opciones) => collect($opciones)->pluck('id')->sort()->values()->all() === $esperados
+                && str_ends_with(collect($opciones)->firstWhere('id', $operario->id)['label'], '— inactivo'))
         );
     }
 
@@ -1654,15 +1747,239 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertNotNull($ajena);
     }
 
-    public function test_jefe_conductor_no_puede_registrar_su_vehiculo_de_otra_area_a_nombre_de_otro_conductor(): void
+    public function test_jefe_conductor_puede_registrar_su_vehiculo_de_otra_area_a_nombre_de_otro_operario(): void
     {
         $e = $this->escenarioJefeConductorConVehiculoEnOtraArea();
 
         $this->actingAs($e['jefe'])->post(
             route('operacion-diaria.store'),
             $this->payloadOperacionValida($e['vehiculoPropio'], ['id_conductor' => $e['operario']->id])
-        )->assertSessionHas('error');
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertSame($e['operario']->id, OperacionDiaria::firstOrFail()->id_conductor);
+    }
+
+    /**
+     * fecha_inicio/fecha_fin de una jornada 08:00–18:00 del día indicado.
+     *
+     * @return array{fecha_inicio: string, fecha_fin: string}
+     */
+    private function jornadaDelDia(Carbon $dia): array
+    {
+        return [
+            'fecha_inicio' => $dia->copy()->setTime(8, 0)->format('Y-m-d\TH:i'),
+            'fecha_fin' => $dia->copy()->setTime(18, 0)->format('Y-m-d\TH:i'),
+        ];
+    }
+
+    /**
+     * Jefe del área, un operario y un vehículo (por kilometraje) de esa área.
+     *
+     * @return array{0: User, 1: Conductor, 2: Vehiculo, 3: Area}
+     */
+    private function escenarioJefeConVehiculo(): array
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeAreaConUsuario($area);
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $operario);
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        return [$jefe, $operario, $vehiculo, $area];
+    }
+
+    public function test_no_permite_dos_operaciones_del_mismo_vehiculo_el_mismo_dia(): void
+    {
+        [$jefe, $operario, $vehiculo, $area] = $this->escenarioJefeConVehiculo();
+
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        // Mismo vehículo y mismo día, aunque a otra hora y por otro operario.
+        [, $otroOperario] = $this->crearConductorConUsuario();
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, [
+                'id_conductor' => $otroOperario->id,
+                'turno' => 'NOCHE',
+                'fecha_inicio' => now()->setTime(19, 0)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->addDay()->setTime(5, 0)->format('Y-m-d\TH:i'),
+            ])
+        )->assertSessionHasErrors('fecha_inicio');
+
+        $this->assertDatabaseCount('operacion_diaria', 1);
+
+        // Otro vehículo el mismo día sí se puede.
+        $otroVehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAArea($otroVehiculo, $area);
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($otroVehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertDatabaseCount('operacion_diaria', 2);
+    }
+
+    public function test_update_no_permite_mover_la_operacion_a_un_dia_que_ya_tiene_otra_del_vehiculo(): void
+    {
+        [$jefe, $operario, $vehiculo] = $this->escenarioJefeConVehiculo();
+
+        foreach ([now(), now()->subDay()] as $dia) {
+            $this->actingAs($jefe)->post(
+                route('operacion-diaria.store'),
+                $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia($dia))
+            )->assertRedirect(route('operacion-diaria.index'));
+        }
+
+        $deAyer = OperacionDiaria::whereDate('fecha_inicio', now()->subDay()->toDateString())->firstOrFail();
+
+        $this->actingAs($jefe)->put(
+            route('operacion-diaria.update', $deAyer),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
+        )->assertSessionHasErrors('fecha_inicio');
+
+        // Editarla sin cambiar de día sí se puede (no choca consigo misma).
+        $this->actingAs($jefe)->put(
+            route('operacion-diaria.update', $deAyer),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id, 'observaciones' => 'Corrección de lecturas'] + $this->jornadaDelDia(now()->subDay()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertTrue($deAyer->fresh()->fecha_inicio->isSameDay(now()->subDay()));
+        $this->assertSame('Corrección de lecturas', $deAyer->fresh()->observaciones);
+    }
+
+    public function test_un_conductor_solo_puede_registrar_operaciones_de_hoy_o_de_ayer(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, $this->jornadaDelDia(now()->subDays(3)))
+        )->assertSessionHasErrors('fecha_inicio');
+
+        $this->actingAs($user)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, $this->jornadaDelDia(now()->addDay()))
+        )->assertSessionHasErrors('fecha_inicio');
 
         $this->assertDatabaseCount('operacion_diaria', 0);
+
+        $this->actingAs($user)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, $this->jornadaDelDia(now()->subDay()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_un_jefe_de_area_puede_registrar_cualquier_fecha_para_regularizar(): void
+    {
+        [$jefe, $operario, $vehiculo] = $this->escenarioJefeConVehiculo();
+
+        foreach ([now()->subDays(45), now()->addDays(2)] as $dia) {
+            $this->actingAs($jefe)->post(
+                route('operacion-diaria.store'),
+                $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia($dia))
+            )->assertRedirect(route('operacion-diaria.index'));
+        }
+
+        $this->assertDatabaseCount('operacion_diaria', 2);
+    }
+
+    public function test_un_administrador_puede_registrar_cualquier_fecha_para_regularizar(): void
+    {
+        $admin = User::factory()->create(['id_persona' => Persona::factory()->create()->id]);
+        $admin->assignRole('administrador');
+
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($admin)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()->subMonths(3)))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_un_conductor_puede_editar_una_operacion_antigua_si_no_cambia_el_dia(): void
+    {
+        [$jefe, , $vehiculo] = $this->escenarioJefeConVehiculo();
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+
+        // El jefe regulariza una jornada de hace 10 días a nombre del conductor.
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $conductor->id] + $this->jornadaDelDia(now()->subDays(10)))
+        )->assertRedirect(route('operacion-diaria.index'));
+        $operacion = OperacionDiaria::firstOrFail();
+
+        $this->actingAs($user)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['observaciones' => 'Corrige el kilometraje'] + $this->jornadaDelDia(now()->subDays(10)))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertSame('Corrige el kilometraje', $operacion->fresh()->observaciones);
+    }
+
+    public function test_al_regularizar_la_lectura_se_compara_con_la_ultima_carga_hasta_esa_fecha(): void
+    {
+        [$jefe, $operario, $vehiculo] = $this->escenarioJefeConVehiculo();
+
+        // Carga de ayer con 5000 km: posterior a la jornada a regularizar.
+        CargaCombustible::create([
+            'fecha_carga' => now()->subDay(),
+            'litros' => 50,
+            'precio' => 10,
+            'kilometraje' => 5000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => Grifo::create([
+                'razon_social' => 'Grifo Central',
+                'nit' => '123456',
+                'direccion' => 'Av. Siempre Viva',
+                'ciudad' => 'La Paz',
+                'telefono' => '70000000',
+                'estado_grifo' => 'ACTIVO',
+                'es_principal' => true,
+            ])->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'id_conductor' => $operario->id,
+            'tipo_carga' => 'PREPAGO',
+        ]);
+
+        // Jornada de hace 10 días con 1000 km: válida, la carga es posterior.
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()->subDays(10)))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        // Hoy, en cambio, 1000 km es menor a la última carga (5000 km).
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
+        )->assertSessionHasErrors('kilometraje_inicio');
+
+        $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_el_formulario_indica_si_el_usuario_puede_regularizar_fechas(): void
+    {
+        [$jefe] = $this->escenarioJefeConVehiculo();
+        [$conductorUser] = $this->crearConductorConUsuario();
+
+        $this->actingAs($jefe)->get(route('operacion-diaria.create'))
+            ->assertInertia(fn (Assert $page) => $page->where('puedeRegularizar', true)->where('diasAtrasSinRegularizar', 1));
+
+        $this->actingAs($conductorUser)->get(route('operacion-diaria.create'))
+            ->assertInertia(fn (Assert $page) => $page->where('puedeRegularizar', false));
     }
 }

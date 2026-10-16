@@ -5,6 +5,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/**/*.php | .ai/rules/actions.md |
+| app/Http/Requests/OperacionStoreRequest.php,app/Actions/Actividades/SincronizarActividadesRealizadasAction.php,resources/js/Pages/Operacion/*.vue | .ai/rules/actividades-js-pages-operacion.md |
 | app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Actions/Actividades/SincronizarActividadesRealizadasAction.php | .ai/rules/actividades.md |
 | app/Http/Controllers/Api/V1/ValeController.php,app/Http/Requests/ValeRequest.php,app/Http/Controllers/Api/V1/ParametrosController.php | .ai/rules/api-v1.md |
 | app/**/*.php | .ai/rules/app.md |
@@ -72,7 +73,9 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/CargaCombustible.php,app/Http/Controllers/CargaCombustibleController.php,app/Http/Requests/CargaCombustibleRequest.php,database/migrations/2026_05_28_000010_create_carga_combustible_table.php | .ai/rules/requests-migrations.md |
 | app/Http/Controllers/Api/V1/CargaMaterialController.php,app/Http/Controllers/CargaMaterialController.php,app/Http/Requests/ViajeRequest.php,app/Http/Requests/CargaMaterialRequest.php,app/Models/Viaje.php | .ai/rules/requests-models.md |
 | app/Http/Requests/**/*.php, app/Http/Requests/*.php | .ai/rules/requests.md |
+| resources/js/Pages/Operacion/Create.vue | .ai/rules/resources-js-pages-operacion.md |
 | routes/*.php, routes/web.php | .ai/rules/routes.md |
+| app/Http/Requests/OperacionStoreRequest.php,app/Actions/OperacionDiaria/*.php,app/Models/OperacionDiaria.php,app/Rules/GreaterThanPreviousReading.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/rules-js-pages-operacion.md |
 | database/seeders/UserSeeder.php,database/seeders/UserSeederInit.php | .ai/rules/seeders-seeders.md |
 | database/seeders/UserSeeder.php | .ai/rules/seeders.md |
 | app/Http/Controllers/SolicitudMantenimientoController.php,app/Http/Controllers/Api/V1/SolicitudMantenimientoController.php,app/Http/Requests/SolicitudMantenimientoRequest.php,app/Actions/SolicitudMantenimiento/CreateSolicitudMantenimientoAction.php,app/Models/SolicitudMantenimiento.php,resources/js/Pages/SolicitudMantenimiento/Create.vue | .ai/rules/solicitud-mantenimiento.md |
@@ -82,6 +85,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Middleware/VerificarSesionDePestana.php,resources/js/bootstrap.js,resources/js/Utils/sesionPestanaUtil.js,resources/js/Components/SesionPestanaAviso.vue,bootstrap/app.php | .ai/rules/utils-js-components.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml, app/Http/Controllers/Api/V1/VehiculoController.php,routes/api.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
 | app/Actions/OrdenTrabajo/*.php,app/Http/Controllers/OrdenTrabajoController.php,app/Http/Controllers/Api/V1/SolicitudMantenimientoController.php,app/Http/Requests/EmitirOrdenTrabajoRequest.php | .ai/rules/v1-http-requests.md |
+| app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Http/Controllers/Api/V1/ParametrosController.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/v1-js-pages-operacion.md |
 | app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php, app/Http/Controllers/Api/V1/*.php,routes/api.php, app/Http/Controllers/Api/V1/*.php | .ai/rules/v1.md |
 | app/Http/Controllers/Api/V1/ValeController.php,app/Actions/Vale/ListValeAction.php | .ai/rules/vale.md |
 | app/Http/Requests/ValeRequest.php,app/Models/Vale.php,app/Http/Controllers/ValeController.php,app/Http/Controllers/Api/V1/ValeController.php,app/Http/Controllers/Api/V1/ParametrosController.php,resources/js/Pages/Vales/Create.vue | .ai/rules/vales.md |

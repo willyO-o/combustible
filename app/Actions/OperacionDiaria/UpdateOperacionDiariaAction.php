@@ -5,8 +5,11 @@ namespace App\Actions\OperacionDiaria;
 use App\Actions\Actividades\SincronizarActividadesRealizadasAction;
 use App\Events\ObservacionOperacionEvent;
 use App\Exceptions\ConductorNoAsignadoException;
+use App\Exceptions\OperacionDiariaDuplicadaException;
+use App\Models\Conductor;
 use App\Models\OperacionDiaria;
 use App\Models\Vehiculo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class UpdateOperacionDiariaAction
@@ -20,18 +23,30 @@ class UpdateOperacionDiariaAction
     {
         return DB::transaction(function () use ($operacionDiaria, $datos) {
 
+            // Mover la fecha de inicio a un día en que el vehículo ya tiene
+            // otra operación rompería la regla de una por vehículo y por día.
+            if (! empty($datos['fecha_inicio'])) {
+                Vehiculo::lockForUpdate()->find($operacionDiaria->id_vehiculo);
+
+                if (OperacionDiaria::delVehiculoEnElDia($operacionDiaria->id_vehiculo, Carbon::parse($datos['fecha_inicio']), $operacionDiaria->id)) {
+                    throw new OperacionDiariaDuplicadaException;
+                }
+            }
+
             // Sin id_conductor (p.ej. el combo quedó vacío) se conserva el
             // de la operación: la columna no admite null. Conservar el mismo
-            // conductor siempre es válido aunque ya no esté asignado al
-            // vehículo (operaciones históricas tras una reasignación); sólo
-            // un CAMBIO de conductor exige que el nuevo esté asignado hoy.
+            // operario siempre es válido aunque ya no esté activo (operaciones
+            // históricas); un CAMBIO sólo exige que el nuevo esté ACTIVO — ya
+            // no se exige que esté asignado al vehículo.
             if (empty($datos['id_conductor'])) {
                 unset($datos['id_conductor']);
             } elseif ((int) $datos['id_conductor'] !== (int) $operacionDiaria->id_conductor) {
-                $vehiculo = Vehiculo::find($datos['id_vehiculo'] ?? $operacionDiaria->id_vehiculo);
+                $operarioActivo = Conductor::whereKey($datos['id_conductor'])
+                    ->where('estado_conductor', 'ACTIVO')
+                    ->exists();
 
-                if (! $vehiculo || ! $vehiculo->conductoresAsignados->contains('id', $datos['id_conductor'])) {
-                    throw new ConductorNoAsignadoException('El conductor seleccionado no está asignado actualmente a este vehículo.');
+                if (! $operarioActivo) {
+                    throw new ConductorNoAsignadoException('El operario seleccionado no está activo.');
                 }
             }
 

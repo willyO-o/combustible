@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\OperacionDiaria\CreateOperacionDiariaAction;
 use App\Actions\OperacionDiaria\ListOperacionesDiariasAction;
+use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
 use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
 use App\Http\Requests\OperacionStoreRequest;
 use App\Libraries\Reportes;
@@ -101,7 +102,7 @@ class OperacionDiariaController extends Controller
      * cualquier rol puede hacerlo, pero el listado de vehículos para elegir
      * depende del rol (ver vehiculosDisponibles()).
      */
-    public function create()
+    public function create(ListOperariosDisponiblesAction $listOperarios)
     {
         $user = request()->user();
 
@@ -112,7 +113,29 @@ class OperacionDiariaController extends Controller
             'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->esConductorPuro(),
+            // Jefe de área/administrador/super-admin: cualquier fecha (regularizar); el resto, hoy o ayer.
+            'puedeRegularizar' => $user->puedeRegularizarOperaciones(),
+            'diasAtrasSinRegularizar' => OperacionStoreRequest::DIAS_ATRAS_SIN_REGULARIZAR,
+            'operarios' => $this->operariosDisponibles($user, $listOperarios),
         ]);
+    }
+
+    /**
+     * Opciones del combo "Operario": TODOS los conductores activos, sin
+     * filtrar por la asignación al vehículo (a pedido del usuario, la
+     * asignación conductor-vehículo todavía no es confiable). Sólo se envían
+     * a quien ve el combo; el conductor puro no elige (se le asigna él mismo,
+     * ver datosConConductorResuelto()).
+     *
+     * @return array<int, array{id: int, label: string, meta: array}>
+     */
+    private function operariosDisponibles(User $user, ListOperariosDisponiblesAction $listOperarios, ?int $incluirIdConductor = null): array
+    {
+        if ($user->esConductorPuro()) {
+            return [];
+        }
+
+        return $listOperarios->execute($incluirIdConductor)->all();
     }
 
     /**
@@ -176,7 +199,7 @@ class OperacionDiariaController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(OperacionDiaria $operacionDiaria)
+    public function edit(OperacionDiaria $operacionDiaria, ListOperariosDisponiblesAction $listOperarios)
     {
         if ($operacionDiaria->estado === 'VERIFICADO') {
             return redirect()->route('operacion-diaria.show', $operacionDiaria)
@@ -192,52 +215,19 @@ class OperacionDiariaController extends Controller
             // Se asegura que el vehículo ya asignado a la operación aparezca en
             // el listado aunque ya no cumpla el filtro por rol (p.ej. fue
             // reasignado de área/conductor después de crear la operación).
-            'vehiculosAsignados' => $this->incluirConductorDeLaOperacion(
-                $this->vehiculosDisponibles($user, $operacionDiaria->vehiculo),
-                $operacionDiaria,
-                $user
-            ),
+            'vehiculosAsignados' => $this->vehiculosDisponibles($user, $operacionDiaria->vehiculo),
             'operacion' => $operacionDiaria->load(['vehiculo', 'area']),
             'actividadesSugeridas' => $this->actividadesSugeridas($user),
             'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->esConductorPuro(),
+            // Jefe de área/administrador/super-admin: cualquier fecha (regularizar); el resto, hoy o ayer.
+            'puedeRegularizar' => $user->puedeRegularizarOperaciones(),
+            'diasAtrasSinRegularizar' => OperacionStoreRequest::DIAS_ATRAS_SIN_REGULARIZAR,
+            // El operario original se incluye aunque ya no esté activo, si no
+            // el combo lo descartaría y se perdería al guardar.
+            'operarios' => $this->operariosDisponibles($user, $listOperarios, $operacionDiaria->id_conductor),
         ]);
-    }
-
-    /**
-     * Agrega el conductor de la operación a las opciones del combo de su
-     * vehículo si ya no figura entre los asignados (fue reasignado después
-     * de registrarla). Sin esto, el formulario de edición lo descartaba y la
-     * operación terminaba guardándose con otro conductor o sin ninguno.
-     *
-     * @param  array<int, array{id: int, label: string, meta: array}>  $vehiculos
-     * @return array<int, array{id: int, label: string, meta: array}>
-     */
-    private function incluirConductorDeLaOperacion(array $vehiculos, OperacionDiaria $operacionDiaria, User $user): array
-    {
-        if ($user->esConductorPuro()) {
-            return $vehiculos;
-        }
-
-        $persona = $operacionDiaria->conductor?->persona;
-
-        foreach ($vehiculos as $indice => $vehiculo) {
-            if ($vehiculo['id'] !== $operacionDiaria->id_vehiculo) {
-                continue;
-            }
-
-            $yaIncluido = collect($vehiculo['meta']['conductoresAsignados'])->contains('id', $operacionDiaria->id_conductor);
-
-            if (! $yaIncluido && $persona) {
-                $vehiculos[$indice]['meta']['conductoresAsignados'][] = [
-                    'id' => $operacionDiaria->id_conductor,
-                    'label' => "{$persona->nombre_completo} (CI: {$persona->ci}) — ya no asignado",
-                ];
-            }
-        }
-
-        return $vehiculos;
     }
 
     /**
@@ -391,7 +381,9 @@ class OperacionDiariaController extends Controller
                 'codigo' => $vehiculo->codigo,
                 // Conductores activos/provisionales asignados a este
                 // vehículo (titular + eventuales reemplazos por permiso o
-                // vacaciones) para el combo "Conductor" del formulario.
+                // vacaciones). Ya no limitan el combo "Operario" (que lista a
+                // todos los activos, prop operarios): sólo sirven para
+                // sugerirlos primero y preseleccionar al único asignado.
                 'conductoresAsignados' => collect($conductoresAsignados)
                     ->unique('id_conductor')
                     ->map(fn ($asignacion) => [
@@ -502,8 +494,8 @@ class OperacionDiariaController extends Controller
             'destino' => 'required_without:lugar|nullable|string',
             'id_material' => ['nullable', 'integer', Rule::exists('material', 'id')],
             'actividad' => 'required|string|min:3',
-            'cantidad' => 'required|numeric|min:1',
-            'unidad_medida' => 'required|string',
+            'cantidad' => 'nullable|numeric|min:1',
+            'unidad_medida' => 'nullable|string|max:30',
         ]);
 
         // Agregar la actividad al arreglo de actividades_realizadas

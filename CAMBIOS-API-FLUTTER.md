@@ -14,6 +14,42 @@ Este documento resume **todo lo que cambió en la API** en esta ronda. Está div
 
 ---
 
+## Actualización 2026-10-16 — Operación diaria: una por vehículo y día + regularización (API 1.17.0)
+
+- **Una sola operación por vehículo y por día** (día de `fecha_inicio`). Una segunda responde
+  `422` con `errors.fecha_inicio` ("El vehículo ya tiene una operación diaria registrada el …").
+- `fecha_inicio`: jefe de área, administrador y super-admin pueden enviar **cualquier fecha**
+  (regularizar). El resto (p. ej. conductor) sólo **hoy o ayer**, nunca futura → `422` en `fecha_inicio`.
+- Al regularizar, la lectura de km/horómetro se compara con la última carga **hasta esa fecha**.
+- Actividades: `cantidad` y `unidad_medida` ya **no son obligatorias** (pueden omitirse o ir vacías;
+  se guardan como `null`). Las respuestas pueden traer `pivot.cantidad` / `pivot.unidad_medida` en
+  `null`: tratarlos como opcionales en la app.
+
+**Checklist**
+
+- [ ] Mostrar `errors.fecha_inicio` del `422` junto al campo de fecha.
+- [ ] Para el conductor, limitar el selector de fecha a hoy y ayer (opcional, el servidor ya valida).
+
+---
+
+## Actualización 2026-10-16 — Operación diaria: cualquier operario activo (API 1.16.0)
+
+Para jefe de área / administrador / super-admin, `id_conductor` en `POST`/`PUT /operacion-diaria`
+ya **no tiene que estar asignado al vehículo**: se acepta cualquier conductor `ACTIVO`.
+
+- Lista para el combo: `GET /parametros/colecciones?incluir=operaciones_diarias` →
+  `operaciones_diarias.operarios` (`[{ id, label, meta: { ci, nombre_completo } }]`).
+- Operario inexistente o inactivo al registrar: `422` con `errors.id_conductor`.
+- El **conductor puro no cambia**: no ve el combo, no envía `id_conductor` y se le asigna él mismo
+  (`operarios` le llega vacío).
+
+**Checklist**
+
+- [ ] En el formulario de operación diaria (roles de gestión), llenar el combo de operario con
+  `operaciones_diarias.operarios` en vez de `vehiculos[].conductores_asignados`.
+
+---
+
 ## Actualización 2026-10-13 — Cambio de correo desde el perfil (API 1.15.0)
 
 El usuario ya puede cambiar su correo en `PUT /auth/me` (o `PATCH`). Como el correo es con

@@ -2,6 +2,42 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.17.0 — 2026-10-16
+
+### Cambiado
+
+- `POST` / `PUT /operacion-diaria`: **una sola operación por vehículo y por día** (según el día de
+  `fecha_inicio`). Una segunda responde `422` con el error en `fecha_inicio`.
+- `fecha_inicio`: `jefe-area`, `administrador` y `super-admin` pueden enviar cualquier fecha para
+  regularizar jornadas no registradas. El resto de usuarios sólo hoy o ayer, nunca una fecha futura
+  (`422` en `fecha_inicio`). Al editar sin cambiar el día no se aplica ese límite.
+- Lecturas (`kilometraje_inicio` / `horometro_inicio`): se comparan con la última carga de
+  combustible hecha **hasta `fecha_inicio`**, no con la última de todas.
+- Actividades realizadas (`actividades_realizadas[]` y `POST /operacion-actividad/validar`):
+  `cantidad` y `unidad_medida` dejan de ser obligatorias. Si se omiten se guardan como `null`.
+- `GET /parametros`: `api_version` pasa a `1.17.0`.
+
+## 1.16.0 — 2026-10-16
+
+Compatible con la versión anterior.
+
+### Agregado
+
+- `GET /parametros/colecciones`: nueva lista `operaciones_diarias.operarios` con **todos** los
+  conductores activos (`id`, `label`, `meta.ci`, `meta.nombre_completo`). Vacía para un conductor
+  puro (sin rol de gestión).
+
+### Cambiado
+
+- `POST` / `PUT /operacion-diaria`: para jefe-area/administrador/super-admin, `id_conductor`
+  ya no tiene que estar asignado al vehículo — se acepta cualquier conductor `ACTIVO`. Un valor
+  inexistente o no activo responde `422` (en el registro, como error de validación en
+  `errors.id_conductor`). Al editar, conservar el mismo operario sigue siendo válido aunque ya no
+  esté activo.
+- El conductor puro no cambia: no envía `id_conductor` y se le asigna él mismo.
+- `GET /parametros`: `api_version` pasa a `1.16.0`.
+
+
 ## 1.15.1 — 2026-10-13
 
 Corrección compatible con la versión anterior.

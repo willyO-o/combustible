@@ -6,8 +6,11 @@ use App\Actions\Actividades\SincronizarActividadesRealizadasAction;
 use App\Events\ObservacionOperacionEvent;
 use App\Exceptions\AreaNoAsignadaException;
 use App\Exceptions\ConductorNoAsignadoException;
+use App\Exceptions\OperacionDiariaDuplicadaException;
+use App\Models\Conductor;
 use App\Models\OperacionDiaria;
 use App\Models\Vehiculo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class CreateOperacionDiariaAction
@@ -23,7 +26,15 @@ class CreateOperacionDiariaAction
         return DB::transaction(
             function () use ($datos) {
 
-                $vehiculo = Vehiculo::findOrFail($datos['id_vehiculo']);
+                // lockForUpdate serializa registros simultáneos del mismo
+                // vehículo (doble clic, web + app a la vez): así la regla de
+                // una operación por vehículo y por día (ya validada en
+                // OperacionStoreRequest) no se puede saltar por concurrencia.
+                $vehiculo = Vehiculo::lockForUpdate()->findOrFail($datos['id_vehiculo']);
+
+                if (OperacionDiaria::delVehiculoEnElDia($vehiculo->id, Carbon::parse($datos['fecha_inicio']))) {
+                    throw new OperacionDiariaDuplicadaException;
+                }
 
                 $area = $vehiculo->areasAsignadas()->first();
 
@@ -33,31 +44,29 @@ class CreateOperacionDiariaAction
 
                 $datos['id_area'] = $area->id;
 
-                // El registro ya no lo crea necesariamente el propio conductor
-                // (ahora cualquier rol puede registrar la operación de un
-                // vehículo que no maneja él mismo): un vehículo puede tener
-                // varios conductores asignados a la vez (1 titular ACTIVO y
-                // otros PROVISIONAL por permiso/vacaciones), así que el rol
-                // conductor va directo (id_conductor = él mismo, resuelto en
-                // el controller) y cualquier otro rol elige entre los
-                // conductores realmente asignados al vehículo vía el combo
-                // del formulario (id_conductor ya viene en $datos).
-                $conductoresAsignados = $vehiculo->conductoresAsignados;
-
-                if ($conductoresAsignados->isEmpty()) {
-                    throw new ConductorNoAsignadoException;
-                }
-
+                // Cualquier operario ACTIVO puede figurar en la operación,
+                // esté o no asignado al vehículo (a pedido del usuario: la
+                // asignación conductor-vehículo todavía no es confiable). Sólo
+                // si no llega id_conductor (no debería ocurrir: la request lo
+                // exige salvo al conductor puro, al que el controller le
+                // completa el suyo) se recurre al titular o al primer
+                // conductor asignado.
                 if (! empty($datos['id_conductor'])) {
-                    if (! $conductoresAsignados->contains('id', $datos['id_conductor'])) {
-                        throw new ConductorNoAsignadoException('El conductor seleccionado no está asignado actualmente a este vehículo.');
+                    $operarioActivo = Conductor::whereKey($datos['id_conductor'])
+                        ->where('estado_conductor', 'ACTIVO')
+                        ->exists();
+
+                    if (! $operarioActivo) {
+                        throw new ConductorNoAsignadoException('El operario seleccionado no está activo.');
                     }
                 } else {
-                    // Sin conductor explícito (no debería ocurrir si el
-                    // formulario obliga a elegirlo): se usa el titular activo
-                    // o, si sólo hay asignaciones provisionales, la primera.
-                    $titular = $vehiculo->conductorAsignado;
-                    $datos['id_conductor'] = $titular?->id ?? $conductoresAsignados->first()->id;
+                    $conductorPorDefecto = $vehiculo->conductorAsignado ?? $vehiculo->conductoresAsignados->first();
+
+                    if (! $conductorPorDefecto) {
+                        throw new ConductorNoAsignadoException('Debe seleccionar el operario de la operación.');
+                    }
+
+                    $datos['id_conductor'] = $conductorPorDefecto->id;
                 }
 
                 $operacionDiaria = OperacionDiaria::create($datos);

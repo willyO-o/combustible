@@ -52,6 +52,11 @@ const props = defineProps({
     // hora actual.
     horaSugerida: { type: String, default: '' },
     opens: { type: String, default: 'right' }, // 'left' | 'right' | 'center'
+    // Límites opcionales del calendario (Date). Pasar el inicio del día
+    // mínimo y el final del día máximo: el paquete compara con la hora.
+    // Sólo guían al usuario; la validación real es del servidor.
+    minDate: { type: Date, default: null },
+    maxDate: { type: Date, default: null },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -155,6 +160,8 @@ const localeEs = {
         :show-dropdowns="false"
         :disabled="disabled"
         :opens="opens"
+        :min-date="minDate"
+        :max-date="maxDate"
         :control-container-class="[
             'form-control date-time-input',
             { 'is-invalid': invalid, 'date-time-input--disabled': disabled },

@@ -323,8 +323,8 @@ const verificarOperacion =  async () => {
                                             <span v-else class="text-muted">Sin material</span>
                                         </td>
                                         <td v-if="act.pivot.lugar">{{ act.pivot.lugar }}</td>
-                                        <td class="text-center">{{ act.pivot.cantidad }}</td>
-                                        <td>{{ act.pivot.unidad_medida }}</td>
+                                        <td class="text-center">{{ act.pivot.cantidad ?? '—' }}</td>
+                                        <td>{{ act.pivot.unidad_medida || '—' }}</td>
                                         <td v-if="tieneHorario">
                                             <span v-if="act.pivot.hora_inicio || act.pivot.hora_fin">{{ act.pivot.hora_inicio }} - {{ act.pivot.hora_fin }}</span>
                                         </td>

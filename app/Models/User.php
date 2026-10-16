@@ -78,6 +78,16 @@ class User extends Authenticatable implements Auditable, JWTSubject
     }
 
     /**
+     * Jefe de área, administrador o super-admin: pueden registrar operaciones
+     * diarias con cualquier fecha anterior para regularizar jornadas no
+     * registradas. El resto sólo hoy o ayer (ver OperacionStoreRequest).
+     */
+    public function puedeRegularizarOperaciones(): bool
+    {
+        return $this->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
+    }
+
+    /**
      * Contraseña inicial por defecto de una cuenta nueva: "CI#Plusmetals".
      * Única fuente del formato (Personas, Usuarios y jefes de Área la usan
      * cuando no se escribe otra); el front la replica sólo para mostrarla en

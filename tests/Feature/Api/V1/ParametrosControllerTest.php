@@ -185,6 +185,37 @@ class ParametrosControllerTest extends TestCase
         $this->assertSame('L', collect($tipos)->firstWhere('tipo_mantenimiento', 'Combustible cargado')['unidad_medida']);
     }
 
+    public function test_colecciones_incluye_todos_los_operarios_activos_para_un_jefe_de_area(): void
+    {
+        $jefe = $this->crearUsuario();
+        $jefe->assignRole('jefe-area');
+
+        // Uno asignado a un vehículo, otro sin ninguna asignación y uno inactivo.
+        $asignado = Conductor::create(['id' => Persona::factory()->create()->id, 'estado_conductor' => 'ACTIVO']);
+        $this->asignarVehiculoAConductor($asignado, Vehiculo::factory()->create());
+        $sinAsignar = Conductor::create(['id' => Persona::factory()->create()->id, 'estado_conductor' => 'ACTIVO']);
+        $inactivo = Conductor::create(['id' => Persona::factory()->create()->id, 'estado_conductor' => 'INACTIVO']);
+
+        $response = $this->actingAs($jefe, 'api')->getJson(route('api.v1.parametros.colecciones', ['incluir' => 'operaciones_diarias']));
+
+        $response->assertOk();
+        $ids = array_column($response->json('data.operaciones_diarias.operarios'), 'id');
+        $this->assertEqualsCanonicalizing([$asignado->id, $sinAsignar->id], $ids);
+        $this->assertNotContains($inactivo->id, $ids);
+        $response->assertJsonStructure(['data' => ['operaciones_diarias' => ['operarios' => [['id', 'label', 'meta' => ['ci', 'nombre_completo']]]]]]);
+    }
+
+    public function test_colecciones_no_envia_operarios_a_un_conductor_puro(): void
+    {
+        Conductor::create(['id' => Persona::factory()->create()->id, 'estado_conductor' => 'ACTIVO']);
+
+        $response = $this->actingAs($this->crearUsuarioConductor(), 'api')
+            ->getJson(route('api.v1.parametros.colecciones', ['incluir' => 'operaciones_diarias']));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.operaciones_diarias.operarios', []);
+    }
+
     public function test_colecciones_incluye_los_vehiculos_externos(): void
     {
         VehiculoExterno::factory()->create(['nro_placa' => '148-JLK']);

@@ -3,16 +3,24 @@
 namespace App\Http\Requests;
 
 use App\Models\MantenimientoOperacionDiaria;
+use App\Models\OperacionDiaria;
 use App\Models\Vehiculo;
 use App\Rules\GreaterThanPreviousReading;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 class OperacionStoreRequest extends FormRequest
 {
+    /**
+     * Días hacia atrás que puede registrar un usuario sin rol de gestión
+     * (1 = hoy o ayer). Fechas anteriores sólo con User::puedeRegularizarOperaciones().
+     */
+    public const DIAS_ATRAS_SIN_REGULARIZAR = 1;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -68,6 +76,12 @@ class OperacionStoreRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            if (! $validator->errors()->has('fecha_inicio')) {
+                $this->validarFechaInicio($validator);
+            }
+        });
+
+        $validator->after(function (Validator $validator) {
             $operacion = $this->route('operacionDiaria');
 
             foreach ($this->input('mantenimientos', []) as $idx => $fila) {
@@ -102,6 +116,50 @@ class OperacionStoreRequest extends FormRequest
     }
 
     /**
+     * Reglas de la fecha de inicio (web y API comparten esta request):
+     * - Una sola operación diaria por vehículo y por día (excluye la propia
+     *   operación al editar).
+     * - jefe-area/administrador/super-admin pueden usar cualquier fecha (a
+     *   pedido del usuario, para regularizar jornadas no registradas).
+     * - El resto, sólo hoy o ayer (ayer cubre el turno noche y el registro al
+     *   día siguiente), nunca una fecha futura. Al editar, si el día no cambia
+     *   no se exige este límite: la operación ya existía.
+     */
+    private function validarFechaInicio(Validator $validator): void
+    {
+        $fechaInicio = Carbon::parse($this->input('fecha_inicio'));
+        $operacion = $this->route('operacionDiaria');
+        $idVehiculo = (int) ($this->input('id_vehiculo') ?? $operacion?->id_vehiculo);
+
+        $mismoDiaQueLaOperacion = $operacion?->fecha_inicio?->isSameDay($fechaInicio) ?? false;
+        $fechaMinima = now()->subDays(self::DIAS_ATRAS_SIN_REGULARIZAR)->startOfDay();
+
+        if (! $mismoDiaQueLaOperacion && ! $this->user()?->puedeRegularizarOperaciones()) {
+            if ($fechaInicio->greaterThan(now()->endOfDay())) {
+                $validator->errors()->add('fecha_inicio', 'La fecha de inicio no puede ser posterior a hoy.');
+
+                return;
+            }
+
+            if ($fechaInicio->lessThan($fechaMinima)) {
+                $validator->errors()->add(
+                    'fecha_inicio',
+                    'Sólo puedes registrar operaciones de hoy o de ayer. Para regularizar una fecha anterior, solicítalo a tu jefe de área.'
+                );
+
+                return;
+            }
+        }
+
+        if ($idVehiculo && ($existente = OperacionDiaria::delVehiculoEnElDia($idVehiculo, $fechaInicio, $operacion?->id))) {
+            $validator->errors()->add(
+                'fecha_inicio',
+                "El vehículo ya tiene una operación diaria registrada el {$fechaInicio->format('d/m/Y')} (N° {$existente->nro_operacion})."
+            );
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -111,14 +169,16 @@ class OperacionStoreRequest extends FormRequest
         // dd($this->method());
         return [
             'id_vehiculo' => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id'],
-            // El combo de conductor se oculta sólo al conductor puro (sin
-            // rol de gestión, siempre es él mismo); para cualquier otro rol
-            // (incluido jefe-area/administrador que además es conductor) es
-            // obligatorio al crear, ya que un vehículo puede tener varios
-            // conductores asignados a la vez (titular + provisionales). El
-            // controller lo completa con el conductor autenticado cuando es
-            // conductor puro (User::esConductorPuro()).
-            'id_conductor' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => ! $this->user()?->esConductorPuro()) : 'sometimes', 'nullable', 'exists:conductor,id'],
+            // Los roles de gestión eligen el operario entre TODOS los
+            // conductores ACTIVO (ya no sólo los asignados al vehículo). Es
+            // obligatorio al crear salvo para el conductor puro, que no elige:
+            // el controller le asigna el suyo (User::esConductorPuro()).
+            // Al editar basta con que exista: conservar el operario original
+            // es válido aunque ya no esté activo; un cambio lo valida
+            // UpdateOperacionDiariaAction.
+            'id_conductor' => $this->method() === 'POST'
+                ? [Rule::requiredIf(fn () => ! $this->user()?->esConductorPuro()), 'nullable', Rule::exists('conductor', 'id')->where('estado_conductor', 'ACTIVO')->whereNull('deleted_at')]
+                : ['sometimes', 'nullable', 'exists:conductor,id'],
             'turno' => 'required|in:DIA,NOCHE',
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',
@@ -126,13 +186,13 @@ class OperacionStoreRequest extends FormRequest
                 $vehiculo = Vehiculo::find($this->id_vehiculo);
 
                 return $vehiculo && $vehiculo->tipo_medicion === 'kilometraje';
-            }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje')],
+            }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'kilometraje', $this->input('fecha_inicio'))],
             'kilometraje_fin' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => $this->kilometraje_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:kilometraje_inicio'],
             'horometro_inicio' => [$this->method() === 'POST' ? Rule::requiredIf(function () {
                 $vehiculo = Vehiculo::find($this->id_vehiculo);
 
                 return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
-            }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
+            }) : 'sometimes', 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro', $this->input('fecha_inicio'))],
             'horometro_fin' => [$this->method() === 'POST' ? Rule::requiredIf(fn () => $this->horometro_inicio !== null) : 'sometimes', 'nullable', 'numeric', 'min:0', 'gt:horometro_inicio'],
             // "horas_trabajadas" => 'required|numeric|min:0', se calcula automáticamente a partir de fecha_inicio y fecha_fin
             'observaciones' => 'nullable|string|min:10',
@@ -158,8 +218,9 @@ class OperacionStoreRequest extends FormRequest
             // por kilometraje (viajes y traslados). Opcional — no todo viaje
             // mueve material (traslado de personal, retorno en vacío, etc.).
             'actividades_realizadas.*.id_material' => ['nullable', 'integer', Rule::exists('material', 'id')],
-            'actividades_realizadas.*.cantidad' => 'required|numeric|min:1',
-            'actividades_realizadas.*.unidad_medida' => 'required|string|min:1',
+            // Cantidad y unidad de medida son opcionales (a pedido del usuario).
+            'actividades_realizadas.*.cantidad' => 'nullable|numeric|min:1',
+            'actividades_realizadas.*.unidad_medida' => 'nullable|string|max:30',
             // hora_inicio/hora_fin ya no se capturan: si un cliente antiguo
             // las envía se ignoran. El id (del registro ya guardado, al
             // editar) sólo sirve para conservar las horas históricas, ver
@@ -187,15 +248,14 @@ class OperacionStoreRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'id_conductor.required' => 'Debe seleccionar el conductor asignado al vehículo.',
+            'id_conductor.required' => 'Debe seleccionar el operario.',
+            'id_conductor.exists' => 'El operario seleccionado no existe o no está activo.',
             'actividades_realizadas.required' => 'Debe agregar al menos una actividad realizada.',
             'actividades_realizadas.*.actividad.required' => 'La actividad es obligatoria.',
             'actividades_realizadas.*.lugar.required' => 'El lugar es obligatorio.',
             'actividades_realizadas.*.origen.required' => 'El origen es obligatorio.',
             'actividades_realizadas.*.destino.required' => 'El destino es obligatorio.',
             'actividades_realizadas.*.id_material.exists' => 'El material seleccionado no es válido.',
-            'actividades_realizadas.*.cantidad.required' => 'La cantidad es obligatoria.',
-            'actividades_realizadas.*.unidad_medida.required' => 'La unidad de medida es obligatoria.',
             'mantenimientos.*.id_tipo_mantenimiento.exists' => 'El control de mantenimiento seleccionado no es válido para operación diaria.',
             'mantenimientos.*.valor.numeric' => 'El valor del control de mantenimiento debe ser numérico.',
             'mantenimientos.*.evidencia.image' => 'La evidencia debe ser una imagen.',

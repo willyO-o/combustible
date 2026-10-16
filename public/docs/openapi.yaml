@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.15.1"
+  version: "1.17.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.15.1"
+                api_version: "1.17.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -647,6 +647,10 @@ paths:
                       - id: 5
                         nombre_actividad: Acarreo de material
                         unidad_medida: viajes
+                    operarios:
+                      - id: 45
+                        label: "Juan Pérez Quispe (CI: 1234567)"
+                        meta: { ci: "1234567", nombre_completo: Juan Pérez Quispe }
                     tipos_mantenimiento:
                       - id: 12
                         tipo_mantenimiento: Combustible cargado
@@ -761,8 +765,14 @@ paths:
         - Si el vehículo tiene `tipo_medicion = horometro`, `horometro_inicio` es obligatorio.
         - `kilometraje_fin` es obligatorio si se envió `kilometraje_inicio`, y debe ser mayor a este.
         - `horometro_fin` es obligatorio si se envió `horometro_inicio`, y debe ser mayor a este.
-        - `kilometraje_inicio` / `horometro_inicio` no pueden ser inferiores a la última lectura
-          registrada para el vehículo (según el último registro de carga de combustible).
+        - `kilometraje_inicio` / `horometro_inicio` no pueden ser inferiores a la lectura de la
+          última carga de combustible del vehículo **hecha hasta `fecha_inicio`** (así se puede
+          regularizar una jornada pasada aunque haya cargas posteriores con lecturas mayores).
+        - **Una sola operación por vehículo y por día** (según el día de `fecha_inicio`). Si ya
+          existe, responde `422` con el error en `fecha_inicio`.
+        - `fecha_inicio`: `jefe-area`, `administrador` y `super-admin` pueden enviar **cualquier
+          fecha** (regularización). El resto de usuarios sólo **hoy o ayer**, nunca una fecha
+          futura (`422` en `fecha_inicio`).
         - Si el vehículo tiene `tipo_medicion = horometro`, cada actividad realizada debe indicar
           `lugar`. Si tiene `tipo_medicion = kilometraje`, cada actividad debe indicar `origen`
           **y** `destino` (p. ej. actividades de transporte).
@@ -936,7 +946,7 @@ paths:
                       unidad_medida: null
                       pivot: { id: 89, valor: null, realizado: SI }
         '422':
-          description: Error de validación, el vehículo no tiene un área asignada, o `id_conductor` no está asignado al vehículo.
+          description: Error de validación (incluido un `id_conductor` inexistente o no `ACTIVO`) o el vehículo no tiene un área asignada.
           content:
             application/json:
               examples:
@@ -952,10 +962,13 @@ paths:
                   summary: Vehículo sin área asignada
                   value:
                     message: "Error: El conductor no tiene un área asignada."
-                conductor_no_asignado:
-                  summary: "`id_conductor` enviado (obligatorio para jefe-area/administrador/super-admin) no es uno de los conductores actualmente asignados al vehículo"
+                operario_no_activo:
+                  summary: "`id_conductor` enviado (obligatorio para jefe-area/administrador/super-admin) no existe o no está ACTIVO"
                   value:
-                    message: "El conductor seleccionado no está asignado actualmente a este vehículo."
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      id_conductor: ["El operario seleccionado no existe o no está activo."]
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -1145,7 +1158,7 @@ paths:
                       unidad_medida: null
                       pivot: { id: 90, valor: null, realizado: SI }
         '422':
-          description: Error de validación, o `id_conductor` no está asignado al vehículo.
+          description: Error de validación, o el `id_conductor` nuevo no está `ACTIVO`.
           content:
             application/json:
               schema:
@@ -1158,10 +1171,10 @@ paths:
                     message: Los datos enviados no son válidos.
                     errors:
                       kilometraje_fin: ["El kilometraje fin debe ser mayor que kilometraje inicio."]
-                conductor_no_asignado:
-                  summary: "`id_conductor` enviado no es uno de los conductores actualmente asignados al vehículo"
+                operario_no_activo:
+                  summary: "Se cambió `id_conductor` a un operario que no está ACTIVO"
                   value:
-                    message: "El conductor seleccionado no está asignado actualmente a este vehículo."
+                    message: "El operario seleccionado no está activo."
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -3971,7 +3984,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.15.1" }
+        api_version: { type: string, example: "1.17.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4176,6 +4189,23 @@ components:
                       id: { type: integer, example: 5 }
                       nombre_actividad: { type: string, example: Acarreo de material }
                       unidad_medida: { type: string, nullable: true, example: viajes }
+                operarios:
+                  type: array
+                  description: |
+                    Operarios que se pueden enviar como `id_conductor` en `POST`/`PUT
+                    /operacion-diaria`: **todos** los conductores con `estado_conductor = ACTIVO`,
+                    sin importar a qué vehículo estén asignados. Vacío (`[]`) para un conductor
+                    puro (sin rol de gestión), que no elige operario: se le asigna él mismo.
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 45 }
+                      label: { type: string, example: "Juan Pérez Quispe (CI: 1234567)" }
+                      meta:
+                        type: object
+                        properties:
+                          ci: { type: string, nullable: true, example: "1234567" }
+                          nombre_completo: { type: string, example: Juan Pérez Quispe }
                 tipos_mantenimiento:
                   type: array
                   description: |
@@ -4227,7 +4257,7 @@ components:
         (por ejemplo, para actividades de transporte). Para `kilometraje` se acepta además
         `id_material` (opcional) con el material trasladado. Desde 1.14.0 las actividades ya no
         llevan horas de inicio/fin.
-      required: [actividad, cantidad, unidad_medida]
+      required: [actividad]
       properties:
         actividad:
           type: string
@@ -4263,10 +4293,16 @@ components:
           type: number
           format: float
           minimum: 1
-          description: Cantidad realizada, en la unidad indicada por `unidad_medida` (viajes, m3, horas, etc.).
+          nullable: true
+          description: |
+            Opcional (desde 1.17.0). Cantidad realizada, en la unidad indicada por `unidad_medida`
+            (viajes, m3, horas, etc.). Si se envía, debe ser un número mayor o igual a 1.
           example: 6
         unidad_medida:
           type: string
+          nullable: true
+          maxLength: 30
+          description: Opcional (desde 1.17.0).
           example: viajes
         id:
           type: integer
@@ -4369,12 +4405,10 @@ components:
             valor que envíe se ignora y el servidor usa su propio `id_conductor` — se puede
             omitir por completo. Para cualquier usuario con rol `jefe-area`, `administrador` o
             `super-admin` (aunque también tenga el rol `conductor` — p.ej. un jefe de área que
-            además es conductor de otro vehículo) es **obligatorio** y debe ser uno de los
-            conductores actualmente asignados al vehículo (`vehiculos[].id_conductor` /
-            `conductores_asignados` de `GET /parametros/colecciones` sólo trae el titular; para
-            ver todos los asignados —titular + provisionales— no hay otro endpoint todavía,
-            se conoce por contexto de la operación de campo). Un valor que no esté asignado al
-            vehículo responde `422`.
+            además es conductor de otro vehículo) es **obligatorio** y puede ser **cualquier**
+            conductor `ACTIVO`, esté o no asignado al vehículo (desde 1.16.0; lista en
+            `GET /parametros/colecciones` → `operaciones_diarias.operarios`). Un valor inexistente
+            o no `ACTIVO` responde `422`.
           example: 45
         turno:
           type: string
@@ -4383,6 +4417,11 @@ components:
         fecha_inicio:
           type: string
           format: date-time
+          description: |
+            Una sola operación por vehículo y por día (el día de esta fecha). jefe-area,
+            administrador y super-admin pueden enviar cualquier fecha (regularización); el resto,
+            sólo hoy o ayer y nunca una fecha futura. Al editar sin cambiar el día no se aplica el
+            límite de hoy/ayer. Error en cualquier caso: `422` en `fecha_inicio`.
           example: "2026-08-13 07:00"
         fecha_fin:
           type: string
@@ -4464,8 +4503,9 @@ components:
             que en `POST /operacion-diaria` (ver `OperacionDiariaStoreRequest.id_conductor`) si
             se envía: un conductor puro no puede cambiarlo (se ignora lo que envíe, sigue
             siendo él mismo); para jefe-area/administrador/super-admin (aunque también tengan
-            el rol `conductor`) el valor enviado se respeta y debe ser uno de los conductores
-            actualmente asignados al vehículo (`422` si no lo es).
+            el rol `conductor`) el valor enviado se respeta: conservar el mismo siempre es
+            válido; cambiarlo exige que el nuevo esté `ACTIVO` (no hace falta que esté asignado
+            al vehículo; `422` si no está activo).
           example: 45
         turno:
           type: string
@@ -4474,6 +4514,11 @@ components:
         fecha_inicio:
           type: string
           format: date-time
+          description: |
+            Una sola operación por vehículo y por día (el día de esta fecha). jefe-area,
+            administrador y super-admin pueden enviar cualquier fecha (regularización); el resto,
+            sólo hoy o ayer y nunca una fecha futura. Al editar sin cambiar el día no se aplica el
+            límite de hoy/ayer. Error en cualquier caso: `422` en `fecha_inicio`.
           example: "2026-08-13 07:00"
         fecha_fin:
           type: string

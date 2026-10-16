@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -53,6 +54,20 @@ class OperacionDiaria extends Model implements Auditable
         $digitos = ParametrosEmpresa::first()->parametros_vale->digitos_serie;
 
         return str_pad($this->nro_operacion, $digitos, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Operación ya registrada para el vehículo el mismo día (por fecha de
+     * inicio): sólo se permite una operación diaria por vehículo y por día.
+     * $exceptoId excluye la propia operación al editar.
+     */
+    public static function delVehiculoEnElDia(int $idVehiculo, CarbonInterface $fechaInicio, ?int $exceptoId = null): ?self
+    {
+        return self::query()
+            ->where('id_vehiculo', $idVehiculo)
+            ->whereDate('fecha_inicio', $fechaInicio->toDateString())
+            ->when($exceptoId, fn ($query) => $query->whereKeyNot($exceptoId))
+            ->first(['id', 'nro_operacion', 'fecha_inicio']);
     }
 
     public function getFechaIFAttribute()

@@ -7,6 +7,7 @@ use App\Actions\OperacionDiaria\ListOperacionesDiariasAction;
 use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
 use App\Exceptions\AreaNoAsignadaException;
 use App\Exceptions\ConductorNoAsignadoException;
+use App\Exceptions\OperacionDiariaDuplicadaException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OperacionStoreRequest;
 use App\Libraries\Reportes;
@@ -75,7 +76,7 @@ class OperacionDiariaController extends Controller
             return response()->json([
                 'message' => 'Error: El conductor no tiene un área asignada.',
             ], 422);
-        } catch (ConductorNoAsignadoException $e) {
+        } catch (ConductorNoAsignadoException|OperacionDiariaDuplicadaException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 422);
@@ -113,7 +114,7 @@ class OperacionDiariaController extends Controller
                 'data' => $operacionDiaria,
             ]);
 
-        } catch (ConductorNoAsignadoException $e) {
+        } catch (ConductorNoAsignadoException|OperacionDiariaDuplicadaException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 422);
@@ -203,8 +204,8 @@ class OperacionDiariaController extends Controller
             'destino' => 'required_without:lugar|nullable|string',
             'id_material' => ['nullable', 'integer', Rule::exists('material', 'id')],
             'actividad' => 'required|string|min:3',
-            'cantidad' => 'required|numeric|min:1',
-            'unidad_medida' => 'required|string',
+            'cantidad' => 'nullable|numeric|min:1',
+            'unidad_medida' => 'nullable|string|max:30',
         ]);
 
         // Las horas ya no se capturan ni se validan, pero si una versión

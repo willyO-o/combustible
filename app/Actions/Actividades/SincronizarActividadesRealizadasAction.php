@@ -38,7 +38,7 @@ class SincronizarActividadesRealizadasAction
                 ['nombre_normalizado' => $nombreNormalizado],
                 [
                     'nombre_actividad' => $actividadData['actividad'],
-                    'unidad_medida' => $actividadData['unidad_medida'],
+                    'unidad_medida' => $actividadData['unidad_medida'] ?? null,
                     'id_area' => $operacionDiaria->id_area,
                     'estado_actividad' => 'ACTIVO',
                     'ultimo_uso' => now(),
@@ -56,8 +56,8 @@ class SincronizarActividadesRealizadasAction
                 'origen' => $actividadData['origen'] ?? null,
                 'destino' => $actividadData['destino'] ?? null,
                 'lugar' => $actividadData['lugar'] ?? null,
-                'cantidad' => $actividadData['cantidad'],
-                'unidad_medida' => $actividadData['unidad_medida'],
+                'cantidad' => $actividadData['cantidad'] ?? null,
+                'unidad_medida' => $actividadData['unidad_medida'] ?? null,
                 'hora_inicio' => $horas['hora_inicio'],
                 'hora_fin' => $horas['hora_fin'],
             ]);

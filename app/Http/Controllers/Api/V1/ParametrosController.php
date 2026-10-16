@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
 use App\Http\Controllers\Controller;
 use App\Models\Actividad;
 use App\Models\Conductor;
@@ -27,7 +28,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.15.1',
+            'api_version' => '1.17.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -136,6 +137,11 @@ class ParametrosController extends Controller
             ],
             'operaciones_diarias' => fn () => [
                 'actividades_sugeridas' => $this->actividadesSugeridas($conductor, $resolverAreasACargo()),
+                // Operarios elegibles para `id_conductor`: todos los
+                // conductores activos, sin filtrar por la asignación al
+                // vehículo. Vacío para el conductor puro (no elige: se le
+                // asigna él mismo).
+                'operarios' => $user->esConductorPuro() ? [] : app(ListOperariosDisponiblesAction::class)->execute()->all(),
                 // Controles de mantenimiento que se pueden registrar en una
                 // operación diaria (ámbito operacion_diaria, activos). Según
                 // `tipo_valor`: `cantidad` -> se envía `valor` (en `unidad_medida`),

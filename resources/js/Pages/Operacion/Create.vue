@@ -35,10 +35,19 @@ const props = defineProps({
     // [{ id, tipo_mantenimiento, tipo_valor: 'cantidad'|'booleano'|null, unidad_medida }]
     // controles de mantenimiento de ámbito operacion_diaria (activos).
     tiposMantenimiento: { type: Array, default: () => [] },
-    // false para el rol conductor (siempre es él mismo, sin ambigüedad); true
-    // para cualquier otro rol, que debe elegir entre los conductores
-    // realmente asignados al vehículo (titular + provisionales).
+    // false para el conductor puro (siempre es él mismo, sin ambigüedad); true
+    // para cualquier rol de gestión, que elige el operario entre todos los
+    // conductores activos (prop operarios).
     mostrarSelectorConductor: Boolean,
+    // [{ id, label, meta }] todos los conductores activos (más el de la
+    // operación en edición aunque ya no lo esté). Vacío para el conductor puro.
+    operarios: { type: Array, default: () => [] },
+    // true para jefe-area/administrador/super-admin: pueden registrar con
+    // cualquier fecha (regularizar). El resto, sólo los últimos
+    // diasAtrasSinRegularizar días (hoy o ayer). Lo valida el servidor
+    // (OperacionStoreRequest); aquí sólo limita el calendario y avisa.
+    puedeRegularizar: { type: Boolean, default: false },
+    diasAtrasSinRegularizar: { type: Number, default: 1 },
 })
 
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
@@ -55,13 +64,35 @@ const esEdicion = computed(() => !!props.operacion)
 /* ------------------------------------------------------------------ */
 /*  Form                                                               */
 /* ------------------------------------------------------------------ */
-// Hora de ingreso del personal: en un alta, la fecha de inicio arranca hoy a
-// esta hora (editable). También es la hora que propone el calendario si el
-// campo se vacía.
-const HORA_INGRESO = '08:30'
+// Horario de la jornada: en un alta, la fecha de inicio arranca hoy a la hora
+// de ingreso y la fecha fin hoy a la hora de salida (ambas editables). También
+// son las horas que propone el calendario si el campo se vacía.
+const HORA_INGRESO = '08:00'
+const HORA_SALIDA = '18:00'
 // 'YYYY-MM-DDTHH:mm' en hora local (mismo formato que <input type="datetime-local">).
 const hoy = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10)
 const inicioDeJornada = `${hoy}T${HORA_INGRESO}`
+const finDeJornada = `${hoy}T${HORA_SALIDA}`
+
+// Límites del calendario de fecha de inicio: nunca después de hoy; sin rol
+// de gestión, tampoco antes de N días atrás. Al editar, el día ya guardado
+// sigue siendo elegible (si no, el calendario lo recortaría).
+const finDeHoy = new Date(new Date().setHours(23, 59, 59, 999))
+const minFechaInicio = computed(() => {
+    if (props.puedeRegularizar) return null
+
+    const minimo = new Date()
+    minimo.setDate(minimo.getDate() - props.diasAtrasSinRegularizar)
+    minimo.setHours(0, 0, 0, 0)
+
+    const guardada = props.operacion?.fecha_i_f ? new Date(props.operacion.fecha_i_f.replace(' ', 'T')) : null
+    if (guardada && !isNaN(guardada) && guardada < minimo) {
+        guardada.setHours(0, 0, 0, 0)
+        return guardada
+    }
+
+    return minimo
+})
 const turnoDefault = function () {
     const hour = new Date().getHours()
 
@@ -77,7 +108,7 @@ const form = useForm({
     id_conductor: (props.operacion ? props.operacion.id_conductor : null) ?? null,
     turno: (props.operacion ? props.operacion.turno : turnoDefault()) ?? turnoDefault(),
     fecha_inicio: (props.operacion ? props.operacion.fecha_i_f : inicioDeJornada) ?? inicioDeJornada,
-    fecha_fin: (props.operacion ? props.operacion.fecha_f_f : '') ?? '',
+    fecha_fin: (props.operacion ? props.operacion.fecha_f_f : finDeJornada) ?? '',
     kilometraje_inicio: (props.operacion ? props.operacion.kilometraje_inicio : '') ?? '',
     kilometraje_fin: (props.operacion ? props.operacion.kilometraje_fin : '') ?? '',
     horometro_inicio: (props.operacion ? props.operacion.horometro_inicio : '') ?? '',
@@ -218,11 +249,27 @@ const usoDeJornada = computed(() => {
     }
 })
 
-// Conductores activos/provisionales del vehículo seleccionado (sólo viene
-// poblado desde el backend cuando mostrarSelectorConductor es true).
+// Conductores activos/provisionales asignados al vehículo seleccionado (sólo
+// viene poblado cuando mostrarSelectorConductor es true).
 const conductoresDelVehiculo = computed(() => {
     const vehiculoSelected = vehiculosAsignadosOpt.value.find(v => v.id === form.id_vehiculo)
     return vehiculoSelected?.meta?.conductoresAsignados ?? []
+})
+
+// Opciones del combo "Operario": todos los operarios activos; los asignados
+// al vehículo elegido se muestran primero, marcados con una insignia (slot
+// #option) como sugerencia.
+// OJO: Multiselect (refreshLabels) reescribe `label` sobre el objeto de la
+// opción seleccionada cada vez que cambian las opciones. Por eso siempre se
+// entregan copias (nunca los objetos de props.operarios) y el `label` no se
+// modifica: si se le concatenara el texto "asignado", se acumulaba en cada
+// recálculo ("· asignado al vehículo · asignado al vehículo ...").
+const operariosOpt = computed(() => {
+    const idsAsignados = new Set(conductoresDelVehiculo.value.map(c => c.id))
+
+    return props.operarios
+        .map(operario => ({ ...operario, asignado: idsAsignados.has(operario.id) }))
+        .sort((a, b) => Number(b.asignado) - Number(a.asignado))
 })
 
 watch(() => form.id_vehiculo, async (val, oldVal) => {
@@ -243,7 +290,6 @@ watch(() => form.id_vehiculo, async (val, oldVal) => {
     }
 
     if (!val) {
-        form.id_conductor = null
         return
     }
 
@@ -253,13 +299,14 @@ watch(() => form.id_vehiculo, async (val, oldVal) => {
         tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
     }
 
-    if (props.mostrarSelectorConductor) {
+    // Cualquier operario activo es válido para cualquier vehículo, así que el
+    // ya elegido se respeta. Si aún no hay uno y el vehículo tiene un único
+    // asignado, se sugiere preseleccionándolo (editable).
+    if (props.mostrarSelectorConductor && !form.id_conductor) {
         const conductores = vehiculoSelected?.meta?.conductoresAsignados ?? []
 
-        // Si el conductor ya elegido no pertenece al nuevo vehículo, se
-        // limpia; si sólo queda una opción, se autoselecciona.
-        if (!conductores.some(c => c.id === form.id_conductor)) {
-            form.id_conductor = conductores.length === 1 ? conductores[0].id : null
+        if (conductores.length === 1) {
+            form.id_conductor = conductores[0].id
         }
     }
 })
@@ -505,20 +552,25 @@ onMounted(() => {
                                     </div>
                                 </div>
 
-                                <!-- Conductor: sólo se muestra a quien no tiene el rol conductor,
-                                     ya que un vehículo puede tener varios conductores asignados
-                                     (1 titular + provisionales por permiso/vacaciones). -->
+                                <!-- Operario: se oculta al conductor puro (siempre es él mismo);
+                                     los roles de gestión eligen entre todos los operarios activos. -->
                                 <div v-if="mostrarSelectorConductor" class="col-12">
                                     <label class="form-label fw-medium">
-                                        Conductor <span class="text-danger">*</span>
+                                        Operario <span class="text-danger">*</span>
                                     </label>
                                     <Multiselect v-model="form.id_conductor"
-                                        :options="conductoresDelVehiculo" value-prop="id" label="label"
-                                        :searchable="true" :filter-results="true" :disabled="!form.id_vehiculo"
-                                        placeholder="Selecciona un conductor..."
-                                        no-options-text="Este vehículo no tiene conductores asignados"
+                                        :options="operariosOpt" value-prop="id" label="label"
+                                        :searchable="true" :filter-results="true"
+                                        placeholder="Selecciona un operario..."
+                                        no-options-text="No hay operarios activos registrados"
                                         no-results-text="Sin resultados"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
+                                        <template #option="{ option }">
+                                            <span>{{ option.label }}</span>
+                                            <span v-if="option.asignado"
+                                                class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado al vehículo</span>
+                                        </template>
+                                    </Multiselect>
 
                                     <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                         form.errors.id_conductor }}</div>
@@ -531,15 +583,21 @@ onMounted(() => {
                                         Fecha y hora inicio <span class="text-danger">*</span>
                                     </label>
                                     <DateTimeInput v-model="form.fecha_inicio" :invalid="!!form.errors.fecha_inicio"
-                                        :hora-sugerida="HORA_INGRESO" />
+                                        :hora-sugerida="HORA_INGRESO" :min-date="minFechaInicio" :max-date="puedeRegularizar ? null : finDeHoy" />
                                     <div v-if="form.errors.fecha_inicio" class="text-danger small mt-1">{{
                                         form.errors.fecha_inicio }}</div>
+                                    <div v-else class="form-text">
+                                        <template v-if="puedeRegularizar">Puedes registrar cualquier fecha para regularizar.</template>
+                                        <template v-else>Sólo hoy o ayer.</template>
+                                        Una operación por vehículo y por día.
+                                    </div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label fw-medium">
                                         Fecha y hora fin <span class="text-danger">*</span>
                                     </label>
-                                    <DateTimeInput v-model="form.fecha_fin" :invalid="!!form.errors.fecha_fin" />
+                                    <DateTimeInput v-model="form.fecha_fin" :invalid="!!form.errors.fecha_fin"
+                                        :hora-sugerida="HORA_SALIDA" />
                                     <div v-if="form.errors.fecha_fin" class="text-danger small mt-1">{{
                                         form.errors.fecha_fin }}</div>
                                 </div>
@@ -753,7 +811,7 @@ onMounted(() => {
                                             Cantidad:
                                         </label>
                                         <p class="mb-0">
-                                            {{ r.cantidad }} {{ r.unidad_medida }}
+                                            {{ [r.cantidad, r.unidad_medida].filter(v => v !== null && v !== undefined && v !== '').join(' ') || '—' }}
                                         </p>
                                     </div>
 
@@ -975,7 +1033,7 @@ onMounted(() => {
                         </div>
                         <div class="col-4">
                             <label class="form-label fw-medium">
-                                Cantidad <span class="text-danger">*</span>
+                                Cantidad <span class="text-muted fw-normal small">(opcional)</span>
                             </label>
                             <input v-model="formActividad.cantidad" type="text" class="form-control" v-entero="1"
                                 :class="{ 'is-invalid': formActividad.errors.cantidad }" placeholder="Cantidad" />
@@ -986,7 +1044,7 @@ onMounted(() => {
                         </div>
                         <div class="col-8">
                             <label class="form-label fw-medium">
-                                Unidad de medida <span class="text-danger">*</span>
+                                Unidad de medida <span class="text-muted fw-normal small">(opcional)</span>
                             </label>
                             <input v-model="formActividad.unidad_medida" type="text" class="form-control"
                                 :class="{ 'is-invalid': formActividad.errors.unidad_medida }"

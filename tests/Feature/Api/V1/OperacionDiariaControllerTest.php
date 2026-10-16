@@ -178,6 +178,23 @@ class OperacionDiariaControllerTest extends TestCase
             ->assertJsonMissingPath('data.hora_fin');
     }
 
+    public function test_validar_actividad_y_store_no_exigen_cantidad_ni_unidad_de_medida(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.agregar-actividad'), [
+            'actividad' => 'Traslado de personal',
+            'origen' => 'Base',
+            'destino' => 'Mina',
+        ])->assertOk();
+
+        $this->actingAs($user, 'api')->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+            'actividades_realizadas' => [['actividad' => 'Traslado de personal', 'origen' => 'Base', 'destino' => 'Mina']],
+        ]))->assertCreated()
+            ->assertJsonPath('data.actividades_realizadas.0.pivot.cantidad', null)
+            ->assertJsonPath('data.actividades_realizadas.0.pivot.unidad_medida', null);
+    }
+
     public function test_validar_actividad_devuelve_en_eco_las_horas_de_una_version_anterior_de_la_app(): void
     {
         [$user] = $this->usuarioConVehiculoAsignado();
@@ -594,11 +611,10 @@ class OperacionDiariaControllerTest extends TestCase
     }
 
     /**
-     * ConductorNoAsignadoException antes cala en el catch (\Exception $e)
-     * genérico y devolvía 500; ahora tiene su propio catch, igual que
-     * AreaNoAsignadaException.
+     * Para roles de gestión, cualquier operario ACTIVO es válido aunque no
+     * esté asignado al vehículo; uno inactivo responde 422 de validación.
      */
-    public function test_store_devuelve_422_si_el_id_conductor_no_esta_asignado_al_vehiculo(): void
+    public function test_store_acepta_un_operario_activo_no_asignado_y_rechaza_uno_inactivo(): void
     {
         Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web']);
 
@@ -620,7 +636,18 @@ class OperacionDiariaControllerTest extends TestCase
             'estado_asignacion' => 'ACTIVO',
         ]);
 
-        // Conductor que existe pero NO está asignado a este vehículo.
+        $conductorInactivo = Conductor::factory()->create(['estado_conductor' => 'INACTIVO']);
+
+        $response = $this->actingAs($user, 'api')->postJson(
+            route('api.v1.operacion-diaria.store'),
+            $this->payloadValido($conductorInactivo, $vehiculo)
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('id_conductor');
+        $this->assertDatabaseCount('operacion_diaria', 0);
+
+        // Conductor activo que NO está asignado a este vehículo.
         $conductorAjeno = Conductor::factory()->create();
 
         $response = $this->actingAs($user, 'api')->postJson(
@@ -628,9 +655,43 @@ class OperacionDiariaControllerTest extends TestCase
             $this->payloadValido($conductorAjeno, $vehiculo)
         );
 
-        $response->assertStatus(422);
-        $response->assertJsonPath('message', 'El conductor seleccionado no está asignado actualmente a este vehículo.');
-        $this->assertDatabaseCount('operacion_diaria', 0);
+        $response->assertCreated();
+        $this->assertSame($conductorAjeno->id, OperacionDiaria::firstOrFail()->id_conductor);
+    }
+
+    public function test_store_devuelve_422_si_el_vehiculo_ya_tiene_una_operacion_ese_dia(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+                'fecha_inicio' => now()->setTime(8, 0)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->setTime(12, 0)->format('Y-m-d\TH:i'),
+            ]))
+            ->assertCreated();
+
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+                'fecha_inicio' => now()->setTime(13, 0)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->setTime(18, 0)->format('Y-m-d\TH:i'),
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('fecha_inicio');
+
+        $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_store_de_un_conductor_rechaza_fechas_anteriores_a_ayer(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+                'fecha_inicio' => now()->subDays(5)->setTime(8, 0)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->subDays(5)->setTime(18, 0)->format('Y-m-d\TH:i'),
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('fecha_inicio');
     }
 
     public function test_index_de_un_jefe_conductor_incluye_su_propio_vehiculo_aunque_sea_de_otra_area(): void
