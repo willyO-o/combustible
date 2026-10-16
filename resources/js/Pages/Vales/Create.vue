@@ -270,16 +270,18 @@ const vehiculoSeleccionado = (vehiculo) => {
                                             class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado al vehículo</span>
                                     </template>
                                 </Multiselect>
+                                <!-- v-else debe ir JUSTO después del v-if del Multiselect: no
+                                     insertar nada entre ambos (rompería el alta). -->
+                                <select v-else v-model="form.id_conductor" class="form-select" disabled
+                                    :class="{ 'is-invalid': form.errors.id_conductor }">
+                                    <option :value="props.conductorActual?.id">{{ props.conductorActual?.label }}</option>
+                                </select>
+
                                 <div v-if="!props.vale && vehiculoSinConductor && !form.errors.id_conductor"
                                     class="form-text text-warning">
                                     <i class="ri-information-line"></i> Este vehículo no tiene conductor asignado:
                                     elige el conductor manualmente.
                                 </div>
-
-                                <select v-else v-model="form.id_conductor" class="form-select" disabled
-                                    :class="{ 'is-invalid': form.errors.id_conductor }">
-                                    <option :value="props.conductorActual.id">{{ props.conductorActual.label }}</option>
-                                </select>
 
                                 <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                     form.errors.id_conductor }}</div>
