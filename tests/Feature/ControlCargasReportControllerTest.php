@@ -12,10 +12,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class ControlCargasReportControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     private User $admin;

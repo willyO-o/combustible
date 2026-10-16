@@ -226,8 +226,17 @@ class VehiculoController extends Controller
             ->with('success', 'Vehículo registrado exitosamente.');
     }
 
-    public function show(Vehiculo $vehiculo): Response
+    public function show(Request $request, Vehiculo $vehiculo): Response
     {
+        // Sin vehiculos.ver sólo se llega por las alertas de mantenimiento del
+        // dashboard (ver routes/web.php): el conductor ve únicamente la ficha
+        // de los vehículos que tiene asignados.
+        abort_unless(
+            $request->user()->can('vehiculos.ver')
+                || $request->user()->persona?->vehiculosAsignados()->whereKey($vehiculo->id)->exists(),
+            403
+        );
+
         $vehiculo->load([
             'tipoCombustible',
             'tipoVehiculo',

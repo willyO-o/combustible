@@ -1,11 +1,17 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import { tienePermiso } from '@/Directives/can'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     solicitud: Object,
 })
+
+// El técnico llega desde su orden de trabajo sin acceso al listado de
+// solicitudes: "Volver" lo regresa a sus órdenes en vez de a una página 403.
+const puedeVerListado = tienePermiso('mantenimiento.solicitudes.ver')
+const rutaVolver = puedeVerListado ? route('mantenimiento.solicitudes.index') : route('mantenimiento.ordenes.index')
 
 const estadoBadge = (estado) => {
     const map = {
@@ -32,7 +38,7 @@ const tipoBadge = (tipo) => {
                 <nav>
                     <ol class="breadcrumb mb-1">
                         <li class="breadcrumb-item"><Link :href="route('dashboard')">Inicio</Link></li>
-                        <li class="breadcrumb-item">
+                        <li v-if="puedeVerListado" class="breadcrumb-item">
                             <Link :href="route('mantenimiento.solicitudes.index')">Solicitudes Mantenimiento</Link>
                         </li>
                         <li class="breadcrumb-item active">Detalle #{{ solicitud.nro }}</li>
@@ -41,7 +47,7 @@ const tipoBadge = (tipo) => {
                 <h1 class="page-title fw-medium fs-18 mb-0">Solicitud de Mantenimiento #{{ solicitud.nro }}</h1>
             </div>
             <div class="d-flex gap-2">
-                <Link :href="route('mantenimiento.solicitudes.index')" class="btn btn-outline-secondary btn-wave">
+                <Link :href="rutaVolver" class="btn btn-outline-secondary btn-wave">
                     <i class="ri-arrow-left-line me-1"></i> Volver
                 </Link>
                 <Link v-can="'mantenimiento.ordenes.crear'"

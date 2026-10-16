@@ -9,10 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class VehiculoExternoControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     private User $admin;

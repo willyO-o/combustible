@@ -20,10 +20,12 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class OperacionDiariaControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -287,18 +289,20 @@ class OperacionDiariaControllerTest extends TestCase
     }
 
     // vehiculosDisponibles() no filtra por área/conductor para roles que no
-    // son "conductor". El técnico de mantenimiento ya NO tiene acceso a
-    // operación diaria (se le quitó el permiso, ver UserSeederTest); el gating
-    // es sólo de frontend (v-can), así que la ruta sigue respondiendo. Se
-    // mantiene el caso para cubrir esa rama con un rol sin área a cargo.
+    // son "conductor" ni "jefe-area". La ruta exige operacion-diaria.crear
+    // (routes/web.php; el técnico de mantenimiento ya no lo tiene, ver
+    // PermisosRutasWebTest), así que la rama se cubre con un rol creado desde
+    // el módulo de Roles que sí lo tiene y no tiene área a cargo.
     public function test_un_rol_sin_conductor_asignado_ve_todos_los_vehiculos_en_el_alta(): void
     {
-        $tecnico = User::factory()->create();
-        $tecnico->assignRole('tecnico-mantenimiento');
+        $supervisor = User::factory()->create();
+        $supervisor->assignRole(
+            Role::create(['name' => 'supervisor', 'guard_name' => 'web'])->givePermissionTo('operacion-diaria.crear')
+        );
 
         Vehiculo::factory()->count(2)->create(['estado_vehiculo' => 'ACTIVO']);
 
-        $response = $this->actingAs($tecnico)->get(route('operacion-diaria.create'));
+        $response = $this->actingAs($supervisor)->get(route('operacion-diaria.create'));
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page

@@ -6,10 +6,12 @@ use App\Models\Grifo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class GrifoControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     protected function setUp(): void

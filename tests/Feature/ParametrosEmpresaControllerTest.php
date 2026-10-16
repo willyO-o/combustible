@@ -9,10 +9,12 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class ParametrosEmpresaControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     private User $admin;

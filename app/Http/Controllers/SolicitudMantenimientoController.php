@@ -222,8 +222,17 @@ class SolicitudMantenimientoController extends Controller
     /**
      * Detalle de una solicitud.
      */
-    public function show(SolicitudMantenimiento $solicitud): Response
+    public function show(Request $request, SolicitudMantenimiento $solicitud): Response
     {
+        // Sin mantenimiento.solicitudes.ver sólo se llega desde una orden de
+        // trabajo (ver routes/web.php): el técnico ve únicamente la solicitud
+        // de origen de una orden que tiene asignada.
+        abort_unless(
+            $request->user()->can('mantenimiento.solicitudes.ver')
+                || $solicitud->ordenTrabajo()->where('id_usuario_ejecuta', $request->user()->id)->exists(),
+            403
+        );
+
         $solicitud->load(['vehiculo', 'conductor.persona', 'usuarioRegistra', 'ordenTrabajo']);
 
         return Inertia::render('SolicitudMantenimiento/Show', [

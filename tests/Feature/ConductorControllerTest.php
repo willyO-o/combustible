@@ -21,10 +21,12 @@ use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class ConductorControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     private User $admin;
@@ -189,9 +191,12 @@ class ConductorControllerTest extends TestCase
 
     public function test_store_sin_permiso_de_usuarios_no_puede_crear_la_cuenta(): void
     {
-        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        // jefe-area puede registrar operarios (conductores.crear) pero no
+        // crear cuentas de usuario (no tiene usuarios.crear).
+        $jefeArea = User::factory()->create();
+        $jefeArea->assignRole('jefe-area');
 
-        $this->actingAs($this->admin)
+        $this->actingAs($jefeArea)
             ->post(route('conductores.store'), $this->payloadConductorConCuenta())
             ->assertForbidden();
 
@@ -203,8 +208,7 @@ class ConductorControllerTest extends TestCase
     {
         // Sin el rol "conductor" la asignación del rol falla: toda la
         // transacción se revierte (ni persona, ni conductor, ni usuario).
-        Permission::firstOrCreate(['name' => 'usuarios.crear', 'guard_name' => 'web']);
-        $this->admin->givePermissionTo('usuarios.crear');
+        Role::findByName('conductor', 'web')->delete();
         Exceptions::fake();
 
         $this->actingAs($this->admin)

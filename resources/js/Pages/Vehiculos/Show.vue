@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 import { confirm } from '@/Utils/alertUtil.js'
+import { tienePermiso } from '@/Directives/can'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -10,6 +11,11 @@ const props = defineProps({
     historialAsignaciones: Array,
     alertasMantenimiento: { type: Array, default: () => [] },
 })
+
+// El conductor llega desde las alertas del dashboard sin acceso al listado
+// de vehículos: "Volver" lo lleva al inicio en vez de a una página 403.
+const puedeVerListado = tienePermiso('vehiculos.ver')
+const rutaVolver = puedeVerListado ? route('vehiculos.index') : route('dashboard')
 
 const conductorActual = computed(() => props.vehiculo.conductor_asignado ?? null)
 const areaActual = computed(() => props.vehiculo.areas_asignadas?.[0] ?? null)
@@ -133,7 +139,7 @@ const restanteTexto = (alerta) => {
                     <li class="breadcrumb-item">
                         <Link :href="route('dashboard')">Inicio</Link>
                     </li>
-                    <li class="breadcrumb-item">
+                    <li v-if="puedeVerListado" class="breadcrumb-item">
                         <Link :href="route('vehiculos.index')">Vehículos</Link>
                     </li>
                     <li class="breadcrumb-item active">Ver detalles</li>
@@ -146,7 +152,7 @@ const restanteTexto = (alerta) => {
                 </span>
             </h1>
         </div>
-        <Link :href="route('vehiculos.index')" class="btn btn-outline-secondary btn-wave">
+        <Link :href="rutaVolver" class="btn btn-outline-secondary btn-wave">
             <i class="ri-arrow-left-line me-1"></i> Volver
         </Link>
     </div>

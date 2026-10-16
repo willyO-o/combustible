@@ -21,10 +21,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class CargaCombustibleControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     private User $admin;

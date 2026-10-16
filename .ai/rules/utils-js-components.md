@@ -1,0 +1,10 @@
+---
+paths:
+  - 'app/Http/Middleware/VerificarSesionDePestana.php,resources/js/bootstrap.js,resources/js/Utils/sesionPestanaUtil.js,resources/js/Components/SesionPestanaAviso.vue,bootstrap/app.php'
+---
+
+# Utils Js Components
+
+## Sesión entre pestañas: cabecera X-Sesion-Usuario + middleware VerificarSesionDePestana
+Desde 2026-10-15 (pedido del usuario): una pestaña que quedó con la interfaz de otro usuario (logout + login con otra cuenta en otra pestaña; misma cookie) no puede actuar. El CSRF no lo frenaba: axios lee XSRF-TOKEN de la cookie. Funcionamiento: un interceptor de axios (resources/js/bootstrap.js → Utils/sesionPestanaUtil.js; Inertia v2 usa ESA MISMA instancia global de axios) agrega `X-Sesion-Usuario` = id del usuario de page.props.auth.user, o "invitado", sólo en peticiones al mismo origen. El middleware del grupo web (bootstrap/app.php) compara con la sesión real: si no coincide → Inertia::location(dashboard) (409) o un 409 JSON con la cabecera X-Sesion-Cambiada. Sólo verifica los métodos no seguros y las recargas parciales (X-Inertia-Partial-Data/Except, p.ej. el usePoll de 30 s). NUNCA verificar los GET completos: el navegador repite la cabecera al seguir el redirect posterior al login/logout. "logout" está exento. Sin cabecera (API, descargas, tests) no hace nada. "auth" tiene prioridad y corre antes, así que una sesión cerrada sigue yendo al login.
+SesionPestanaAviso.vue (hermano de <App> en app.js) separa la identidad "mostrada" (puede venir del historial: con "Atrás", Inertia restaura la página sin consultar al servidor) de la "sesion" (montaje inicial, eventos router success/error, mensajes de otras pestañas por BroadcastChannel 'siget-sesion'). Si no coinciden, muestra un aviso que bloquea la pestaña. En sessionStorage guarda la identidad de la pestaña y, si cambió al recargar, muestra un toast. Una POST nueva con fetch() no lleva la cabecera: usar axios o router. Tests: tests/Feature/Auth/SesionEntrePestanasTest.php. Los permisos por ruta (capa 1) están en routes/web.php, ver directives.md.

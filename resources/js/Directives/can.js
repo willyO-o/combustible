@@ -22,11 +22,31 @@ const can = {
 
 const page = usePage();
 
+/**
+ * Misma regla que v-can, para usarla en el script (p.ej. elegir a dónde
+ * lleva un enlace según el permiso). Cualquiera de los permisos basta.
+ */
+export function tienePermiso(value) {
+    if (isCurrentUserSuperAdmin()) {
+        return true;
+    }
+
+    const requiredPermissions = normalizePermissions(value);
+    const currentPermissions = getCurrentPermissions();
+
+    return requiredPermissions.some((permission) => currentPermissions.includes(permission));
+}
+
+function isCurrentUserSuperAdmin() {
+    const auth = page.props?.auth ?? {};
+
+    return auth.is_super_admin === true
+        || (Array.isArray(auth.roles) && auth.roles.includes('super-admin'));
+}
+
 function updateVisibility(element, binding) {
     const requiredPermissions = normalizePermissions(binding.value);
-    const auth = page.props?.auth ?? {};
-    const isSuperAdmin = auth.is_super_admin === true
-        || (Array.isArray(auth.roles) && auth.roles.includes('super-admin'));
+    const isSuperAdmin = isCurrentUserSuperAdmin();
 
     // El super-admin no requiere permisos individuales, incluso cuando el
     // elemento de navegación todavía no declara una propiedad permission.

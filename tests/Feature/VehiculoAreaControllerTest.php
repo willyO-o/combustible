@@ -8,10 +8,12 @@ use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class VehiculoAreaControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     protected function setUp(): void

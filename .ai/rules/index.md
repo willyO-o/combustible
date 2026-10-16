@@ -26,6 +26,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/Pages/Operacion/Create.vue,resources/css/my-styles.css | .ai/rules/css.md |
 | resources/js/Data/app.js | .ai/rules/data.md |
 | database/** | .ai/rules/database.md |
+| routes/web.php,tests/Feature/**/*.php,tests/ConPermisosReales.php,resources/js/Directives/can.js | .ai/rules/directives.md |
 | public/docs/openapi.yaml | .ai/rules/docs.md |
 | tests/Feature/**/*.php | .ai/rules/feature.md |
 | public/fonts/fpdf-calibri/** | .ai/rules/fpdf-calibri.md |
@@ -78,6 +79,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/TipoMantenimientoController.php,app/Http/Requests/TipoMantenimientoRequest.php,resources/js/Pages/TiposMantenimiento/**,app/Http/Controllers/OrdenTrabajoController.php,app/Http/Controllers/TipoVehiculoController.php,app/Http/Controllers/Api/V1/ParametrosController.php,app/Http/Requests/DetalleMantenimientoRequest.php,app/Http/Requests/TipoVehiculoRequest.php | .ai/rules/tipos-mantenimiento.md |
 | app/Actions/Personas/*.php,app/Http/Requests/PersonaRequest.php,app/Http/Controllers/PersonaController.php,app/Http/Controllers/UserController.php,resources/js/Pages/Personas/*.vue,resources/js/Pages/Usuarios/Form.vue,resources/js/Components/RolesSelector.vue | .ai/rules/usuarios-js-components.md |
 | app/Models/User.php,app/Actions/Personas/*.php,app/Http/Requests/PersonaRequest.php,app/Http/Requests/UserRequest.php,app/Http/Controllers/UserController.php,app/Http/Controllers/AreaController.php,resources/js/Components/ContrasenaInicialInput.vue,resources/js/Pages/Personas/*.vue,resources/js/Pages/Usuarios/Form.vue | .ai/rules/usuarios.md |
+| app/Http/Middleware/VerificarSesionDePestana.php,resources/js/bootstrap.js,resources/js/Utils/sesionPestanaUtil.js,resources/js/Components/SesionPestanaAviso.vue,bootstrap/app.php | .ai/rules/utils-js-components.md |
 | app/Http/Controllers/Api/V1/*.php,public/docs/openapi.yaml, app/Http/Controllers/Api/V1/VehiculoController.php,routes/api.php,public/docs/openapi.yaml | .ai/rules/v1-docs.md |
 | app/Actions/OrdenTrabajo/*.php,app/Http/Controllers/OrdenTrabajoController.php,app/Http/Controllers/Api/V1/SolicitudMantenimientoController.php,app/Http/Requests/EmitirOrdenTrabajoRequest.php | .ai/rules/v1-http-requests.md |
 | app/Http/Controllers/Api/V1/ParametrosController.php, app/Http/Controllers/Api/V1/OrdenTrabajoController.php, app/Http/Controllers/Api/V1/*.php,routes/api.php, app/Http/Controllers/Api/V1/*.php | .ai/rules/v1.md |

@@ -8,10 +8,12 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
+use Tests\ConPermisosReales;
 use Tests\TestCase;
 
 class CargoControllerTest extends TestCase
 {
+    use ConPermisosReales;
     use RefreshDatabase;
 
     protected function setUp(): void
