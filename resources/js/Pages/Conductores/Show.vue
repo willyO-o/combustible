@@ -131,6 +131,10 @@ const tipoDocumentoLabel = (tipo) => {
                 class="btn btn-primary btn-wave">
                 <i class="ri-file-chart-line me-1"></i> Reporte de actividades y combustible
             </Link>
+            <Link v-can="'conductores.editar'" :href="route('conductores.edit', conductor.id)"
+                class="btn btn-outline-primary btn-wave">
+                <i class="ri-edit-line me-1"></i> Editar
+            </Link>
             <Link :href="route('conductores.index')" class="btn btn-outline-secondary btn-wave">
                 <i class="ri-arrow-left-line me-1"></i> Volver
             </Link>
@@ -143,9 +147,16 @@ const tipoDocumentoLabel = (tipo) => {
             <div class="card custom-card h-100">
                 <div class="card-header justify-content-between">
                     <div class="card-title">Datos Personales</div>
-                    <span class="badge" :class="estadoConductorBadge(conductor.estado_conductor)">
-                        {{ conductor.estado_conductor }}
-                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge" :class="estadoConductorBadge(conductor.estado_conductor)">
+                            {{ conductor.estado_conductor }}
+                        </span>
+                        <Link v-can="'conductores.editar'" :href="route('conductores.edit', conductor.id)"
+                            class="btn btn-sm btn-icon btn-primary-light" title="Editar datos personales"
+                            aria-label="Editar datos personales">
+                            <i class="ri-pencil-line" aria-hidden="true"></i>
+                        </Link>
+                    </div>
                 </div>
                 <div class="card-body d-flex flex-column align-items-center gap-3">
                     <div class="border rounded-3 overflow-hidden"
@@ -303,7 +314,14 @@ const tipoDocumentoLabel = (tipo) => {
             <div class="card-title">
                 <h6 class="mb-0">Documentos del Conductor</h6>
             </div>
-            <span class="badge bg-primary-transparent text-primary">{{ documentos.length }} registros</span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary-transparent text-primary">{{ documentos.length }} registros</span>
+                <Link v-can="'conductores.editar'" :href="route('conductores.edit', conductor.id)"
+                    class="btn btn-sm btn-icon btn-primary-light" title="Editar documentos"
+                    aria-label="Editar documentos">
+                    <i class="ri-pencil-line" aria-hidden="true"></i>
+                </Link>
+            </div>
         </div>
         <div v-if="documentos.length > 0" class="card-body p-0">
             <div class="table-responsive">

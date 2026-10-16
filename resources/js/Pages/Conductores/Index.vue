@@ -112,6 +112,10 @@ const estadoBadge = (estado) => {
 const fotoUrl = (foto) =>
     storageUrl(foto) ?? '/images/faces/1.jpg'
 
+// Nombre sin los "—" de relleno cuando falta un apellido.
+const nombreCompleto = (conductor) =>
+    [conductor.nombres, conductor.paterno, conductor.materno].filter(Boolean).join(' ')
+
 
 const cambiarEstado = async (conductorId, nuevoEstado) => {
     const confirmar = await confirm(`¿Desea cambiar el estado del operario a <b>${nuevoEstado}</b>?`, "Confirmación", "Si, cambiar");
@@ -345,8 +349,12 @@ const tipoAsignacionBadge = (tipo) =>
                                     </span>
                                 </td>
                                 <td><span class="fw-medium">{{ conductor.ci }}</span></td>
-                                <td>{{ conductor.nombres }} {{ conductor.paterno ?? '—' }} {{ conductor.materno ?? '—'
-                                }}</td>
+                                <td>
+                                    <Link :href="route('conductores.show', conductor.id)" class="fw-medium text-primary"
+                                        title="Ver perfil del operario">
+                                        {{ nombreCompleto(conductor) }}
+                                    </Link>
+                                </td>
                                 <td>
                                     <span v-if="conductor.nombre_cargo" class="fw-medium">{{ conductor.nombre_cargo }}</span>
                                     <span v-else class="text-muted">Sin cargo</span>
@@ -406,6 +414,11 @@ const tipoAsignacionBadge = (tipo) =>
                                         <Link :href="route('conductores.show', conductor.id)"
                                             class="btn btn-sm btn-icon btn-light" title="Ver">
                                             <i class="ri-eye-line"></i>
+                                        </Link>
+                                        <Link v-can="'operacion-diaria.reporte.operario'"
+                                            :href="route('operacion-diaria.reporte.operario.index', { id_conductor: conductor.id })"
+                                            class="btn btn-sm btn-icon btn-info-light" title="Reporte de actividades y combustible">
+                                            <i class="ri-file-chart-line"></i>
                                         </Link>
                                         <Link v-can="'conductores.editar'" :href="route('conductores.edit', conductor.id)"
                                             class="btn btn-sm btn-icon btn-light" title="Editar">
@@ -482,6 +495,12 @@ const tipoAsignacionBadge = (tipo) =>
                                     <li>
                                         <Link class="dropdown-item" :href="route('conductores.show', conductor.id)">
                                             <i class="ri-eye-line me-2"></i> Ver
+                                        </Link>
+                                    </li>
+                                    <li v-can="'operacion-diaria.reporte.operario'">
+                                        <Link class="dropdown-item"
+                                            :href="route('operacion-diaria.reporte.operario.index', { id_conductor: conductor.id })">
+                                            <i class="ri-file-chart-line me-2"></i> Reporte
                                         </Link>
                                     </li>
                                     <li v-can="'conductores.editar'">
