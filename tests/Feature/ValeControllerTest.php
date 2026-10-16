@@ -316,6 +316,44 @@ class ValeControllerTest extends TestCase
         $this->assertTrue($ids->contains($vehiculoSinArea->id));
     }
 
+    public function test_create_envia_a_un_jefe_de_area_todos_los_vehiculos_de_sus_areas(): void
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+
+        $deSuArea = Vehiculo::factory()->count(3)->create();
+        $deSuArea->each(fn ($vehiculo) => $this->asignarVehiculoAArea($vehiculo, $area));
+        $retiradoDeSuArea = Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
+        $this->asignarVehiculoAArea($retiradoDeSuArea, $area);
+
+        $deOtraArea = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($deOtraArea, Area::factory()->create());
+        Vehiculo::factory()->create();
+
+        $this->actingAs($jefe)->get(route('vales.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('vehiculos', 3)
+                ->where('vehiculos', fn ($vehiculos) => collect($vehiculos)->pluck('id')->sort()->values()->all()
+                    === $deSuArea->pluck('id')->sort()->values()->all())
+                ->has('vehiculos.0.meta.tipo_medicion')
+                ->has('vehiculos.0.meta.conductores_asignados')
+            );
+    }
+
+    public function test_create_envia_a_un_administrador_todos_los_vehiculos_activos_sin_limite(): void
+    {
+        Vehiculo::factory()->count(25)->create();
+        Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
+
+        $this->actingAs($this->admin)->get(route('vales.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('vehiculos', 25));
+
+        // El buscador (lo usan otras pantallas) mantiene su tope de 20.
+        $this->assertCount(20, $this->actingAs($this->admin)->getJson(route('search.vehiculos', ['q' => '']))->json());
+    }
+
     public function test_store_rechaza_un_vehiculo_fuera_del_area_del_jefe(): void
     {
         $area = Area::factory()->create();

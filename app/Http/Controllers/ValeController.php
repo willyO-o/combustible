@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -56,7 +57,7 @@ class ValeController extends Controller
         ]);
     }
 
-    public function create(ListOperariosDisponiblesAction $listOperarios): Response
+    public function create(Request $request, ListOperariosDisponiblesAction $listOperarios): Response
     {
         $nextNroVale = Vale::siguienteNroValeProvisional();
 
@@ -83,6 +84,10 @@ class ValeController extends Controller
             // vehículo elegido se sugieren primero (meta.conductores_asignados
             // de searchVehiculos()).
             'operarios' => $listOperarios->execute()->all(),
+            // Todos los vehículos que el usuario puede usar (jefe de área: los
+            // de sus áreas; administrador: todos los activos), ya cargados
+            // para el select sin necesidad de escribir para buscar.
+            'vehiculos' => $this->vehiculosParaVale($request->user())->all(),
         ]);
     }
 
@@ -189,18 +194,36 @@ class ValeController extends Controller
 
     public function searchVehiculos(Request $request): JsonResponse
     {
-        $q = $request->input('q', '');
+        return response()->json(
+            $this->vehiculosParaVale($request->user(), (string) $request->input('q', ''), 20)
+        );
+    }
 
+    /**
+     * Vehículos ACTIVO que el usuario puede usar en un vale, ya con el
+     * formato {id, label, meta} de los selects: un jefe de área sólo los de
+     * sus áreas a cargo; administrador/super-admin (y otros roles con
+     * vales.crear) todos. Sin $limite trae la lista completa (formulario de
+     * vales); search.vehiculos lo usa con filtro y límite de 20.
+     *
+     * @return Collection<int, array{id: int, label: string, meta: array<string, mixed>}>
+     */
+    private function vehiculosParaVale(?User $user, string $q = '', ?int $limite = null): Collection
+    {
         $query = Vehiculo::with(['conductorAsignado', 'conductoresAsignados'])->where('estado_vehiculo', 'ACTIVO')
-            ->where(function ($query) use ($q) {
-                $query->where('nro_placa', 'like', "%{$q}%")
-                    ->orWhere('marca', 'like', "%{$q}%")
-                    ->orWhere('codigo', 'like', "%{$q}%");
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($query) use ($q) {
+                    $query->where('nro_placa', 'like', "%{$q}%")
+                        ->orWhere('marca', 'like', "%{$q}%")
+                        ->orWhere('codigo', 'like', "%{$q}%");
+                });
             });
 
-        $this->restringirVehiculosPorAreaDeJefe($query, $request->user());
+        $this->restringirVehiculosPorAreaDeJefe($query, $user);
 
-        $vehiculos = $query->limit(20)
+        return $query->when($limite, fn ($query) => $query->limit($limite))
+            ->orderBy('codigo')
+            ->orderBy('nro_placa')
             ->get()
             ->map(fn ($v) => [
                 'id' => $v->id,
@@ -219,9 +242,8 @@ class ValeController extends Controller
                     'anio' => $v->anio,
                     'modelo' => $v->modelo,
                 ],
-            ]);
-
-        return response()->json($vehiculos);
+            ])
+            ->values();
     }
 
     /**

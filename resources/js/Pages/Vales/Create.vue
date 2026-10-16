@@ -2,12 +2,11 @@
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
-import SearchSelect from '@/Components/SearchSelect.vue'
 import Multiselect from '@vueform/multiselect'
 import GrifoFormModal from '@/Components/GrifoFormModal.vue'
 import DateTimeInput from '@/Components/DateTimeInput.vue'
 
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { formatDate } from '@/Utils/dateUtil'
 
 const props = defineProps({
@@ -21,6 +20,9 @@ const props = defineProps({
     vencimientoSugerido: Object,
     // [{ id, label, meta }] todos los conductores activos (sólo al crear).
     operarios: { type: Array, default: () => [] },
+    // [{ id, label, meta }] vehículos que el usuario puede usar (sólo al
+    // crear): jefe de área, los de sus áreas; administrador, todos.
+    vehiculos: { type: Array, default: () => [] },
 })
 
 // Copia local editable: al dar de alta un grifo nuevo desde el "+", se
@@ -135,8 +137,21 @@ const vehiculoSinConductor = computed(() =>
     !!form.id_vehiculo && conductoresDelVehiculo.value.length === 0
 )
 
-// Los SearchSelect retornan el objeto completo {id, label}
-// Extraemos el id antes de enviar
+/* ------------------------------------------------------------------ */
+/*  Vehículo: todos los del usuario ya cargados (prop vehiculos)       */
+/* ------------------------------------------------------------------ */
+// Copias (Multiselect reescribe `label` de la opción seleccionada).
+const vehiculosOpt = computed(() => props.vehiculos.map(vehiculo => ({ ...vehiculo })))
+
+// Multiselect emite el id (o null al limpiar): se busca el vehículo para
+// tomar su meta (combustible, tipo de medición, conductores asignados).
+function onVehiculoChange(idVehiculo) {
+    form.clearErrors('id_vehiculo')
+    vehiculoSeleccionado(props.vehiculos.find(v => v.id === idVehiculo) ?? null)
+}
+
+// Los selects pueden devolver el objeto completo {id, label}: se extrae el
+// id antes de enviar.
 function submit() {
     if (!form.fecha_vencimiento) {
         form.setError('fecha_vencimiento', 'Indique la fecha de vencimiento.')
@@ -192,6 +207,15 @@ const vehiculoSeleccionado = (vehiculo) => {
 
 
 }
+
+onMounted(() => {
+    // Alta: si el usuario tiene un único vehículo, se preselecciona (con su
+    // conductor, combustible y estación sugeridos).
+    if (!props.vale && props.vehiculos.length === 1 && !form.id_vehiculo) {
+        form.id_vehiculo = props.vehiculos[0].id
+        vehiculoSeleccionado(props.vehiculos[0])
+    }
+})
 </script>
 
 <template>
@@ -237,14 +261,18 @@ const vehiculoSeleccionado = (vehiculo) => {
                                 <label class="form-label fw-medium">
                                     Vehículo <span class="text-danger">*</span>
                                 </label>
-                                <SearchSelect v-if="!props.vale" @selected="vehiculoSeleccionado" :object="true"
-                                    v-model="form.id_vehiculo" :search-url="route('search.vehiculos')"
-                                    placeholder="Buscar por placa o marca (mín. 2 caracteres)..."
-                                    :invalid="!!form.errors.id_vehiculo" />
-
+                                <Multiselect v-if="!props.vale" v-model="form.id_vehiculo"
+                                    :options="vehiculosOpt" value-prop="id" label="label"
+                                    :searchable="true" :filter-results="true"
+                                    placeholder="Selecciona o busca por código, placa o marca..."
+                                    no-options-text="No tienes vehículos activos asignados"
+                                    no-results-text="Sin resultados"
+                                    @change="onVehiculoChange"
+                                    :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                                <!-- v-else debe ir JUSTO después del v-if: no insertar nada entre ambos. -->
                                 <select v-else v-model="form.id_vehiculo" class="form-select" disabled
                                     :class="{ 'is-invalid': form.errors.id_vehiculo }">
-                                    <option :value="props.vehiculoActual.id">{{ props.vehiculoActual.label }}</option>
+                                    <option :value="props.vehiculoActual?.id">{{ props.vehiculoActual?.label }}</option>
                                 </select>
 
                                 <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">{{
