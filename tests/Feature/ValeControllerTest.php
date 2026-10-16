@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Area;
+use App\Models\Asignacion;
 use App\Models\Conductor;
 use App\Models\EncargadoArea;
 use App\Models\Grifo;
@@ -729,5 +730,95 @@ class ValeControllerTest extends TestCase
         ])->assertRedirect(route('vales.index'))->assertSessionHas('success');
 
         $this->assertTrue($vale->fresh()->fecha_vencimiento->isFuture());
+    }
+
+    public function test_create_envia_todos_los_conductores_activos_para_elegir_manualmente(): void
+    {
+        $asignado = Conductor::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => Vehiculo::factory()->create()->id,
+            'id_conductor' => $asignado->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        $sinVehiculo = Conductor::factory()->create();
+        $inactivo = Conductor::factory()->create(['estado_conductor' => 'INACTIVO']);
+
+        $this->actingAs($this->admin)->get(route('vales.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('operarios', fn ($operarios) => collect($operarios)->pluck('id')->sort()->values()->all()
+                    === collect([$asignado->id, $sinVehiculo->id])->sort()->values()->all())
+                ->where('operarios', fn ($operarios) => ! collect($operarios)->pluck('id')->contains($inactivo->id))
+            );
+    }
+
+    public function test_search_vehiculos_incluye_los_conductores_asignados_titular_y_provisional(): void
+    {
+        $vehiculo = Vehiculo::factory()->create(['estado_vehiculo' => 'ACTIVO']);
+        $titular = Conductor::factory()->create();
+        $provisional = Conductor::factory()->create();
+
+        foreach ([[$titular, 'ACTIVO'], [$provisional, 'PROVISIONAL']] as [$conductor, $estado]) {
+            Asignacion::create([
+                'id_vehiculo' => $vehiculo->id,
+                'id_conductor' => $conductor->id,
+                'fecha_asignacion' => now()->subMonth(),
+                'estado_asignacion' => $estado,
+            ]);
+        }
+        $sinConductor = Vehiculo::factory()->create(['estado_vehiculo' => 'ACTIVO']);
+
+        $vehiculos = collect($this->actingAs($this->admin)->getJson(route('search.vehiculos', ['q' => '']))->assertOk()->json());
+
+        $this->assertSame($titular->id, $vehiculos->firstWhere('id', $vehiculo->id)['meta']['id_conductor']);
+        $this->assertEqualsCanonicalizing([$titular->id, $provisional->id], $vehiculos->firstWhere('id', $vehiculo->id)['meta']['conductores_asignados']);
+        $this->assertSame([], $vehiculos->firstWhere('id', $sinConductor->id)['meta']['conductores_asignados']);
+    }
+
+    public function test_un_jefe_de_area_emite_un_vale_con_un_conductor_no_asignado_si_el_vehiculo_no_tiene_conductor(): void
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculo, $area);
+        $conductor = Conductor::factory()->create();
+
+        $this->actingAs($jefe)->post(route('vales.store'), [
+            ...$this->datosDeVale(),
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_vencimiento' => today()->addDays(2)->format('Y-m-d'),
+        ])->assertRedirect(route('vales.index'))->assertSessionHas('success');
+
+        $this->assertDatabaseHas('vale', ['id_vehiculo' => $vehiculo->id, 'id_conductor' => $conductor->id]);
+    }
+
+    public function test_store_rechaza_un_conductor_inactivo(): void
+    {
+        $inactivo = Conductor::factory()->create(['estado_conductor' => 'INACTIVO']);
+
+        $this->actingAs($this->admin)->post(route('vales.store'), [
+            ...$this->datosDeVale(),
+            'id_conductor' => $inactivo->id,
+            'fecha_vencimiento' => today()->addDays(2)->format('Y-m-d'),
+        ])->assertSessionHasErrors('id_conductor');
+
+        $this->assertDatabaseCount('vale', 0);
+    }
+
+    public function test_update_conserva_un_conductor_que_quedo_inactivo_despues_de_emitir_el_vale(): void
+    {
+        $datos = $this->datosDeVale();
+        $vale = Vale::create([...$datos, 'id_tipo_combustible' => TipoCombustible::factory()->create()->id]);
+        Conductor::whereKey($datos['id_conductor'])->update(['estado_conductor' => 'INACTIVO']);
+
+        $this->actingAs($this->admin)->put(route('vales.update', $vale), [
+            ...$datos,
+            'litros' => 35,
+            'fecha_vencimiento' => today()->addDays(3)->format('Y-m-d'),
+        ])->assertRedirect(route('vales.index'))->assertSessionHas('success');
+
+        $this->assertEquals(35, $vale->fresh()->litros);
     }
 }

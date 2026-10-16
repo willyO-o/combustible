@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import SearchSelect from '@/Components/SearchSelect.vue'
+import Multiselect from '@vueform/multiselect'
 import GrifoFormModal from '@/Components/GrifoFormModal.vue'
 import DateTimeInput from '@/Components/DateTimeInput.vue'
 
@@ -18,6 +19,8 @@ const props = defineProps({
     grifos: Array,
     // { fecha: 'YYYY-MM-DD', dias: int } según tiempo_expiracion parametrizado
     vencimientoSugerido: Object,
+    // [{ id, label, meta }] todos los conductores activos (sólo al crear).
+    operarios: { type: Array, default: () => [] },
 })
 
 // Copia local editable: al dar de alta un grifo nuevo desde el "+", se
@@ -109,7 +112,28 @@ function usarVencimientoSugerido() {
 
 watch(() => form.fecha_vencimiento, () => form.clearErrors('fecha_vencimiento'))
 
-const paramsConductor = ref({ id_vehiculo: null })
+/* ------------------------------------------------------------------ */
+/*  Conductor: todos los operarios activos (prop operarios), con los   */
+/*  asignados al vehículo elegido primero y marcados.                  */
+/* ------------------------------------------------------------------ */
+// ids de los conductores asignados (titular + provisionales) al vehículo
+// elegido, de meta.conductores_asignados de search.vehiculos.
+const conductoresDelVehiculo = ref([])
+
+// Copias: Multiselect reescribe `label` sobre la opción seleccionada, así que
+// nunca se le pasan los objetos de la prop ni se altera el label (ver
+// .ai/rules/js.md).
+const operariosOpt = computed(() => {
+    const asignados = new Set(conductoresDelVehiculo.value)
+
+    return props.operarios
+        .map(operario => ({ ...operario, asignado: asignados.has(operario.id) }))
+        .sort((a, b) => Number(b.asignado) - Number(a.asignado))
+})
+
+const vehiculoSinConductor = computed(() =>
+    !!form.id_vehiculo && conductoresDelVehiculo.value.length === 0
+)
 
 // Los SearchSelect retornan el objeto completo {id, label}
 // Extraemos el id antes de enviar
@@ -144,10 +168,19 @@ const vehiculoSeleccionado = (vehiculo) => {
     form.id_grifo = null
     form.id_tipo_combustible = vehiculo?.meta.id_tipo_combustible ?? null
 
-    paramsConductor.value = {
-        id_vehiculo: vehiculo?.id ?? null,
-    }
-
+    // Conductor: se sugiere el titular del vehículo (o su único asignado);
+    // si no tiene ninguno se deja vacío para elegirlo a mano de la lista de
+    // todos los operarios activos.
+    conductoresDelVehiculo.value = vehiculo?.meta?.conductores_asignados ?? []
+    const idsOperarios = new Set(props.operarios.map(o => o.id))
+    const titular = vehiculo?.meta?.id_conductor
+    const sugerido = idsOperarios.has(titular)
+        ? titular
+        : (conductoresDelVehiculo.value.length === 1 && idsOperarios.has(conductoresDelVehiculo.value[0])
+            ? conductoresDelVehiculo.value[0]
+            : null)
+    form.id_conductor = sugerido
+    form.clearErrors('id_conductor')
 
 
     if (vehiculo?.meta?.tipo_medicion == 'horometro') {
@@ -223,10 +256,25 @@ const vehiculoSeleccionado = (vehiculo) => {
                                 <label class="form-label fw-medium">
                                     Conductor <span class="text-danger">*</span>
                                 </label>
-                                <SearchSelect v-if="!props.vale" v-model="form.id_conductor"
-                                    :search-url="route('search.conductores')"
-                                    placeholder="Buscar por CI, nombre o apellido (mín. 2 caracteres)..."
-                                    :params="paramsConductor" :invalid="!!form.errors.id_conductor" />
+                                <Multiselect v-if="!props.vale" v-model="form.id_conductor"
+                                    :options="operariosOpt" value-prop="id" label="label"
+                                    :searchable="true" :filter-results="true"
+                                    placeholder="Buscar por CI, nombre o apellido..."
+                                    no-options-text="No hay conductores activos registrados"
+                                    no-results-text="Sin resultados"
+                                    @change="form.clearErrors('id_conductor')"
+                                    :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
+                                    <template #option="{ option }">
+                                        <span>{{ option.label }}</span>
+                                        <span v-if="option.asignado"
+                                            class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado al vehículo</span>
+                                    </template>
+                                </Multiselect>
+                                <div v-if="!props.vale && vehiculoSinConductor && !form.errors.id_conductor"
+                                    class="form-text text-warning">
+                                    <i class="ri-information-line"></i> Este vehículo no tiene conductor asignado:
+                                    elige el conductor manualmente.
+                                </div>
 
                                 <select v-else v-model="form.id_conductor" class="form-select" disabled
                                     :class="{ 'is-invalid': form.errors.id_conductor }">

@@ -14,6 +14,20 @@ Este documento resume **todo lo que cambió en la API** en esta ronda. Está div
 
 ---
 
+## Actualización 2026-10-16 — Vales: conductor manual si el vehículo no tiene asignado (API 1.18.0)
+
+- `POST /vales`: `id_conductor` puede ser **cualquier conductor activo**, esté o no asignado al
+  vehículo (ya se aceptaba cualquiera; ahora además debe estar `ACTIVO` → si no, `422` en `id_conductor`).
+- Si `vehiculos[].id_conductor` viene `null` (vehículo sin conductor), ofrecer la lista
+  `GET /parametros/colecciones?incluir=operaciones_diarias` → `operaciones_diarias.operarios`.
+
+**Checklist**
+
+- [ ] En "Emitir vale", si el vehículo no tiene conductor, permitir elegirlo de `operarios`
+  en vez de bloquear la emisión.
+
+---
+
 ## Actualización 2026-10-16 — Operación diaria: una por vehículo y día + regularización (API 1.17.0)
 
 - **Una sola operación por vehículo y por día** (día de `fecha_inicio`). Una segunda responde

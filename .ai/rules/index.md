@@ -16,6 +16,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/Components/DateTimeInput.vue,resources/js/Pages/**/*.vue | .ai/rules/components-js-pages.md |
 | resources/js/Components/ConexionAviso.vue,resources/js/app.js | .ai/rules/components-js.md |
 | resources/js/Components/PageLoader.vue | .ai/rules/components.md |
+| app/Http/Controllers/ConductorController.php,resources/js/Pages/Conductores/Show.vue,routes/web.php | .ai/rules/conductores.md |
 | app/Http/Controllers/CargaMaterialController.php,database/seeders/UserSeeder.php,resources/js/Pages/ControlCargas/Show.vue | .ai/rules/control-cargas.md |
 | app/Actions/Actividades/SincronizarActividadesRealizadasAction.php,app/Http/Requests/OperacionStoreRequest.php,resources/js/Pages/Operacion/*.vue,app/Libraries/Reportes.php,app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php | .ai/rules/controllers-api-v1.md |
 | resources/js/Components/CiInput.vue,resources/js/Pages/Personas/*.vue,resources/js/Pages/Conductores/Form.vue,app/Http/Controllers/PersonaController.php,app/Http/Controllers/ConductorController.php,app/Http/Requests/ConductorRequest.php | .ai/rules/controllers-http-controllers-http-requests.md |
@@ -62,6 +63,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/pages-orden-trabajo.md |
 | app/Http/Controllers/ProfileController.php,resources/js/Pages/Profile/Edit.vue | .ai/rules/pages-profile.md |
 | app/Http/Controllers/CargasCombustibleReportController.php,app/Libraries/Reportes.php,resources/js/Pages/Reportes/CargasCombustibleReporte.vue | .ai/rules/pages-reportes.md |
+| app/Http/Controllers/ValeController.php,app/Http/Requests/ValeRequest.php,resources/js/Pages/Vales/Create.vue | .ai/rules/pages-vales.md |
 | app/Http/Requests/VehiculoRequest.php,resources/js/Pages/Vehiculos/Create.vue,resources/js/Pages/Vehiculos/Index.vue | .ai/rules/pages-vehiculos.md |
 | resources/js/Pages/**/*.vue | .ai/rules/pages.md |
 | app/Models/Cargo.php,app/Http/Controllers/CargoController.php,app/Http/Requests/CargoRequest.php,resources/js/Pages/Cargos/**,resources/js/Components/CargoSelect.vue,app/Http/Requests/PersonaRequest.php,app/Http/Requests/ConductorRequest.php,app/Actions/Personas/*.php,database/migrations/2026_10_14_* | .ai/rules/personas-migrations.md |

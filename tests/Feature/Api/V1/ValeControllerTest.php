@@ -247,6 +247,33 @@ class ValeControllerTest extends TestCase
         Notification::assertSentTo($usuarioConductor, ValeEmitidoNotification::class);
     }
 
+    public function test_emitir_vale_acepta_un_conductor_activo_no_asignado_y_rechaza_uno_inactivo(): void
+    {
+        $area = Area::factory()->create();
+        $jefe = $this->crearJefeDeArea($area);
+        $vehiculo = Vehiculo::factory()->create();
+        $this->asignarVehiculoAArea($vehiculo, $area);
+
+        $grifo = $this->crearGrifo();
+        $datos = fn (Conductor $conductor) => [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'id_grifo' => $grifo->id,
+            'litros' => 20,
+            'precio' => 6.97,
+        ];
+
+        $this->actingAs($jefe, 'api')
+            ->postJson(route('api.v1.vales.store'), $datos(Conductor::factory()->create(['estado_conductor' => 'INACTIVO'])))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('id_conductor');
+
+        // El vehículo no tiene conductor asignado: se elige uno activo cualquiera.
+        $this->actingAs($jefe, 'api')
+            ->postJson(route('api.v1.vales.store'), $datos(Conductor::factory()->create()))
+            ->assertCreated();
+    }
+
     public function test_un_jefe_de_area_no_puede_emitir_un_vale_para_un_vehiculo_de_otra_area(): void
     {
         $jefe = $this->crearJefeDeArea(Area::factory()->create());

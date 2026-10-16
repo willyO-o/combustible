@@ -129,6 +129,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:conductores.asignar-vehiculo');
     Route::patch('conductores/{conductor}/asignaciones/{asignacion}/finalizar', [ConductorController::class, 'finalizarAsignacion'])->name('conductores.asignaciones.finalizar')
         ->middleware('permission:conductores.asignar-vehiculo');
+    // Cambio rápido del cargo desde el perfil del operario (lápiz en Conductores/Show).
+    Route::patch('conductores/{conductor}/cargo', [ConductorController::class, 'actualizarCargo'])->name('conductores.cargo.actualizar')
+        ->middleware('permission:conductores.editar');
 
     Route::resource('personas', PersonaController::class)
         ->parameters(['personas' => 'persona'])

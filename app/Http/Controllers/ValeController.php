@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
 use App\Actions\Vale\ListValeAction;
 use App\Events\ValeEmitido;
 use App\Http\Requests\ValeRequest;
@@ -55,7 +56,7 @@ class ValeController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(ListOperariosDisponiblesAction $listOperarios): Response
     {
         $nextNroVale = Vale::siguienteNroValeProvisional();
 
@@ -76,6 +77,12 @@ class ValeController extends Controller
             'grifos' => $grifos,
             'vale' => null,
             'vencimientoSugerido' => Vale::vencimientoSugerido(),
+            // Todos los conductores activos, para poder emitir el vale aunque
+            // el vehículo no tenga conductor asignado (a pedido del usuario,
+            // la asignación todavía no es confiable). Los asignados al
+            // vehículo elegido se sugieren primero (meta.conductores_asignados
+            // de searchVehiculos()).
+            'operarios' => $listOperarios->execute()->all(),
         ]);
     }
 
@@ -184,7 +191,7 @@ class ValeController extends Controller
     {
         $q = $request->input('q', '');
 
-        $query = Vehiculo::with('conductorAsignado')->where('estado_vehiculo', 'ACTIVO')
+        $query = Vehiculo::with(['conductorAsignado', 'conductoresAsignados'])->where('estado_vehiculo', 'ACTIVO')
             ->where(function ($query) use ($q) {
                 $query->where('nro_placa', 'like', "%{$q}%")
                     ->orWhere('marca', 'like', "%{$q}%")
@@ -200,6 +207,9 @@ class ValeController extends Controller
                 'label' => "{$v->codigo} —  {$v->nro_placa}".($v->marca ? " — {$v->marca}" : '').($v->anio ? " ({$v->anio})" : ''),
                 'meta' => [
                     'id_conductor' => $v->conductorAsignado ? $v->conductorAsignado->id : null,
+                    // Titular + provisionales vigentes: el formulario de
+                    // vales los sugiere primero en la lista de operarios.
+                    'conductores_asignados' => $v->conductoresAsignados->pluck('id')->unique()->values()->all(),
                     'id_tipo_vehiculo' => $v->id_tipo_vehiculo,
                     'codigo' => $v->codigo,
                     'id_tipo_combustible' => $v->id_tipo_combustible,

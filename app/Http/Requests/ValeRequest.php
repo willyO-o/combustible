@@ -8,6 +8,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class ValeRequest extends FormRequest
 {
@@ -68,7 +69,13 @@ class ValeRequest extends FormRequest
             'litros' => ['required', 'numeric', 'min:0.01', 'max:9999.99'],
             'precio' => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
             'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id', $this->reglaVehiculoDeAreaDeJefe()],
-            'id_conductor' => ['required', 'integer', 'exists:conductor,id'],
+            // Al emitir, cualquier conductor ACTIVO (esté o no asignado al
+            // vehículo: la asignación todavía no es confiable). Al editar el
+            // conductor ya está fijo, así que basta con que exista aunque
+            // después haya quedado inactivo.
+            'id_conductor' => $this->isMethod('POST')
+                ? ['required', 'integer', Rule::exists('conductor', 'id')->where('estado_conductor', 'ACTIVO')->whereNull('deleted_at')]
+                : ['required', 'integer', 'exists:conductor,id'],
             'id_grifo' => ['required', 'integer', 'exists:grifo,id'],
             // En la API es opcional: si no se envía, Vale::boot() la calcula
             // como fecha de emisión + tiempo_expiracion (ver openapi.yaml).
@@ -83,6 +90,7 @@ class ValeRequest extends FormRequest
     {
         return [
             'fecha_vencimiento.after_or_equal' => 'La fecha de vencimiento debe ser posterior a hoy.',
+            'id_conductor.exists' => 'El conductor seleccionado no existe o no está activo.',
         ];
     }
 

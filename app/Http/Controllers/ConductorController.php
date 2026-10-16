@@ -22,6 +22,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -300,7 +301,38 @@ class ConductorController extends Controller
         return Inertia::render('Conductores/Show', [
             'conductor' => $conductor,
             'historialAsignaciones' => $historialAsignaciones,
+            // Opciones del lápiz "cambiar cargo" (sólo se usa con conductores.editar).
+            'cargos' => Cargo::seleccionables($conductor->persona?->id_cargo),
         ]);
+    }
+
+    /**
+     * Cambia sólo el cargo del operario desde su perfil (lápiz junto al
+     * cargo), sin pasar por el formulario completo. Mismo criterio que
+     * ConductorRequest: un cargo ACTIVO, el que ya tiene aunque se haya
+     * desactivado, o ninguno (el cargo es opcional).
+     */
+    public function actualizarCargo(Request $request, Conductor $conductor): RedirectResponse
+    {
+        $persona = $conductor->persona;
+
+        if (! $persona) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'id_cargo' => [
+                'nullable',
+                'integer',
+                Rule::exists('cargo', 'id')->where(fn ($query) => $query->where(
+                    fn ($query) => $query->where('estado_cargo', 'ACTIVO')->orWhere('id', $persona->id_cargo)
+                )),
+            ],
+        ], [], ['id_cargo' => 'cargo']);
+
+        $persona->update(['id_cargo' => $validated['id_cargo'] ?? null]);
+
+        return back()->with('success', 'Cargo actualizado exitosamente.');
     }
 
     public function edit(Conductor $conductor): Response

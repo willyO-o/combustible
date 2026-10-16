@@ -2,6 +2,16 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.18.0 — 2026-10-16
+
+### Cambiado
+
+- `POST /vales`: `id_conductor` debe ser un conductor **activo**; antes bastaba con que existiera.
+  Sigue sin exigirse que esté asignado al vehículo. Si el vehículo no tiene conductor asignado, la
+  app puede ofrecer la lista `GET /parametros/colecciones` → `operaciones_diarias.operarios`.
+  Un conductor inactivo o inexistente responde `422` en `id_conductor`.
+- `GET /parametros`: `api_version` pasa a `1.18.0`.
+
 ## 1.17.0 — 2026-10-16
 
 ### Cambiado

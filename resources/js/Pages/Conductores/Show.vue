@@ -1,15 +1,42 @@
 <script setup>
-import { computed } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
+import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
+import CargoSelect from '@/Components/CargoSelect.vue'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
     conductor: Object,
     historialAsignaciones: Array,
+    // Cargo::seleccionables(): activos + el actual aunque esté inactivo.
+    cargos: { type: Array, default: () => [] },
 })
 
 const persona = computed(() => props.conductor.persona ?? {})
+
+/* ------------------------------------------------------------------ */
+/*  Cambio rápido del cargo (lápiz, permiso conductores.editar)        */
+/* ------------------------------------------------------------------ */
+const editandoCargo = ref(false)
+const formCargo = useForm({ id_cargo: '' })
+
+function editarCargo() {
+    formCargo.clearErrors()
+    formCargo.id_cargo = persona.value.id_cargo ?? ''
+    editandoCargo.value = true
+}
+
+function cancelarCargo() {
+    formCargo.clearErrors()
+    editandoCargo.value = false
+}
+
+function guardarCargo() {
+    formCargo.patch(route('conductores.cargo.actualizar', props.conductor.id), {
+        preserveScroll: true,
+        onSuccess: () => (editandoCargo.value = false),
+    })
+}
 const vehiculosAsignados = computed(() => props.conductor.asignaciones_activas ?? [])
 
 const estadoConductorBadge = (estado) => {
@@ -133,10 +160,32 @@ const tipoDocumentoLabel = (tipo) => {
                                 <span class="text-muted fs-13">C.I.</span>
                                 <span class="fw-medium">{{ persona.ci ?? 'N/A' }}</span>
                             </li>
-                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                            <li v-if="!editandoCargo"
+                                class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
                                 <span class="text-muted fs-13">Cargo</span>
-                                <span v-if="persona.cargo" class="fw-medium text-end">{{ persona.cargo.cargo }}</span>
-                                <span v-else class="text-muted">Sin cargo</span>
+                                <span class="d-flex align-items-center gap-1 text-end">
+                                    <span v-if="persona.cargo" class="fw-medium">{{ persona.cargo.cargo }}</span>
+                                    <span v-else class="text-muted">Sin cargo</span>
+                                    <button v-can="'conductores.editar'" type="button"
+                                        class="btn btn-sm btn-icon btn-primary-light" title="Cambiar cargo"
+                                        aria-label="Cambiar cargo" @click="editarCargo">
+                                        <i class="ri-pencil-line" aria-hidden="true"></i>
+                                    </button>
+                                </span>
+                            </li>
+                            <li v-else class="py-2 border-bottom">
+                                <form @submit.prevent="guardarCargo">
+                                    <CargoSelect v-model="formCargo.id_cargo" :cargos="cargos"
+                                        :error="formCargo.errors.id_cargo" id="perfil_id_cargo" />
+                                    <div class="d-flex justify-content-end gap-2 mt-2">
+                                        <button type="button" class="btn btn-sm btn-light" :disabled="formCargo.processing"
+                                            @click="cancelarCargo">Cancelar</button>
+                                        <button type="submit" class="btn btn-sm btn-primary" :disabled="formCargo.processing">
+                                            <span v-if="formCargo.processing" class="spinner-border spinner-border-sm me-1"></span>
+                                            Guardar
+                                        </button>
+                                    </div>
+                                </form>
                             </li>
                             <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
                                 <span class="text-muted fs-13">Celular</span>

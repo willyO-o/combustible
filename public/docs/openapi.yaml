@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.17.0"
+  version: "1.18.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.17.0"
+                api_version: "1.18.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -1596,7 +1596,10 @@ paths:
 
         El `id_conductor` normalmente es el conductor titular del vehículo — disponible en
         `GET /parametros/colecciones` → `vehiculos[].id_conductor` — pero se acepta cualquier
-        conductor existente.
+        conductor **activo** (`estado_conductor = ACTIVO`), esté o no asignado al vehículo: si el
+        vehículo no tiene conductor asignado, elígelo de
+        `GET /parametros/colecciones` → `operaciones_diarias.operarios` (todos los activos).
+        Un conductor inactivo o inexistente responde `422` en `id_conductor` (desde 1.18.0).
       requestBody:
         required: true
         content:
@@ -3984,7 +3987,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.17.0" }
+        api_version: { type: string, example: "1.18.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4829,7 +4832,7 @@ components:
           example: 8
         id_conductor:
           type: integer
-          description: Debe existir en `conductor`. Normalmente el conductor titular del vehículo (`vehiculos[].id_conductor` de `GET /parametros/colecciones`).
+          description: Conductor ACTIVO (desde 1.18.0; antes bastaba con que existiera), esté o no asignado al vehículo. Normalmente el titular (`vehiculos[].id_conductor` de `GET /parametros/colecciones`); si el vehículo no tiene, cualquiera de `operaciones_diarias.operarios`.
           example: 45
         id_grifo:
           type: integer

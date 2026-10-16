@@ -924,4 +924,83 @@ class ConductorControllerTest extends TestCase
         )->first(fn ($f) => in_array('6680001', $f, true));
         $this->assertSame('Supervisor', $fila[6]);
     }
+
+    public function test_show_envia_los_cargos_seleccionables_incluido_el_actual_inactivo(): void
+    {
+        $inactivoActual = Cargo::factory()->inactivo()->create();
+        $otroInactivo = Cargo::factory()->inactivo()->create();
+        $conductor = Conductor::factory()->create();
+        $conductor->persona->update(['id_cargo' => $inactivoActual->id]);
+
+        $this->actingAs($this->admin)->get(route('conductores.show', $conductor->id))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('cargos', fn ($cargos) => collect($cargos)->pluck('id')->contains($inactivoActual->id)
+                    && ! collect($cargos)->pluck('id')->contains($otroInactivo->id)
+                    && collect($cargos)->pluck('id')->contains(Cargo::where('cargo', 'Técnico')->value('id')))
+            );
+    }
+
+    public function test_actualizar_cargo_cambia_solo_el_cargo_del_operario(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $persona = $conductor->persona;
+        $cargo = Cargo::where('cargo', 'Supervisor')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->from(route('conductores.show', $conductor->id))
+            ->patch(route('conductores.cargo.actualizar', $conductor->id), ['id_cargo' => $cargo->id])
+            ->assertRedirect(route('conductores.show', $conductor->id))
+            ->assertSessionHas('success');
+
+        $actualizada = $persona->fresh();
+        $this->assertSame($cargo->id, $actualizada->id_cargo);
+        $this->assertSame($persona->nombres, $actualizada->nombres);
+        $this->assertSame($persona->ci, $actualizada->ci);
+    }
+
+    public function test_actualizar_cargo_permite_quitar_el_cargo(): void
+    {
+        $conductor = Conductor::factory()->create();
+        $conductor->persona->update(['id_cargo' => Cargo::where('cargo', 'Técnico')->value('id')]);
+
+        $this->actingAs($this->admin)
+            ->patch(route('conductores.cargo.actualizar', $conductor->id), ['id_cargo' => ''])
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull($conductor->persona->fresh()->id_cargo);
+    }
+
+    public function test_actualizar_cargo_rechaza_un_cargo_inactivo_pero_conserva_el_actual_inactivo(): void
+    {
+        $actual = Cargo::factory()->inactivo()->create();
+        $otroInactivo = Cargo::factory()->inactivo()->create();
+        $conductor = Conductor::factory()->create();
+        $conductor->persona->update(['id_cargo' => $actual->id]);
+
+        $this->actingAs($this->admin)
+            ->patch(route('conductores.cargo.actualizar', $conductor->id), ['id_cargo' => $otroInactivo->id])
+            ->assertSessionHasErrors('id_cargo');
+        $this->assertSame($actual->id, $conductor->persona->fresh()->id_cargo);
+
+        $this->actingAs($this->admin)
+            ->patch(route('conductores.cargo.actualizar', $conductor->id), ['id_cargo' => $actual->id])
+            ->assertSessionHasNoErrors();
+        $this->assertSame($actual->id, $conductor->persona->fresh()->id_cargo);
+    }
+
+    public function test_actualizar_cargo_exige_el_permiso_de_editar_operarios(): void
+    {
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        $usuarioConductor = User::factory()->create();
+        $usuarioConductor->assignRole('conductor');
+
+        $conductor = Conductor::factory()->create();
+
+        $this->actingAs($usuarioConductor)
+            ->patch(route('conductores.cargo.actualizar', $conductor->id), ['id_cargo' => Cargo::where('cargo', 'Técnico')->value('id')])
+            ->assertForbidden();
+
+        $this->assertNull($conductor->persona->fresh()->id_cargo);
+    }
 }
