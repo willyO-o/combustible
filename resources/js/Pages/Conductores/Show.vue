@@ -125,9 +125,16 @@ const tipoDocumentoLabel = (tipo) => {
                 </span>
             </h1>
         </div>
-        <Link :href="route('conductores.index')" class="btn btn-outline-secondary btn-wave">
-            <i class="ri-arrow-left-line me-1"></i> Volver
-        </Link>
+        <div class="d-flex gap-2 flex-wrap">
+            <Link v-can="'operacion-diaria.reporte.operario'"
+                :href="route('operacion-diaria.reporte.operario.index', { id_conductor: conductor.id })"
+                class="btn btn-primary btn-wave">
+                <i class="ri-file-chart-line me-1"></i> Reporte de actividades y combustible
+            </Link>
+            <Link :href="route('conductores.index')" class="btn btn-outline-secondary btn-wave">
+                <i class="ri-arrow-left-line me-1"></i> Volver
+            </Link>
+        </div>
     </div>
 
     <div class="row g-4 mb-4">

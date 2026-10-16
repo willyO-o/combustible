@@ -81,6 +81,9 @@ class UserSeeder extends Seeder
             'operacion-diaria.reporte.detalle',
             'operacion-diaria.reporte.detalle.pdf',
             'operacion-diaria.reporte.detalle.excel',
+            // Reporte por operario: actividades de sus jornadas + sus cargas
+            // de combustible (enlazado desde el perfil del operario).
+            'operacion-diaria.reporte.operario',
             'operacion-diaria.verificar',
         ];
     }

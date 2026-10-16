@@ -76,7 +76,7 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
 
   {
-    menutitle: 'REPORTES', permission: ['cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', 'control-cargas.reporte', 'operacion-diaria.reporte.uso', 'operacion-diaria.reporte.detalle', ]
+    menutitle: 'REPORTES', permission: ['cargas-combustible.reporte', 'cargas-combustible.reporte.rendimiento', 'control-cargas.reporte', 'operacion-diaria.reporte.uso', 'operacion-diaria.reporte.detalle', 'operacion-diaria.reporte.operario', ]
   },
   {
     title: 'Reportes Combustible', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/cargas-combustible', active: false, selected: false, dirchange: false, permission: 'cargas-combustible.reporte',
@@ -92,6 +92,9 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
   },
   {
     title: 'Bitácora por Vehículo', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/operacion-diaria/detalle', active: false, selected: false, dirchange: false, permission: 'operacion-diaria.reporte.detalle',
+  },
+  {
+    title: 'Reporte por Operario', icon: Svgicons.Chartsicon, type: 'link', path: '/reportes/operacion-diaria/operario', active: false, selected: false, dirchange: false, permission: 'operacion-diaria.reporte.operario',
   },
   {
     menutitle: 'CATALOGOS', permission: ['conductores.ver', 'vehiculos.ver', 'grifos.ver', 'tipos-combustible.ver', 'tipos-mantenimiento.ver', 'tipos-vehiculo.ver', 'grupos-vehiculo.ver', 'repuestos.ver']

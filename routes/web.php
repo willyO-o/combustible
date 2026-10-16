@@ -15,6 +15,7 @@ use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\OperacionDiariaController;
 use App\Http\Controllers\OperacionDiariaReportController;
+use App\Http\Controllers\OperarioReportController;
 use App\Http\Controllers\OrdenTrabajoController;
 use App\Http\Controllers\ParametrosEmpresaController;
 use App\Http\Controllers\PersonaController;
@@ -464,6 +465,10 @@ Route::middleware('auth')->group(function () {
         Route::get('operacion-diaria/detalle/excel', [OperacionDiariaReportController::class, 'detalleExcel'])->name('excel')
             ->middleware('permission:operacion-diaria.reporte.detalle.excel');
     });
+
+    // ── Reporte por operario (actividades de sus jornadas + cargas de combustible) ──
+    Route::get('reportes/operacion-diaria/operario', [OperarioReportController::class, 'index'])->name('operacion-diaria.reporte.operario.index')
+        ->middleware('permission:operacion-diaria.reporte.operario');
 
     //  Actividades de los operadores de transporte
     Route::post('operacion-diaria/verificar', [OperacionDiariaController::class, 'verificarOperacion'])->name('operacion-diaria.verificar')

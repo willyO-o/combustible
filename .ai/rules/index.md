@@ -59,6 +59,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Http/Requests/OperacionStoreRequest.php,app/Actions/OperacionDiaria/*.php | .ai/rules/operacion-diaria.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/operacion.md |
 | app/Http/Controllers/OrdenTrabajoController.php,app/Http/Requests/OrdenTrabajoRequest.php,app/Models/SolicitudMantenimiento.php,resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/orden-trabajo.md |
+| app/Http/Controllers/OperarioReportController.php,resources/js/Pages/Reportes/OperarioReporte.vue,resources/js/Pages/Conductores/Show.vue | .ai/rules/pages-conductores.md |
 | app/Http/Controllers/CargaMaterialController.php,resources/js/Pages/ControlCargas/Index.vue | .ai/rules/pages-control-cargas.md |
 | app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Actions/Actividades/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/OperacionDiaria.php,app/Models/ActividadRealizada.php,resources/js/Pages/Operacion/*.vue | .ai/rules/pages-operacion.md |
 | resources/js/Pages/OrdenTrabajo/Create.vue | .ai/rules/pages-orden-trabajo.md |

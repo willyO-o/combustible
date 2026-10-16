@@ -100,6 +100,7 @@ return [
                 'operacion-diaria.eliminar' => 'Eliminar',
                 'operacion-diaria.informe' => 'Ver informe',
                 'operacion-diaria.reporte.pdf' => 'Generar reporte PDF',
+                'operacion-diaria.reporte.operario' => 'Ver reporte por operario',
                 'operacion-diaria.verificar' => 'Verificar',
             ],
         ],
