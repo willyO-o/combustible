@@ -16,6 +16,7 @@ use App\Models\OperacionDiaria;
 use App\Models\TipoMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -246,83 +247,95 @@ class OperacionDiariaController extends Controller
 
     /**
      * Vehículos que el usuario puede elegir al registrar/editar una operación
-     * diaria, según su rol:
-     * - conductor: sólo sus propios vehículos asignados (Conductor::asignacionesActivas,
-     *   asignación ACTIVO/PROVISIONAL con fecha_culminacion nula o futura).
-     * - jefe-area: sólo los vehículos de las áreas que tiene a cargo
-     *   (Persona::encargadoAreas + vehiculo_area con asignación ACTIVO/PROVISIONAL
-     *   y fecha_culminacion nula o futura).
-     * - un usuario con ambos roles ve la unión de los dos listados, sin duplicar.
-     * - administrador/super-admin (aunque además sea conductor o jefe-area) y
-     *   cualquier otro rol (técnico de mantenimiento, etc.): sin filtro, todos
-     *   los vehículos activos.
+     * diaria: TODOS los vehículos activos, para cualquier rol (a pedido del
+     * usuario, 2026-10-16: la asignación vehículo-conductor/área todavía no es
+     * confiable y el filtro por rol dejaba fuera vehículos que sí se operan).
      *
-     * $incluirSiFalta permite garantizar que el vehículo ya asignado a una
-     * operación existente (edit()) aparezca en el listado aunque ya no
-     * cumpla el filtro del rol actual.
+     * Los "propios" del usuario (los asignados a él como conductor y los de
+     * las áreas que tiene a cargo como jefe) se marcan con meta.propio y van
+     * primero, como sugerencia. meta.sin_area señala los vehículos sin área
+     * vigente: no se pueden registrar (la operación toma el área del
+     * vehículo; OperacionStoreRequest lo rechaza con un mensaje claro).
+     *
+     * $incluirSiFalta garantiza que el vehículo de una operación existente
+     * (edit()) aparezca aunque ya no esté activo.
      */
     private function vehiculosDisponibles(User $user, ?Vehiculo $incluirSiFalta = null): array
     {
-        $persona = $user->persona;
-        $esAdministrador = $user->hasAnyRole(['administrador', 'super-admin']);
-        $esConductor = $user->hasRole('conductor') && $persona?->conductor;
-        $esJefeArea = $user->hasRole('jefe-area') && $persona;
-
-        if ($esAdministrador || (! $esConductor && ! $esJefeArea)) {
-            $vehiculos = Vehiculo::select($this->columnasVehiculoOpt())
-                ->where('estado_vehiculo', 'ACTIVO')
-                ->get();
-        } else {
-            $vehiculos = collect();
-
-            if ($esConductor) {
-                $vehiculos = $vehiculos->merge($persona->conductor->asignacionesActivas);
-            }
-
-            if ($esJefeArea) {
-                $idsArea = $persona->encargadoAreas()->pluck('id_area');
-
-                if ($idsArea->isNotEmpty()) {
-                    $vehiculosArea = Vehiculo::select($this->columnasVehiculoOpt())
-                        ->where('estado_vehiculo', 'ACTIVO')
-                        ->whereHas('areas', function ($query) use ($idsArea) {
-                            $query->whereIn('area.id', $idsArea)
-                                ->where(function ($query) {
-                                    $query->where('vehiculo_area.estado_asignacion', 'ACTIVO')
-                                        ->orWhere('vehiculo_area.estado_asignacion', 'PROVISIONAL');
-                                })
-                                ->where(function ($query) {
-                                    $query->whereNull('vehiculo_area.fecha_culminacion')
-                                        ->orWhere('vehiculo_area.fecha_culminacion', '>', now());
-                                });
-                        })
-                        ->get();
-
-                    $vehiculos = $vehiculos->merge($vehiculosArea);
-                }
-            }
-
-            $vehiculos = $vehiculos->unique('id');
-        }
+        $vehiculos = Vehiculo::select($this->columnasVehiculoOpt())
+            ->where('estado_vehiculo', 'ACTIVO')
+            ->get();
 
         if ($incluirSiFalta && ! $vehiculos->contains('id', $incluirSiFalta->id)) {
-            $vehiculos = $vehiculos->push($incluirSiFalta);
+            $vehiculos->push($incluirSiFalta);
         }
 
-        $vehiculos = $vehiculos->sortBy('nro_placa')->values();
+        $idsPropios = $this->idsVehiculosPropios($user);
+
+        $idsConArea = VehiculoArea::query()
+            ->whereIn('id_vehiculo', $vehiculos->pluck('id'))
+            ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
+            ->where(fn ($query) => $query->whereNull('fecha_culminacion')->orWhere('fecha_culminacion', '>', now()))
+            ->pluck('id_vehiculo')
+            ->flip();
+
+        $vehiculos = $vehiculos
+            ->sortBy([
+                fn ($a, $b) => (int) $idsPropios->has($b->id) <=> (int) $idsPropios->has($a->id),
+                fn ($a, $b) => strnatcasecmp((string) $a->codigo, (string) $b->codigo),
+            ])
+            ->values();
 
         // El combo para elegir conductor se oculta sólo al conductor puro
         // (ver mostrarSelectorConductor en create()/edit()): en los demás
         // casos se resuelve, en una única consulta agrupada por vehículo
         // (evita el N+1 de un conductoresAsignados() por vehículo, relevante
-        // con ~200 vehículos para administrador).
+        // con ~200 vehículos).
         $conductoresPorVehiculo = $user->esConductorPuro()
             ? collect()
             : $this->conductoresAsignadosPorVehiculo($vehiculos->pluck('id'));
 
         return $vehiculos
-            ->map(fn (Vehiculo $vehiculo) => $this->vehiculoOpt($vehiculo, $conductoresPorVehiculo->get($vehiculo->id, collect())))
+            ->map(function (Vehiculo $vehiculo) use ($conductoresPorVehiculo, $idsPropios, $idsConArea) {
+                $opcion = $this->vehiculoOpt($vehiculo, $conductoresPorVehiculo->get($vehiculo->id, collect()));
+                $opcion['meta']['propio'] = $idsPropios->has($vehiculo->id);
+                $opcion['meta']['sin_area'] = ! $idsConArea->has($vehiculo->id);
+
+                return $opcion;
+            })
             ->all();
+    }
+
+    /**
+     * Vehículos "propios" del usuario, sólo para sugerirlos primero: los que
+     * tiene asignados como conductor y los de las áreas que tiene a cargo.
+     *
+     * @return Collection<int, int> ids como llaves (lookup O(1))
+     */
+    private function idsVehiculosPropios(User $user): Collection
+    {
+        $persona = $user->persona;
+        $ids = collect();
+
+        if ($user->hasRole('conductor') && $persona?->conductor) {
+            $ids = $ids->merge($persona->conductor->asignacionesActivas()->pluck('vehiculo.id'));
+        }
+
+        if ($user->hasRole('jefe-area') && $persona) {
+            $idsArea = $persona->encargadoAreas()->pluck('id_area');
+
+            if ($idsArea->isNotEmpty()) {
+                $ids = $ids->merge(
+                    VehiculoArea::query()
+                        ->whereIn('id_area', $idsArea)
+                        ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
+                        ->where(fn ($query) => $query->whereNull('fecha_culminacion')->orWhere('fecha_culminacion', '>', now()))
+                        ->pluck('id_vehiculo')
+                );
+            }
+        }
+
+        return $ids->unique()->flip();
     }
 
     /**

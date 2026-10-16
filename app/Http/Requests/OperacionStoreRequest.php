@@ -5,7 +5,9 @@ namespace App\Http\Requests;
 use App\Models\MantenimientoOperacionDiaria;
 use App\Models\OperacionDiaria;
 use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use App\Rules\GreaterThanPreviousReading;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -160,6 +162,32 @@ class OperacionStoreRequest extends FormRequest
     }
 
     /**
+     * Cualquier usuario puede elegir cualquier vehículo activo, pero la
+     * operación toma el área vigente del vehículo (id_area NOT NULL): sin
+     * área no se puede registrar. Antes esto llegaba como un error genérico
+     * de la Action (AreaNoAsignadaException); ahora es un error del campo.
+     * Sólo al crear: al editar el vehículo y el área ya están fijos.
+     */
+    private function reglaVehiculoConArea(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($this->method() !== 'POST' || ! $value) {
+                return;
+            }
+
+            $tieneArea = VehiculoArea::query()
+                ->where('id_vehiculo', $value)
+                ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
+                ->where(fn ($query) => $query->whereNull('fecha_culminacion')->orWhere('fecha_culminacion', '>', now()))
+                ->exists();
+
+            if (! $tieneArea) {
+                $fail('El vehículo no tiene un área asignada: asígnalo a un área antes de registrar su operación.');
+            }
+        };
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
@@ -168,7 +196,7 @@ class OperacionStoreRequest extends FormRequest
     {
         // dd($this->method());
         return [
-            'id_vehiculo' => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id'],
+            'id_vehiculo' => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id', $this->reglaVehiculoConArea()],
             // Los roles de gestión eligen el operario entre TODOS los
             // conductores ACTIVO (ya no sólo los asignados al vehículo). Es
             // obligatorio al crear salvo para el conductor puro, que no elige:

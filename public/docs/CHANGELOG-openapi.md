@@ -2,6 +2,18 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.19.0 — 2026-10-16
+
+### Cambiado
+
+- `POST /operacion-diaria`: cualquier usuario puede registrar la operación de **cualquier
+  vehículo activo**, no sólo los suyos o los de sus áreas. Un vehículo sin área vigente ahora
+  responde `422` como error de validación en `errors.id_vehiculo` (antes era
+  `message: "Error: El conductor no tiene un área asignada."`).
+- `GET /operacion-diaria`: el conductor y el jefe de área ven además las operaciones que
+  **registraron ellos mismos**, aunque el vehículo sea de otra área.
+- `GET /parametros`: `api_version` pasa a `1.19.0`.
+
 ## 1.18.0 — 2026-10-16
 
 ### Cambiado

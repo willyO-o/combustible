@@ -1,6 +1,7 @@
 ---
 paths:
   - 'app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/Vehiculo.php,resources/js/Pages/Operacion/Create.vue'
+  - 'app/Http/Controllers/OperacionDiariaController.php,app/Actions/OperacionDiaria/*.php,app/Http/Requests/OperacionStoreRequest.php,app/Models/OperacionDiaria.php,resources/js/Pages/Operacion/Create.vue'
 ---
 
 # Operacion
@@ -14,3 +15,6 @@ OperacionDiariaController::vehiculosDisponibles() sólo resuelve la lista de con
 
 ## Operación Diaria web: roles combinados usan User::esConductorPuro(), no hasRole('conductor')
 BUG corregido 2026-10-14 (reportado: jefes de área con rol conductor no podían registrar operaciones). En la web, mostrarSelectorConductor, datosConConductorResuelto(), la carga de meta.conductoresAsignados (vehiculosDisponibles) y el Rule::requiredIf de id_conductor en OperacionStoreRequest usaban hasRole('conductor'): un jefe-area/administrador que también era conductor no veía el combo de operarios y se le forzaba id_conductor = él mismo -> ConductorNoAsignadoException. Ahora TODO ese criterio usa User::esConductorPuro() (rol de gestión prevalece), igual que Api\V1. Además administrador/super-admin ve todos los vehículos activos y todas las actividades sugeridas aunque también sea conductor/jefe-area. La unión conductor+jefe-area de vehículos se mantiene. OperacionStoreRequest es compartida con la API: id_conductor ahora es obligatorio en POST para jefe-area+conductor también vía API. Tests: OperacionDiariaControllerTest *_tambien_es_conductor_*.
+
+## Operación diaria: TODOS los vehículos para todos los usuarios + id_usuario_registro
+A pedido del usuario (2026-10-16), reemplaza el filtro por rol de vehiculosDisponibles() descrito en operacion.md: cualquier rol ve TODOS los vehículos ACTIVO (más el de la operación al editar). meta.propio (asignados al usuario como conductor + los de las áreas que tiene a cargo, idsVehiculosPropios()) los ordena primero con insignia "Asignado"; meta.sin_area marca los que no tienen vehiculo_area vigente. OperacionStoreRequest::reglaVehiculoConArea() rechaza en POST un vehículo sin área (error en id_vehiculo; la Action mantiene AreaNoAsignadaException como respaldo). Create.vue autoselecciona si hay 1 vehículo o 1 propio. Columna nueva operacion_diaria.id_usuario_registro (FK users nullable, set null) que llena OperacionDiaria::creating con auth()->id() — NO es fillable; ListOperacionesDiariasAction la usa para que jefe-area y conductor vean además lo que registraron ellos (si no, un vehículo de otra área desaparecía de su listado). Despliegue: php artisan migrate --force. El listado de vehículos de la API (ParametrosController::coleccionVehiculos) NO se cambió (lo comparten vales/cargas en la app). API 1.19.0.

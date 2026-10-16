@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.18.0"
+  version: "1.19.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.18.0"
+                api_version: "1.19.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -697,8 +697,11 @@ paths:
         Lista paginada de operaciones diarias, ordenadas por fecha de creación descendente.
 
         Las restricciones de visibilidad dependen del rol del usuario autenticado:
-        - **conductor**: solo ve sus propias operaciones (`id_conductor` = persona del usuario).
-        - **jefe-area**: solo ve las operaciones de las áreas que tiene a su cargo.
+        - **conductor**: sus propias operaciones (`id_conductor` = persona del usuario) y las que
+          registró él mismo.
+        - **jefe-area**: las operaciones de las áreas que tiene a su cargo y las que registró él
+          mismo (desde 1.19.0 cualquier usuario puede registrar cualquier vehículo, aunque sea de
+          otra área).
         - Otros roles: sin restricción adicional.
       parameters:
         - name: nro_placa
@@ -959,9 +962,12 @@ paths:
                       id_vehiculo: ["El campo id vehiculo seleccionado es inválido."]
                       actividades_realizadas: ["Debe agregar al menos una actividad realizada."]
                 sin_area:
-                  summary: Vehículo sin área asignada
+                  summary: Vehículo sin área asignada (desde 1.19.0 es un error de validación en `id_vehiculo`)
                   value:
-                    message: "Error: El conductor no tiene un área asignada."
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      id_vehiculo: ["El vehículo no tiene un área asignada: asígnalo a un área antes de registrar su operación."]
                 operario_no_activo:
                   summary: "`id_conductor` enviado (obligatorio para jefe-area/administrador/super-admin) no existe o no está ACTIVO"
                   value:
@@ -3987,7 +3993,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.18.0" }
+        api_version: { type: string, example: "1.19.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }

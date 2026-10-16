@@ -62,7 +62,10 @@ class ListOperacionesDiariasAction
             // (ver OperacionDiariaController::vehiculosDisponibles()): debe
             // seguir viéndolas en su listado.
             $query->where(function ($query) use ($idsArea, $user) {
-                $query->whereIn('id_area', $idsArea);
+                $query->whereIn('id_area', $idsArea)
+                    // Cualquier usuario puede registrar cualquier vehículo:
+                    // lo que registró él mismo siempre le aparece.
+                    ->orWhere('id_usuario_registro', $user->id);
 
                 if ($user->hasRole('conductor')) {
                     $query->orWhere('id_conductor', $user->id_persona);
@@ -73,7 +76,10 @@ class ListOperacionesDiariasAction
         }
 
         if ($user->hasRole('conductor')) {
-            $query->where('id_conductor', $user->id_persona);
+            $query->where(function ($query) use ($user) {
+                $query->where('id_conductor', $user->id_persona)
+                    ->orWhere('id_usuario_registro', $user->id);
+            });
         }
     }
 }

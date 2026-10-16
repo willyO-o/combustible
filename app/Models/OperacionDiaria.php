@@ -86,6 +86,12 @@ class OperacionDiaria extends Model implements Auditable
             $ultimoNroOperacion = self::max('nro_operacion');
             $operacion->nro_operacion = $ultimoNroOperacion ? $ultimoNroOperacion + 1 : 1;
 
+            // Quién la registró (web o API). No es fillable a propósito: el
+            // cliente no puede atribuírsela a otro usuario. Lo usa
+            // ListOperacionesDiariasAction para que cada usuario vea lo que
+            // registró aunque el vehículo sea de otra área.
+            $operacion->id_usuario_registro ??= auth()->id();
+
             // id_conductor ya viene resuelto por CreateOperacionDiariaAction a partir
             // del conductor actualmente asignado al vehículo (no del usuario
             // autenticado): ahora cualquier rol puede registrar una operación para

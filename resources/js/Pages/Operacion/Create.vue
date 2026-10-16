@@ -22,10 +22,10 @@ const isMobile = breakpoints.smaller('md') // Devuelve true si la pantalla es me
 
 
 const props = defineProps({
-    // [{ id, label, meta }] vehículos que el usuario puede elegir: ya viene
-    // filtrado por rol desde el backend (conductor -> sus vehículos
-    // asignados; jefe-area -> los de sus áreas a cargo; cualquier otro rol,
-    // sin filtro -> todos). Ver OperacionDiariaController::vehiculosDisponibles().
+    // [{ id, label, meta }] TODOS los vehículos activos, para cualquier rol.
+    // meta.propio = asignado al usuario o de sus áreas (van primero);
+    // meta.sin_area = no se puede registrar. Ver
+    // OperacionDiariaController::vehiculosDisponibles().
     vehiculosAsignados: Array,
     operacion: Object, // la operación a editar (null en modo creación)
     actividadesSugeridas: Array, // [{ id, nombre_actividad, unidad_medida }] actividades sugeridas según el/las área(s) del usuario
@@ -51,6 +51,12 @@ const props = defineProps({
 })
 
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
+
+// meta.sin_area: el vehículo no tiene área vigente y el servidor rechazará
+// el registro (la operación toma el área del vehículo).
+const vehiculoSeleccionadoSinArea = computed(() =>
+    !!vehiculosAsignadosOpt.value.find(v => v.id === form.id_vehiculo)?.meta?.sin_area
+)
 
 // En edición el vehículo queda bloqueado: cambiarlo invalidaría las lecturas
 // (km/horómetro) y las actividades ya registradas, que dependen de su
@@ -445,9 +451,18 @@ const agregarActividad = () => {
 
 
 onMounted(() => {
-    // Si sólo hay un vehículo disponible para elegir, se auto-selecciona.
-    if (vehiculosAsignadosOpt.value.length === 1 && !form.id_vehiculo) {
-        form.id_vehiculo = vehiculosAsignadosOpt.value[0].id
+    // Alta: se auto-selecciona si sólo hay un vehículo, o si de todos los
+    // vehículos el usuario tiene asignado uno solo (p.ej. un conductor con su
+    // vehículo): igual que antes de liberar la lista completa.
+    if (!props.operacion && !form.id_vehiculo) {
+        const propios = vehiculosAsignadosOpt.value.filter(v => v.meta?.propio)
+        const unico = vehiculosAsignadosOpt.value.length === 1
+            ? vehiculosAsignadosOpt.value[0]
+            : (propios.length === 1 ? propios[0] : null)
+
+        if (unico) {
+            form.id_vehiculo = unico.id
+        }
     }
 
     // Modo edición: preseleccionar el vehículo y conductor que ya tiene la
@@ -538,7 +553,21 @@ onMounted(() => {
                                         :searchable="true" :filter-results="true" :disabled="esEdicion"
                                         :can-clear="!esEdicion" placeholder="Buscar vehículo..."
                                         no-options-text="Sin vehículos disponibles" no-results-text="Sin resultados"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }">
+                                        <template #option="{ option }">
+                                            <span>{{ option.label }}</span>
+                                            <span v-if="option.meta?.propio"
+                                                class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado</span>
+                                            <span v-if="option.meta?.sin_area"
+                                                class="badge bg-warning-transparent text-warning fw-normal ms-2">Sin área</span>
+                                        </template>
+                                    </Multiselect>
+
+                                    <div v-if="!esEdicion && vehiculoSeleccionadoSinArea && !form.errors.id_vehiculo"
+                                        class="text-warning small mt-1">
+                                        <i class="ri-error-warning-line me-1"></i>Este vehículo no tiene un área asignada:
+                                        no se podrá registrar hasta asignarlo a un área.
+                                    </div>
 
                                     <div v-if="esEdicion" class="text-muted small mt-1">
                                         <i class="ri-lock-line me-1"></i>El vehículo no se puede cambiar al editar la

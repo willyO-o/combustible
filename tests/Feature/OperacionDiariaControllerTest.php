@@ -98,45 +98,58 @@ class OperacionDiariaControllerTest extends TestCase
         ]);
     }
 
-    public function test_un_conductor_solo_ve_sus_propios_vehiculos_asignados(): void
+    public function test_un_conductor_ve_todos_los_vehiculos_activos_con_el_suyo_primero(): void
     {
         [$user, $conductor] = $this->crearConductorConUsuario();
 
-        $vehiculoPropio = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $vehiculoPropio = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje', 'codigo' => 'ZZZ-999']);
         $this->asignarVehiculoAConductor($vehiculoPropio, $conductor);
 
-        // Otro vehículo, sin ninguna asignación al conductor: no debe aparecer.
-        Vehiculo::factory()->create();
+        // Otro vehículo sin asignación al conductor: ahora también aparece.
+        $otro = Vehiculo::factory()->create(['codigo' => 'AAA-001']);
+        $retirado = Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
 
         $response = $this->actingAs($user)->get(route('operacion-diaria.create'));
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Operacion/Create')
-            ->has('vehiculosAsignados', 1)
+            ->has('vehiculosAsignados', 2)
+            // El propio va primero aunque por código ordene después.
             ->where('vehiculosAsignados.0.id', $vehiculoPropio->id)
+            ->where('vehiculosAsignados.0.meta.propio', true)
+            ->where('vehiculosAsignados.1.id', $otro->id)
+            ->where('vehiculosAsignados.1.meta.propio', false)
+            ->where('vehiculosAsignados', fn ($v) => ! collect($v)->pluck('id')->contains($retirado->id))
         );
     }
 
-    public function test_un_jefe_de_area_solo_ve_los_vehiculos_de_su_area(): void
+    public function test_un_jefe_de_area_ve_todos_los_vehiculos_con_los_de_su_area_marcados(): void
     {
         $area = Area::factory()->create();
         $otraArea = Area::factory()->create();
         $user = $this->crearJefeAreaConUsuario($area);
 
-        $vehiculoDelArea = Vehiculo::factory()->create();
+        $vehiculoDelArea = Vehiculo::factory()->create(['codigo' => 'ZZZ-999']);
         $this->asignarVehiculoAArea($vehiculoDelArea, $area);
 
-        $vehiculoDeOtraArea = Vehiculo::factory()->create();
+        $vehiculoDeOtraArea = Vehiculo::factory()->create(['codigo' => 'AAA-001']);
         $this->asignarVehiculoAArea($vehiculoDeOtraArea, $otraArea);
+
+        $sinArea = Vehiculo::factory()->create(['codigo' => 'BBB-002']);
 
         $response = $this->actingAs($user)->get(route('operacion-diaria.create'));
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Operacion/Create')
-            ->has('vehiculosAsignados', 1)
+            ->has('vehiculosAsignados', 3)
             ->where('vehiculosAsignados.0.id', $vehiculoDelArea->id)
+            ->where('vehiculosAsignados.0.meta.propio', true)
+            ->where('vehiculosAsignados.1.id', $vehiculoDeOtraArea->id)
+            ->where('vehiculosAsignados.1.meta.sin_area', false)
+            ->where('vehiculosAsignados.2.id', $sinArea->id)
+            ->where('vehiculosAsignados.2.meta.sin_area', true)
         );
     }
 
@@ -1678,12 +1691,12 @@ class OperacionDiariaControllerTest extends TestCase
         return compact('jefe', 'conductorJefe', 'operario', 'vehiculoArea', 'vehiculoPropio', 'areaJefe', 'otraArea');
     }
 
-    public function test_jefe_conductor_ve_los_vehiculos_de_su_area_y_su_propio_vehiculo_de_otra_area(): void
+    public function test_jefe_conductor_ve_todos_los_vehiculos_con_los_de_su_area_y_el_propio_primero(): void
     {
         $e = $this->escenarioJefeConductorConVehiculoEnOtraArea();
 
-        // Vehículo de un área ajena que no conduce: no debe aparecer.
-        $ajeno = Vehiculo::factory()->create();
+        // Vehículo de un área ajena que no conduce: ahora también aparece, al final.
+        $ajeno = Vehiculo::factory()->create(['codigo' => 'AAA-000']);
         $this->asignarVehiculoAArea($ajeno, $e['otraArea']);
 
         $response = $this->actingAs($e['jefe'])->get(route('operacion-diaria.create'));
@@ -1691,12 +1704,66 @@ class OperacionDiariaControllerTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->where('mostrarSelectorConductor', true)
-            ->has('vehiculosAsignados', 2)
-            ->where('vehiculosAsignados.0.id', $e['vehiculoArea']->id)
-            ->where('vehiculosAsignados.0.meta.conductoresAsignados.0.id', $e['operario']->id)
-            ->where('vehiculosAsignados.1.id', $e['vehiculoPropio']->id)
-            ->where('vehiculosAsignados.1.meta.conductoresAsignados.0.id', $e['conductorJefe']->id)
+            ->has('vehiculosAsignados', 3)
+            ->where('vehiculosAsignados', fn ($v) => collect($v)->take(2)->pluck('id')->sort()->values()->all()
+                === collect([$e['vehiculoArea']->id, $e['vehiculoPropio']->id])->sort()->values()->all()
+                && collect($v)->take(2)->every(fn ($x) => $x['meta']['propio'] === true))
+            ->where('vehiculosAsignados.2.id', $ajeno->id)
+            ->where('vehiculosAsignados.2.meta.propio', false)
         );
+    }
+
+    public function test_store_rechaza_un_vehiculo_sin_area_con_error_en_el_campo(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $sinArea = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($sinArea, $conductor);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($sinArea))
+            ->assertSessionHasErrors('id_vehiculo');
+
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    public function test_cualquier_usuario_registra_un_vehiculo_ajeno_y_lo_ve_en_su_listado(): void
+    {
+        // Jefe del área A registra un vehículo del área B (que no tiene a cargo).
+        $areaJefe = Area::factory()->create();
+        $otraArea = Area::factory()->create();
+        $jefe = $this->crearJefeAreaConUsuario($areaJefe);
+        [, $operario] = $this->crearConductorConUsuario();
+        $vehiculoAjeno = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAArea($vehiculoAjeno, $otraArea);
+
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculoAjeno, ['id_conductor' => $operario->id])
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion = OperacionDiaria::firstOrFail();
+        $this->assertSame($jefe->id, $operacion->id_usuario_registro);
+        $this->assertSame($otraArea->id, $operacion->id_area);
+
+        $this->actingAs($jefe)->get(route('operacion-diaria.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('actividades.data', fn ($ops) => collect($ops)->pluck('id')->contains($operacion->id)));
+
+        // Un conductor puro que registra un vehículo que no tiene asignado.
+        [$userConductor, $conductor] = $this->crearConductorConUsuario();
+        $otroVehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAArea($otroVehiculo, $otraArea);
+
+        $this->actingAs($userConductor)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($otroVehiculo)
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $propia = OperacionDiaria::where('id_vehiculo', $otroVehiculo->id)->firstOrFail();
+        $this->assertSame($conductor->id, $propia->id_conductor);
+
+        $this->actingAs($userConductor)->get(route('operacion-diaria.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('actividades.data', fn ($ops) => collect($ops)->pluck('id')->all() === [$propia->id]));
     }
 
     public function test_jefe_conductor_registra_operaciones_de_su_area_y_de_su_propio_vehiculo_y_las_ve_en_el_listado(): void
