@@ -13,6 +13,7 @@ use App\Models\TipoCombustible;
 use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
+use App\Models\VehiculoArea;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -84,10 +85,11 @@ class ValeController extends Controller
             // vehículo elegido se sugieren primero (meta.conductores_asignados
             // de searchVehiculos()).
             'operarios' => $listOperarios->execute()->all(),
-            // Todos los vehículos que el usuario puede usar (jefe de área: los
-            // de sus áreas; administrador: todos los activos), ya cargados
-            // para el select sin necesidad de escribir para buscar.
-            'vehiculos' => $this->vehiculosParaVale($request->user())->all(),
+            // TODOS los vehículos activos para cualquier usuario (a pedido del
+            // usuario, la asignación a áreas todavía no es confiable), ya
+            // cargados para el select. Los de las áreas del jefe van primero
+            // con meta.propio.
+            'vehiculos' => $this->vehiculosParaFormularioVale($request->user())->all(),
         ]);
     }
 
@@ -200,15 +202,62 @@ class ValeController extends Controller
     }
 
     /**
-     * Vehículos ACTIVO que el usuario puede usar en un vale, ya con el
-     * formato {id, label, meta} de los selects: un jefe de área sólo los de
-     * sus áreas a cargo; administrador/super-admin (y otros roles con
-     * vales.crear) todos. Sin $limite trae la lista completa (formulario de
-     * vales); search.vehiculos lo usa con filtro y límite de 20.
+     * Formulario de vales: TODOS los vehículos activos (sin el filtro por
+     * área del jefe), con los de sus áreas a cargo primero y marcados con
+     * meta.propio como sugerencia.
      *
      * @return Collection<int, array{id: int, label: string, meta: array<string, mixed>}>
      */
-    private function vehiculosParaVale(?User $user, string $q = '', ?int $limite = null): Collection
+    private function vehiculosParaFormularioVale(?User $user): Collection
+    {
+        $idsPropios = $this->idsVehiculosDeAreasDelJefe($user)->flip();
+
+        return $this->vehiculosParaVale($user, soloSusAreas: false)
+            ->map(function (array $vehiculo) use ($idsPropios) {
+                $vehiculo['meta']['propio'] = $idsPropios->has($vehiculo['id']);
+
+                return $vehiculo;
+            })
+            ->sortByDesc(fn (array $vehiculo) => $vehiculo['meta']['propio'])
+            ->values();
+    }
+
+    /**
+     * Ids de los vehículos con asignación vigente a alguna de las áreas que
+     * el usuario tiene a cargo como jefe (vacío para otros roles).
+     *
+     * @return Collection<int, int>
+     */
+    private function idsVehiculosDeAreasDelJefe(?User $user): Collection
+    {
+        if (! $user || ! $user->hasRole('jefe-area') || ! $user->persona) {
+            return collect();
+        }
+
+        $areas = $user->persona->encargadoAreas()->pluck('id_area');
+
+        if ($areas->isEmpty()) {
+            return collect();
+        }
+
+        return VehiculoArea::query()
+            ->whereIn('id_area', $areas)
+            ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
+            ->where(fn ($query) => $query->whereNull('fecha_culminacion')->orWhere('fecha_culminacion', '>', now()))
+            ->pluck('id_vehiculo')
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Vehículos ACTIVO con el formato {id, label, meta} de los selects. Con
+     * $soloSusAreas (por defecto, lo usa search.vehiculos, compartido con
+     * otras pantallas) un jefe de área sólo ve los de sus áreas a cargo;
+     * administrador/super-admin todos. Sin $limite trae la lista completa.
+     *
+     * @return Collection<int, array{id: int, label: string, meta: array<string, mixed>}>
+     */
+    private function vehiculosParaVale(?User $user, string $q = '', ?int $limite = null, bool $soloSusAreas = true): Collection
     {
         $query = Vehiculo::with(['conductorAsignado', 'conductoresAsignados'])->where('estado_vehiculo', 'ACTIVO')
             ->when($q !== '', function ($query) use ($q) {
@@ -219,7 +268,9 @@ class ValeController extends Controller
                 });
             });
 
-        $this->restringirVehiculosPorAreaDeJefe($query, $user);
+        if ($soloSusAreas) {
+            $this->restringirVehiculosPorAreaDeJefe($query, $user);
+        }
 
         return $query->when($limite, fn ($query) => $query->limit($limite))
             ->orderBy('codigo')

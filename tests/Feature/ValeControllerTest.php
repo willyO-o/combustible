@@ -316,7 +316,7 @@ class ValeControllerTest extends TestCase
         $this->assertTrue($ids->contains($vehiculoSinArea->id));
     }
 
-    public function test_create_envia_a_un_jefe_de_area_todos_los_vehiculos_de_sus_areas(): void
+    public function test_create_envia_a_un_jefe_de_area_todos_los_vehiculos_con_los_de_su_area_primero(): void
     {
         $area = Area::factory()->create();
         $jefe = $this->crearJefeDeArea($area);
@@ -328,17 +328,28 @@ class ValeControllerTest extends TestCase
 
         $deOtraArea = Vehiculo::factory()->create();
         $this->asignarVehiculoAArea($deOtraArea, Area::factory()->create());
-        Vehiculo::factory()->create();
+        $sinArea = Vehiculo::factory()->create();
 
         $this->actingAs($jefe)->get(route('vales.create'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->has('vehiculos', 3)
-                ->where('vehiculos', fn ($vehiculos) => collect($vehiculos)->pluck('id')->sort()->values()->all()
-                    === $deSuArea->pluck('id')->sort()->values()->all())
+                // Todos los activos (3 de su área + 1 de otra + 1 sin área), sin el retirado.
+                ->has('vehiculos', 5)
+                // Los de su área primero, marcados.
+                ->where('vehiculos', fn ($vehiculos) => collect($vehiculos)->take(3)->pluck('id')->sort()->values()->all()
+                    === $deSuArea->pluck('id')->sort()->values()->all()
+                    && collect($vehiculos)->take(3)->every(fn ($v) => $v['meta']['propio'] === true)
+                    && collect($vehiculos)->skip(3)->pluck('id')->sort()->values()->all()
+                        === collect([$deOtraArea->id, $sinArea->id])->sort()->values()->all()
+                    && collect($vehiculos)->skip(3)->every(fn ($v) => $v['meta']['propio'] === false)
+                    && ! collect($vehiculos)->pluck('id')->contains($retiradoDeSuArea->id))
                 ->has('vehiculos.0.meta.tipo_medicion')
                 ->has('vehiculos.0.meta.conductores_asignados')
             );
+
+        // El buscador (compartido con otras pantallas) mantiene el filtro por área del jefe.
+        $ids = collect($this->actingAs($jefe)->getJson(route('search.vehiculos', ['q' => '']))->json())->pluck('id');
+        $this->assertFalse($ids->contains($deOtraArea->id));
     }
 
     public function test_create_envia_a_un_administrador_todos_los_vehiculos_activos_sin_limite(): void
@@ -354,7 +365,7 @@ class ValeControllerTest extends TestCase
         $this->assertCount(20, $this->actingAs($this->admin)->getJson(route('search.vehiculos', ['q' => '']))->json());
     }
 
-    public function test_store_rechaza_un_vehiculo_fuera_del_area_del_jefe(): void
+    public function test_store_permite_a_un_jefe_un_vehiculo_de_otra_area_y_lo_ve_en_su_listado(): void
     {
         $area = Area::factory()->create();
         $jefe = $this->crearJefeDeArea($area);
@@ -377,8 +388,12 @@ class ValeControllerTest extends TestCase
             'precio' => 6.97,
         ]);
 
-        $response->assertSessionHasErrors('id_vehiculo');
-        $this->assertDatabaseMissing('vale', ['id_vehiculo' => $vehiculoDeOtraArea->id]);
+        $response->assertRedirect(route('vales.index'))->assertSessionHas('success');
+        $vale = Vale::where('id_vehiculo', $vehiculoDeOtraArea->id)->firstOrFail();
+        $this->assertSame($jefe->id, $vale->id_user);
+
+        // Aunque el vehículo no es de sus áreas, lo emitió él: le aparece en su listado.
+        $this->assertTrue($this->idsDelListado($this->actingAs($jefe)->get(route('vales.index')))->contains($vale->id));
     }
 
     public function test_store_permite_un_vehiculo_del_area_del_jefe(): void

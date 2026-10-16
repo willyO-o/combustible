@@ -20,8 +20,8 @@ const props = defineProps({
     vencimientoSugerido: Object,
     // [{ id, label, meta }] todos los conductores activos (sólo al crear).
     operarios: { type: Array, default: () => [] },
-    // [{ id, label, meta }] vehículos que el usuario puede usar (sólo al
-    // crear): jefe de área, los de sus áreas; administrador, todos.
+    // [{ id, label, meta }] TODOS los vehículos activos (sólo al crear); los
+    // de las áreas del jefe llevan meta.propio y van primero.
     vehiculos: { type: Array, default: () => [] },
 })
 
@@ -209,11 +209,18 @@ const vehiculoSeleccionado = (vehiculo) => {
 }
 
 onMounted(() => {
-    // Alta: si el usuario tiene un único vehículo, se preselecciona (con su
-    // conductor, combustible y estación sugeridos).
-    if (!props.vale && props.vehiculos.length === 1 && !form.id_vehiculo) {
-        form.id_vehiculo = props.vehiculos[0].id
-        vehiculoSeleccionado(props.vehiculos[0])
+    // Alta: si hay un único vehículo, o el jefe tiene uno solo de su área,
+    // se preselecciona (con su conductor, combustible y estación sugeridos).
+    if (!props.vale && !form.id_vehiculo) {
+        const propios = props.vehiculos.filter(v => v.meta?.propio)
+        const unico = props.vehiculos.length === 1
+            ? props.vehiculos[0]
+            : (propios.length === 1 ? propios[0] : null)
+
+        if (unico) {
+            form.id_vehiculo = unico.id
+            vehiculoSeleccionado(unico)
+        }
     }
 })
 </script>
@@ -265,10 +272,16 @@ onMounted(() => {
                                     :options="vehiculosOpt" value-prop="id" label="label"
                                     :searchable="true" :filter-results="true"
                                     placeholder="Selecciona o busca por código, placa o marca..."
-                                    no-options-text="No tienes vehículos activos asignados"
+                                    no-options-text="No hay vehículos activos"
                                     no-results-text="Sin resultados"
                                     @change="onVehiculoChange"
-                                    :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                                    :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }">
+                                    <template #option="{ option }">
+                                        <span>{{ option.label }}</span>
+                                        <span v-if="option.meta?.propio"
+                                            class="badge bg-primary-transparent text-primary fw-normal ms-2">De mi área</span>
+                                    </template>
+                                </Multiselect>
                                 <!-- v-else debe ir JUSTO después del v-if: no insertar nada entre ambos. -->
                                 <select v-else v-model="form.id_vehiculo" class="form-select" disabled
                                     :class="{ 'is-invalid': form.errors.id_vehiculo }">

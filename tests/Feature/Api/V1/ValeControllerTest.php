@@ -274,7 +274,7 @@ class ValeControllerTest extends TestCase
             ->assertCreated();
     }
 
-    public function test_un_jefe_de_area_no_puede_emitir_un_vale_para_un_vehiculo_de_otra_area(): void
+    public function test_un_jefe_de_area_puede_emitir_un_vale_para_un_vehiculo_de_otra_area(): void
     {
         $jefe = $this->crearJefeDeArea(Area::factory()->create());
 
@@ -289,9 +289,12 @@ class ValeControllerTest extends TestCase
             'precio' => 6.97,
         ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors('id_vehiculo');
-        $this->assertSame(0, Vale::count());
+        $response->assertCreated();
+        $this->assertSame(1, Vale::where('id_vehiculo', $vehiculoAjeno->id)->count());
+
+        // Y le aparece en su listado aunque el vehículo no sea de sus áreas.
+        $ids = collect($this->actingAs($jefe, 'api')->getJson(route('api.v1.vales.index'))->json('data'))->pluck('id');
+        $this->assertTrue($ids->contains(Vale::firstOrFail()->id));
     }
 
     public function test_un_conductor_no_puede_emitir_vales(): void

@@ -84,8 +84,12 @@ class ListValeAction
         if ($user->hasRole('jefe-area')) {
             $areas = $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? [];
 
-            $query->whereHas('vehiculo.areasAsignadas', function ($q) use ($areas) {
-                $q->whereIn('area.id', $areas);
+            // Además los que emitió él mismo: puede emitir vales para
+            // cualquier vehículo, aunque no sea de sus áreas.
+            $query->where(function ($query) use ($areas, $user) {
+                $query->whereHas('vehiculo.areasAsignadas', function ($q) use ($areas) {
+                    $q->whereIn('area.id', $areas);
+                })->orWhere('id_user', $user->id);
             });
 
             return;

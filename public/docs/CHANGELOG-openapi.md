@@ -2,6 +2,16 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.20.0 — 2026-10-16
+
+### Cambiado
+
+- `POST /vales`: un `jefe-area` puede emitir vales para **cualquier vehículo**, no sólo los de
+  sus áreas a cargo (antes respondía `422` en `id_vehiculo`).
+- `GET /vales`: el `jefe-area` ve además los vales que **emitió él mismo** para vehículos de
+  otras áreas.
+- `GET /parametros`: `api_version` pasa a `1.20.0`.
+
 ## 1.19.0 — 2026-10-16
 
 ### Cambiado

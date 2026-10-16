@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.19.0"
+  version: "1.20.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.19.0"
+                api_version: "1.20.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -1400,7 +1400,8 @@ paths:
           persona del usuario).
         - **jefe-area** (puro, o combinado con `conductor`, pero sin `administrador`/
           `super-admin`): ve todos los vales de vehículos asignados a alguna de sus áreas a
-          cargo, sin importar quién los emitió o a nombre de qué conductor.
+          cargo, sin importar quién los emitió o a nombre de qué conductor, y además los que
+          emitió él mismo para vehículos de otras áreas (desde 1.20.0).
         - **administrador** / **super-admin** (incluso combinado con otros roles): sin
           restricción, ve todos los vales del sistema.
       parameters:
@@ -3993,7 +3994,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.19.0" }
+        api_version: { type: string, example: "1.20.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4834,7 +4835,7 @@ components:
       properties:
         id_vehiculo:
           type: integer
-          description: Debe existir en `vehiculo`. Para un `jefe-area`, debe estar asignado a una de sus áreas a cargo.
+          description: Debe existir en `vehiculo`. Desde 1.20.0 cualquier vehículo, también para un `jefe-area` (antes debía estar asignado a una de sus áreas a cargo).
           example: 8
         id_conductor:
           type: integer

@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Models\VehiculoArea;
-use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -68,7 +66,10 @@ class ValeRequest extends FormRequest
         return [
             'litros' => ['required', 'numeric', 'min:0.01', 'max:9999.99'],
             'precio' => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
-            'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id', $this->reglaVehiculoDeAreaDeJefe()],
+            // Cualquier vehículo (también para un jefe de área, aunque no sea de
+            // sus áreas: a pedido del usuario, la asignación a áreas todavía no
+            // es confiable).
+            'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id'],
             // Al emitir, cualquier conductor ACTIVO (esté o no asignado al
             // vehículo: la asignación todavía no es confiable). Al editar el
             // conductor ya está fijo, así que basta con que exista aunque
@@ -92,43 +93,6 @@ class ValeRequest extends FormRequest
             'fecha_vencimiento.after_or_equal' => 'La fecha de vencimiento debe ser posterior a hoy.',
             'id_conductor.exists' => 'El conductor seleccionado no existe o no está activo.',
         ];
-    }
-
-    /**
-     * Al emitir (crear) un vale, un jefe de área sólo puede elegir un
-     * vehículo con asignación de área activa/provisional a alguna de sus
-     * áreas a cargo. No se reevalúa al editar: el vehículo del vale ya está
-     * fijo y bloqueado en el formulario, y podría haberse reasignado de área
-     * después de emitido sin que eso deba bloquear otras correcciones.
-     */
-    private function reglaVehiculoDeAreaDeJefe(): Closure
-    {
-        return function (string $attribute, mixed $value, Closure $fail): void {
-            if (! $this->isMethod('POST')) {
-                return;
-            }
-
-            $user = $this->user();
-
-            if (! $user || ! $user->hasRole('jefe-area') || $user->hasAnyRole(['super-admin', 'administrador'])) {
-                return;
-            }
-
-            $areas = $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? [];
-
-            $asignado = VehiculoArea::where('id_vehiculo', $value)
-                ->whereIn('id_area', $areas)
-                ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
-                ->where(function ($query) {
-                    $query->whereNull('fecha_culminacion')
-                        ->orWhere('fecha_culminacion', '>', now());
-                })
-                ->exists();
-
-            if (! $asignado) {
-                $fail('Sólo puede emitir vales para vehículos asignados a su área.');
-            }
-        };
     }
 
     public function attributes(): array
