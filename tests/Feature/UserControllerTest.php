@@ -477,4 +477,67 @@ class UserControllerTest extends TestCase
 
         $this->assertSame($cargo->id, $persona->fresh()->id_cargo);
     }
+
+    /**
+     * Quien administra usuarios no conoce la contraseña del otro: el cambio
+     * desde el módulo Usuarios no pide (ni valida) la contraseña actual.
+     */
+    public function test_el_administrador_cambia_la_contrasena_de_otro_usuario_sin_la_contrasena_actual(): void
+    {
+        $usuario = User::factory()->create();
+
+        $this->actingAs($this->admin)->put(route('usuarios.update-password', $usuario->id), [
+            'new_password' => 'NuevaClave2026',
+            'new_password_confirmation' => 'NuevaClave2026',
+        ])->assertSessionHasNoErrors()->assertRedirect(route('usuarios.index'));
+
+        $this->assertTrue(Hash::check('NuevaClave2026', $usuario->fresh()->password));
+    }
+
+    public function test_una_contrasena_actual_incorrecta_enviada_al_modulo_usuarios_se_ignora(): void
+    {
+        $usuario = User::factory()->create();
+
+        $this->actingAs($this->admin)->put(route('usuarios.update-password', $usuario->id), [
+            'current_password' => 'no-es-la-real',
+            'new_password' => 'NuevaClave2026',
+            'new_password_confirmation' => 'NuevaClave2026',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue(Hash::check('NuevaClave2026', $usuario->fresh()->password));
+    }
+
+    public function test_cambiar_contrasena_desde_usuarios_sigue_exigiendo_una_nueva_valida_y_confirmada(): void
+    {
+        $usuario = User::factory()->create();
+        $hashAnterior = $usuario->password;
+
+        $this->actingAs($this->admin)->put(route('usuarios.update-password', $usuario->id), [
+            'new_password' => 'corta1',
+            'new_password_confirmation' => 'corta1',
+        ])->assertSessionHasErrors('new_password');
+
+        $this->actingAs($this->admin)->put(route('usuarios.update-password', $usuario->id), [
+            'new_password' => 'NuevaClave2026',
+            'new_password_confirmation' => 'OtraClave2026',
+        ])->assertSessionHasErrors('new_password');
+
+        $this->assertSame($hashAnterior, $usuario->fresh()->password);
+    }
+
+    public function test_sin_permiso_no_puede_cambiar_la_contrasena_de_otro_usuario(): void
+    {
+        $jefe = User::factory()->create();
+        $jefe->assignRole('jefe-area');
+        $usuario = User::factory()->create();
+        $hashAnterior = $usuario->password;
+
+        $this->actingAs($jefe)->get(route('usuarios.edit-password', $usuario->id))->assertForbidden();
+        $this->actingAs($jefe)->put(route('usuarios.update-password', $usuario->id), [
+            'new_password' => 'NuevaClave2026',
+            'new_password_confirmation' => 'NuevaClave2026',
+        ])->assertForbidden();
+
+        $this->assertSame($hashAnterior, $usuario->fresh()->password);
+    }
 }

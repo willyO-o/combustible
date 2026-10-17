@@ -10,12 +10,10 @@ const props = defineProps({
 })
 
 const form = useForm({
-    current_password:          '',
     new_password:              '',
     new_password_confirmation: '',
 })
 
-const showCurrent = ref(false)
 const showNew     = ref(false)
 const showConfirm = ref(false)
 
@@ -95,34 +93,14 @@ function submit() {
                         <form @submit.prevent="submit">
                             <div class="row g-4">
 
-                                <!-- Contraseña actual -->
                                 <div class="col-12">
-                                    <label for="current_password" class="form-label fw-medium">
-                                        Contraseña actual <span class="text-danger">*</span>
-                                    </label>
-                                    <div class="input-group">
-                                        <input
-                                            id="current_password"
-                                            v-model="form.current_password"
-                                            :type="showCurrent ? 'text' : 'password'"
-                                            class="form-control"
-                                            :class="{ 'is-invalid': form.errors.current_password }"
-                                            placeholder="Contraseña actual"
-                                            autocomplete="current-password"
-                                        />
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline-secondary"
-                                            @click="showCurrent = !showCurrent"
-                                            tabindex="-1"
-                                        >
-                                            <i :class="showCurrent ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
-                                        </button>
-                                        <div v-if="form.errors.current_password" class="invalid-feedback">
-                                            {{ form.errors.current_password }}
-                                        </div>
+                                    <div class="alert alert-info d-flex align-items-start gap-2 mb-0 py-2" role="note">
+                                        <i class="ri-information-line fs-16"></i>
+                                        <span class="small">
+                                            No se necesita la contraseña actual del usuario. Comunícale la nueva
+                                            contraseña; podrá cambiarla luego desde <strong>Mi Perfil</strong>.
+                                        </span>
                                     </div>
-                                    <InputError :message="form.errors.current_password" class="mt-1" />
                                 </div>
 
                                 <!-- Nueva contraseña -->
