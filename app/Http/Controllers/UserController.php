@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Personas\UpdatePersonaAction;
+use App\Actions\Vehiculo\ListVehiculosSeleccionablesAction;
 use App\Http\Requests\UserPasswordRequest;
 use App\Http\Requests\UserRequest;
 use App\Models\Area;
@@ -50,10 +51,12 @@ class UserController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request, ListVehiculosSeleccionablesAction $listVehiculos): Response
     {
         return Inertia::render('Usuarios/Form', [
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
+            // Vehículos precargados para la asignación (rol conductor).
+            'vehiculos' => $listVehiculos->execute($request->user())->all(),
             'roles' => $this->rolesAsignables(),
         ]);
     }
@@ -77,7 +80,7 @@ class UserController extends Controller
             ->with('success', "Usuario para {$persona->nombres} creado exitosamente.");
     }
 
-    public function edit(User $usuario): Response
+    public function edit(Request $request, User $usuario, ListVehiculosSeleccionablesAction $listVehiculos): Response
     {
         $usuario->load(['persona.conductor.asignacionesActivas', 'persona.encargadoAreas']);
 
@@ -93,7 +96,9 @@ class UserController extends Controller
             // Una cuenta de sistema sin persona: sus roles, sin los ocultos.
             'rolesAsignados' => $persona?->rolesParaFormulario()
                 ?? $usuario->getRoleNames()->diff(config('acl.roles_ocultos'))->values()->all(),
-            'vehiculoActual' => $persona?->conductor?->asignacionesActivas->first(),
+            'vehiculoActual' => $vehiculoActual = $persona?->conductor?->asignacionesActivas->first(),
+            // Vehículos precargados; el actual se incluye aunque ya no esté activo.
+            'vehiculos' => $listVehiculos->execute($request->user(), $vehiculoActual?->id)->all(),
             'areaActual' => $persona?->encargadoAreas->first(),
         ]);
     }

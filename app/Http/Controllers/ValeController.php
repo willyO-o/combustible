@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
 use App\Actions\Vale\ListValeAction;
+use App\Actions\Vehiculo\ListVehiculosSeleccionablesAction;
 use App\Events\ValeEmitido;
 use App\Http\Requests\ValeRequest;
 use App\Libraries\Reportes;
@@ -13,7 +14,6 @@ use App\Models\TipoCombustible;
 use App\Models\User;
 use App\Models\Vale;
 use App\Models\Vehiculo;
-use App\Models\VehiculoArea;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -58,7 +58,7 @@ class ValeController extends Controller
         ]);
     }
 
-    public function create(Request $request, ListOperariosDisponiblesAction $listOperarios): Response
+    public function create(Request $request, ListOperariosDisponiblesAction $listOperarios, ListVehiculosSeleccionablesAction $listVehiculos): Response
     {
         $nextNroVale = Vale::siguienteNroValeProvisional();
 
@@ -89,7 +89,7 @@ class ValeController extends Controller
             // usuario, la asignación a áreas todavía no es confiable), ya
             // cargados para el select. Los de las áreas del jefe van primero
             // con meta.propio.
-            'vehiculos' => $this->vehiculosParaFormularioVale($request->user())->all(),
+            'vehiculos' => $listVehiculos->execute($request->user())->all(),
         ]);
     }
 
@@ -199,54 +199,6 @@ class ValeController extends Controller
         return response()->json(
             $this->vehiculosParaVale($request->user(), (string) $request->input('q', ''), 20)
         );
-    }
-
-    /**
-     * Formulario de vales: TODOS los vehículos activos (sin el filtro por
-     * área del jefe), con los de sus áreas a cargo primero y marcados con
-     * meta.propio como sugerencia.
-     *
-     * @return Collection<int, array{id: int, label: string, meta: array<string, mixed>}>
-     */
-    private function vehiculosParaFormularioVale(?User $user): Collection
-    {
-        $idsPropios = $this->idsVehiculosDeAreasDelJefe($user)->flip();
-
-        return $this->vehiculosParaVale($user, soloSusAreas: false)
-            ->map(function (array $vehiculo) use ($idsPropios) {
-                $vehiculo['meta']['propio'] = $idsPropios->has($vehiculo['id']);
-
-                return $vehiculo;
-            })
-            ->sortByDesc(fn (array $vehiculo) => $vehiculo['meta']['propio'])
-            ->values();
-    }
-
-    /**
-     * Ids de los vehículos con asignación vigente a alguna de las áreas que
-     * el usuario tiene a cargo como jefe (vacío para otros roles).
-     *
-     * @return Collection<int, int>
-     */
-    private function idsVehiculosDeAreasDelJefe(?User $user): Collection
-    {
-        if (! $user || ! $user->hasRole('jefe-area') || ! $user->persona) {
-            return collect();
-        }
-
-        $areas = $user->persona->encargadoAreas()->pluck('id_area');
-
-        if ($areas->isEmpty()) {
-            return collect();
-        }
-
-        return VehiculoArea::query()
-            ->whereIn('id_area', $areas)
-            ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
-            ->where(fn ($query) => $query->whereNull('fecha_culminacion')->orWhere('fecha_culminacion', '>', now()))
-            ->pluck('id_vehiculo')
-            ->unique()
-            ->values();
     }
 
     /**

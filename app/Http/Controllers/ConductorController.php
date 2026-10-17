@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Vehiculo\ListVehiculosSeleccionablesAction;
 use App\Http\Requests\AsignacionRequest;
 use App\Http\Requests\ConductorRequest;
 use App\Libraries\Reportes;
@@ -33,7 +34,7 @@ class ConductorController extends Controller
      */
     private const FILTROS_LISTADO = ['ci', 'nombres', 'paterno', 'celular'];
 
-    public function index(Request $request): Response
+    public function index(Request $request, ListVehiculosSeleccionablesAction $listVehiculos): Response
     {
         $conductores = $this->consultaListado($request)
             ->paginate(10)
@@ -46,6 +47,12 @@ class ConductorController extends Controller
             // tarjetas (mobile). Ver .ai/rules/pages.md.
             'conductores' => Inertia::scroll($conductores),
             'filters' => $request->only(self::FILTROS_LISTADO),
+            // Vehículos precargados para el modal "Reasignar vehículo". Closure:
+            // las recargas parciales del scroll infinito (only: conductores)
+            // no los vuelven a calcular. Sólo para quien puede asignar.
+            'vehiculos' => fn () => $request->user()->can('conductores.asignar-vehiculo')
+                ? $listVehiculos->execute($request->user())->all()
+                : [],
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),

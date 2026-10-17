@@ -1,8 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import SearchSelect from '@/Components/SearchSelect.vue'
-
 import Multiselect from '@vueform/multiselect'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
@@ -17,6 +15,12 @@ const props = defineProps({
     conductor: Object,   // { id, label } del conductor asignado al vehículo (si hay uno)
     valesConductor: { type: Array, default: () => [] }, // [{ id, nro_vale, fecha_emision, litros }] vales PENDIENTE del conductor (si hay uno)
     vehiculosAsignados: { type: Array, default: () => [] }, // [{ id, label }] vehículos asignados al conductor (si hay uno)
+    // ── Quien no es conductor puro: listas precargadas para elegir libremente ──
+    // [{ id, label, meta }] TODOS los vehículos activos; los propios (asignados o
+    // de sus áreas) llevan meta.propio y van primero.
+    vehiculos: { type: Array, default: () => [] },
+    // [{ id, label, meta }] todos los operarios (conductores) activos.
+    operarios: { type: Array, default: () => [] },
 
     // ── "Usar vale" desde el listado de vales (modo creación) ──────────
     valePreseleccionado: { type: Object, default: null }, // { id, nro, litros, precio, id_vehiculo, vehiculo, id_conductor, conductor, id_grifo, grifo, id_tipo_combustible, tipo_combustible, tipo_medicion }
@@ -38,13 +42,27 @@ const valesVehiculo = ref(
         : modoVale.value ? [{ id: props.valePreseleccionado.id, label: `Vale #${props.valePreseleccionado.nro} — ${props.valePreseleccionado.litros} Lt` }]
             : (props.valesConductor || [])
 )
-const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
-
-const conductoresOpt = ref(
-    isEdit.value && props.conductorActual ? [props.conductorActual]
-        : modoVale.value && props.valePreseleccionado.conductor ? [props.valePreseleccionado.conductor]
-            : []
+// Conductor puro: sus vehículos asignados. Cualquier otro usuario: todos los
+// vehículos activos. Copias, porque Multiselect reescribe `label` de la opción
+// seleccionada (ver .ai/rules/js.md).
+const modoConductor = computed(() => !!props.conductor)
+const vehiculosOpt = computed(() =>
+    (modoConductor.value ? props.vehiculosAsignados : props.vehiculos).map(vehiculo => ({ ...vehiculo }))
 )
+const buscarVehiculo = (id) =>
+    (modoConductor.value ? props.vehiculosAsignados : props.vehiculos).find(v => v.id === id) ?? null
+
+// ids de los operarios asignados (titular + provisionales) al vehículo
+// elegido: se sugieren primero y marcados en la lista de todos los operarios.
+const conductoresDelVehiculo = ref([])
+const operariosOpt = computed(() => {
+    const asignados = new Set(conductoresDelVehiculo.value)
+
+    return props.operarios
+        .map(operario => ({ ...operario, asignado: asignados.has(operario.id) }))
+        .sort((a, b) => Number(b.asignado) - Number(a.asignado))
+})
+const conductorEsAsignado = computed(() => conductoresDelVehiculo.value.includes(form.id_conductor))
 
 /* ------------------------------------------------------------------ */
 /*  Form                                                               */
@@ -85,11 +103,7 @@ if (modoVale.value) {
 const valeActivo = computed(() => !isEdit.value && !modoVale.value && !!form.id_vale)
 const datosLocked = computed(() => isEdit.value || modoVale.value || valeActivo.value)
 
-const vehiculoLabelActual = computed(() => {
-    if (form.id_vehiculo && typeof form.id_vehiculo === 'object') return form.id_vehiculo.label
-    const encontrado = vehiculosAsignadosOpt.value.find(v => v.id === form.id_vehiculo)
-    return encontrado?.label ?? '—'
-})
+const vehiculoLabelActual = computed(() => buscarVehiculo(form.id_vehiculo)?.label ?? '—')
 
 // Datos de sólo lectura a mostrar cuando el vale bloquea el formulario,
 // normalizados sin importar de dónde vienen (edición / "usar vale" / elegido manualmente).
@@ -132,42 +146,52 @@ const valeInfo = computed(() => {
 })
 
 /* ------------------------------------------------------------------ */
-/*  Auto-relleno al seleccionar vehículo (solo creación, sin vale)     */
+/*  Al elegir vehículo (solo creación, sin vale preseleccionado): se   */
+/*  toman combustible y tipo de medición de su meta, se sugiere su     */
+/*  operario titular y se cargan sus vales pendientes. Un watch (y no  */
+/*  @change) para cubrir también la preselección programática.         */
 /* ------------------------------------------------------------------ */
-const conductorAutoFill = ref(
-    isEdit.value ? (props.conductorActual ?? null)
-        : modoVale.value ? (props.valePreseleccionado.conductor ?? null)
-            : null
-)   // { id, label } del conductor asignado
-const loadingVehiculo = ref(false)
+let consultaVales = 0
 
-watch(() => form.id_vehiculo, async (val) => {
+watch(() => form.id_vehiculo, async (idVehiculo) => {
     if (isEdit.value || modoVale.value) return
 
-    if (!val) {
-        form.id_tipo_combustible = ''
-        conductorAutoFill.value = null
-        form.id_conductor = null
-        conductoresOpt.value = []
+    form.kilometraje = ''
+    form.horometro = ''
+    form.id_vale = null
+    form.id_grifo = null
+    form.precio = ''
+    form.litros = ''
+    form.clearErrors('id_vehiculo', 'id_conductor', 'kilometraje', 'horometro')
+
+    const vehiculo = buscarVehiculo(idVehiculo)
+    tipoMedicion.value = vehiculo?.meta?.tipo_medicion ?? ''
+    form.id_tipo_combustible = vehiculo?.meta?.id_tipo_combustible ?? ''
+
+    // El conductor puro siempre es él mismo (el servidor lo fuerza).
+    if (!modoConductor.value) {
+        conductoresDelVehiculo.value = vehiculo?.meta?.conductores_asignados ?? []
+        const idsOperarios = new Set(props.operarios.map(o => o.id))
+        const titular = vehiculo?.meta?.id_conductor
+        form.id_conductor = idsOperarios.has(titular)
+            ? titular
+            : (conductoresDelVehiculo.value.length === 1 && idsOperarios.has(conductoresDelVehiculo.value[0])
+                ? conductoresDelVehiculo.value[0]
+                : null)
+    }
+
+    if (!vehiculo) {
+        valesVehiculo.value = modoConductor.value ? [...props.valesConductor] : []
         return
     }
-    loadingVehiculo.value = true
-    try {
-        const res = await fetch(route('cargas.vehiculo-info', val))
-        const data = await res.json()
-        if (data.tipo_combustible) {
-            form.id_tipo_combustible = data.tipo_combustible.id
-        }
-        if (data.conductor) {
-            conductorAutoFill.value = data.conductor
-            form.id_conductor = data.conductor.id
-        } else {
-            conductorAutoFill.value = null
-        }
-    } catch (error) {
-        // no critical
-    } finally {
-        loadingVehiculo.value = false
+
+    // Descarta la respuesta si mientras tanto se eligió otro vehículo.
+    const consulta = ++consultaVales
+    const { data } = await axios.get(route('search.vales-carga'), {
+        params: { id_vehiculo: vehiculo.id, q: '' },
+    })
+    if (consulta === consultaVales && data) {
+        valesVehiculo.value = data.map(v => ({ id: v.id, label: v.label, meta: v.meta }))
     }
 })
 
@@ -297,75 +321,18 @@ const tipoMedicion = ref(
             : ''
 ) // 'kilometraje' o 'horometro'
 
-const cambioVehiculo = async (vehiculoId) => {
-    if (isEdit.value || modoVale.value) return
-
-    form.kilometraje = ''
-    form.horometro = ''
-    form.id_vale = null
-    form.id_grifo = null
-    form.precio = ''
-    form.litros = ''
-    form.id_conductor = null
-
-    let vehiculoSelected = null
-
-    if (!vehiculoId || (typeof vehiculoId === 'object' && vehiculoId === null) || JSON.stringify(vehiculoId) === '{}') {
-        tipoMedicion.value = ''
-        valesVehiculo.value = []
-        return
-    }
-
-    if (typeof vehiculoId === 'object' && vehiculoId !== null) {
-        vehiculoSelected = vehiculoId
-        vehiculoId = vehiculoId.id
-    } else {
-        vehiculoSelected = vehiculosAsignadosOpt.value.find(v => v.id === vehiculoId)
-    }
-
-    if (vehiculoSelected) {
-        tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
-    }
-
-    const { data } = await axios.get(route('search.vales-carga'), {
-        params: {
-            id_vehiculo: vehiculoId,
-            q: '',
-        }
-    })
-    if (data) {
-        valesVehiculo.value = data.map(v => ({
-            id: v.id,
-            label: v.label,
-            meta: v.meta,
-        }))
-    }
-
-    const conductoresRes = await axios.get(route('search.conductores'), {
-        params: {
-            id_vehiculo: vehiculoId,
-        }
-    })
-
-    conductoresOpt.value = conductoresRes.data.map(c => ({
-        id: c.id,
-        label: c.label,
-        meta: c.meta,
-    }))
-}
-
 onMounted(() => {
     // En edición y en "usar vale" no hay auto-relleno: los campos ya vienen
     // bloqueados con los datos guardados / los datos del vale.
     if (isEdit.value || modoVale.value) return
 
-    // Si hay un conductor asignado desde el servidor, auto-seleccionarlo
-    if (props.conductor) {
+    // Conductor puro: es el conductor de la carga y se preselecciona su
+    // primer vehículo asignado (el watch carga sus datos).
+    if (modoConductor.value) {
         form.id_conductor = props.conductor.id
-        form.id_tipo_combustible = props.conductor.tipo_combustible_id
 
-        if (vehiculosAsignadosOpt.value.length > 0) {
-            form.id_vehiculo = vehiculosAsignadosOpt.value[0].id
+        if (props.vehiculosAsignados.length > 0) {
+            form.id_vehiculo = props.vehiculosAsignados[0].id
         }
     }
 })
@@ -487,24 +454,20 @@ onMounted(() => {
                                         Vehículo <span class="text-danger">*</span>
                                     </label>
 
-                                    <Multiselect v-if="props.conductor" v-model="form.id_vehiculo"
-                                        :options="vehiculosAsignadosOpt" value-prop="id" label="label"
-                                        @change="cambioVehiculo" placeholder="Seleccionar vehículo" />
-
-                                    <SearchSelect v-else @change-data="cambioVehiculo" v-model="form.id_vehiculo"
-                                        :search-url="route('search.vehiculos')" value-prop="id" :object="true"
-                                        label-prop="label" :searchable="true" :min-chars="2" :delay="300"
-                                        :resolve-on-load="false"
-                                        placeholder="Buscar por placa o marca (mín. 2 caracteres)..."
-                                        no-options-text="Escriba para buscar" no-results-text="Sin resultados"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                                    <Multiselect v-model="form.id_vehiculo" :options="vehiculosOpt"
+                                        value-prop="id" label="label" :searchable="true" :filter-results="true"
+                                        placeholder="Selecciona o busca por código, placa o marca..."
+                                        no-options-text="No hay vehículos disponibles" no-results-text="Sin resultados"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }">
+                                        <template #option="{ option }">
+                                            <span>{{ option.label }}</span>
+                                            <span v-if="!modoConductor && option.meta?.propio"
+                                                class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado</span>
+                                        </template>
+                                    </Multiselect>
 
                                     <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">{{
                                         form.errors.id_vehiculo }}</div>
-                                    <div v-if="loadingVehiculo" class="text-muted small mt-1">
-                                        <span class="spinner-border spinner-border-sm me-1"></span> Cargando datos del
-                                        vehículo...
-                                    </div>
                                 </div>
 
                                 <!-- Tipo Combustible (auto-llenado) -->
@@ -540,20 +503,27 @@ onMounted(() => {
                                 <div class="col-12" v-if="!props.conductor">
                                     <label class="form-label fw-medium">
                                         Conductor <span class="text-danger">*</span>
-                                        <span v-if="conductorAutoFill"
+                                        <span v-if="form.id_conductor && conductorEsAsignado"
                                             class="badge bg-success-transparent text-success ms-2 fs-10">
-                                            Asignado activo
+                                            Asignado al vehículo
                                         </span>
-                                        <span v-else-if="form.id_vehiculo && !conductorAutoFill"
+                                        <span v-else-if="form.id_vehiculo && conductoresDelVehiculo.length === 0"
                                             class="badge bg-warning-transparent text-warning ms-2 fs-10">
-                                            Sin asignación activa
+                                            Vehículo sin operario asignado
                                         </span>
                                     </label>
 
-                                    <Multiselect v-model="form.id_conductor" :options="conductoresOpt" value-prop="id" label="label"
-                                        :searchable="true" :filter-results="true" placeholder="Buscar conductor..."
-                                        no-options-text="Sin conductores activos" no-results-text="Sin resultados"
-                                        :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
+                                    <Multiselect v-model="form.id_conductor" :options="operariosOpt" value-prop="id" label="label"
+                                        :searchable="true" :filter-results="true" placeholder="Buscar por CI, nombre o apellido..."
+                                        no-options-text="No hay conductores activos registrados" no-results-text="Sin resultados"
+                                        @change="form.clearErrors('id_conductor')"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
+                                        <template #option="{ option }">
+                                            <span>{{ option.label }}</span>
+                                            <span v-if="option.asignado"
+                                                class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado al vehículo</span>
+                                        </template>
+                                    </Multiselect>
                                     <div v-if="form.errors.id_conductor" class="text-danger small mt-1">{{
                                         form.errors.id_conductor }}</div>
                                 </div>

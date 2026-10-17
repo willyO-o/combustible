@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import InputError from '@/Components/InputError.vue'
 import SearchSelect from '@/Components/SearchSelect.vue'
+import Multiselect from '@vueform/multiselect'
 import ContrasenaInicialInput from '@/Components/ContrasenaInicialInput.vue'
 import RolesSelector from '@/Components/RolesSelector.vue'
 
@@ -15,15 +16,17 @@ const props = defineProps({
     rolesAsignados: Array, // presente solo al editar
     vehiculoActual: Object,
     areaActual: Object,
+    vehiculos: { type: Array, default: () => [] }, // [{ id, label, meta }] activos precargados (+ el actual)
 })
+
+// Vehículos activos precargados ({ id, label, meta }). Copias: Multiselect
+// reescribe `label` de la opción seleccionada (ver .ai/rules/js.md).
+const vehiculosOpt = computed(() => props.vehiculos.map(vehiculo => ({ ...vehiculo })))
 
 const esEdicion = computed(() => !!props.usuario)
 const persona = computed(() => props.usuario?.persona ?? null)
 
 const today = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 10)
-
-const vehiculoLabel = (v) =>
-    v ? `${v.codigo ?? ''} — ${v.nro_placa ?? ''}${v.marca ? ' — ' + v.marca : ''}${v.anio ? ' (' + v.anio + ')' : ''}` : ''
 
 const form = useForm({
     // password: contraseña inicial, sólo al crear (prellenada con CI#Plusmetals).
@@ -34,7 +37,7 @@ const form = useForm({
     roles: esEdicion.value ? [...(props.rolesAsignados ?? [])] : [],
 
     estado_conductor: persona.value?.conductor?.estado_conductor ?? 'ACTIVO',
-    id_vehiculo: props.vehiculoActual ? { id: props.vehiculoActual.id, label: vehiculoLabel(props.vehiculoActual) } : null,
+    id_vehiculo: props.vehiculoActual?.id ?? null,
     fecha_asignacion: today,
 
     id_area: props.areaActual?.id ?? '',
@@ -214,9 +217,11 @@ function submit() {
 
                                 <div class="col-12">
                                     <label class="form-label fw-medium">{{ esEdicion ? 'Vehículo Asignado' : 'Vehículo a Asignar' }}</label>
-                                    <SearchSelect v-model="form.id_vehiculo" :object="true" :search-url="route('search.vehiculos')"
-                                        placeholder="Buscar por placa, código o marca (mín. 2 caracteres)..."
-                                        :invalid="!!form.errors.id_vehiculo" />
+<Multiselect v-model="form.id_vehiculo" :options="vehiculosOpt" value-prop="id" label="label"
+                                        :searchable="true" :filter-results="true"
+                                        placeholder="Selecciona o busca por código, placa o marca..."
+                                        no-options-text="No hay vehículos activos" no-results-text="Sin resultados"
+                                        :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
                                     <InputError :message="form.errors.id_vehiculo" class="mt-1" />
                                     <small class="text-muted">
                                         <template v-if="esEdicion">

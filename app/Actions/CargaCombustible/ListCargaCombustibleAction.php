@@ -52,8 +52,17 @@ class ListCargaCombustibleAction
         if ($user->hasRole('jefe-area')) {
             $areas = $user->persona?->encargadoAreas()->pluck('id_area')->toArray() ?? [];
 
-            $query->whereHas('vehiculo.areasAsignadas', function ($q) use ($areas) {
-                $q->whereIn('area.id', $areas);
+            // Cualquier vehículo se puede elegir al registrar una carga: lo que
+            // registró él mismo (o lo que cargó como conductor, si también lo
+            // es) le aparece aunque el vehículo sea de otra área.
+            $query->where(function ($query) use ($areas, $user) {
+                $query->whereHas('vehiculo.areasAsignadas', function ($q) use ($areas) {
+                    $q->whereIn('area.id', $areas);
+                })->orWhere('id_usuario', $user->id);
+
+                if ($user->hasRole('conductor')) {
+                    $query->orWhere('id_conductor', $user->id_persona);
+                }
             });
 
             return;

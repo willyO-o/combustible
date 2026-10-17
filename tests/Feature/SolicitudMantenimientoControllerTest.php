@@ -200,7 +200,11 @@ class SolicitudMantenimientoControllerTest extends TestCase
         ]);
     }
 
-    public function test_store_exige_un_conductor_asignado_al_vehiculo_para_administrador(): void
+    /**
+     * A pedido del usuario (2026-10-17) quien elige vehículo y conductor puede
+     * elegir cualquier operario ACTIVO, aunque no esté asignado al vehículo.
+     */
+    public function test_administrador_puede_elegir_un_conductor_activo_no_asignado_al_vehiculo(): void
     {
         $vehiculo = Vehiculo::factory()->create();
         // Conductor registrado pero SIN asignación a este vehículo.
@@ -215,7 +219,32 @@ class SolicitudMantenimientoControllerTest extends TestCase
             'kilometraje_actual' => 1000,
         ]);
 
-        $response->assertSessionHasErrors('id_conductor');
+        $response->assertSessionHasNoErrors()->assertRedirect(route('mantenimiento.solicitudes.index'));
+        $this->assertDatabaseHas('solicitud_mantenimiento', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+        ]);
+    }
+
+    public function test_store_rechaza_un_conductor_inactivo_o_sin_conductor(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductorUser = $this->crearUsuarioConductor();
+        $conductor = Conductor::find($conductorUser->id_persona);
+        $conductor->update(['estado_conductor' => 'INACTIVO']);
+
+        $datos = [
+            'id_vehiculo' => $vehiculo->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'descripcion_problema' => 'Cambio de aceite',
+            'kilometraje_actual' => 1000,
+        ];
+
+        $this->post(route('mantenimiento.solicitudes.store'), $datos + ['id_conductor' => $conductor->id])
+            ->assertSessionHasErrors('id_conductor');
+        $this->post(route('mantenimiento.solicitudes.store'), $datos)
+            ->assertSessionHasErrors('id_conductor');
+
         $this->assertDatabaseCount('solicitud_mantenimiento', 0);
     }
 
@@ -285,17 +314,19 @@ class SolicitudMantenimientoControllerTest extends TestCase
     }
 
     /**
-     * jefe-area sólo ve los vehículos de las áreas que tiene a cargo, y debe
-     * elegir el conductor (mostrarSelectorConductor=true).
+     * jefe-area ve TODOS los vehículos activos y operarios precargados: los
+     * de sus áreas primero (meta.propio), y debe elegir el conductor
+     * (mostrarSelectorConductor=true).
      */
-    public function test_create_lista_solo_los_vehiculos_del_area_del_jefe(): void
+    public function test_create_lista_todos_los_vehiculos_con_los_del_area_del_jefe_primero(): void
     {
         $area = Area::factory()->create();
         $jefe = $this->crearJefeDeArea($area);
 
-        $vehiculoDelArea = Vehiculo::factory()->create();
+        $vehiculoDeOtraArea = Vehiculo::factory()->create(['codigo' => 'AAA-001']);
+        $vehiculoDelArea = Vehiculo::factory()->create(['codigo' => 'ZZZ-001']);
         $this->asignarVehiculoAArea($vehiculoDelArea, $area);
-        Vehiculo::factory()->create(); // de otra área / sin área
+        $operario = Conductor::find($this->crearUsuarioConductor()->id_persona);
 
         $response = $this->actingAs($jefe)->get(route('mantenimiento.solicitudes.create'));
 
@@ -303,15 +334,20 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('SolicitudMantenimiento/Create')
             ->where('mostrarSelectorConductor', true)
-            ->has('vehiculos', 1)
+            ->has('vehiculos', 2)
             ->where('vehiculos.0.id', $vehiculoDelArea->id)
+            ->where('vehiculos.0.meta.propio', true)
+            ->where('vehiculos.1.id', $vehiculoDeOtraArea->id)
+            ->where('vehiculos.1.meta.propio', false)
+            ->where('operarios', fn ($operarios) => collect($operarios)->pluck('id')->contains($operario->id))
         );
     }
 
     /**
      * Un usuario con ambos roles (conductor y jefe-area) es tratado como
-     * jefe-area: ve los vehículos de su área (no sólo el suyo propio) y debe
-     * elegir el conductor, en vez de operar automáticamente sobre sí mismo.
+     * jefe-area: ve todos los vehículos (no sólo el suyo propio), con los de
+     * su área y el suyo primero, y debe elegir el conductor, en vez de operar
+     * automáticamente sobre sí mismo.
      */
     public function test_jefe_area_prevalece_sobre_conductor_cuando_el_usuario_tiene_ambos_roles(): void
     {
@@ -332,11 +368,13 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $vehiculoDelArea = Vehiculo::factory()->create();
         $this->asignarVehiculoAArea($vehiculoDelArea, $area);
 
-        // Vehículo asignado a él como conductor, pero fuera de su área: no
-        // debería aparecer (jefe-area prevalece, no se usa el criterio de
-        // conductor).
+        // Vehículo asignado a él como conductor, pero fuera de su área:
+        // también es "propio".
         $vehiculoPropio = Vehiculo::factory()->create();
         $this->asignarConductorAVehiculo(Conductor::find($jefeYConductor->id_persona), $vehiculoPropio);
+
+        // Vehículo ajeno: aparece igual (selección libre), al final.
+        $vehiculoAjeno = Vehiculo::factory()->create();
 
         $response = $this->actingAs($jefeYConductor)->get(route('mantenimiento.solicitudes.create'));
 
@@ -344,8 +382,12 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('SolicitudMantenimiento/Create')
             ->where('mostrarSelectorConductor', true)
-            ->has('vehiculos', 1)
-            ->where('vehiculos.0.id', $vehiculoDelArea->id)
+            ->has('vehiculos', 3)
+            ->where('vehiculos', fn ($vehiculos) => collect($vehiculos)->take(2)->pluck('id')->sort()->values()->all()
+                    === collect([$vehiculoDelArea->id, $vehiculoPropio->id])->sort()->values()->all()
+                && collect($vehiculos)->last()['id'] === $vehiculoAjeno->id
+                && collect($vehiculos)->last()['meta']['propio'] === false)
+            ->where('operarios', fn ($operarios) => count($operarios) > 0)
         );
     }
 
@@ -364,5 +406,45 @@ class SolicitudMantenimientoControllerTest extends TestCase
         $pdf = (new Reportes)->generarSolicitudMantenimiento($solicitud, 'S');
 
         $this->assertStringStartsWith('%PDF', $pdf);
+    }
+
+    /**
+     * Registrar solicitudes depende del permiso, no del rol: un rol
+     * personalizado con mantenimiento.solicitudes.crear (que no es conductor)
+     * elige libremente vehículo y operario; sin el permiso, no puede.
+     */
+    public function test_un_rol_personalizado_con_el_permiso_registra_solicitudes_y_sin_el_permiso_no(): void
+    {
+        $supervisor = User::factory()->create();
+        $supervisor->assignRole(Role::create(['name' => 'supervisor-flota', 'guard_name' => 'web'])
+            ->givePermissionTo(['mantenimiento.solicitudes.ver', 'mantenimiento.solicitudes.crear']));
+        $sinPermiso = User::factory()->create();
+        $sinPermiso->assignRole(Role::create(['name' => 'consulta', 'guard_name' => 'web'])
+            ->givePermissionTo('mantenimiento.solicitudes.ver'));
+
+        $vehiculo = Vehiculo::factory()->create();
+        $operario = Conductor::find($this->crearUsuarioConductor()->id_persona);
+        $datos = [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $operario->id,
+            'tipo_mantenimiento' => 'CORRECTIVO',
+            'descripcion_problema' => 'Falla en frenos',
+            'kilometraje_actual' => 1000,
+        ];
+
+        $this->actingAs($supervisor)->get(route('mantenimiento.solicitudes.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('mostrarSelectorConductor', true));
+        $this->actingAs($supervisor)->post(route('mantenimiento.solicitudes.store'), $datos)
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('mantenimiento.solicitudes.index'));
+
+        $this->actingAs($sinPermiso)->post(route('mantenimiento.solicitudes.store'), $datos)->assertForbidden();
+
+        $this->assertDatabaseCount('solicitud_mantenimiento', 1);
+        $this->assertDatabaseHas('solicitud_mantenimiento', [
+            'id_conductor' => $operario->id,
+            'id_usuario_registra' => $supervisor->id,
+        ]);
     }
 }

@@ -28,7 +28,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.20.0',
+            'api_version' => '1.21.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -192,36 +192,64 @@ class ParametrosController extends Controller
     }
 
     /**
+     * Permisos de registro con los que un usuario elige libremente el vehículo
+     * (y el operario) en vales, cargas, operación diaria o mantenimiento.
+     */
+    private const PERMISOS_ELEGIR_VEHICULO = [
+        'vales.crear',
+        'cargas-combustible.registrar',
+        'operacion-diaria.crear',
+        'mantenimiento.solicitudes.crear',
+        'mantenimiento.ordenes.crear',
+    ];
+
+    /**
      * Vehículos que el usuario puede operar desde la app, ya formateados.
      *
-     * Un administrador o super-admin (roles que se pueden combinar con conductor
-     * o jefe de área) supervisa toda la flota: todos los vehículos activos, sin
-     * repetir ninguno. El resto ve sólo los que conduce como conductor
-     * autenticado unificados con los de las áreas que administra como jefe de
-     * área; unique('id') evita duplicar el vehículo que un jefe de área también
-     * conduce.
+     * Igual que en la web (ListVehiculosSeleccionablesAction, a pedido del
+     * usuario 2026-10-17): quien no es conductor puro (aunque también tenga el
+     * rol conductor) y es administrador/jefe de área o tiene permiso de
+     * registro en alguno de esos módulos recibe TODOS los vehículos activos. El
+     * resto (conductor puro, cuentas sin esos permisos) ve sólo los que conduce
+     * unificados con los de las áreas que administra; unique('id') evita
+     * duplicar el vehículo que un jefe de área también conduce. En ambos casos
+     * `propio` marca (y ordena primero) los que conduce o son de sus áreas.
      */
     private function coleccionVehiculos(User $user, ?Conductor $conductor, EloquentCollection $areasACargo): Collection
     {
-        $vehiculos = $user->hasAnyRole(['super-admin', 'administrador'])
+        $propios = EloquentCollection::make(
+            ($conductor ? $conductor->asignacionesActivas : collect())
+                ->merge($areasACargo->flatMap(fn ($area) => $area->vehiculosActivos))
+                ->unique('id')
+                ->values()
+                ->all()
+        );
+        $idsPropios = $propios->pluck('id')->flip();
+
+        $vehiculos = $this->puedeElegirCualquierVehiculo($user)
             ? Vehiculo::where('estado_vehiculo', 'ACTIVO')->get()
-            : EloquentCollection::make(
-                ($conductor ? $conductor->asignacionesActivas : collect())
-                    ->merge($areasACargo->flatMap(fn ($area) => $area->vehiculosActivos))
-                    ->unique('id')
-                    ->values()
-                    ->all()
-            );
+            : $propios;
+
+        $vehiculos = $vehiculos
+            ->sortBy([
+                fn ($a, $b) => (int) $idsPropios->has($b->id) <=> (int) $idsPropios->has($a->id),
+                fn ($a, $b) => strnatcasecmp((string) $a->codigo, (string) $b->codigo),
+            ])
+            ->values();
 
         // Conductor actualmente asignado a cada vehículo (titular ACTIVO), para
         // que un jefe de área pueda autocompletar `id_conductor` al emitir un
         // vale desde la app (mismo dato que `meta.id_conductor` del buscador de
-        // vehículos del módulo web). Se carga en bloque para evitar N+1.
+        // vehículos del módulo web), y todos sus asignados vigentes. Se cargan
+        // en bloque para evitar N+1 (ahora la lista puede ser toda la flota).
         if ($vehiculos->isNotEmpty()) {
-            $vehiculos->load('conductorAsignado.persona:id,nombres,paterno,materno,ci');
+            EloquentCollection::make($vehiculos->all())->load([
+                'conductorAsignado.persona:id,nombres,paterno,materno,ci',
+                'conductoresAsignados.persona',
+            ]);
         }
 
-        return $vehiculos->map(function ($vehiculo) {
+        return $vehiculos->map(function ($vehiculo) use ($idsPropios) {
             $conductorAsignado = $vehiculo->conductorAsignado;
 
             return [
@@ -244,8 +272,34 @@ class ParametrosController extends Controller
                     'ci' => $conductorAsignado->persona?->ci,
                 ] : null,
                 'conductores_asignados' => $vehiculo->conductoresAsignadosOpt() ?? [],
+                'propio' => $idsPropios->has($vehiculo->id),
             ];
         });
+    }
+
+    /**
+     * Mismo criterio que la web (User::esConductorPuro()): el conductor puro
+     * nunca elige libremente; el resto sí, si tiene un rol de gestión o un
+     * permiso de registro. Guard 'web' explícito: bajo auth:api el guard por
+     * defecto es 'api' y los permisos viven en 'web' (ver .ai/rules/v1.md).
+     */
+    private function puedeElegirCualquierVehiculo(User $user): bool
+    {
+        if ($user->esConductorPuro()) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
+            return true;
+        }
+
+        foreach (self::PERMISOS_ELEGIR_VEHICULO as $permiso) {
+            if ($user->checkPermissionTo($permiso, 'web')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

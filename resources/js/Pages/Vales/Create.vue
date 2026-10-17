@@ -119,7 +119,7 @@ watch(() => form.fecha_vencimiento, () => form.clearErrors('fecha_vencimiento'))
 /*  asignados al vehículo elegido primero y marcados.                  */
 /* ------------------------------------------------------------------ */
 // ids de los conductores asignados (titular + provisionales) al vehículo
-// elegido, de meta.conductores_asignados de search.vehiculos.
+// elegido, de meta.conductores_asignados de la prop vehiculos.
 const conductoresDelVehiculo = ref([])
 
 // Copias: Multiselect reescribe `label` sobre la opción seleccionada, así que
@@ -279,7 +279,7 @@ onMounted(() => {
                                     <template #option="{ option }">
                                         <span>{{ option.label }}</span>
                                         <span v-if="option.meta?.propio"
-                                            class="badge bg-primary-transparent text-primary fw-normal ms-2">De mi área</span>
+                                            class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado</span>
                                     </template>
                                 </Multiselect>
                                 <!-- v-else debe ir JUSTO después del v-if: no insertar nada entre ambos. -->

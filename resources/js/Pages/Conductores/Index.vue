@@ -6,7 +6,7 @@ defineOptions({ layout: Maindashboard })
 
 import { showToast, confirm , showError} from '@/Utils/alertUtil.js'
 import InputError from '@/Components/InputError.vue'
-import SearchSelect from '@/Components/SearchSelect.vue'
+import Multiselect from '@vueform/multiselect'
 import { useBootstrapModal } from '@/Composables/useBootstrapModal'
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
 import { storageUrl } from '@/Utils/storageUtil'
@@ -15,7 +15,14 @@ const props = defineProps({
     conductores: Object,
     filters: Object,
     flash: Object,
+    // [{ id, label, meta }] vehículos activos precargados para el modal
+    // "Reasignar vehículo" (vacío sin el permiso conductores.asignar-vehiculo).
+    vehiculos: { type: Array, default: () => [] },
 })
+
+// Vehículos activos precargados ({ id, label, meta }). Copias: Multiselect
+// reescribe `label` de la opción seleccionada (ver .ai/rules/js.md).
+const vehiculosOpt = computed(() => props.vehiculos.map(vehiculo => ({ ...vehiculo })))
 
 // Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
 // listado en tarjetas con scroll infinito en vez de la tabla (ver
@@ -176,14 +183,14 @@ function abrirAsignacion(conductor) {
     })
 }
 
-function onVehiculoSeleccionado(vehiculo) {
+// Multiselect emite el id (o null al limpiar): la lectura inicial depende del
+// tipo de medición del vehículo elegido.
+function onVehiculoChange(idVehiculo) {
+    const vehiculo = props.vehiculos.find(v => v.id === idVehiculo) ?? null
     tipoMedicionSeleccionado.value = vehiculo?.meta?.tipo_medicion ?? null
     asignacionForm.kilometraje_inicial = ''
     asignacionForm.horometro_inicial = ''
-}
-
-function onVehiculoLimpiado() {
-    tipoMedicionSeleccionado.value = null
+    asignacionForm.clearErrors('id_vehiculo')
 }
 
 function submitAsignacion() {
@@ -609,15 +616,12 @@ const tipoAsignacionBadge = (tipo) =>
                                     <label class="form-label fw-medium">
                                         Vehículo <span class="text-danger">*</span>
                                     </label>
-                                    <SearchSelect
-                                        v-model="asignacionForm.id_vehiculo"
-                                        :object="true"
-                                        :search-url="route('search.vehiculos')"
-                                        placeholder="Buscar por placa, código o marca (mín. 2 caracteres)..."
-                                        :invalid="!!asignacionForm.errors.id_vehiculo"
-                                        @selected="onVehiculoSeleccionado"
-                                        @cleared="onVehiculoLimpiado"
-                                    />
+                                    <Multiselect v-model="asignacionForm.id_vehiculo" :options="vehiculosOpt"
+                                        value-prop="id" label="label" :searchable="true" :filter-results="true"
+                                        placeholder="Selecciona o busca por código, placa o marca..."
+                                        no-options-text="No hay vehículos activos" no-results-text="Sin resultados"
+                                        @change="onVehiculoChange"
+                                        :class="{ 'is-invalid-multiselect': asignacionForm.errors.id_vehiculo }" />
                                     <InputError :message="asignacionForm.errors.id_vehiculo" class="mt-1" />
                                 </div>
 

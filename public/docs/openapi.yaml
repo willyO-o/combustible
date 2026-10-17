@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.20.0"
+  version: "1.21.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.20.0"
+                api_version: "1.21.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -501,13 +501,17 @@ paths:
         operación diaria, y los valores enumerados usados por otros módulos (cargas de
         combustible, solicitudes de mantenimiento, control de cargas).
 
-        El listado `vehiculos` unifica, sin duplicados, los vehículos que el usuario tiene
-        asignados como conductor y todos los vehículos activos de las áreas que administra
-        como jefe de área. Un usuario puede tener ambos roles, uno solo o ninguno; si no
-        tiene ninguno, `vehiculos` llega vacío. No requiere un registro de conductor.
-        Excepción: un usuario `administrador` o `super-admin` (roles que se pueden combinar
-        con los anteriores) recibe todos los vehículos activos del sistema, sin repetir
-        ninguno. Cada
+        El listado `vehiculos` depende del usuario (desde 1.21.0):
+        - **conductor** sin ningún rol de gestión (o una cuenta sin permisos de registro):
+          sólo los vehículos que tiene asignados como conductor más los de las áreas que
+          administra, sin duplicados; vacío si no tiene ninguno.
+        - **jefe-area**, **administrador**, **super-admin** (aunque además tengan el rol
+          `conductor`) o cualquier usuario con permiso para registrar vales, cargas,
+          operaciones diarias, solicitudes u órdenes de trabajo: **todos los vehículos
+          activos**, para poder elegir libremente.
+
+        En ambos casos `propio = true` marca los vehículos que el usuario conduce o que son
+        de sus áreas, y van primero en la lista. Cada
         vehículo trae además `id_conductor` / `conductor_asignado` (su conductor titular
         actual), para autocompletar el conductor al emitir un vale (`POST /vales`), y
         `conductores_asignados` con todos los conductores asignados al vehículo (titular más
@@ -1878,8 +1882,12 @@ paths:
         Lista paginada de cargas de combustible, ordenadas por `fecha_carga` e `id` descendente.
 
         Las restricciones de visibilidad dependen del rol del usuario autenticado:
-        - **conductor**: solo ve sus propias cargas (`id_conductor` = persona del usuario).
-        - Otros roles: sin restricción adicional.
+        - **administrador** / **super-admin**: todas las cargas.
+        - **jefe-area**: las cargas de los vehículos de sus áreas, más las que **registró él
+          mismo** (de cualquier vehículo) y, si también es conductor, las suyas como conductor
+          (desde 1.21.0).
+        - **conductor** (sin ningún rol de gestión): solo sus propias cargas (`id_conductor` =
+          persona del usuario).
       parameters:
         - name: nro_placa
           in: query
@@ -1952,8 +1960,13 @@ paths:
           `tipo_medicion = kilometraje`; `horometro` es obligatorio si tiene
           `tipo_medicion = horometro`. En ambos casos, el valor no puede ser inferior a la
           última lectura registrada para ese vehículo.
-        - `id_conductor` es obligatorio si el usuario autenticado tiene el rol `conductor`;
-          opcional para el resto de roles.
+        - `id_conductor` (desde 1.21.0): si el usuario es `conductor` sin ningún rol de gestión,
+          se ignora y la carga queda siempre a su nombre. Con `id_vale`, el conductor sale del
+          vale. En el resto de los casos es opcional, pero si se envía debe ser **cualquier**
+          conductor `ACTIVO` (no hace falta que esté asignado al vehículo); con
+          `is_offline = true` basta con que exista. Un valor inválido responde `422` en
+          `id_conductor`. Lista de operarios: `GET /parametros/colecciones` →
+          `operaciones_diarias.operarios`.
         - Si se envía `id_vale`, debe referenciar un vale con `estado_vale = PENDIENTE`, del
           mismo `id_vehiculo`, y aún no vencido (`fecha_vencimiento > ahora`). Al registrarse la
           carga, ese vale queda marcado como `USADO`.
@@ -2689,17 +2702,19 @@ paths:
         Registra una nueva solicitud/alarma de mantenimiento para un vehículo (Paso 1 del
         flujo de mantenimiento).
 
-        **Disponible para los roles `conductor`, `jefe-area`, `administrador` y
-        `super-admin`**: cualquier otro rol recibe `403`. El comportamiento de `id_vehiculo` e
-        `id_conductor` depende de cuál tenga el usuario autenticado:
+        **Disponible para cualquier usuario con permiso para registrar solicitudes de
+        mantenimiento** (por defecto `conductor`, `jefe-area`, `administrador` y `super-admin`);
+        sin ese permiso responde `403`. El comportamiento de `id_vehiculo` e `id_conductor`
+        depende de cuál tenga el usuario autenticado:
         - **conductor** (sin ningún rol de gestión): sólo puede usar uno de sus propios
           vehículos asignados (`id_vehiculo` debe tener una asignación `ACTIVO` vigente con
           ese conductor); `id_conductor` no se pide — se asigna siempre a la propia persona
           del usuario, ignorando cualquier valor que se envíe.
-        - **jefe-area** (incluso si además tiene el rol `conductor`: `jefe-area` prevalece),
-          **administrador** o **super-admin**: `id_vehiculo` puede ser cualquier vehículo
-          activo, e `id_conductor` es **obligatorio** — debe ser uno de los conductores
-          actualmente asignados (`ACTIVO` o `PROVISIONAL`) a ese vehículo.
+        - **cualquier otro usuario** (`jefe-area`, `administrador`, `super-admin`, incluso si
+          además tiene el rol `conductor`: el rol de gestión prevalece): `id_vehiculo` puede ser
+          cualquier vehículo activo, e `id_conductor` es **obligatorio** — cualquier conductor
+          `ACTIVO`, esté o no asignado a ese vehículo (desde 1.21.0; antes debía estar
+          asignado). Con `is_offline = true` basta con que exista.
 
         Se envía como `application/json`. Los siguientes campos se calculan/asignan
         automáticamente en el servidor y **no deben enviarse**:
@@ -3994,7 +4009,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.20.0" }
+        api_version: { type: string, example: "1.21.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4058,6 +4073,12 @@ components:
             id: { type: integer, example: 45 }
             nombre_completo: { type: string, example: Juan Pérez Quispe }
             ci: { type: string, nullable: true, example: "1234567" }
+        propio:
+          type: boolean
+          description: >-
+            `true` si el usuario conduce este vehículo o es de un área que administra. Estos
+            vehículos van primero en la lista (desde 1.21.0).
+          example: true
         conductores_asignados:
           type: array
           description: >-
@@ -4065,7 +4086,8 @@ components:
             el titular más eventuales reemplazos por permiso o vacaciones. Sirve para ofrecer
             un selector de conductor cuando el vehículo tiene más de uno. Lista vacía si no
             tiene ninguno. `conductor_asignado` / `id_conductor` corresponden al titular y son
-            un subconjunto de esta lista.
+            un subconjunto de esta lista. Para elegir otro operario cualquiera, usar
+            `operaciones_diarias.operarios`.
           items:
             type: object
             properties:
@@ -5171,6 +5193,15 @@ components:
           type: integer
           description: Debe existir en la tabla `vehiculo`.
           example: 8
+        id_conductor:
+          type: integer
+          nullable: true
+          description: >-
+            Opcional. Cualquier conductor `ACTIVO` (no hace falta que esté asignado al
+            vehículo; con `is_offline = true` basta con que exista). Se ignora si se envía
+            `id_vale` (se usa el del vale) o si el usuario es `conductor` sin rol de gestión
+            (se usa su propia persona). Desde 1.21.0.
+          example: 45
         id_grifo:
           type: integer
           description: requerido en caso de que no se envíe `id_vale`. Debe existir en la tabla `grifo` y tener `estado_grifo = ACTIVO`.
@@ -5643,11 +5674,12 @@ components:
           type: integer
           nullable: true
           description: |
-            Obligatorio si el usuario autenticado es `jefe-area`, `administrador` o
-            `super-admin`: debe ser uno de los conductores actualmente asignados
-            (`ACTIVO`/`PROVISIONAL`) a `id_vehiculo`. Se ignora (y no hace falta enviarlo) si
-            el usuario es `conductor` sin ningún rol de gestión — en ese caso se asigna
-            siempre su propia persona (`id_conductor` = `id_persona` del usuario).
+            Obligatorio si el usuario autenticado no es `conductor` puro (`jefe-area`,
+            `administrador`, `super-admin`...): cualquier conductor `ACTIVO`, esté o no asignado
+            a `id_vehiculo` (desde 1.21.0; con `is_offline = true` basta con que exista). Se
+            ignora (y no hace falta enviarlo) si el usuario es `conductor` sin ningún rol de
+            gestión — en ese caso se asigna siempre su propia persona (`id_conductor` =
+            `id_persona` del usuario).
           example: 1
         tipo_mantenimiento:
           type: string

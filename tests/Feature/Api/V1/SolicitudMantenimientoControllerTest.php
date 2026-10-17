@@ -27,12 +27,14 @@ class SolicitudMantenimientoControllerTest extends TestCase
         parent::setUp();
 
         $permisoEmitirOrden = Permission::firstOrCreate(['name' => 'mantenimiento.ordenes.crear', 'guard_name' => 'web']);
+        $permisoCrearSolicitud = Permission::firstOrCreate(['name' => 'mantenimiento.solicitudes.crear', 'guard_name' => 'web']);
 
         // Igual que UserSeeder: jefe-area y administrador pueden generar órdenes;
-        // conductor y técnico no.
-        Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web'])->givePermissionTo($permisoEmitirOrden);
-        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web'])->givePermissionTo($permisoEmitirOrden);
-        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web']);
+        // conductor y técnico no. Registrar solicitudes: conductor, jefe-area y
+        // administrador (SolicitudMantenimientoRequest::authorize() lo exige).
+        Role::firstOrCreate(['name' => 'administrador', 'guard_name' => 'web'])->givePermissionTo([$permisoEmitirOrden, $permisoCrearSolicitud]);
+        Role::firstOrCreate(['name' => 'jefe-area', 'guard_name' => 'web'])->givePermissionTo([$permisoEmitirOrden, $permisoCrearSolicitud]);
+        Role::firstOrCreate(['name' => 'conductor', 'guard_name' => 'web'])->givePermissionTo($permisoCrearSolicitud);
         Role::firstOrCreate(['name' => 'tecnico-mantenimiento', 'guard_name' => 'web']);
 
         // SolicitudMantenimiento::calcularGestion()/getNroAttribute() leen este parámetro.

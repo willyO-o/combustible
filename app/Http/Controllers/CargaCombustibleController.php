@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\CargaCombustible\CreateCargaCombustibleAction;
 use App\Actions\CargaCombustible\ListCargaCombustibleAction;
+use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
+use App\Actions\Vehiculo\ListVehiculosSeleccionablesAction;
 use App\Http\Requests\CargaCombustibleRequest;
 use App\Libraries\Reportes;
 use App\Models\CargaCombustible;
@@ -52,7 +54,7 @@ class CargaCombustibleController extends Controller
         ]);
     }
 
-    public function create(Request $request): Response|RedirectResponse
+    public function create(Request $request, ListVehiculosSeleccionablesAction $listVehiculos, ListOperariosDisponiblesAction $listOperarios): Response|RedirectResponse
     {
         $tiposCombustible = TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')
             ->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']);
@@ -125,6 +127,13 @@ class CargaCombustibleController extends Controller
             'valesConductor' => $valesConductor,
             'vehiculosAsignados' => $vehiculosAsignados,
             'valePreseleccionado' => $valePreseleccionado,
+            // Quien no es conductor puro (aunque también tenga el rol
+            // conductor) elige libremente entre TODOS los vehículos y
+            // operarios activos, ya precargados: los suyos (asignados o de
+            // sus áreas) van primero con meta.propio y los operarios
+            // asignados al vehículo elegido se sugieren primero.
+            'vehiculos' => $request->user()->esConductorPuro() ? [] : $listVehiculos->execute($request->user())->all(),
+            'operarios' => $request->user()->esConductorPuro() ? [] : $listOperarios->execute()->all(),
         ]);
     }
 
@@ -183,7 +192,9 @@ class CargaCombustibleController extends Controller
     public function update(CargaCombustibleRequest $request, CargaCombustible $carga): RedirectResponse
     {
         $data = $request->validated();
-        unset($data['respaldo_count']);
+        // El conductor de una carga ya registrada no se cambia al editar (el
+        // formulario lo muestra bloqueado), igual que antes de validarlo.
+        unset($data['respaldo_count'], $data['id_conductor']);
 
         // Si la carga tiene (o vuelve a tener) un vale, el tipo de carga es
         // siempre VALE, sin importar lo enviado.

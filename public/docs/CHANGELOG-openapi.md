@@ -2,6 +2,25 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.21.0 — 2026-10-17
+
+### Cambiado
+
+- `GET /parametros/colecciones` → `vehiculos`: el `jefe-area`, el `administrador`, el
+  `super-admin` (aunque además sean `conductor`) y cualquier usuario con permiso para registrar
+  vales, cargas, operaciones diarias, solicitudes u órdenes reciben **todos los vehículos
+  activos**. El conductor puro sigue recibiendo sólo los suyos. Nuevo campo `propio` (los que
+  conduce o son de sus áreas), que además van primero en la lista.
+- `POST /cargas`: `id_conductor`, si se envía, debe ser **cualquier** conductor `ACTIVO` (no hace
+  falta que esté asignado al vehículo); con `is_offline = true` basta con que exista. Para el
+  conductor puro se ignora y la carga queda siempre a su nombre.
+- `GET /cargas`: el `jefe-area` ve además las cargas que **registró él mismo** para vehículos de
+  otras áreas y, si también es conductor, las suyas como conductor.
+- `POST /solicitudes-mantenimiento`: `id_conductor` puede ser **cualquier** conductor `ACTIVO`
+  (antes debía estar asignado al vehículo). El acceso depende del permiso para registrar
+  solicitudes, no de una lista fija de roles.
+- `GET /parametros`: `api_version` pasa a `1.21.0`.
+
 ## 1.20.0 — 2026-10-16
 
 ### Cambiado

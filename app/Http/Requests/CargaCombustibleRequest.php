@@ -44,6 +44,16 @@ class CargaCombustibleRequest extends FormRequest
         // exigencia de que el vale siga PENDIENTE y vigente.
         $esRegistroOffline = $this->is('api/*') && $this->boolean('is_offline');
 
+        // Al registrar sin vale, quien no es conductor puro (aunque también
+        // tenga el rol conductor) elige libremente el operario: cualquiera
+        // ACTIVO, no sólo los asignados al vehículo. Con vale el conductor sale
+        // del vale y el conductor puro siempre es él mismo (ambos se fuerzan en
+        // CreateCargaCombustibleAction), así que ahí no se valida lo enviado.
+        // Al editar el conductor no cambia (CargaCombustibleController::update()).
+        $eligeConductor = $this->isMethod('POST')
+            && ! $this->filled('id_vale')
+            && ! $this->user()?->esConductorPuro();
+
         return [
             'fecha_carga' => [$esRegistroOffline ? 'required' : 'nullable', 'date'],
             // litros y precio son requeridos solo cuando id_vale es null, de lo contrario no se requieren y se ignoran
@@ -67,7 +77,20 @@ class CargaCombustibleRequest extends FormRequest
             'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id'],
             // 'id_grifo' => ['required', 'integer', 'exists:grifo,id'],
             // 'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
-            // 'id_conductor' => [$this->user()->hasRole('conductor') ? 'required' : 'nullable', 'integer', 'exists:conductor,id'],
+            // Obligatorio sólo en la web (el formulario lo pide); la API lo
+            // mantiene opcional para no romper la app, pero si llega se valida.
+            // Un registro offline pudo capturarse con un operario que después
+            // se inactivó: ahí basta con que exista.
+            'id_conductor' => $eligeConductor
+                ? [
+                    Rule::requiredIf(! $this->is('api/*')),
+                    'nullable',
+                    'integer',
+                    $esRegistroOffline
+                        ? Rule::exists('conductor', 'id')
+                        : Rule::exists('conductor', 'id')->where('estado_conductor', 'ACTIVO')->whereNull('deleted_at'),
+                ]
+                : ['nullable'],
             'id_vale' => [
                 'nullable',
                 'integer',
@@ -119,6 +142,8 @@ class CargaCombustibleRequest extends FormRequest
             // mensaje con el último valor registrado (ver su $fail()), y una
             // entrada estática aquí lo pisaría dejando al usuario sin saber
             // cuál es el valor mínimo esperado.
+            'id_conductor.required' => 'Debe seleccionar el conductor.',
+            'id_conductor.exists' => 'El conductor seleccionado no existe o no está activo.',
             'kilometraje.required_if' => 'El kilometraje es obligatorio para vehículos con medición por kilometraje.',
             'horometro.required_if' => 'El horómetro es obligatorio para vehículos con medición por horómetro.',
         ];

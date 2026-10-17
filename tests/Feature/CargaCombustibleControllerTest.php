@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Area;
+use App\Models\Asignacion;
 use App\Models\CargaCombustible;
 use App\Models\Conductor;
 use App\Models\EncargadoArea;
@@ -925,5 +926,166 @@ class CargaCombustibleControllerTest extends TestCase
 
         $response->assertOk();
         $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    /**
+     * Datos mínimos de una carga PREPAGO (sin vale) para el formulario web.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosCargaPrepago(Vehiculo $vehiculo, array $overrides = []): array
+    {
+        return array_merge([
+            'fecha_carga' => now()->format('Y-m-d'),
+            'litros' => 30,
+            'precio' => 3.74,
+            'kilometraje' => 1000,
+            'id_vehiculo' => $vehiculo->id,
+            'id_grifo' => Grifo::first()?->id ?? $this->crearGrifo()->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'tipo_carga' => 'PREPAGO',
+        ], $overrides);
+    }
+
+    private function asignarVehiculoAArea(Vehiculo $vehiculo, Area $area): void
+    {
+        VehiculoArea::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+    }
+
+    /**
+     * A pedido del usuario (2026-10-17): quien no es conductor puro (aquí un
+     * jefe de área que además es conductor) recibe TODOS los vehículos y
+     * operarios activos precargados, con los de su área primero.
+     */
+    public function test_create_un_jefe_de_area_con_rol_conductor_recibe_todos_los_vehiculos_y_operarios_precargados(): void
+    {
+        $area = Area::factory()->create();
+        $user = $this->crearUsuarioConductorJefeDeArea($area);
+
+        $vehiculoAjeno = Vehiculo::factory()->create(['codigo' => 'AAA-001']);
+        $vehiculoDelArea = Vehiculo::factory()->create(['codigo' => 'ZZZ-001']);
+        $this->asignarVehiculoAArea($vehiculoDelArea, $area);
+        $operario = $this->crearConductor();
+
+        $this->actingAs($user)->get(route('cargas.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('CargasCombustible/Create')
+                ->where('conductor', null)
+                ->has('vehiculos', 2)
+                ->where('vehiculos.0.id', $vehiculoDelArea->id)
+                ->where('vehiculos.0.meta.propio', true)
+                ->where('vehiculos.1.id', $vehiculoAjeno->id)
+                ->has('vehiculos.0.meta.tipo_medicion')
+                ->has('vehiculos.0.meta.id_tipo_combustible')
+                ->has('vehiculos.0.meta.conductores_asignados')
+                ->where('operarios', fn ($operarios) => collect($operarios)->pluck('id')->contains($operario->id))
+            );
+    }
+
+    public function test_create_un_conductor_puro_sigue_limitado_a_sus_vehiculos(): void
+    {
+        $conductor = $this->crearConductor();
+        $vehiculo = Vehiculo::factory()->create();
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+        Vehiculo::factory()->create();
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+
+        $this->actingAs($user)->get(route('cargas.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->whereNot('conductor', null)
+                ->has('vehiculosAsignados', 1)
+                ->where('vehiculosAsignados.0.id', $vehiculo->id)
+                ->where('vehiculos', [])
+                ->where('operarios', [])
+            );
+    }
+
+    /**
+     * El jefe de área registra la carga de un vehículo de OTRA área con un
+     * operario no asignado a ese vehículo; luego la ve en su listado porque
+     * la registró él.
+     */
+    public function test_store_un_jefe_de_area_registra_cualquier_vehiculo_y_operario_y_la_ve_en_su_listado(): void
+    {
+        $this->crearParametrosEmpresa();
+        $user = $this->crearUsuarioConductorJefeDeArea(Area::factory()->create());
+        $vehiculoDeOtraArea = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAArea($vehiculoDeOtraArea, Area::factory()->create());
+        $operarioNoAsignado = $this->crearConductor();
+
+        $this->actingAs($user)
+            ->post(route('cargas.store'), $this->datosCargaPrepago($vehiculoDeOtraArea, ['id_conductor' => $operarioNoAsignado->id]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('cargas.index'));
+
+        $carga = CargaCombustible::where('id_vehiculo', $vehiculoDeOtraArea->id)->firstOrFail();
+        $this->assertSame($operarioNoAsignado->id, $carga->id_conductor);
+        $this->assertSame($user->id, $carga->id_usuario);
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('cargas.index')));
+        $this->assertTrue($ids->contains($carga->id));
+    }
+
+    public function test_index_un_jefe_de_area_con_rol_conductor_ve_sus_cargas_como_conductor_de_otra_area(): void
+    {
+        $this->crearParametrosEmpresa();
+        $user = $this->crearUsuarioConductorJefeDeArea(Area::factory()->create());
+        $conductorDelJefe = Conductor::findOrFail($user->id_persona);
+
+        // La registró otro usuario (el admin del setUp) a nombre del jefe.
+        $cargaComoConductor = $this->crearCargaParaListado(Vehiculo::factory()->create(), $conductorDelJefe);
+
+        $ids = $this->idsDelListado($this->actingAs($user)->get(route('cargas.index')));
+        $this->assertTrue($ids->contains($cargaComoConductor->id));
+    }
+
+    public function test_store_web_exige_un_conductor_activo_sin_vale(): void
+    {
+        $this->crearParametrosEmpresa();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $inactivo = $this->crearConductor();
+        $inactivo->update(['estado_conductor' => 'INACTIVO']);
+
+        $this->post(route('cargas.store'), $this->datosCargaPrepago($vehiculo))
+            ->assertSessionHasErrors('id_conductor');
+        $this->post(route('cargas.store'), $this->datosCargaPrepago($vehiculo, ['id_conductor' => $inactivo->id]))
+            ->assertSessionHasErrors('id_conductor');
+
+        $this->assertSame(0, CargaCombustible::count());
+    }
+
+    public function test_store_un_conductor_puro_siempre_registra_la_carga_a_su_nombre(): void
+    {
+        $this->crearParametrosEmpresa();
+        $conductor = $this->crearConductor();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        Asignacion::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
+            'fecha_asignacion' => now(),
+            'estado_asignacion' => 'PROVISIONAL',
+        ]);
+        $user = User::factory()->create(['id_persona' => $conductor->id]);
+        $user->assignRole('conductor');
+
+        $this->actingAs($user)
+            ->post(route('cargas.store'), $this->datosCargaPrepago($vehiculo, ['id_conductor' => $this->crearConductor()->id]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('cargas.index'));
+
+        $this->assertSame($conductor->id, CargaCombustible::firstOrFail()->id_conductor);
     }
 }

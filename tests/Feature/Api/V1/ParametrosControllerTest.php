@@ -389,4 +389,44 @@ class ParametrosControllerTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors('incluir.1');
     }
+
+    /**
+     * A pedido del usuario (2026-10-17), igual que en la web: un jefe de área
+     * que también es conductor recibe TODOS los vehículos activos, con los
+     * suyos (que conduce o de su área) primero y marcados con `propio`.
+     */
+    public function test_colecciones_un_jefe_de_area_con_rol_conductor_recibe_toda_la_flota_con_los_propios_primero(): void
+    {
+        $user = $this->crearUsuarioConductor();
+        $user->assignRole('jefe-area');
+        $area = Area::factory()->create();
+        $this->ponerPersonaACargoDeArea($user->persona, $area);
+
+        $ajeno = Vehiculo::factory()->create(['codigo' => 'AAA-001']);
+        $delArea = Vehiculo::factory()->create(['codigo' => 'MMM-001']);
+        $this->ponerVehiculoEnArea($delArea, $area);
+        $queConduce = Vehiculo::factory()->create(['codigo' => 'ZZZ-001']);
+        $this->asignarVehiculoAConductor($user->persona->conductor, $queConduce);
+        Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones', ['incluir' => 'vehiculos']));
+
+        $response->assertOk();
+        $this->assertSame([$delArea->id, $queConduce->id, $ajeno->id], $response->json('data.vehiculos.*.id'));
+        $this->assertSame([true, true, false], $response->json('data.vehiculos.*.propio'));
+    }
+
+    public function test_colecciones_un_conductor_puro_no_recibe_vehiculos_ajenos(): void
+    {
+        $user = $this->crearUsuarioConductor();
+        $propio = Vehiculo::factory()->create();
+        $this->asignarVehiculoAConductor($user->persona->conductor, $propio);
+        Vehiculo::factory()->count(2)->create();
+
+        $response = $this->actingAs($user, 'api')->getJson(route('api.v1.parametros.colecciones', ['incluir' => 'vehiculos']));
+
+        $response->assertOk();
+        $this->assertSame([$propio->id], $response->json('data.vehiculos.*.id'));
+        $this->assertTrue($response->json('data.vehiculos.0.propio'));
+    }
 }

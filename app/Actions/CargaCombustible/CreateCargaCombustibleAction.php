@@ -46,6 +46,13 @@ class CreateCargaCombustibleAction
                     'estado_vale' => 'USADO',
                 ]);
             } else {
+                // El conductor puro siempre registra a su nombre (no elige
+                // operario): se ignora cualquier id_conductor recibido.
+                $user = $request->user();
+                if ($user?->esConductorPuro() && $user->persona?->conductor) {
+                    $datos['id_conductor'] = $user->persona->conductor->id;
+                }
+
                 $cargaCombustible = CargaCombustible::create($datos);
             }
 

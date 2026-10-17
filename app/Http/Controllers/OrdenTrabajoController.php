@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
 use App\Actions\OrdenTrabajo\CreateOrdenTrabajoAction;
+use App\Actions\Vehiculo\ListVehiculosSeleccionablesAction;
 use App\Events\OrdenTrabajoAsignada;
 use App\Events\OrdenTrabajoCulminada;
 use App\Events\OrdenTrabajoVerificada;
 use App\Http\Requests\DetalleMantenimientoRequest;
 use App\Http\Requests\EjecucionOrdenTrabajoRequest;
 use App\Http\Requests\OrdenTrabajoRequest;
-use App\Models\Asignacion;
 use App\Models\DetalleMantenimiento;
 use App\Models\OrdenTrabajo;
 use App\Models\Repuesto;
@@ -20,7 +21,6 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -89,17 +89,21 @@ class OrdenTrabajoController extends Controller
     }
 
     /**
-     * Formulario para emitir una orden de trabajo.
+     * Formulario para emitir una orden de trabajo: cualquier usuario con el
+     * permiso mantenimiento.ordenes.crear (la ruta ya lo exige; super-admin
+     * pasa por Gate::before).
      *
-     * Sólo jefes de área y administradores pueden generar órdenes de trabajo.
+     * Vehículos y operarios llegan precargados: TODOS los activos (a pedido
+     * del usuario, la asignación a áreas/conductores no es confiable), con
+     * los vehículos propios y los operarios asignados al vehículo primero.
      */
-    public function create(Request $request): Response
+    public function create(Request $request, ListVehiculosSeleccionablesAction $listVehiculos, ListOperariosDisponiblesAction $listOperarios): Response
     {
-        if (! $request->user()->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
-            abort(403, 'Sólo un jefe de área o administrador puede generar una orden de trabajo.');
+        if (! $request->user()->can('mantenimiento.ordenes.crear')) {
+            abort(403, 'No tiene permiso para generar una orden de trabajo.');
         }
 
-        $vehiculos = $this->vehiculosConConductores();
+        $vehiculos = $listVehiculos->execute($request->user())->all();
 
         $talleres = Taller::select('id', 'razon_social', 'nit')
             ->where('estado_taller', 'ACTIVO')
@@ -136,6 +140,7 @@ class OrdenTrabajoController extends Controller
 
         return Inertia::render('OrdenTrabajo/Create', [
             'vehiculos' => $vehiculos,
+            'operarios' => $listOperarios->execute()->all(),
             'talleres' => $talleres,
             'usuarios' => $usuarios,
             'solicitudesPendientes' => $solicitudesPendientes,
@@ -146,7 +151,7 @@ class OrdenTrabajoController extends Controller
     /**
      * Guarda la orden de trabajo.
      *
-     * El acceso ya queda restringido a jefes de área/administradores por
+     * El acceso ya queda restringido por permiso en
      * OrdenTrabajoRequest::authorize(). La lógica de emisión (con o sin
      * solicitud de origen) vive en CreateOrdenTrabajoAction, compartida con la API.
      */
@@ -196,8 +201,8 @@ class OrdenTrabajoController extends Controller
      */
     public function edit(Request $request, OrdenTrabajo $orden): Response
     {
-        if (! $request->user()->hasAnyRole(['super-admin', 'administrador', 'jefe-area'])) {
-            abort(403, 'Sólo un jefe de área o administrador puede editar la orden de trabajo.');
+        if (! $request->user()->can('mantenimiento.ordenes.editar')) {
+            abort(403, 'No tiene permiso para editar la orden de trabajo.');
         }
 
         $orden->load(['vehiculo', 'conductor', 'solicitudMantenimiento', 'taller']);
@@ -229,7 +234,7 @@ class OrdenTrabajoController extends Controller
     /**
      * Actualiza la orden de trabajo.
      *
-     * El acceso ya queda restringido a jefes de área/administradores por
+     * El acceso ya queda restringido por permiso en
      * OrdenTrabajoRequest::authorize().
      */
     public function update(OrdenTrabajoRequest $request, OrdenTrabajo $orden): RedirectResponse
@@ -427,69 +432,6 @@ class OrdenTrabajoController extends Controller
         if (! in_array($orden->estado_orden, ['PENDIENTE', 'EN_EJECUCION'], true)) {
             abort(403, 'La orden ya fue culminada: no se puede modificar su detalle de trabajo.');
         }
-    }
-
-    /**
-     * Vehículos activos disponibles para emitir la orden, cada uno con sus
-     * conductores actualmente asignados en 'conductoresAsignados': cuando no
-     * se elige una solicitud de origen, Create.vue usa esa lista para ofrecer
-     * un combo de conductor (se resuelve en una sola consulta agrupada, ver
-     * conductoresAsignadosPorVehiculo(), para no incurrir en un N+1).
-     *
-     * @return array<int, array{id: int, codigo: string, nro_placa: string, marca: string, conductoresAsignados: array}>
-     */
-    private function vehiculosConConductores(): array
-    {
-        $vehiculos = Vehiculo::select('id', 'codigo', 'nro_placa', 'marca')
-            ->where('estado_vehiculo', 'ACTIVO')
-            ->orderBy('nro_placa')
-            ->get();
-
-        $conductoresPorVehiculo = $this->conductoresAsignadosPorVehiculo($vehiculos->pluck('id'));
-
-        return $vehiculos->map(fn (Vehiculo $vehiculo) => [
-            'id' => $vehiculo->id,
-            'codigo' => $vehiculo->codigo,
-            'nro_placa' => $vehiculo->nro_placa,
-            'marca' => $vehiculo->marca,
-            'conductoresAsignados' => $conductoresPorVehiculo->get($vehiculo->id, collect())
-                ->unique('id_conductor')
-                ->map(fn ($asignacion) => [
-                    'id' => $asignacion->id_conductor,
-                    'label' => "{$asignacion->conductor->persona->nombre_completo} (CI: {$asignacion->conductor->persona->ci})",
-                ])
-                ->values()
-                ->all(),
-        ])->all();
-    }
-
-    /**
-     * Conductores actualmente asignados (ACTIVO o PROVISIONAL, ver
-     * Vehiculo::conductoresAsignados()) de cada vehículo de $idsVehiculo, en
-     * una sola consulta agrupada por id_vehiculo. Mismo patrón que
-     * SolicitudMantenimientoController::conductoresAsignadosPorVehiculo().
-     *
-     * @param  Collection<int, int>  $idsVehiculo
-     * @return Collection<int, Collection>
-     */
-    private function conductoresAsignadosPorVehiculo($idsVehiculo)
-    {
-        if ($idsVehiculo->isEmpty()) {
-            return collect();
-        }
-
-        return Asignacion::with('conductor.persona:id,nombres,paterno,materno,ci')
-            ->whereIn('id_vehiculo', $idsVehiculo)
-            ->where(function ($query) {
-                $query->where('estado_asignacion', 'ACTIVO')
-                    ->orWhere('estado_asignacion', 'PROVISIONAL');
-            })
-            ->where(function ($query) {
-                $query->whereNull('fecha_culminacion')
-                    ->orWhere('fecha_culminacion', '>', now());
-            })
-            ->get()
-            ->groupBy('id_vehiculo');
     }
 
     /**

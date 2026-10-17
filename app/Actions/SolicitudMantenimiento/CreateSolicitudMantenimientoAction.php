@@ -11,9 +11,8 @@ class CreateSolicitudMantenimientoAction
     public function execute(array $datos, User $user): SolicitudMantenimiento
     {
         // Un conductor que además es jefe de área elige explícitamente el
-        // vehículo (de sus áreas a cargo) y el conductor de la solicitud —
-        // el rol jefe-area prevalece sobre conductor (a diferencia de
-        // Operación Diaria, ver .ai/rules/operacion.md). Sólo un conductor
+        // vehículo y el conductor de la solicitud (cualquiera activo) — el
+        // rol de gestión prevalece sobre conductor. Sólo un conductor
         // "puro" queda siempre atado a sí mismo, ignorando cualquier
         // id_conductor que llegue en el payload (evita que se pueda
         // suplantar a otro conductor).

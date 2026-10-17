@@ -6,11 +6,13 @@ defineOptions({ layout: Maindashboard })
 import Multiselect from '@vueform/multiselect'
 
 const props = defineProps({
-    // Cada vehículo trae 'conductoresAsignados' (ACTIVO/PROVISIONAL
-    // vigentes) para el combo "Conductor" que sólo se muestra cuando no hay
-    // solicitud de origen seleccionada. Ver
-    // OrdenTrabajoController::vehiculosConConductores().
+    // [{ id, label, meta }] TODOS los vehículos activos (ver
+    // ListVehiculosSeleccionablesAction): meta.propio, meta.tipo_medicion,
+    // meta.id_conductor (titular) y meta.conductores_asignados.
     vehiculos: Array,
+    // [{ id, label, meta }] todos los operarios activos, para el combo
+    // "Conductor" que sólo se muestra cuando no hay solicitud de origen.
+    operarios: { type: Array, default: () => [] },
     talleres: Array,
     usuarios: Array,
     solicitudesPendientes: Array,
@@ -39,10 +41,11 @@ const solicitudesOpt = computed(() => props.solicitudesPendientes.map(s => ({
     label: `#${s.nro} – ${s.vehiculo?.codigo} – ${s.vehiculo?.nro_placa} – ${s.tipo_mantenimiento}`,
 })))
 
-const vehiculosOpt = computed(() => props.vehiculos.map(v => ({
-    ...v,
-    label: `${v.codigo} – ${v.nro_placa} – ${v.marca}`,
-})))
+// Copias: Multiselect reescribe `label` de la opción seleccionada (ver
+// .ai/rules/js.md).
+const vehiculosOpt = computed(() => props.vehiculos.map(v => ({ ...v })))
+const vehiculoSeleccionado = computed(() => props.vehiculos.find((v) => v.id === form.id_vehiculo) ?? null)
+const tipoMedicion = computed(() => vehiculoSeleccionado.value?.meta?.tipo_medicion ?? 'kilometraje')
 
 // Al elegir (o quitar) la solicitud de origen, copiar o liberar los datos
 // que dependen de ella (vehículo, conductor, categoría, kilometraje/horómetro).
@@ -75,34 +78,43 @@ const solicitudSeleccionada = computed(() => {
 })
 const datosLocked = computed(() => !!solicitudSeleccionada.value)
 
-// Conductores actualmente asignados al vehículo elegido, sólo usados cuando
-// no hay solicitud de origen (si la hay, el conductor viene de esa
-// solicitud, ver el watch de id_solicitud_mantenimiento más arriba).
-const conductoresDelVehiculo = computed(() => {
-    const vehiculoSeleccionado = props.vehiculos.find((v) => v.id === form.id_vehiculo)
-    return vehiculoSeleccionado?.conductoresAsignados ?? []
+// Operarios asignados (titular + provisionales) al vehículo elegido: se
+// sugieren primero y marcados en la lista de todos los operarios activos.
+// Sólo se usan cuando no hay solicitud de origen (si la hay, el conductor
+// viene de esa solicitud, ver el watch de id_solicitud_mantenimiento).
+const conductoresDelVehiculo = computed(() => vehiculoSeleccionado.value?.meta?.conductores_asignados ?? [])
+const operariosOpt = computed(() => {
+    const asignados = new Set(conductoresDelVehiculo.value)
+
+    return props.operarios
+        .map(operario => ({ ...operario, asignado: asignados.has(operario.id) }))
+        .sort((a, b) => Number(b.asignado) - Number(a.asignado))
 })
 
-// Al elegir vehículo manualmente (sin solicitud de origen), se limpia el
-// conductor si ya no pertenece al nuevo vehículo, y se autoselecciona si sólo
-// queda una opción. Cuando SÍ hay solicitud de origen, el watch de arriba ya
-// controla id_vehiculo/id_conductor directamente, así que este watch no debe
-// interferir.
+// Al elegir vehículo manualmente (sin solicitud de origen) se sugiere su
+// titular (o su único asignado). Cuando SÍ hay solicitud de origen, el watch
+// de arriba ya controla id_vehiculo/id_conductor directamente, así que este
+// watch no debe interferir.
 watch(() => form.id_vehiculo, (val) => {
     if (form.id_solicitud_mantenimiento) {
         return
     }
+
+    form.kilometraje_actual = ''
+    form.horometro_actual = ''
 
     if (!val) {
         form.id_conductor = ''
         return
     }
 
-    const conductores = props.vehiculos.find((v) => v.id === val)?.conductoresAsignados ?? []
-
-    if (!conductores.some((c) => c.id === form.id_conductor)) {
-        form.id_conductor = conductores.length === 1 ? conductores[0].id : ''
-    }
+    const idsOperarios = new Set(props.operarios.map(o => o.id))
+    const titular = vehiculoSeleccionado.value?.meta?.id_conductor
+    const asignados = conductoresDelVehiculo.value
+    form.id_conductor = idsOperarios.has(titular)
+        ? titular
+        : (asignados.length === 1 && idsOperarios.has(asignados[0]) ? asignados[0] : '')
+    form.clearErrors('id_conductor')
 })
 
 const esExterno = computed(() => !!form.id_taller)
@@ -180,7 +192,13 @@ function submit() {
                                 label="label" :searchable="true" :filter-results="true" :disabled="datosLocked"
                                 placeholder="Buscar vehículo..." no-options-text="Sin vehículos activos"
                                 no-results-text="Sin resultados"
-                                :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                                :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }">
+                                <template #option="{ option }">
+                                    <span>{{ option.label }}</span>
+                                    <span v-if="option.meta?.propio"
+                                        class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado</span>
+                                </template>
+                            </Multiselect>
                             <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">
                                 {{ form.errors.id_vehiculo }}
                             </div>
@@ -195,17 +213,24 @@ function submit() {
                              emite igual y la solicitud que se genera queda sin conductor. -->
                         <div v-if="!datosLocked" class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">Conductor</label>
-                            <Multiselect v-model="form.id_conductor" :options="conductoresDelVehiculo"
+                            <Multiselect v-model="form.id_conductor" :options="operariosOpt"
                                 value-prop="id" label="label" :searchable="true" :filter-results="true"
-                                :disabled="!form.id_vehiculo" placeholder="Buscar conductor..."
-                                no-options-text="Este vehículo no tiene conductores asignados"
+                                placeholder="Buscar por CI, nombre o apellido..."
+                                no-options-text="No hay conductores activos registrados"
                                 no-results-text="Sin resultados"
-                                :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
+                                @change="form.clearErrors('id_conductor')"
+                                :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
+                                <template #option="{ option }">
+                                    <span>{{ option.label }}</span>
+                                    <span v-if="option.asignado"
+                                        class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado al vehículo</span>
+                                </template>
+                            </Multiselect>
                             <div v-if="form.errors.id_conductor" class="text-danger small mt-1">
                                 {{ form.errors.id_conductor }}
                             </div>
                             <small v-else-if="form.id_vehiculo && conductoresDelVehiculo.length === 0" class="text-muted">
-                                Este vehículo no tiene conductores asignados actualmente.
+                                Este vehículo no tiene operario asignado: puedes elegir cualquiera.
                             </small>
                         </div>
 
@@ -255,8 +280,20 @@ function submit() {
                             </small>
                         </div>
 
-                        <!-- Km actual -->
-                        <div class="col-sm-6 col-xl-4">
+                        <!-- Lectura actual: kilometraje u horómetro según el vehículo -->
+                        <div v-if="tipoMedicion === 'horometro'" class="col-sm-6 col-xl-4">
+                            <label class="form-label fw-medium">Horómetro Actual</label>
+                            <div class="input-group">
+                                <input v-model="form.horometro_actual" type="number" min="0" :disabled="datosLocked"
+                                    class="form-control" :class="{ 'is-invalid': form.errors.horometro_actual }"
+                                    placeholder="Ej: 1200" />
+                                <span class="input-group-text">h</span>
+                                <div v-if="form.errors.horometro_actual" class="invalid-feedback">
+                                    {{ form.errors.horometro_actual }}
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">Kilometraje Actual</label>
                             <div class="input-group">
                                 <input v-model="form.kilometraje_actual" type="number" min="0" :disabled="datosLocked"

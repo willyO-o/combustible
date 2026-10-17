@@ -277,12 +277,11 @@ class OrdenTrabajoControllerTest extends TestCase
     }
 
     /**
-     * El conductor elegido junto al vehículo (sin solicitud de origen) debe
-     * estar realmente asignado a ese vehículo; uno de otro vehículo se
-     * rechaza en la validación (una sola consulta exists, ver
-     * OrdenTrabajoRequest::rules()).
+     * A pedido del usuario (2026-10-17) el conductor elegido junto al
+     * vehículo (sin solicitud de origen) puede ser cualquier operario ACTIVO,
+     * aunque esté asignado a otro vehículo.
      */
-    public function test_store_rechaza_un_conductor_no_asignado_al_vehiculo_sin_solicitud_de_origen(): void
+    public function test_store_acepta_un_conductor_activo_no_asignado_al_vehiculo_sin_solicitud_de_origen(): void
     {
         $vehiculo = Vehiculo::factory()->create();
         $otroVehiculo = Vehiculo::factory()->create();
@@ -291,6 +290,25 @@ class OrdenTrabajoControllerTest extends TestCase
         $response = $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
             'id_vehiculo' => $vehiculo->id,
             'id_conductor' => $conductorDeOtroVehiculo->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'PREVENTIVO',
+            'kilometraje_actual' => 1000,
+        ]);
+
+        $response->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertDatabaseHas('orden_trabajo', ['id_vehiculo' => $vehiculo->id, 'id_conductor' => $conductorDeOtroVehiculo->id]);
+        $this->assertDatabaseHas('solicitud_mantenimiento', ['id_vehiculo' => $vehiculo->id, 'id_conductor' => $conductorDeOtroVehiculo->id]);
+    }
+
+    public function test_store_rechaza_un_conductor_inactivo_sin_solicitud_de_origen(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $conductor = $this->asignarConductorAVehiculo($vehiculo);
+        $conductor->update(['estado_conductor' => 'INACTIVO']);
+
+        $response = $this->actingAs($this->admin)->post(route('mantenimiento.ordenes.store'), [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $conductor->id,
             'id_usuario_ejecuta' => $this->crearTecnico()->id,
             'tipo_mantenimiento' => 'PREVENTIVO',
             'kilometraje_actual' => 1000,
@@ -332,23 +350,33 @@ class OrdenTrabajoControllerTest extends TestCase
 
     /**
      * Create.vue ofrece un combo de "Conductor" (visible cuando no se elige
-     * solicitud de origen) poblado desde los conductores realmente asignados
-     * a cada vehículo, resueltos en una sola consulta agrupada.
+     * solicitud de origen) con TODOS los operarios activos precargados; los
+     * asignados a cada vehículo (meta.conductores_asignados, titular en
+     * meta.id_conductor) sólo se usan para sugerirlos primero.
      */
-    public function test_create_incluye_los_conductores_asignados_de_cada_vehiculo(): void
+    public function test_create_precarga_todos_los_operarios_y_los_asignados_de_cada_vehiculo(): void
     {
         $vehiculo = Vehiculo::factory()->create();
         $conductor = $this->asignarConductorAVehiculo($vehiculo);
-        Vehiculo::factory()->create(); // sin conductor asignado
+        $sinConductor = Vehiculo::factory()->create();
+        // Operario activo sin ningún vehículo asignado.
+        $otroOperario = Conductor::create(['id' => Persona::factory()->create()->id, 'estado_conductor' => 'ACTIVO']);
 
         $response = $this->get(route('mantenimiento.ordenes.create'));
 
         $response->assertOk();
-        $vehiculos = collect($response->viewData('page')['props']['vehiculos']);
+        $props = $response->viewData('page')['props'];
+        $vehiculos = collect($props['vehiculos']);
         $opcion = $vehiculos->firstWhere('id', $vehiculo->id);
 
         $this->assertNotNull($opcion);
-        $this->assertSame([$conductor->id], collect($opcion['conductoresAsignados'])->pluck('id')->all());
+        $this->assertSame([$conductor->id], $opcion['meta']['conductores_asignados']);
+        $this->assertSame($conductor->id, $opcion['meta']['id_conductor']);
+        $this->assertSame([], $vehiculos->firstWhere('id', $sinConductor->id)['meta']['conductores_asignados']);
+        $this->assertEqualsCanonicalizing(
+            [$conductor->id, $otroOperario->id],
+            collect($props['operarios'])->pluck('id')->all()
+        );
     }
 
     /**
@@ -1021,5 +1049,41 @@ class OrdenTrabajoControllerTest extends TestCase
 
         $this->assertSame('PENDIENTE', $ordenAjena->fresh()->estado_orden);
         $this->assertSame(0, DetalleMantenimiento::where('id_orden_trabajo', $ordenAjena->id)->count());
+    }
+
+    /**
+     * Emitir órdenes depende del permiso, no del rol: un rol personalizado
+     * con mantenimiento.ordenes.crear puede (con cualquier vehículo y
+     * operario activo); sin el permiso, no.
+     */
+    public function test_un_rol_personalizado_con_el_permiso_emite_ordenes_y_sin_el_permiso_no(): void
+    {
+        $supervisor = User::factory()->create();
+        $supervisor->assignRole(Role::create(['name' => 'supervisor-flota', 'guard_name' => 'web'])
+            ->givePermissionTo(['mantenimiento.ordenes.ver', 'mantenimiento.ordenes.crear']));
+        $sinPermiso = User::factory()->create();
+        $sinPermiso->assignRole(Role::create(['name' => 'consulta', 'guard_name' => 'web'])
+            ->givePermissionTo('mantenimiento.ordenes.ver'));
+
+        $vehiculo = Vehiculo::factory()->create();
+        $operario = $this->asignarConductorAVehiculo(Vehiculo::factory()->create());
+        $datos = [
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $operario->id,
+            'id_usuario_ejecuta' => $this->crearTecnico()->id,
+            'tipo_mantenimiento' => 'CORRECTIVO',
+            'kilometraje_actual' => 1000,
+        ];
+
+        $this->actingAs($supervisor)->get(route('mantenimiento.ordenes.create'))->assertOk();
+        $this->actingAs($supervisor)->post(route('mantenimiento.ordenes.store'), $datos)
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $this->actingAs($sinPermiso)->get(route('mantenimiento.ordenes.create'))->assertForbidden();
+        $this->actingAs($sinPermiso)->post(route('mantenimiento.ordenes.store'), $datos)->assertForbidden();
+
+        $this->assertSame(1, OrdenTrabajo::count());
+        $this->assertSame($supervisor->id, OrdenTrabajo::firstOrFail()->id_usuario_emite);
     }
 }

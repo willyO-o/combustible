@@ -6,22 +6,18 @@ defineOptions({ layout: Maindashboard })
 import Multiselect from '@vueform/multiselect'
 
 const props = defineProps({
-    // [{ id, label, meta }] vehículos que el usuario puede elegir: ya viene
-    // filtrado por rol desde el backend (conductor "puro" -> sus vehículos
-    // asignados; jefe-area -> los de sus áreas a cargo, incluso si además es
-    // conductor, ese rol prevalece; cualquier otro rol -> todos los activos).
-    // Ver SolicitudMantenimientoController::vehiculosDisponibles().
+    // [{ id, label, meta }] vehículos que el usuario puede elegir (ver
+    // SolicitudMantenimientoController::create()): conductor "puro" -> sus
+    // vehículos asignados; cualquier otro usuario (aunque también sea
+    // conductor) -> TODOS los activos, con los propios primero (meta.propio).
     vehiculos: Array,
+    // [{ id, label, meta }] todos los operarios activos (vacío para el
+    // conductor puro, que no elige).
+    operarios: { type: Array, default: () => [] },
     // false para un conductor "puro" (la solicitud siempre es sobre sí
-    // mismo, sin ambigüedad); true para jefe-area/administrador/etc., que
-    // deben elegir entre los conductores realmente asignados al vehículo.
+    // mismo, sin ambigüedad); true para el resto, que elige el conductor.
     mostrarSelectorConductor: Boolean,
 })
-
-// El combo nativo se reemplaza por un Multiselect con filtrado local (sin
-// búsqueda remota, ver SearchSelect.vue) para no volverse impracticable
-// cuando hay muchos vehículos registrados. props.vehiculos ya llega en
-// formato {id, label, meta} desde el backend.
 
 // El conductor sólo se pide cuando mostrarSelectorConductor es true; si no,
 // el modelo lo asigna automáticamente a partir del usuario autenticado (ver
@@ -33,34 +29,45 @@ const form = useForm({
     tipo_mantenimiento:   'PREVENTIVO',
     descripcion_problema: '',
     kilometraje_actual:   '',
+    horometro_actual:     '',
     observacion:          '',
 })
 
-// Conductores activos/provisionales del vehículo seleccionado (sólo viene
-// poblado desde el backend cuando mostrarSelectorConductor es true).
-const conductoresDelVehiculo = computed(() => {
-    const vehiculoSeleccionado = props.vehiculos.find((v) => v.id === form.id_vehiculo)
-    return vehiculoSeleccionado?.meta?.conductoresAsignados ?? []
+// Copias: Multiselect reescribe `label` de la opción seleccionada (ver
+// .ai/rules/js.md).
+const vehiculosOpt = computed(() => props.vehiculos.map(vehiculo => ({ ...vehiculo })))
+const vehiculoSeleccionado = computed(() => props.vehiculos.find((v) => v.id === form.id_vehiculo) ?? null)
+const tipoMedicion = computed(() => vehiculoSeleccionado.value?.meta?.tipo_medicion ?? 'kilometraje')
+
+// Operarios asignados (titular + provisionales) al vehículo elegido: se
+// sugieren primero y marcados en la lista de todos los operarios activos.
+const conductoresDelVehiculo = computed(() => vehiculoSeleccionado.value?.meta?.conductores_asignados ?? [])
+const operariosOpt = computed(() => {
+    const asignados = new Set(conductoresDelVehiculo.value)
+
+    return props.operarios
+        .map(operario => ({ ...operario, asignado: asignados.has(operario.id) }))
+        .sort((a, b) => Number(b.asignado) - Number(a.asignado))
 })
 
-watch(() => form.id_vehiculo, (val) => {
+watch(() => form.id_vehiculo, () => {
+    // La lectura depende del tipo de medición del vehículo.
+    form.kilometraje_actual = ''
+    form.horometro_actual = ''
+
     if (!props.mostrarSelectorConductor) {
         return
     }
 
-    if (!val) {
-        form.id_conductor = ''
-        return
-    }
-
-    const vehiculoSeleccionado = props.vehiculos.find((v) => v.id === val)
-    const conductores = vehiculoSeleccionado?.meta?.conductoresAsignados ?? []
-
-    // Si el conductor ya elegido no pertenece al nuevo vehículo, se limpia;
-    // si sólo queda una opción, se autoselecciona.
-    if (!conductores.some((c) => c.id === form.id_conductor)) {
-        form.id_conductor = conductores.length === 1 ? conductores[0].id : ''
-    }
+    // Se sugiere el titular del vehículo (o su único asignado); si no tiene,
+    // queda vacío para elegirlo de la lista completa.
+    const idsOperarios = new Set(props.operarios.map(o => o.id))
+    const titular = vehiculoSeleccionado.value?.meta?.id_conductor
+    const asignados = conductoresDelVehiculo.value
+    form.id_conductor = idsOperarios.has(titular)
+        ? titular
+        : (asignados.length === 1 && idsOperarios.has(asignados[0]) ? asignados[0] : '')
+    form.clearErrors('id_conductor')
 })
 
 function submit() {
@@ -104,31 +111,46 @@ function submit() {
                             <label class="form-label fw-medium">
                                 Vehículo <span class="text-danger">*</span>
                             </label>
-                            <Multiselect v-model="form.id_vehiculo" :options="vehiculos" value-prop="id" label="label"
+                            <Multiselect v-model="form.id_vehiculo" :options="vehiculosOpt" value-prop="id" label="label"
                                 :searchable="true" :filter-results="true" placeholder="Buscar vehículo..."
                                 no-options-text="Sin vehículos activos" no-results-text="Sin resultados"
-                                :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }" />
+                                :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }">
+                                <template #option="{ option }">
+                                    <span>{{ option.label }}</span>
+                                    <span v-if="mostrarSelectorConductor && option.meta?.propio"
+                                        class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado</span>
+                                </template>
+                            </Multiselect>
                             <div v-if="form.errors.id_vehiculo" class="text-danger small mt-1">
                                 {{ form.errors.id_vehiculo }}
                             </div>
                         </div>
 
-                        <!-- Conductor: sólo se muestra a quien no es conductor "puro"
-                             (jefe-area/administrador/etc.), ya que un vehículo puede
-                             tener varios conductores asignados. -->
+                        <!-- Conductor: sólo se muestra a quien no es conductor "puro";
+                             cualquier operario activo, con los asignados al vehículo primero. -->
                         <div v-if="mostrarSelectorConductor" class="col-md-6">
                             <label class="form-label fw-medium">
                                 Conductor <span class="text-danger">*</span>
                             </label>
-                            <Multiselect v-model="form.id_conductor" :options="conductoresDelVehiculo"
+                            <Multiselect v-model="form.id_conductor" :options="operariosOpt"
                                 value-prop="id" label="label" :searchable="true" :filter-results="true"
-                                :disabled="!form.id_vehiculo" placeholder="Selecciona un conductor..."
-                                no-options-text="Este vehículo no tiene conductores asignados"
+                                placeholder="Buscar por CI, nombre o apellido..."
+                                no-options-text="No hay conductores activos registrados"
                                 no-results-text="Sin resultados"
-                                :class="{ 'is-invalid-multiselect': form.errors.id_conductor }" />
+                                @change="form.clearErrors('id_conductor')"
+                                :class="{ 'is-invalid-multiselect': form.errors.id_conductor }">
+                                <template #option="{ option }">
+                                    <span>{{ option.label }}</span>
+                                    <span v-if="option.asignado"
+                                        class="badge bg-primary-transparent text-primary fw-normal ms-2">Asignado al vehículo</span>
+                                </template>
+                            </Multiselect>
                             <div v-if="form.errors.id_conductor" class="text-danger small mt-1">
                                 {{ form.errors.id_conductor }}
                             </div>
+                            <small v-else-if="form.id_vehiculo && conductoresDelVehiculo.length === 0" class="text-muted">
+                                Este vehículo no tiene operario asignado: elige el conductor manualmente.
+                            </small>
                         </div>
 
                         <!-- Tipo -->
@@ -146,8 +168,20 @@ function submit() {
                             </div>
                         </div>
 
-                        <!-- Km actual -->
-                        <div class="col-sm-6 col-xl-4">
+                        <!-- Lectura actual: kilometraje u horómetro según el vehículo -->
+                        <div v-if="tipoMedicion === 'horometro'" class="col-sm-6 col-xl-4">
+                            <label class="form-label fw-medium">Horómetro Actual</label>
+                            <div class="input-group">
+                                <input v-model="form.horometro_actual" type="number" min="0"
+                                    class="form-control" :class="{ 'is-invalid': form.errors.horometro_actual }"
+                                    placeholder="Ej: 1200" />
+                                <span class="input-group-text">h</span>
+                                <div v-if="form.errors.horometro_actual" class="invalid-feedback">
+                                    {{ form.errors.horometro_actual }}
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="col-sm-6 col-xl-4">
                             <label class="form-label fw-medium">Kilometraje Actual</label>
                             <div class="input-group">
                                 <input v-model="form.kilometraje_actual" type="number" min="0"

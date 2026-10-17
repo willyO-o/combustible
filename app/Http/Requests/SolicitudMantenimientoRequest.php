@@ -10,10 +10,16 @@ use Illuminate\Validation\Rule;
 class SolicitudMantenimientoRequest extends FormRequest
 {
     /**
-     * Registrar (POST) ahora también lo pueden hacer jefe de área y
-     * administrador, eligiendo vehículo y conductor desde el formulario (ver
+     * Registrar (POST) lo puede hacer cualquier usuario con el permiso
+     * mantenimiento.solicitudes.crear (conductor, jefe de área,
+     * administrador o un rol personalizado), eligiendo vehículo y conductor
+     * desde el formulario salvo el conductor puro (ver
      * SolicitudMantenimientoController::create()); editar (PUT/PATCH) sigue
-     * siendo sólo del conductor autor, como antes de este cambio.
+     * siendo sólo del conductor autor.
+     *
+     * Permiso con guard 'web' explícito y checkPermissionTo(): bajo auth:api
+     * el guard por defecto es 'api' y los permisos viven en 'web' (ver
+     * .ai/rules/v1.md).
      */
     public function authorize(): bool
     {
@@ -24,7 +30,8 @@ class SolicitudMantenimientoRequest extends FormRequest
         }
 
         if ($this->isMethod('POST')) {
-            return $user->hasAnyRole(['super-admin', 'administrador', 'jefe-area', 'conductor']);
+            return $user->hasRole('super-admin')
+                || $user->checkPermissionTo('mantenimiento.solicitudes.crear', 'web');
         }
 
         return $user->hasRole('conductor');
@@ -45,11 +52,7 @@ class SolicitudMantenimientoRequest extends FormRequest
      */
     private function esConductorFinal(): bool
     {
-        $user = $this->user();
-
-        return $user
-            && $user->hasRole('conductor')
-            && ! $user->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
+        return (bool) $this->user()?->esConductorPuro();
     }
 
     public function rules(): array
@@ -78,23 +81,20 @@ class SolicitudMantenimientoRequest extends FormRequest
                         }),
             ],
             // Sólo se exige/valida cuando el usuario elige vehículo y
-            // conductor (ver arriba); en el resto de los casos el conductor
-            // se resuelve solo (ignorando cualquier valor recibido, ver
-            // CreateSolicitudMantenimientoAction), así que no aplica.
+            // conductor (ver arriba): cualquier operario ACTIVO, no sólo los
+            // asignados al vehículo (a pedido del usuario, la asignación no
+            // es confiable). En el resto de los casos el conductor se resuelve
+            // solo (ignorando cualquier valor recibido, ver
+            // CreateSolicitudMantenimientoAction), así que no aplica. Un
+            // registro offline pudo capturarse con un operario que después se
+            // inactivó: ahí basta con que exista.
             'id_conductor' => $eligeVehiculoYConductor
                 ? [
                     'required',
                     'integer',
-                    Rule::exists('asignacion', 'id_conductor')
-                        ->where('id_vehiculo', $this->input('id_vehiculo'))
-                        ->where(function ($query) {
-                            $query->where('estado_asignacion', 'ACTIVO')
-                                ->orWhere('estado_asignacion', 'PROVISIONAL');
-                        })
-                        ->where(function ($query) {
-                            $query->whereNull('fecha_culminacion')
-                                ->orWhere('fecha_culminacion', '>', now());
-                        }),
+                    $esRegistroOffline
+                        ? Rule::exists('conductor', 'id')
+                        : Rule::exists('conductor', 'id')->where('estado_conductor', 'ACTIVO')->whereNull('deleted_at'),
                 ]
                 : ['nullable'],
             'tipo_mantenimiento' => ['required', 'in:PREVENTIVO,CORRECTIVO'],
@@ -131,7 +131,7 @@ class SolicitudMantenimientoRequest extends FormRequest
             'id_vehiculo.required' => 'Debe seleccionar un vehículo.',
             'id_vehiculo.exists' => 'El vehículo seleccionado no está asignado al conductor o no está activo.',
             'id_conductor.required' => 'Debe seleccionar un conductor.',
-            'id_conductor.exists' => 'El conductor seleccionado no está asignado actualmente a este vehículo.',
+            'id_conductor.exists' => 'El conductor seleccionado no existe o no está activo.',
             'tipo_mantenimiento.required' => 'Debe indicar el tipo de mantenimiento.',
             'descripcion_problema.required' => 'La descripción del problema o mantenimiento es obligatoria.',
             'fecha_solicitud.required' => 'La fecha de solicitud es obligatoria.',

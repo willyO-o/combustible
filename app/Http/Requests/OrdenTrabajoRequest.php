@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Asignacion;
 use App\Models\SolicitudMantenimiento;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -13,55 +12,38 @@ use Illuminate\Validation\Rule;
 class OrdenTrabajoRequest extends FormRequest
 {
     /**
-     * Sólo un jefe de área o administrador puede generar o editar una orden
-     * de trabajo.
+     * Generar (POST) u editar (PUT) una orden lo puede cualquier usuario con
+     * el permiso mantenimiento.ordenes.crear / .editar respectivamente (el
+     * mismo que exige la ruta; super-admin pasa por Gate::before).
      */
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['super-admin', 'administrador', 'jefe-area']) ?? false;
+        $permiso = $this->isMethod('POST') ? 'mantenimiento.ordenes.crear' : 'mantenimiento.ordenes.editar';
+
+        return (bool) $this->user()?->can($permiso);
     }
 
     protected function failedAuthorization(): never
     {
-        throw new AuthorizationException('Sólo un jefe de área o administrador puede generar o editar una orden de trabajo.');
+        throw new AuthorizationException('No tiene permiso para generar o editar una orden de trabajo.');
     }
 
     public function rules(): array
     {
         return [
             'id_vehiculo' => ['required', 'exists:vehiculo,id'],
+            // Opcional. Elegido manualmente junto al vehículo (sin solicitud de
+            // origen): cualquier operario ACTIVO, no sólo los asignados al
+            // vehículo (a pedido del usuario, la asignación no es confiable).
+            // Con solicitud de origen el conductor llega heredado de ella (ver
+            // CreateOrdenTrabajoAction) y basta con que exista: pudo cambiar de
+            // asignación o inactivarse desde que se generó la solicitud.
             'id_conductor' => [
                 'nullable',
-                'exists:conductor,id',
-                function ($attribute, $value, $fail) {
-                    // Cuando la orden nace de una solicitud de origen, el
-                    // conductor llega heredado de esa solicitud (ver
-                    // store()) y no se re-valida aquí: podría haber cambiado
-                    // de asignación desde que se generó la solicitud, y esa
-                    // no es razón para bloquear la orden.
-                    if (! $value || $this->filled('id_solicitud_mantenimiento')) {
-                        return;
-                    }
-
-                    // Elegido manualmente junto al vehículo (sin solicitud de
-                    // origen): debe ser un conductor realmente asignado a ese
-                    // vehículo, resuelto en una sola consulta (exists).
-                    $asignado = Asignacion::where('id_vehiculo', $this->input('id_vehiculo'))
-                        ->where('id_conductor', $value)
-                        ->where(function ($query) {
-                            $query->where('estado_asignacion', 'ACTIVO')
-                                ->orWhere('estado_asignacion', 'PROVISIONAL');
-                        })
-                        ->where(function ($query) {
-                            $query->whereNull('fecha_culminacion')
-                                ->orWhere('fecha_culminacion', '>', now());
-                        })
-                        ->exists();
-
-                    if (! $asignado) {
-                        $fail('El conductor seleccionado no está asignado actualmente a este vehículo.');
-                    }
-                },
+                'integer',
+                $this->filled('id_solicitud_mantenimiento')
+                    ? Rule::exists('conductor', 'id')
+                    : Rule::exists('conductor', 'id')->where('estado_conductor', 'ACTIVO')->whereNull('deleted_at'),
             ],
             'id_solicitud_mantenimiento' => [
                 'nullable',
@@ -134,6 +116,7 @@ class OrdenTrabajoRequest extends FormRequest
     {
         return [
             'id_vehiculo.required' => 'Debe seleccionar un vehículo.',
+            'id_conductor.exists' => 'El conductor seleccionado no existe o no está activo.',
             'id_usuario_ejecuta.required' => 'Debe asignar un responsable de ejecución.',
             'tipo_mantenimiento.required' => 'Debe indicar si es preventivo o correctivo.',
         ];

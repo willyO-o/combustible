@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Personas\CreatePersonaAction;
 use App\Actions\Personas\UpdatePersonaAction;
+use App\Actions\Vehiculo\ListVehiculosSeleccionablesAction;
 use App\Http\Requests\PersonaRequest;
 use App\Libraries\Reportes;
 use App\Libraries\ReportesExcel;
@@ -258,10 +259,12 @@ class PersonaController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request, ListVehiculosSeleccionablesAction $listVehiculos): Response
     {
         return Inertia::render('Personas/Create', [
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
+            // Vehículos precargados para la asignación (rol conductor).
+            'vehiculos' => $listVehiculos->execute($request->user())->all(),
             'roles' => $this->rolesAsignables(),
             'cargos' => Cargo::seleccionables(),
         ]);
@@ -285,14 +288,17 @@ class PersonaController extends Controller
             ->with('success', 'Persona registrada exitosamente.');
     }
 
-    public function edit(Persona $persona): Response
+    public function edit(Request $request, Persona $persona, ListVehiculosSeleccionablesAction $listVehiculos): Response
     {
         $persona->load(['user', 'conductor.asignacionesActivas', 'encargadoAreas']);
+        $vehiculoActual = $persona->conductor?->asignacionesActivas->first();
 
         return Inertia::render('Personas/Edit', [
             'persona' => $persona,
             'areas' => Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area']),
-            'vehiculoActual' => $persona->conductor?->asignacionesActivas->first(),
+            'vehiculoActual' => $vehiculoActual,
+            // Vehículos precargados; el actual se incluye aunque ya no esté activo.
+            'vehiculos' => $listVehiculos->execute($request->user(), $vehiculoActual?->id)->all(),
             'areaActual' => $persona->encargadoAreas->first(),
             'roles' => $this->rolesAsignables(),
             'rolesAsignados' => $persona->rolesParaFormulario(),
