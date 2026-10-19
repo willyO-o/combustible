@@ -263,6 +263,7 @@ class OperacionDiariaController extends Controller
     private function vehiculosDisponibles(User $user, ?Vehiculo $incluirSiFalta = null): array
     {
         $vehiculos = Vehiculo::select($this->columnasVehiculoOpt())
+            ->with('tipoVehiculo:id,km_maximo_jornada,horometro_maximo_jornada')
             ->where('estado_vehiculo', 'ACTIVO')
             ->get();
 
@@ -387,6 +388,11 @@ class OperacionDiariaController extends Controller
                 'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
                 'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
                 'tipo_medicion' => $vehiculo->tipo_medicion,
+                // Tope de lectura por jornada de su tipo (km u horas según
+                // tipo_medicion; null = sin tope). Sólo para avisar en la
+                // franja de lecturas: la validación real es del servidor
+                // (OperacionStoreRequest::validarTopeDeLectura()).
+                'tope_jornada' => $vehiculo->tipoVehiculo?->topeJornada($vehiculo->tipo_medicion),
                 'marca' => $vehiculo->marca,
                 'nro_placa' => $vehiculo->nro_placa,
                 'anio' => $vehiculo->anio,

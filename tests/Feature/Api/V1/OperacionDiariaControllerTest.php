@@ -731,4 +731,44 @@ class OperacionDiariaControllerTest extends TestCase
             collect($response->json('data'))->pluck('id_vehiculo')->all()
         );
     }
+
+    public function test_store_devuelve_422_si_el_recorrido_supera_el_tope_del_tipo(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+        $vehiculo->tipoVehiculo->update(['km_maximo_jornada' => 800]);
+
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+                'kilometraje_inicio' => 5460.7,
+                'kilometraje_fin' => 55101,
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['kilometraje_fin']);
+
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    public function test_update_por_api_tambien_valida_el_tope_del_tipo(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+        $vehiculo->tipoVehiculo->update(['km_maximo_jornada' => 800]);
+
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo))
+            ->assertCreated();
+        $operacion = OperacionDiaria::firstOrFail();
+
+        // Corregir la final dentro del tope funciona; con un error de tipeo
+        // (falta el punto decimal) se rechaza.
+        $this->actingAs($user, 'api')
+            ->putJson(route('api.v1.operacion-diaria.update', $operacion), $this->payloadValido($conductor, $vehiculo, ['kilometraje_fin' => 1600]))
+            ->assertOk();
+        $this->assertEquals(1600, $operacion->fresh()->kilometraje_fin);
+
+        $this->actingAs($user, 'api')
+            ->putJson(route('api.v1.operacion-diaria.update', $operacion), $this->payloadValido($conductor, $vehiculo, ['kilometraje_fin' => 10500]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['kilometraje_fin']);
+        $this->assertEquals(1600, $operacion->fresh()->kilometraje_fin);
+    }
 }

@@ -306,4 +306,43 @@ class TipoVehiculoControllerTest extends TestCase
         $response->assertRedirect(route('tipos-vehiculo.index'));
         $this->assertDatabaseHas('tipo_vehiculo', ['id' => $tipoVehiculo->id]);
     }
+
+    public function test_guarda_y_permite_quitar_los_topes_de_lectura_por_jornada(): void
+    {
+        $grupo = GrupoVehiculo::factory()->create();
+
+        $this->post(route('tipos-vehiculo.store'), [
+            'tipo_vehiculo' => 'Tractocamión',
+            'estado_tipo_vehiculo' => 'ACTIVO',
+            'id_grupo_vehiculo' => $grupo->id,
+            'km_maximo_jornada' => 1200,
+            'horometro_maximo_jornada' => 14,
+        ])->assertSessionHasNoErrors();
+
+        $tipo = TipoVehiculo::where('tipo_vehiculo', 'Tractocamión')->firstOrFail();
+        $this->assertSame(1200.0, $tipo->topeJornada('kilometraje'));
+        $this->assertSame(14.0, $tipo->topeJornada('horometro'));
+
+        $this->put(route('tipos-vehiculo.update', $tipo), [
+            'tipo_vehiculo' => 'Tractocamión',
+            'estado_tipo_vehiculo' => 'ACTIVO',
+            'id_grupo_vehiculo' => $grupo->id,
+            'km_maximo_jornada' => '',
+            'horometro_maximo_jornada' => '',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($tipo->fresh()->topeJornada('kilometraje'));
+        $this->assertNull($tipo->fresh()->topeJornada('horometro'));
+    }
+
+    public function test_el_tope_de_horometro_no_puede_superar_24_horas(): void
+    {
+        $this->post(route('tipos-vehiculo.store'), [
+            'tipo_vehiculo' => 'Excavadora',
+            'estado_tipo_vehiculo' => 'ACTIVO',
+            'id_grupo_vehiculo' => GrupoVehiculo::factory()->create()->id,
+            'horometro_maximo_jornada' => 30,
+            'km_maximo_jornada' => 0,
+        ])->assertSessionHasErrors(['horometro_maximo_jornada', 'km_maximo_jornada']);
+    }
 }

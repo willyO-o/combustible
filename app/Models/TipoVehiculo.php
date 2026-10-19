@@ -12,6 +12,8 @@ use OwenIt\Auditing\Contracts\Auditable;
     'estado_tipo_vehiculo',
     'id_grupo_vehiculo',
     'unidad_capacidad_sugerida',
+    'km_maximo_jornada',
+    'horometro_maximo_jornada',
 ])]
 class TipoVehiculo extends Model implements Auditable
 {
@@ -19,6 +21,22 @@ class TipoVehiculo extends Model implements Auditable
     use \OwenIt\Auditing\Auditable;
 
     protected $table = 'tipo_vehiculo';
+
+    /**
+     * Tope de lectura por jornada de operación diaria según cómo mide el
+     * vehículo: km de recorrido (kilometraje) u horas de horómetro. null =
+     * sin tope.
+     */
+    public function topeJornada(?string $tipoMedicion): ?float
+    {
+        $tope = match ($tipoMedicion) {
+            'kilometraje' => $this->km_maximo_jornada,
+            'horometro' => $this->horometro_maximo_jornada,
+            default => null,
+        };
+
+        return $tope === null ? null : (float) $tope;
+    }
 
     public function grupoVehiculo()
     {

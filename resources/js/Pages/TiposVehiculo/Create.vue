@@ -21,6 +21,10 @@ const form = useForm({
     estado_tipo_vehiculo: props.tipo?.estado_tipo_vehiculo ?? 'ACTIVO',
     id_grupo_vehiculo:    props.tipo?.id_grupo_vehiculo ?? '',
     unidad_capacidad_sugerida: props.tipo?.unidad_capacidad_sugerida ?? '',
+    // Topes de lectura por jornada de operación diaria (vacío = sin tope).
+    // Un tipo nuevo arranca con 1000 km / 24 h, igual que el default de la BD.
+    km_maximo_jornada: isEditing.value ? (props.tipo?.km_maximo_jornada ?? '') : 1000,
+    horometro_maximo_jornada: isEditing.value ? (props.tipo?.horometro_maximo_jornada ?? '') : 24,
     intervalos: (props.tipo?.intervalos ?? []).map((i) => ({
         id_tipo_mantenimiento: i.id_tipo_mantenimiento,
         tipo_medicion:         i.tipo_medicion,
@@ -147,6 +151,42 @@ function submit() {
                                     <InputError :message="form.errors.unidad_capacidad_sugerida" class="mt-1" />
                                     <small class="text-muted">
                                         Precarga la unidad de capacidad al registrar un vehículo de este tipo (ej. m³ para volquetas).
+                                    </small>
+                                </div>
+
+                                <!-- Topes de lectura por jornada (operación diaria) -->
+                                <div class="col-12">
+                                    <span class="form-label fw-medium d-block mb-1">Topes por jornada</span>
+                                    <div class="row g-2">
+                                        <div class="col-sm-6">
+                                            <label for="km_maximo_jornada" class="form-label small text-muted mb-1">
+                                                Recorrido máximo
+                                            </label>
+                                            <div class="input-group">
+                                                <input id="km_maximo_jornada" v-model="form.km_maximo_jornada" type="text"
+                                                    inputmode="decimal" v-decimal="2" class="form-control"
+                                                    :class="{ 'is-invalid': form.errors.km_maximo_jornada }" placeholder="Sin tope" />
+                                                <span class="input-group-text">km</span>
+                                            </div>
+                                            <InputError :message="form.errors.km_maximo_jornada" class="mt-1" />
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label for="horometro_maximo_jornada" class="form-label small text-muted mb-1">
+                                                Horas de horómetro máximas
+                                            </label>
+                                            <div class="input-group">
+                                                <input id="horometro_maximo_jornada" v-model="form.horometro_maximo_jornada" type="text"
+                                                    inputmode="decimal" v-decimal="2" class="form-control"
+                                                    :class="{ 'is-invalid': form.errors.horometro_maximo_jornada }" placeholder="Sin tope" />
+                                                <span class="input-group-text">h</span>
+                                            </div>
+                                            <InputError :message="form.errors.horometro_maximo_jornada" class="mt-1" />
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        Una operación diaria que supere el tope no se guarda: frena errores de tipeo, como un
+                                        punto decimal olvidado. Se aplica el que corresponde a cómo mide cada vehículo.
+                                        Déjalo vacío para no limitar. El horómetro no puede pasar de 24 h.
                                     </small>
                                 </div>
 

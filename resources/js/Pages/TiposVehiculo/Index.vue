@@ -60,6 +60,12 @@ async function confirmDelete(tipo) {
     router.delete(route('tipos-vehiculo.destroy', tipo.id))
 }
 
+// Tope de lectura por jornada: "1.000 km" / "24 h"; vacío = sin tope.
+const textoTope = (valor, unidad) =>
+    valor === null || valor === undefined || valor === ''
+        ? `Sin tope (${unidad})`
+        : `${Number(valor).toLocaleString('es-BO', { maximumFractionDigits: 1 })} ${unidad}`
+
 const estadoBadge = (estado) =>
     estado === 'ACTIVO'
         ? 'bg-success-transparent text-success'
@@ -152,6 +158,7 @@ const estadoBadge = (estado) =>
                             <tr>
                                 <th style="width:60px">#</th>
                                 <th>Tipo de Vehículo</th>
+                                <th style="width:190px">Topes por jornada</th>
                                 <th style="width:160px">Estado</th>
                                 <th style="width:130px">Creado</th>
                                 <th style="width:120px" class="text-center">Acciones</th>
@@ -159,7 +166,7 @@ const estadoBadge = (estado) =>
                         </thead>
                         <tbody>
                             <tr v-if="tipos.data.length === 0">
-                                <td colspan="5" class="text-center py-5 text-muted">
+                                <td colspan="6" class="text-center py-5 text-muted">
                                     <i class="ri-car-line fs-3 d-block mb-2"></i>
                                     No se encontraron tipos de vehículo
                                 </td>
@@ -175,6 +182,10 @@ const estadoBadge = (estado) =>
                                         </span>
                                         <span class="fw-medium">{{ tipo.tipo_vehiculo }}</span>
                                     </div>
+                                </td>
+                                <td class="small" style="font-variant-numeric: tabular-nums">
+                                    <span class="d-block">{{ textoTope(tipo.km_maximo_jornada, 'km') }}</span>
+                                    <span class="d-block text-muted">{{ textoTope(tipo.horometro_maximo_jornada, 'h') }}</span>
                                 </td>
                                 <td>
                                     <span class="badge" :class="estadoBadge(tipo.estado_tipo_vehiculo)">
@@ -232,6 +243,12 @@ const estadoBadge = (estado) =>
                             </div>
                             <span class="badge" :class="estadoBadge(tipo.estado_tipo_vehiculo)">
                                 {{ tipo.estado_tipo_vehiculo }}
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between small mt-2">
+                            <span class="text-muted">Topes por jornada</span>
+                            <span style="font-variant-numeric: tabular-nums">
+                                {{ textoTope(tipo.km_maximo_jornada, 'km') }} · {{ textoTope(tipo.horometro_maximo_jornada, 'h') }}
                             </span>
                         </div>
 

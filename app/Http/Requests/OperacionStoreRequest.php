@@ -83,6 +83,13 @@ class OperacionStoreRequest extends FormRequest
             }
         });
 
+        // Topes de lectura por jornada del tipo de vehículo (ver
+        // validarTopeDeLectura()).
+        $validator->after(function (Validator $validator) {
+            $this->validarTopeDeLectura($validator, 'kilometraje');
+            $this->validarTopeDeLectura($validator, 'horometro');
+        });
+
         $validator->after(function (Validator $validator) {
             $operacion = $this->route('operacionDiaria');
 
@@ -127,6 +134,64 @@ class OperacionStoreRequest extends FormRequest
      *   día siguiente), nunca una fecha futura. Al editar, si el día no cambia
      *   no se exige este límite: la operación ya existía.
      */
+    /**
+     * La lectura de una jornada no puede superar el tope del tipo de
+     * vehículo (TipoVehiculo::km_maximo_jornada / horometro_maximo_jornada,
+     * el que corresponde a su tipo_medicion). Frena errores de tipeo como un
+     * punto decimal olvidado: 5460.7 -> 55101 serían 49.640 km en un día.
+     *
+     * Sólo se evalúa si las lecturas ya pasaron sus reglas (numéricas y
+     * final > inicial). Tipo sin tope (null) = sin control. Aplica igual en
+     * alta y edición, web y API (esta request es compartida).
+     */
+    private function validarTopeDeLectura(Validator $validator, string $tipoMedicion): void
+    {
+        $campoInicio = "{$tipoMedicion}_inicio";
+        $campoFin = "{$tipoMedicion}_fin";
+
+        if ($validator->errors()->hasAny([$campoInicio, $campoFin])) {
+            return;
+        }
+
+        $inicio = $this->input($campoInicio);
+        $fin = $this->input($campoFin);
+
+        if (! is_numeric($inicio) || ! is_numeric($fin) || (float) $fin <= (float) $inicio) {
+            return;
+        }
+
+        // En PUT/PATCH prepareForValidation() ya fijó id_vehiculo al de la operación.
+        $vehiculo = Vehiculo::with('tipoVehiculo:id,tipo_vehiculo,km_maximo_jornada,horometro_maximo_jornada')
+            ->find($this->input('id_vehiculo'));
+
+        if (! $vehiculo || $vehiculo->tipo_medicion !== $tipoMedicion) {
+            return;
+        }
+
+        $tope = $vehiculo->tipoVehiculo?->topeJornada($tipoMedicion);
+        $diferencia = round((float) $fin - (float) $inicio, 2);
+
+        if ($tope === null || $diferencia <= $tope) {
+            return;
+        }
+
+        $tipo = $vehiculo->tipoVehiculo->tipo_vehiculo;
+
+        $validator->errors()->add($campoFin, $tipoMedicion === 'kilometraje'
+            ? "El recorrido de la jornada ({$this->formatearLectura($diferencia)} km) supera el máximo de {$this->formatearLectura($tope)} km para {$tipo}. Revisa el kilometraje final: ¿falta un punto decimal?"
+            : "Las horas de horómetro de la jornada ({$this->formatearLectura($diferencia)} h) superan el máximo de {$this->formatearLectura($tope)} h para {$tipo}. Revisa el horómetro final: ¿falta un punto decimal?");
+    }
+
+    /**
+     * 49640.3 -> "49.640,3"; 1000 -> "1.000" (sin decimales si es entero).
+     */
+    private function formatearLectura(float $valor): string
+    {
+        $decimales = fmod($valor, 1.0) == 0.0 ? 0 : 1;
+
+        return number_format($valor, $decimales, ',', '.');
+    }
+
     private function validarFechaInicio(Validator $validator): void
     {
         $fechaInicio = Carbon::parse($this->input('fecha_inicio'));

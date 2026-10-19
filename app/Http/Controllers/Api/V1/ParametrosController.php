@@ -28,7 +28,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.21.0',
+            'api_version' => '1.22.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -246,6 +246,7 @@ class ParametrosController extends Controller
             EloquentCollection::make($vehiculos->all())->load([
                 'conductorAsignado.persona:id,nombres,paterno,materno,ci',
                 'conductoresAsignados.persona',
+                'tipoVehiculo:id,km_maximo_jornada,horometro_maximo_jornada',
             ]);
         }
 
@@ -265,6 +266,10 @@ class ParametrosController extends Controller
                 'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
                 'url_fotografia' => $vehiculo->url_fotografia,
                 'tipo_medicion' => $vehiculo->tipo_medicion,
+                // Tope de lectura por jornada de su tipo (km u horas según
+                // tipo_medicion; null = sin tope), para avisar en la app
+                // antes de enviar la operación diaria.
+                'tope_jornada' => $vehiculo->tipoVehiculo?->topeJornada($vehiculo->tipo_medicion),
                 'id_conductor' => $conductorAsignado?->id,
                 'conductor_asignado' => $conductorAsignado ? [
                     'id' => $conductorAsignado->id,

@@ -2,6 +2,22 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.22.0 — 2026-10-19
+
+### Agregado
+
+- `GET /parametros/colecciones` → `vehiculos`: nuevo campo `tope_jornada` (número o `null`): lo
+  máximo que puede sumar una operación diaria del vehículo en una jornada, en kilómetros si mide
+  por `kilometraje` o en horas si mide por `horometro`. `null` = sin tope.
+
+### Cambiado
+
+- `POST /operacion-diaria` y `PUT /operacion-diaria/{id}`: si `kilometraje_fin − kilometraje_inicio`
+  (o `horometro_fin − horometro_inicio`) supera el tope por jornada del tipo de vehículo, responden
+  `422` con el error en `kilometraje_fin` (o `horometro_fin`). Sirve para frenar errores de tipeo
+  como un punto decimal olvidado (5460.7 → 55101). Por defecto los topes son 1.000 km y 24 h.
+- `GET /parametros`: `api_version` pasa a `1.22.0`.
+
 ## 1.21.0 — 2026-10-17
 
 ### Cambiado

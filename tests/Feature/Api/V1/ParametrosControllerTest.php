@@ -8,6 +8,7 @@ use App\Models\Material;
 use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoMantenimiento;
+use App\Models\TipoVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\VehiculoExterno;
@@ -428,5 +429,27 @@ class ParametrosControllerTest extends TestCase
         $response->assertOk();
         $this->assertSame([$propio->id], $response->json('data.vehiculos.*.id'));
         $this->assertTrue($response->json('data.vehiculos.0.propio'));
+    }
+
+    public function test_colecciones_envia_el_tope_por_jornada_segun_la_medicion_del_vehiculo(): void
+    {
+        $user = $this->crearUsuarioConductor();
+        $conductor = Conductor::findOrFail($user->id_persona);
+
+        $tipo = TipoVehiculo::factory()->create(['km_maximo_jornada' => 650, 'horometro_maximo_jornada' => 14]);
+        $porKm = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje', 'id_tipo_vehiculo' => $tipo->id]);
+        $porHoras = Vehiculo::factory()->create(['tipo_medicion' => 'horometro', 'id_tipo_vehiculo' => $tipo->id]);
+        $this->asignarVehiculoAConductor($conductor, $porKm);
+        $this->asignarVehiculoAConductor($conductor, $porHoras);
+
+        $vehiculos = collect(
+            $this->actingAs($user, 'api')
+                ->getJson(route('api.v1.parametros.colecciones', ['incluir' => 'vehiculos']))
+                ->assertOk()
+                ->json('data.vehiculos')
+        )->keyBy('id');
+
+        $this->assertEquals(650, $vehiculos[$porKm->id]['tope_jornada']);
+        $this->assertEquals(14, $vehiculos[$porHoras->id]['tope_jornada']);
     }
 }

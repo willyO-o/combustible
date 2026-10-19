@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.21.0"
+  version: "1.22.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.21.0"
+                api_version: "1.22.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -979,6 +979,13 @@ paths:
                     message: Los datos enviados no son válidos.
                     errors:
                       id_conductor: ["El operario seleccionado no existe o no está activo."]
+                tope_de_lectura:
+                  summary: "La lectura final supera el tope por jornada del tipo de vehículo (desde 1.22.0)"
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      kilometraje_fin: ["El recorrido de la jornada (49.640,3 km) supera el máximo de 1.000 km para Tractocamión. Revisa el kilometraje final: ¿falta un punto decimal?"]
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -1181,6 +1188,13 @@ paths:
                     message: Los datos enviados no son válidos.
                     errors:
                       kilometraje_fin: ["El kilometraje fin debe ser mayor que kilometraje inicio."]
+                tope_de_lectura:
+                  summary: "La lectura final supera el tope por jornada del tipo de vehículo (desde 1.22.0)"
+                  value:
+                    success: false
+                    message: Los datos enviados no son válidos.
+                    errors:
+                      kilometraje_fin: ["El recorrido de la jornada (49.640,3 km) supera el máximo de 1.000 km para Tractocamión. Revisa el kilometraje final: ¿falta un punto decimal?"]
                 operario_no_activo:
                   summary: "Se cambió `id_conductor` a un operario que no está ACTIVO"
                   value:
@@ -4009,7 +4023,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.21.0" }
+        api_version: { type: string, example: "1.22.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4079,6 +4093,16 @@ components:
             `true` si el usuario conduce este vehículo o es de un área que administra. Estos
             vehículos van primero en la lista (desde 1.21.0).
           example: true
+        tope_jornada:
+          type: number
+          format: float
+          nullable: true
+          description: >-
+            Máximo que puede sumar una operación diaria de este vehículo en una jornada, según su
+            `tipo_medicion`: kilómetros de recorrido (`kilometraje`) u horas de horómetro
+            (`horometro`). `null` = sin tope. Sirve para avisar en la app antes de enviar; el
+            servidor responde `422` si la lectura final lo supera (desde 1.22.0).
+          example: 1000
         conductores_asignados:
           type: array
           description: >-
@@ -4472,7 +4496,7 @@ components:
           format: float
           nullable: true
           minimum: 0
-          description: Obligatorio si se envía `kilometraje_inicio`. Debe ser mayor a `kilometraje_inicio`.
+          description: Obligatorio si se envía `kilometraje_inicio`. Debe ser mayor a `kilometraje_inicio`. La diferencia `kilometraje_fin − kilometraje_inicio` no puede superar el recorrido máximo por jornada del tipo de vehículo (ver `tope_jornada` en `GET /parametros/colecciones`); si lo supera responde `422` en este campo.
           example: 15510.00
         horometro_inicio:
           type: number
@@ -4486,7 +4510,7 @@ components:
           format: float
           nullable: true
           minimum: 0
-          description: Obligatorio si se envía `horometro_inicio`. Debe ser mayor a `horometro_inicio`.
+          description: Obligatorio si se envía `horometro_inicio`. Debe ser mayor a `horometro_inicio`. La diferencia `horometro_fin − horometro_inicio` no puede superar las horas máximas por jornada del tipo de vehículo (ver `tope_jornada` en `GET /parametros/colecciones`); si lo supera responde `422` en este campo.
           example: null
         observaciones:
           type: string
@@ -4569,7 +4593,7 @@ components:
           format: float
           nullable: true
           minimum: 0
-          description: Opcional en la actualización. Si se envía, debe ser mayor a `kilometraje_inicio`.
+          description: Opcional en la actualización. Si se envía, debe ser mayor a `kilometraje_inicio`. La diferencia `kilometraje_fin − kilometraje_inicio` no puede superar el recorrido máximo por jornada del tipo de vehículo (ver `tope_jornada` en `GET /parametros/colecciones`); si lo supera responde `422` en este campo.
           example: 15525.00
         horometro_inicio:
           type: number
@@ -4583,7 +4607,7 @@ components:
           format: float
           nullable: true
           minimum: 0
-          description: Opcional en la actualización. Si se envía, debe ser mayor a `horometro_inicio`.
+          description: Opcional en la actualización. Si se envía, debe ser mayor a `horometro_inicio`. La diferencia `horometro_fin − horometro_inicio` no puede superar las horas máximas por jornada del tipo de vehículo (ver `tope_jornada` en `GET /parametros/colecciones`); si lo supera responde `422` en este campo.
           example: null
         observaciones:
           type: string

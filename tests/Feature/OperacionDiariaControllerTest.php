@@ -16,6 +16,7 @@ use App\Models\ParametrosEmpresa;
 use App\Models\Persona;
 use App\Models\TipoCombustible;
 use App\Models\TipoMantenimiento;
+use App\Models\TipoVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -2048,5 +2049,137 @@ class OperacionDiariaControllerTest extends TestCase
 
         $this->actingAs($conductorUser)->get(route('operacion-diaria.create'))
             ->assertInertia(fn (Assert $page) => $page->where('puedeRegularizar', false));
+    }
+
+    /**
+     * Conductor con un vehículo de $tipoMedicion cuyo tipo tiene los topes
+     * indicados, listo para registrar su operación.
+     *
+     * @return array{0: User, 1: Vehiculo}
+     */
+    private function escenarioConTope(string $tipoMedicion, ?float $kmMaximo = 1000, ?float $horasMaximas = 24): array
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $tipo = TipoVehiculo::factory()->create([
+            'tipo_vehiculo' => 'Tractocamión',
+            'km_maximo_jornada' => $kmMaximo,
+            'horometro_maximo_jornada' => $horasMaximas,
+        ]);
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => $tipoMedicion, 'id_tipo_vehiculo' => $tipo->id]);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        return [$user, $vehiculo];
+    }
+
+    public function test_rechaza_un_recorrido_que_supera_el_tope_del_tipo_de_vehiculo(): void
+    {
+        [$user, $vehiculo] = $this->escenarioConTope('kilometraje', 900);
+
+        // Punto decimal olvidado: 5460.7 -> 55101 = 49.640,3 km en un día.
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'kilometraje_inicio' => 5460.7,
+            'kilometraje_fin' => 55101,
+        ]))->assertSessionHasErrors([
+            'kilometraje_fin' => 'El recorrido de la jornada (49.640,3 km) supera el máximo de 900 km para Tractocamión. Revisa el kilometraje final: ¿falta un punto decimal?',
+        ]);
+
+        $this->assertDatabaseCount('operacion_diaria', 0);
+    }
+
+    public function test_acepta_un_recorrido_igual_al_tope(): void
+    {
+        [$user, $vehiculo] = $this->escenarioConTope('kilometraje', 900);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'kilometraje_inicio' => 5460.7,
+            'kilometraje_fin' => 6360.7,
+        ]))->assertSessionHasNoErrors()->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_un_tipo_sin_tope_no_limita_el_recorrido(): void
+    {
+        [$user, $vehiculo] = $this->escenarioConTope('kilometraje', null);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'kilometraje_inicio' => 5460.7,
+            'kilometraje_fin' => 55101,
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_los_tipos_nuevos_traen_los_topes_por_defecto(): void
+    {
+        $tipo = TipoVehiculo::factory()->create();
+
+        $this->assertSame(1000.0, $tipo->fresh()->topeJornada('kilometraje'));
+        $this->assertSame(24.0, $tipo->fresh()->topeJornada('horometro'));
+    }
+
+    public function test_rechaza_horas_de_horometro_que_superan_el_tope(): void
+    {
+        [$user, $vehiculo] = $this->escenarioConTope('horometro', 1000, 12);
+
+        $payload = $this->payloadOperacionValida($vehiculo, [
+            'kilometraje_inicio' => null,
+            'kilometraje_fin' => null,
+            'horometro_inicio' => 1210.5,
+            'horometro_fin' => 1230.5,
+            'actividades_realizadas' => [['actividad' => 'Carguío', 'lugar' => 'Frente norte']],
+        ]);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $payload)
+            ->assertSessionHasErrors([
+                'horometro_fin' => 'Las horas de horómetro de la jornada (20 h) superan el máximo de 12 h para Tractocamión. Revisa el horómetro final: ¿falta un punto decimal?',
+            ]);
+
+        $payload['horometro_fin'] = 1220;
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $payload)->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_el_tope_de_kilometraje_no_se_aplica_a_un_vehiculo_por_horometro(): void
+    {
+        // El tipo tiene un tope de km mínimo, pero el vehículo mide por
+        // horómetro: sólo cuenta el tope de horas.
+        [$user, $vehiculo] = $this->escenarioConTope('horometro', 1, 24);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo, [
+            'kilometraje_inicio' => null,
+            'kilometraje_fin' => null,
+            'horometro_inicio' => 100,
+            'horometro_fin' => 108,
+            'actividades_realizadas' => [['actividad' => 'Carguío', 'lugar' => 'Frente norte']],
+        ]))->assertSessionHasNoErrors();
+    }
+
+    public function test_al_editar_tambien_se_valida_el_tope(): void
+    {
+        [$user, $vehiculo] = $this->escenarioConTope('kilometraje', 900);
+
+        $this->actingAs($user)->post(route('operacion-diaria.store'), $this->payloadOperacionValida($vehiculo))
+            ->assertSessionHasNoErrors();
+        $operacion = OperacionDiaria::firstOrFail();
+
+        $this->actingAs($user)->put(route('operacion-diaria.update', $operacion), $this->payloadOperacionValida($vehiculo, [
+            'kilometraje_inicio' => 1000,
+            'kilometraje_fin' => 10500,
+        ]))->assertSessionHasErrors('kilometraje_fin');
+
+        $this->assertEquals(1050, $operacion->fresh()->kilometraje_fin);
+    }
+
+    public function test_el_formulario_recibe_el_tope_por_jornada_del_vehiculo(): void
+    {
+        [$user, $vehiculo] = $this->escenarioConTope('kilometraje', 750);
+
+        $this->actingAs($user)->get(route('operacion-diaria.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vehiculosAsignados', fn ($opciones) => collect($opciones)->firstWhere('id', $vehiculo->id)['meta']['tope_jornada'] == 750)
+            );
     }
 }

@@ -184,6 +184,36 @@ const materialNombre = (id) => props.materiales.find((m) => m.id === id)?.materi
 
 
 const tipoMedicion = ref('') // 'kilometraje' o 'horometro'
+// Tope de lectura por jornada del tipo del vehículo (km u horas; null = sin
+// tope). Sólo para avisar en la franja de lecturas: el servidor lo valida.
+const topeJornada = ref(null)
+
+// Qué datos lleva cada actividad según cómo mide el vehículo: por
+// kilometraje es un recorrido (origen -> destino, material opcional); por
+// horómetro, el lugar donde trabajó el equipo. Mismo criterio que el backend
+// (OperacionStoreRequest: lugar u origen/destino según tipo_medicion).
+const MODOS_ACTIVIDAD = {
+    kilometraje: {
+        etiqueta: 'Kilometraje',
+        icono: 'ri-road-map-line',
+        descripcion: 'Registra el recorrido (origen y destino) y, si trasladó carga, el material.',
+        ejemploUnidad: 'Ej: viajes, cargas',
+    },
+    horometro: {
+        etiqueta: 'Horómetro',
+        icono: 'ri-timer-line',
+        descripcion: 'Registra el lugar donde trabajó el equipo.',
+        ejemploUnidad: 'Ej: m³, pasadas, horas',
+    },
+}
+const modoActual = computed(() => MODOS_ACTIVIDAD[tipoMedicion.value] ?? null)
+
+// Una actividad se presenta como recorrido o como lugar según el vehículo;
+// si el dato guardado no calza (actividades antiguas), se muestra lo que trae.
+const esRecorrido = (r) =>
+    tipoMedicion.value ? tipoMedicion.value === 'kilometraje' : !!(r.origen || r.destino)
+const tieneValor = (v) => v !== null && v !== undefined && v !== ''
+const cantidadActividad = (r) => [r.cantidad, r.unidad_medida].filter(tieneValor).join(' ')
 
 // Horas trabajadas: sólo de referencia en el formulario, se calcula en
 // vivo a partir de fecha_inicio/fecha_fin (el backend igual las recalcula
@@ -237,8 +267,18 @@ const lecturaCalculada = computed(() => {
 
     // Lecturas con 1 decimal: se redondea para no arrastrar errores de coma
     // flotante (1221.5 - 1210.2 = 11.299999...).
-    return { ...base, estado: 'ok', valor: Math.round((fin - inicio) * 10) / 10 }
+    const valor = Math.round((fin - inicio) * 10) / 10
+
+    // Más que el tope del tipo de vehículo: casi seguro un error de tipeo
+    // (ej. punto decimal olvidado). El servidor no guardará la operación.
+    if (topeJornada.value !== null && valor > topeJornada.value) {
+        return { ...base, estado: 'excede', valor }
+    }
+
+    return { ...base, estado: 'ok', valor }
 })
+
+const formatearTope = (valor) => Number(valor).toLocaleString('es-BO', { maximumFractionDigits: 1 })
 
 // Horómetro vs. jornada: qué parte de las horas trabajadas estuvo el equipo
 // en marcha. Si el horómetro supera la jornada (con 0.1 h de tolerancia) casi
@@ -281,6 +321,7 @@ const operariosOpt = computed(() => {
 watch(() => form.id_vehiculo, async (val, oldVal) => {
 
     tipoMedicion.value = ''
+    topeJornada.value = null
 
     // Al cambiar de vehículo (no en la selección inicial) se vacían las
     // actividades y los campos que dependen del tipo_medicion: origen/destino
@@ -303,6 +344,7 @@ watch(() => form.id_vehiculo, async (val, oldVal) => {
 
     if (vehiculoSelected) {
         tipoMedicion.value = vehiculoSelected.meta.tipo_medicion
+        topeJornada.value = vehiculoSelected.meta.tope_jornada ?? null
     }
 
     // Cualquier operario activo es válido para cualquier vehículo, así que el
@@ -416,14 +458,35 @@ const mantenimientosRegistrados = computed(
     () => form.mantenimientos.filter(mantenimientoRegistrado).length,
 )
 
+function abrirModalActividad() {
+    formActividad.clearErrors()
+    estaAbiertoModal.value = true
+}
+
+function cerrarModalActividad() {
+    formActividad.clearErrors()
+    estaAbiertoModal.value = false
+}
+
 const agregarActividad = () => {
 
-
     formActividad.post(route('operacion-diaria.agregar-actividad'), {
+        preserveScroll: true,
         onSuccess: () => {
 
-            // Agregar la actividad al arreglo de actividades_realizadas
-            form.actividades_realizadas.push({ ...formActividad });
+            // Sólo los datos de la actividad (no el objeto useForm entero,
+            // que arrastraba errors/processing/métodos al formulario
+            // principal). Se descarta el campo que no corresponde al tipo de
+            // medición del vehículo.
+            const datos = formActividad.data()
+            if (tipoMedicion.value === 'kilometraje') {
+                datos.lugar = ''
+            } else if (tipoMedicion.value === 'horometro') {
+                datos.origen = ''
+                datos.destino = ''
+                datos.id_material = ''
+            }
+            form.actividades_realizadas.push(datos);
 
             // Limpiar el formulario de actividad
             formActividad.actividad = '';
@@ -713,14 +776,14 @@ onMounted(() => {
                                         <div v-if="lecturaCalculada" class="op-calc__item" :class="{
                                             'op-calc__item--ok': lecturaCalculada.estado === 'ok' && !usoDeJornada?.excede,
                                             'op-calc__item--warning': usoDeJornada?.excede,
-                                            'op-calc__item--danger': lecturaCalculada.estado === 'invalido',
+                                            'op-calc__item--danger': ['invalido', 'excede'].includes(lecturaCalculada.estado),
                                         }">
                                             <span class="op-calc__label">
                                                 <i class="bi" :class="lecturaCalculada.icono" aria-hidden="true"></i>
                                                 {{ lecturaCalculada.etiqueta }}
                                             </span>
                                             <span class="op-calc__value">
-                                                <template v-if="lecturaCalculada.estado === 'ok'">
+                                                <template v-if="['ok', 'excede'].includes(lecturaCalculada.estado)">
                                                     {{ lecturaCalculada.valor.toFixed(1) }}<span class="op-calc__unit">{{ lecturaCalculada.unidad }}</span>
                                                 </template>
                                                 <template v-else>—</template>
@@ -728,6 +791,11 @@ onMounted(() => {
                                             <span v-if="lecturaCalculada.estado === 'invalido'" class="op-calc__hint">
                                                 <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
                                                 La lectura final debe ser mayor a la inicial
+                                            </span>
+                                            <span v-else-if="lecturaCalculada.estado === 'excede'" class="op-calc__hint" role="alert">
+                                                <i class="bi bi-exclamation-octagon" aria-hidden="true"></i>
+                                                Supera el máximo de {{ formatearTope(topeJornada) }} {{ lecturaCalculada.unidad }} por jornada
+                                                para este tipo de vehículo. Revisa la lectura final: ¿falta un punto decimal?
                                             </span>
                                             <span v-else-if="usoDeJornada?.excede" class="op-calc__hint">
                                                 <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
@@ -737,7 +805,7 @@ onMounted(() => {
                                                 Completa la lectura inicial y final
                                             </span>
                                             <span v-else class="op-calc__hint">
-                                                {{ lecturaCalculada.origen }}<template v-if="usoDeJornada"> · {{ usoDeJornada.porcentaje }} % de la jornada</template>
+                                                {{ lecturaCalculada.origen }}<template v-if="usoDeJornada"> · {{ usoDeJornada.porcentaje }} % de la jornada</template><template v-if="topeJornada !== null"> · máx. {{ formatearTope(topeJornada) }} {{ lecturaCalculada.unidad }}</template>
                                             </span>
                                         </div>
                                     </div>
@@ -785,85 +853,76 @@ onMounted(() => {
                             <div class="card-title"><i class="ri-settings-3-line me-2"></i>
                                 Actividades realizadas
                             </div>
-
+                            <span v-if="modoActual" class="badge bg-info-transparent text-info op-act-modo"
+                                :title="modoActual.descripcion">
+                                <i :class="modoActual.icono" class="me-1" aria-hidden="true"></i>{{ modoActual.etiqueta }}
+                            </span>
                         </div>
                         <div class="card-body pt-2 text-center">
 
-                            <div v-for="(r, idx) in form.actividades_realizadas" :key="idx"
-                                class="border rounded-3 p-3 mb-3 bg-white rounded-3 shadow-sm ">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <span class="fw-medium  text-muted">
-                                        {{ idx + 1 }} . {{ r.actividad }}
-                                    </span>
-                                    <button type="button" class="btn btn-sm btn-icon btn-danger-light"
-                                        @click="quitarActividad(idx)">
-                                        <i class="ri-close-line"></i>
-                                    </button>
-                                </div>
-                                <div class="row g-2 ps-4 p-2">
-                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
-                                        <label class="form-label form-label-sm fw-medium mb-0">
-                                            <i class="ri-map-pin-line text-info"></i>
-
-                                            Origen:
-                                        </label>
-                                        <p class="mb-0">
-                                            {{ r.origen }}
-                                        </p>
-                                    </div>
-                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
-                                        <label class="form-label form-label-sm fw-medium mb-0">
-                                            <i class="ri-map-pin-line text-info"></i>
-
-                                            Destino:
-                                        </label>
-                                        <p class="mb-0">
-                                            {{ r.destino }}
-                                        </p>
+                            <ol v-if="form.actividades_realizadas.length" class="op-act-lista text-start">
+                                <li v-for="(r, idx) in form.actividades_realizadas" :key="idx" class="op-act"
+                                    :class="{ 'op-act--error': showErrorActividad(idx) }">
+                                    <div class="op-act__cabecera">
+                                        <span class="op-act__num" aria-hidden="true">{{ idx + 1 }}</span>
+                                        <span class="op-act__nombre">{{ r.actividad }}</span>
+                                        <button type="button" class="btn btn-sm btn-icon btn-danger-light flex-shrink-0"
+                                            :title="`Quitar la actividad ${idx + 1}`" :aria-label="`Quitar la actividad ${idx + 1}`"
+                                            @click="quitarActividad(idx)">
+                                            <i class="ri-close-line"></i>
+                                        </button>
                                     </div>
 
-                                    <div v-if="r.id_material" class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
-                                        <label class="form-label form-label-sm fw-medium mb-0">
-                                            <i class="ri-stack-line text-info"></i>
+                                    <dl class="op-act__datos">
+                                        <!-- Kilometraje: un recorrido de origen a destino -->
+                                        <div v-if="esRecorrido(r)" class="op-act__dato op-act__dato--ancho">
+                                            <dt>Recorrido</dt>
+                                            <dd class="op-act__ruta">
+                                                <span><i class="ri-map-pin-line" aria-hidden="true"></i>{{ r.origen || '—' }}</span>
+                                                <i class="ri-arrow-right-line op-act__flecha" aria-label="hacia"></i>
+                                                <span><i class="ri-flag-line" aria-hidden="true"></i>{{ r.destino || '—' }}</span>
+                                            </dd>
+                                        </div>
+                                        <div v-if="esRecorrido(r)" class="op-act__dato">
+                                            <dt>Material</dt>
+                                            <dd :class="{ 'op-act__vacio': !r.id_material }">
+                                                <i class="ri-stack-line" aria-hidden="true"></i>{{ r.id_material ? materialNombre(r.id_material) : 'Sin carga' }}
+                                            </dd>
+                                        </div>
 
-                                            Material:
-                                        </label>
-                                        <p class="mb-0">
-                                            {{ materialNombre(r.id_material) }}
-                                        </p>
+                                        <!-- Horómetro: el lugar donde trabajó el equipo (y actividades
+                                             antiguas que lo traen aunque el vehículo mida por km) -->
+                                        <div v-if="!esRecorrido(r) || r.lugar" class="op-act__dato" :class="{ 'op-act__dato--ancho': !esRecorrido(r) }">
+                                            <dt>Lugar</dt>
+                                            <dd :class="{ 'op-act__vacio': !r.lugar }">
+                                                <i class="ri-map-pin-2-line" aria-hidden="true"></i>{{ r.lugar || '—' }}
+                                            </dd>
+                                        </div>
+
+                                        <div class="op-act__dato">
+                                            <dt>Cantidad</dt>
+                                            <dd :class="{ 'op-act__vacio': !cantidadActividad(r) }">{{ cantidadActividad(r) || '—' }}</dd>
+                                        </div>
+
+                                        <!-- Horas ya no se capturan: sólo actividades antiguas las traen al editar -->
+                                        <div v-if="r.hora_inicio || r.hora_fin" class="op-act__dato">
+                                            <dt>Horario</dt>
+                                            <dd>{{ r.hora_inicio }} - {{ r.hora_fin }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    <div v-if="showErrorActividad(idx)" class="op-act__error">
+                                        <i class="ri-error-warning-line me-1" aria-hidden="true"></i>{{ showErrorActividad(idx) }}
                                     </div>
-
-                                    <div class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
-                                        <label class="form-label form-label-sm fw-medium mb-0">
-                                            <i class="ri-map-pin-line text-info"></i>
-
-                                            Cantidad:
-                                        </label>
-                                        <p class="mb-0">
-                                            {{ [r.cantidad, r.unidad_medida].filter(v => v !== null && v !== undefined && v !== '').join(' ') || '—' }}
-                                        </p>
-                                    </div>
-
-                                    <!-- Horas ya no se capturan: sólo actividades antiguas las traen al editar -->
-                                    <div v-if="r.hora_inicio || r.hora_fin" class="col-sm-6 small d-flex align-items-center  gap-3 my-0">
-                                        <label class="form-label form-label-sm fw-medium mb-0">
-                                            <i class="ri-map-pin-line text-info"></i>
-
-                                            Horario:
-                                        </label>
-                                        <p class="mb-0">
-                                            {{ r.hora_inicio }} - {{ r.hora_fin }}
-                                        </p>
-                                    </div>
-                                    <div v-if="showErrorActividad(idx)" class="text-danger">{{
-                                        showErrorActividad(idx) }}</div>
-
-                                </div>
-                            </div>
+                                </li>
+                            </ol>
+                            <p v-else-if="form.id_vehiculo" class="text-muted small mb-0 mt-2">
+                                Aún no hay actividades. Agrega al menos una de la jornada.
+                            </p>
 
                             <button type="button"
                                 class="text-center px-5 py-2 border border-info mt-4 mb-2 rounded-pill btn-wave btn btn-info-light"
-                                :disabled="!form.id_vehiculo" @click="estaAbiertoModal = true">
+                                :disabled="!form.id_vehiculo" @click="abrirModalActividad">
                                 <i class="ri-add-line"></i>
                                 <small>Añadir actividad</small>
                             </button>
@@ -978,14 +1037,17 @@ onMounted(() => {
 
 
 
-        <Modal :show="estaAbiertoModal" maxWidth="md" @close="estaAbiertoModal = false">
+        <Modal :show="estaAbiertoModal" maxWidth="md" @close="cerrarModalActividad">
 
             <form action="" @submit.prevent="agregarActividad">
                 <div class="p-6">
-                    <h2 class="text-lg text-center font-medium text-gray-600">Detalles de actividad</h2>
+                    <h2 class="text-lg text-center font-medium text-gray-600">Nueva actividad</h2>
 
-                    <p class="mt-2 text-sm text-gray-600 text-sm text-center">
-                        Aquí puedes colocar todo el contenido que desees mostrar dentro del modal.
+                    <p v-if="modoActual" class="op-act-modal__modo">
+                        <span class="badge bg-info-transparent text-info">
+                            <i :class="modoActual.icono" class="me-1" aria-hidden="true"></i>{{ modoActual.etiqueta }}
+                        </span>
+                        <span>{{ modoActual.descripcion }}</span>
                     </p>
 
                     <div class="row g-3">
@@ -1009,25 +1071,25 @@ onMounted(() => {
 
                         </div>
 
-                        <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
-                            <label class="form-label fw-medium">
-                                Origen <span class="text-danger">*</span>
+                        <div v-if="tipoMedicion == 'kilometraje'" class="col-sm-6">
+                            <label for="actividad-origen" class="form-label fw-medium">
+                                <i class="ri-map-pin-line text-info me-1" aria-hidden="true"></i>Origen <span class="text-danger">*</span>
                             </label>
-                            <input v-model="formActividad.origen" type="text" class="form-control"
-                                :class="{ 'is-invalid': formActividad.errors.origen }" placeholder="Lugar de origen" />
+                            <input id="actividad-origen" v-model="formActividad.origen" type="text" class="form-control"
+                                :class="{ 'is-invalid': formActividad.errors.origen }" placeholder="Ej: Cantera" maxlength="255" />
 
                             <div v-if="formActividad.errors.origen" class="text-danger small mt-1">{{
                                 formActividad.errors.origen }}</div>
 
                         </div>
 
-                        <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
-                            <label class="form-label fw-medium">
-                                Destino <span class="text-danger">*</span>
+                        <div v-if="tipoMedicion == 'kilometraje'" class="col-sm-6">
+                            <label for="actividad-destino" class="form-label fw-medium">
+                                <i class="ri-flag-line text-info me-1" aria-hidden="true"></i>Destino <span class="text-danger">*</span>
                             </label>
-                            <input v-model="formActividad.destino" type="text" class="form-control"
+                            <input id="actividad-destino" v-model="formActividad.destino" type="text" class="form-control"
                                 :class="{ 'is-invalid': formActividad.errors.destino }"
-                                placeholder="Lugar de destino" />
+                                placeholder="Ej: Planta" maxlength="255" />
 
                             <div v-if="formActividad.errors.destino" class="text-danger small mt-1">{{
                                 formActividad.errors.destino }}</div>
@@ -1035,10 +1097,10 @@ onMounted(() => {
                         </div>
 
                         <div v-if="tipoMedicion == 'kilometraje'" class="col-12">
-                            <label class="form-label fw-medium">
-                                Material trasladado
+                            <label for="actividad-material" class="form-label fw-medium">
+                                <i class="ri-stack-line text-info me-1" aria-hidden="true"></i>Material trasladado
                             </label>
-                            <select v-model="formActividad.id_material" class="form-select"
+                            <select id="actividad-material" v-model="formActividad.id_material" class="form-select"
                                 :class="{ 'is-invalid': formActividad.errors.id_material }">
                                 <option value="">Sin material (traslado sin carga)</option>
                                 <option v-for="m in materiales" :key="m.id" :value="m.id">{{ m.material }}</option>
@@ -1049,12 +1111,12 @@ onMounted(() => {
                         </div>
 
                         <div v-if="tipoMedicion == 'horometro'" class="col-12">
-                            <label class="form-label fw-medium">
-                                Lugar <span class="text-danger">*</span>
+                            <label for="actividad-lugar" class="form-label fw-medium">
+                                <i class="ri-map-pin-2-line text-info me-1" aria-hidden="true"></i>Lugar de trabajo <span class="text-danger">*</span>
                             </label>
-                            <input v-model="formActividad.lugar" type="text" class="form-control"
+                            <input id="actividad-lugar" v-model="formActividad.lugar" type="text" class="form-control"
                                 :class="{ 'is-invalid': formActividad.errors.lugar }"
-                                placeholder="Lugar de la actividad" />
+                                placeholder="Ej: Frente de explotación norte" maxlength="255" />
 
                             <div v-if="formActividad.errors.lugar" class="text-danger small mt-1">{{
                                 formActividad.errors.lugar }}</div>
@@ -1077,7 +1139,7 @@ onMounted(() => {
                             </label>
                             <input v-model="formActividad.unidad_medida" type="text" class="form-control"
                                 :class="{ 'is-invalid': formActividad.errors.unidad_medida }"
-                                placeholder="Viajes, Cargas, etc. " />
+                                :placeholder="modoActual?.ejemploUnidad ?? 'Ej: viajes, cargas'" maxlength="30" />
 
                             <div v-if="formActividad.errors.unidad_medida" class="text-danger small mt-1">{{
                                 formActividad.errors.unidad_medida }}</div>
@@ -1088,12 +1150,13 @@ onMounted(() => {
 
                     <!-- Botón para cerrar el modal desde adentro -->
                     <div class="mt-6 flex justify-between">
-                        <button @click="estaAbiertoModal = false" class="btn btn-secondary" type="button">
+                        <button @click="cerrarModalActividad" class="btn btn-secondary" type="button">
                             Cancelar
                         </button>
 
-                        <button class="btn btn-primary">
-                            Agregar Actividad
+                        <button class="btn btn-primary" :disabled="formActividad.processing">
+                            <span v-if="formActividad.processing" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Agregar actividad
                         </button>
                     </div>
 

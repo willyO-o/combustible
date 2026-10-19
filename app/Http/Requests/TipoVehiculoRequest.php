@@ -24,6 +24,12 @@ class TipoVehiculoRequest extends FormRequest
             // (ver VehiculoRequest); no obliga nada acá.
             'unidad_capacidad_sugerida' => ['nullable', 'string', 'max:20'],
 
+            // Topes de lectura por jornada en la operación diaria (frenan
+            // errores de tipeo como un punto decimal olvidado). Vacío = sin
+            // tope. El horómetro no puede sumar más de 24 h en un día.
+            'km_maximo_jornada' => ['nullable', 'numeric', 'min:1', 'max:99999'],
+            'horometro_maximo_jornada' => ['nullable', 'numeric', 'min:0.5', 'max:24'],
+
             // Intervalos de mantenimiento (referencia para futuras alertas): a lo
             // sumo un intervalo por tipo de mantenimiento.
             'intervalos' => ['nullable', 'array'],
@@ -45,6 +51,8 @@ class TipoVehiculoRequest extends FormRequest
             'estado_tipo_vehiculo' => 'estado',
             'id_grupo_vehiculo' => 'grupo de vehículo',
             'unidad_capacidad_sugerida' => 'unidad de capacidad sugerida',
+            'km_maximo_jornada' => 'recorrido máximo por jornada',
+            'horometro_maximo_jornada' => 'horas de horómetro máximas por jornada',
             'intervalos.*.id_tipo_mantenimiento' => 'tipo de mantenimiento',
             'intervalos.*.tipo_medicion' => 'medición',
             'intervalos.*.frecuencia' => 'frecuencia',

@@ -2107,3 +2107,162 @@
         width: 100%;
     }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Actividades de la operación diaria (Operacion/Create.vue)          */
+/*  Cada actividad muestra los datos de su tipo de medición:           */
+/*  kilometraje = recorrido (origen -> destino) + material;            */
+/*  horómetro = lugar de trabajo. Mismo lenguaje que .op-calc: borde   */
+/*  fino, tinte primario, sólo tokens del tema (claro y oscuro).        */
+/* ------------------------------------------------------------------ */
+.op-act-modo {
+    font-weight: 500;
+}
+
+.op-act-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.op-act {
+    padding: 0.75rem 0.875rem 0.8rem;
+    border: 1px solid var(--default-border);
+    border-radius: 0.5rem;
+    background-color: var(--custom-white);
+    transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+.op-act--error {
+    border-color: rgba(var(--danger-rgb), 0.45);
+    background-color: rgba(var(--danger-rgb), 0.04);
+}
+
+.op-act__cabecera {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+
+.op-act__num {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 50%;
+    background-color: rgba(var(--primary-rgb), 0.1);
+    color: var(--primary-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.op-act__nombre {
+    flex: 1;
+    min-width: 0;
+    padding-top: 0.15rem;
+    font-weight: 600;
+    color: var(--default-text-color);
+    overflow-wrap: anywhere;
+}
+
+.op-act__datos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.5rem 1rem;
+    margin: 0.625rem 0 0;
+    padding-inline-start: 2.25rem;
+}
+
+.op-act__dato {
+    min-width: 0;
+}
+
+.op-act__dato--ancho {
+    grid-column: 1 / -1;
+}
+
+.op-act__dato dt {
+    margin-bottom: 0.1rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+
+.op-act__dato dd {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--default-text-color);
+    overflow-wrap: anywhere;
+}
+
+.op-act__dato dd > i,
+.op-act__ruta i {
+    flex-shrink: 0;
+    color: rgb(var(--info-rgb));
+}
+
+.op-act__dato dd.op-act__vacio {
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.op-act__dato dd.op-act__vacio > i {
+    color: var(--text-muted);
+}
+
+/* Recorrido: origen -> destino en una línea; se parte en dos si no cabe. */
+.op-act__ruta {
+    flex-wrap: wrap;
+}
+
+.op-act__ruta > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.op-act__ruta .op-act__flecha {
+    color: var(--text-muted);
+}
+
+.op-act__error {
+    margin: 0.5rem 0 0;
+    padding-inline-start: 2.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    /* El coral del tema no llega a 4.5:1 como texto (ver .op-calc): se
+       mezcla con el color de texto; sin color-mix queda el color normal. */
+    color: var(--default-text-color);
+    color: color-mix(in srgb, rgb(var(--danger-rgb)) 55%, var(--default-text-color));
+}
+
+/* Modal "Nueva actividad": qué se registra según el vehículo. */
+.op-act-modal__modo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0 1rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+@media (max-width: 575.98px) {
+    .op-act__datos,
+    .op-act__error {
+        padding-inline-start: 0;
+    }
+}
