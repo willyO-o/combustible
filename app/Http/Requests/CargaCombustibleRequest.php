@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Vehiculo;
 use App\Rules\GreaterThanPreviousReading;
+use App\Rules\VehiculoSeleccionable;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -74,7 +75,13 @@ class CargaCombustibleRequest extends FormRequest
 
                 return $vehiculo && $vehiculo->tipo_medicion === 'horometro';
             }), 'nullable', 'numeric', 'min:0', new GreaterThanPreviousReading($this->id_vehiculo, 'horometro')],
-            'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id'],
+            // Al registrar sin vale: vehículo ACTIVO (cualquiera para todo rol
+            // o combinación de roles; el conductor puro, sólo los suyos). Un
+            // registro offline basta con que exista. Con vale el vehículo sale
+            // del vale (CreateCargaCombustibleAction) y al editar no cambia.
+            'id_vehiculo' => $this->isMethod('POST') && ! $this->filled('id_vale')
+                ? ['required', 'integer', new VehiculoSeleccionable($this->user(), permitirInactivo: $esRegistroOffline)]
+                : ['required', 'integer', 'exists:vehiculo,id'],
             // 'id_grifo' => ['required', 'integer', 'exists:grifo,id'],
             // 'id_tipo_combustible' => ['required', 'integer', 'exists:tipo_combustible,id'],
             // Obligatorio sólo en la web (el formulario lo pide); la API lo

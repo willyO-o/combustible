@@ -73,6 +73,11 @@ class ValeController extends Controller
         $grifos = Grifo::where('estado_grifo', 'ACTIVO')
             ->get(['id', 'razon_social', 'ciudad', 'es_principal']);
 
+        // El conductor puro no elige operario: el vale queda a su nombre
+        // (ValeRequest lo fuerza) y sólo ve sus vehículos asignados.
+        $user = $request->user();
+        $conductorPropio = $user->esConductorPuro() ? $user->persona?->conductor?->load('persona') : null;
+
         return Inertia::render('Vales/Create', [
             'nextNroVale' => $nextNroVale,
             'tiposCombustible' => $tiposCombustible,
@@ -84,12 +89,19 @@ class ValeController extends Controller
             // la asignación todavía no es confiable). Los asignados al
             // vehículo elegido se sugieren primero (meta.conductores_asignados
             // de searchVehiculos()).
-            'operarios' => $listOperarios->execute()->all(),
-            // TODOS los vehículos activos para cualquier usuario (a pedido del
-            // usuario, la asignación a áreas todavía no es confiable), ya
-            // cargados para el select. Los de las áreas del jefe van primero
-            // con meta.propio.
-            'vehiculos' => $listVehiculos->execute($request->user())->all(),
+            'operarios' => $user->esConductorPuro() ? [] : $listOperarios->execute()->all(),
+            'operarioPropio' => $conductorPropio ? [
+                'id' => $conductorPropio->id,
+                'label' => trim($conductorPropio->persona->nombre_completo)." (CI: {$conductorPropio->persona->ci})",
+            ] : null,
+            // Rol conductor sin ficha de conductor: no tiene vehículos ni puede
+            // registrar a su nombre; la vista muestra un aviso en lugar de
+            // selectores vacíos.
+            'sinFichaConductor' => $user->esConductorPuro() && ! $conductorPropio,
+            // TODOS los vehículos activos para cualquier rol o combinación de
+            // roles (los de las áreas del jefe van primero con meta.propio);
+            // el conductor puro, sólo sus asignados.
+            'vehiculos' => $listVehiculos->execute($user)->all(),
         ]);
     }
 

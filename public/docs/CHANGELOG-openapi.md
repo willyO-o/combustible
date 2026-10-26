@@ -2,6 +2,30 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.23.0 — 2026-10-26
+
+### Agregado
+
+- `GET /parametros/colecciones` → `cargas_combustible.operarios`: operarios elegibles para
+  `id_conductor` al registrar una carga sin vale (todos los conductores `ACTIVO`, mismo formato que
+  `operaciones_diarias.operarios`). Vacío para el conductor puro.
+
+### Cambiado
+
+- Regla común para `POST /vales`, `POST /cargas` (sin vale) y `POST /operacion-diaria`:
+  - Cualquier rol o combinación de roles (administrador, jefe de área, técnico, jefe + conductor…)
+    puede usar **cualquier vehículo `ACTIVO`**.
+  - El **conductor puro** (rol conductor sin otro rol de gestión) sólo puede usar los vehículos que
+    tiene asignados; si no, `422` en `id_vehiculo`: "Sólo puedes registrar con un vehículo que
+    tengas asignado.".
+  - Un vehículo que no está `ACTIVO` responde `422` en `id_vehiculo`: "El vehículo seleccionado no
+    está activo.". Excepción: `POST /cargas` con `is_offline = true` (basta con que exista).
+- `POST /vales`: para el conductor puro el vale queda **siempre a su nombre**; se ignora el
+  `id_conductor` enviado (igual que ya ocurría en cargas y operación diaria).
+- `GET /parametros/colecciones` → `vehiculos`: la lista del conductor puro ya no incluye vehículos
+  que no estén `ACTIVO` (aunque su asignación siga vigente).
+- `GET /parametros`: `api_version` pasa a `1.23.0`.
+
 ## 1.22.0 — 2026-10-19
 
 ### Agregado

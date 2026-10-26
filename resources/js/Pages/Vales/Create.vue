@@ -23,6 +23,11 @@ const props = defineProps({
     // [{ id, label, meta }] TODOS los vehículos activos (sólo al crear); los
     // de las áreas del jefe llevan meta.propio y van primero.
     vehiculos: { type: Array, default: () => [] },
+    // Conductor puro: { id, label } de su propia ficha. No elige operario,
+    // el vale queda a su nombre (ValeRequest lo fuerza).
+    operarioPropio: { type: Object, default: null },
+    // Rol conductor sin ficha de conductor: aviso en vez de selectores vacíos.
+    sinFichaConductor: { type: Boolean, default: false },
 })
 
 // Copia local editable: al dar de alta un grifo nuevo desde el "+", se
@@ -45,7 +50,7 @@ const form = useForm({
     litros: props.vale ? props.vale.litros : '',
     precio: props.vale ? props.vale.precio : '',
     id_vehiculo: props.vale ? props.vale.id_vehiculo : null,
-    id_conductor: props.vale ? props.vale.id_conductor : null,
+    id_conductor: props.vale ? props.vale.id_conductor : (props.operarioPropio?.id ?? null),
     id_grifo: props.vale ? props.vale.id_grifo : null,
     estado_vale: 'PENDIENTE',
     id_tipo_combustible: props.vale ? props.vale.id_tipo_combustible : null,
@@ -134,7 +139,7 @@ const operariosOpt = computed(() => {
 })
 
 const vehiculoSinConductor = computed(() =>
-    !!form.id_vehiculo && conductoresDelVehiculo.value.length === 0
+    !props.operarioPropio && !!form.id_vehiculo && conductoresDelVehiculo.value.length === 0
 )
 
 /* ------------------------------------------------------------------ */
@@ -194,7 +199,10 @@ const vehiculoSeleccionado = (vehiculo) => {
         : (conductoresDelVehiculo.value.length === 1 && idsOperarios.has(conductoresDelVehiculo.value[0])
             ? conductoresDelVehiculo.value[0]
             : null)
-    form.id_conductor = sugerido
+    // El conductor puro siempre emite a su nombre: no se le cambia.
+    if (!props.operarioPropio) {
+        form.id_conductor = sugerido
+    }
     form.clearErrors('id_conductor')
 
 
@@ -251,6 +259,15 @@ onMounted(() => {
         </Link>
     </div>
 
+    <div v-if="props.sinFichaConductor" class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="alert">
+        <i class="ri-error-warning-line fs-18" aria-hidden="true"></i>
+        <div>
+            <strong>Tu cuenta no tiene ficha de conductor.</strong>
+            Tienes el rol Conductor pero no estás registrado como operario, así que no hay vehículos a tu nombre.
+            Pide a un administrador que registre tu ficha de conductor y te asigne un vehículo.
+        </div>
+    </div>
+
     <form @submit.prevent="submit">
         <div class="row g-4">
 
@@ -297,7 +314,7 @@ onMounted(() => {
                                 <label class="form-label fw-medium">
                                     Conductor <span class="text-danger">*</span>
                                 </label>
-                                <Multiselect v-if="!props.vale" v-model="form.id_conductor"
+                                <Multiselect v-if="!props.vale && !props.operarioPropio" v-model="form.id_conductor"
                                     :options="operariosOpt" value-prop="id" label="label"
                                     :searchable="true" :filter-results="true"
                                     placeholder="Buscar por CI, nombre o apellido..."
@@ -315,8 +332,13 @@ onMounted(() => {
                                      insertar nada entre ambos (rompería el alta). -->
                                 <select v-else v-model="form.id_conductor" class="form-select" disabled
                                     :class="{ 'is-invalid': form.errors.id_conductor }">
-                                    <option :value="props.conductorActual?.id">{{ props.conductorActual?.label }}</option>
+                                    <option :value="(props.conductorActual ?? props.operarioPropio)?.id">
+                                        {{ (props.conductorActual ?? props.operarioPropio)?.label }}
+                                    </option>
                                 </select>
+                                <div v-if="!props.vale && props.operarioPropio" class="form-text">
+                                    <i class="ri-lock-line" aria-hidden="true"></i> El vale se emite a tu nombre.
+                                </div>
 
                                 <div v-if="!props.vale && vehiculoSinConductor && !form.errors.id_conductor"
                                     class="form-text text-warning">

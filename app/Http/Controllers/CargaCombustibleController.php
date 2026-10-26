@@ -76,7 +76,9 @@ class CargaCombustibleController extends Controller
         if (request()->user()->esConductorPuro() && request()->user()->persona?->conductor) {
             $conductor = request()->user()->persona;
 
-            $vehiculosAsignados = $conductor->conductor->asignacionesActivasOpt();
+            // Sólo sus vehículos asignados y ACTIVOS (misma lista y criterio
+            // que valida VehiculoSeleccionable al registrar).
+            $vehiculosAsignados = $listVehiculos->execute($request->user())->all();
 
             $valesConductor = Vale::with(['grifo', 'tipoCombustible'])
                 ->where('estado_vale', 'PENDIENTE')
@@ -134,6 +136,10 @@ class CargaCombustibleController extends Controller
             // asignados al vehículo elegido se sugieren primero.
             'vehiculos' => $request->user()->esConductorPuro() ? [] : $listVehiculos->execute($request->user())->all(),
             'operarios' => $request->user()->esConductorPuro() ? [] : $listOperarios->execute()->all(),
+            // Rol conductor sin ficha de conductor: no tiene vehículos ni puede
+            // registrar a su nombre; la vista muestra un aviso en lugar de
+            // selectores vacíos.
+            'sinFichaConductor' => $request->user()->esConductorPuro() && ! $request->user()->persona?->conductor,
         ]);
     }
 
@@ -176,7 +182,7 @@ class CargaCombustibleController extends Controller
             // Objetos actuales para los SearchSelects
             'vehiculoActual' => $carga->vehiculo ? [
                 'id' => $carga->vehiculo->id,
-                'label' => "{$carga->vehiculo->nro_placa}"." — {$carga->vehiculo->marca} ({$carga->vehiculo->anio})",
+                'label' => $carga->vehiculo->etiquetaSeleccion(),
                 'meta' => [
                     'id_tipo_combustible' => $carga->vehiculo->id_tipo_combustible,
                     'tipo_medicion' => $carga->vehiculo->tipo_medicion,
@@ -306,7 +312,7 @@ class CargaCombustibleController extends Controller
             'tipo_medicion' => $vale->vehiculo?->tipo_medicion,
             'vehiculo' => $vale->vehiculo ? [
                 'id' => $vale->vehiculo->id,
-                'label' => "{$vale->vehiculo->codigo} — {$vale->vehiculo->nro_placa}".($vale->vehiculo->marca ? " — {$vale->vehiculo->marca}" : ''),
+                'label' => $vale->vehiculo->etiquetaSeleccion(),
             ] : null,
             'conductor' => $vale->conductor ? [
                 'id' => $vale->conductor->id,

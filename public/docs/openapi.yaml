@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.22.0"
+  version: "1.23.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.22.0"
+                api_version: "1.23.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -4023,7 +4023,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.22.0" }
+        api_version: { type: string, example: "1.23.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4165,6 +4165,18 @@ components:
             cargas_combustible:
               type: object
               properties:
+                operarios:
+                  type: array
+                  description: |
+                    Operarios que se pueden enviar como `id_conductor` en `POST /cargas` sin vale:
+                    **todos** los conductores con `estado_conductor = ACTIVO`. Vacío (`[]`) para un
+                    conductor puro, que no elige operario: la carga queda a su nombre. Mismo formato
+                    que `operaciones_diarias.operarios` (desde 1.23.0).
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer, example: 12 }
+                      label: { type: string, example: "Juan Pérez Quispe (CI: 1234567)" }
                 tipos_carga: { type: array, items: { type: string }, example: [VALE, PREPAGO] }
                 tipos_respaldo_digital: { type: array, items: { type: string }, example: [FACTURA, NOTA, COMPROBANTE, OTRO] }
                 estado_carga: { type: array, items: { type: string }, example: [REGISTRADO, VERIFICADO, ANULADO] }

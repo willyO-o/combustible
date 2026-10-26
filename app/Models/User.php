@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use OwenIt\Auditing\Contracts\Auditable;
 use Spatie\Permission\Traits\HasRoles;
 use Tymon\JWTAuth\Contracts\JWTSubject;
@@ -75,6 +76,31 @@ class User extends Authenticatable implements Auditable, JWTSubject
     public function esConductorPuro(): bool
     {
         return $this->hasRole('conductor') && ! $this->hasAnyRole(['jefe-area', 'administrador', 'super-admin']);
+    }
+
+    /**
+     * Ids de los vehículos ACTIVOS que el usuario tiene asignados hoy como
+     * conductor (asignación ACTIVO = titular o PROVISIONAL, vigente). Es lo
+     * único que un conductor puro puede elegir en vales, cargas de
+     * combustible y operación diaria (ListVehiculosSeleccionablesAction y la
+     * regla VehiculoSeleccionable).
+     *
+     * @return Collection<int, int>
+     */
+    public function idsVehiculosAsignados(): Collection
+    {
+        if (! $this->id_persona) {
+            return collect();
+        }
+
+        return Asignacion::query()
+            ->where('id_conductor', $this->id_persona)
+            ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
+            ->where(fn ($query) => $query->whereNull('fecha_culminacion')->orWhere('fecha_culminacion', '>', now()))
+            ->whereHas('vehiculo', fn ($query) => $query->where('estado_vehiculo', 'ACTIVO'))
+            ->pluck('id_vehiculo')
+            ->unique()
+            ->values();
     }
 
     /**

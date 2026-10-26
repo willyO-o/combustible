@@ -99,29 +99,29 @@ class OperacionDiariaControllerTest extends TestCase
         ]);
     }
 
-    public function test_un_conductor_ve_todos_los_vehiculos_activos_con_el_suyo_primero(): void
+    public function test_un_conductor_puro_ve_solo_sus_vehiculos_asignados_y_activos(): void
     {
         [$user, $conductor] = $this->crearConductorConUsuario();
 
         $vehiculoPropio = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje', 'codigo' => 'ZZZ-999']);
         $this->asignarVehiculoAConductor($vehiculoPropio, $conductor);
 
-        // Otro vehículo sin asignación al conductor: ahora también aparece.
+        // Asignado pero dado de baja: no se ofrece.
+        $retiradoAsignado = Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
+        $this->asignarVehiculoAConductor($retiradoAsignado, $conductor);
+
+        // Otro vehículo activo sin asignación al conductor: tampoco aparece.
         $otro = Vehiculo::factory()->create(['codigo' => 'AAA-001']);
-        $retirado = Vehiculo::factory()->create(['estado_vehiculo' => 'RETIRADO']);
 
         $response = $this->actingAs($user)->get(route('operacion-diaria.create'));
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Operacion/Create')
-            ->has('vehiculosAsignados', 2)
-            // El propio va primero aunque por código ordene después.
+            ->where('mostrarSelectorConductor', false)
+            ->has('vehiculosAsignados', 1)
             ->where('vehiculosAsignados.0.id', $vehiculoPropio->id)
-            ->where('vehiculosAsignados.0.meta.propio', true)
-            ->where('vehiculosAsignados.1.id', $otro->id)
-            ->where('vehiculosAsignados.1.meta.propio', false)
-            ->where('vehiculosAsignados', fn ($v) => ! collect($v)->pluck('id')->contains($retirado->id))
+            ->where('vehiculosAsignados', fn ($v) => ! collect($v)->pluck('id')->contains($otro->id))
         );
     }
 
@@ -1726,7 +1726,7 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertDatabaseCount('operacion_diaria', 0);
     }
 
-    public function test_cualquier_usuario_registra_un_vehiculo_ajeno_y_lo_ve_en_su_listado(): void
+    public function test_un_jefe_registra_un_vehiculo_ajeno_pero_un_conductor_puro_solo_los_suyos(): void
     {
         // Jefe del área A registra un vehículo del área B (que no tiene a cargo).
         $areaJefe = Area::factory()->create();
@@ -1749,11 +1749,19 @@ class OperacionDiariaControllerTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('actividades.data', fn ($ops) => collect($ops)->pluck('id')->contains($operacion->id)));
 
-        // Un conductor puro que registra un vehículo que no tiene asignado.
+        // Un conductor puro NO puede registrar un vehículo que no tiene
+        // asignado; con el suyo, sí (a su nombre).
         [$userConductor, $conductor] = $this->crearConductorConUsuario();
         $otroVehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
         $this->asignarVehiculoAArea($otroVehiculo, $otraArea);
 
+        $this->actingAs($userConductor)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($otroVehiculo)
+        )->assertSessionHasErrors(['id_vehiculo' => 'Sólo puedes registrar con un vehículo que tengas asignado.']);
+        $this->assertDatabaseMissing('operacion_diaria', ['id_vehiculo' => $otroVehiculo->id]);
+
+        $this->asignarVehiculoAConductor($otroVehiculo, $conductor);
         $this->actingAs($userConductor)->post(
             route('operacion-diaria.store'),
             $this->payloadOperacionValida($otroVehiculo)

@@ -24,6 +24,8 @@ const props = defineProps({
 
     // ── "Usar vale" desde el listado de vales (modo creación) ──────────
     valePreseleccionado: { type: Object, default: null }, // { id, nro, litros, precio, id_vehiculo, vehiculo, id_conductor, conductor, id_grifo, grifo, id_tipo_combustible, tipo_combustible, tipo_medicion }
+    // Rol conductor sin ficha de conductor: aviso en vez de selectores vacíos.
+    sinFichaConductor: { type: Boolean, default: false },
 
     // ── Props exclusivos del modo edición ──────────────────────────────
     carga: { type: Object, default: null },          // registro a editar (null en modo creación)
@@ -390,6 +392,15 @@ onMounted(() => {
             </small>
         </div>
 
+    <div v-if="props.sinFichaConductor" class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="alert">
+        <i class="ri-error-warning-line fs-18" aria-hidden="true"></i>
+        <div>
+            <strong>Tu cuenta no tiene ficha de conductor.</strong>
+            Tienes el rol Conductor pero no estás registrado como operario, así que no hay vehículos a tu nombre.
+            Pide a un administrador que registre tu ficha de conductor y te asigne un vehículo.
+        </div>
+    </div>
+
         <form @submit.prevent="submit">
             <div class="row g-4">
 
@@ -456,7 +467,7 @@ onMounted(() => {
 
                                     <Multiselect v-model="form.id_vehiculo" :options="vehiculosOpt"
                                         value-prop="id" label="label" :searchable="true" :filter-results="true"
-                                        placeholder="Selecciona o busca por código, placa o marca..."
+                                        placeholder="Selecciona o busca por código, placa, marca o modelo..."
                                         no-options-text="No hay vehículos disponibles" no-results-text="Sin resultados"
                                         :class="{ 'is-invalid-multiselect': form.errors.id_vehiculo }">
                                         <template #option="{ option }">

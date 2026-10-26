@@ -11,6 +11,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/**/*.php | .ai/rules/app.md |
 | app/Http/Controllers/AreaController.php,resources/js/Pages/Areas/**,routes/web.php | .ai/rules/areas.md |
 | app/Actions/CargaCombustible/ListCargaCombustibleAction.php | .ai/rules/carga-combustible.md |
+| app/Actions/Vehiculo/ListVehiculosSeleccionablesAction.php,app/Rules/VehiculoSeleccionable.php,app/Http/Requests/ValeRequest.php,app/Http/Requests/CargaCombustibleRequest.php,app/Http/Requests/OperacionStoreRequest.php,app/Http/Controllers/ValeController.php,app/Http/Controllers/CargaCombustibleController.php,app/Http/Controllers/OperacionDiariaController.php,app/Http/Controllers/Api/V1/ParametrosController.php,resources/js/Pages/Vales/Create.vue,resources/js/Pages/CargasCombustible/Create.vue,resources/js/Pages/Operacion/Create.vue | .ai/rules/cargas-combustible-js-pages-operacion.md |
 | app/Notifications/*.php,app/Channels/*.php | .ai/rules/channels.md |
 | app/Http/Requests/**/*.php,resources/js/Components/*FormModal.vue,resources/js/Components/CargoSelect.vue,bootstrap/app.php | .ai/rules/components-js-components.md |
 | resources/js/Components/DateTimeInput.vue,resources/js/Pages/**/*.vue | .ai/rules/components-js-pages.md |

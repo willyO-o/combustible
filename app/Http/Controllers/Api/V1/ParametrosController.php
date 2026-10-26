@@ -28,7 +28,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.22.0',
+            'api_version' => '1.23.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -93,6 +93,10 @@ class ParametrosController extends Controller
             'estaciones_servicio' => fn () => Grifo::where('estado_grifo', 'ACTIVO')->get(),
             'tipos_combustible' => fn () => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')->get(),
             'cargas_combustible' => fn () => [
+                // Operarios elegibles para `id_conductor` al registrar una
+                // carga sin vale: todos los conductores activos. Vacío para el
+                // conductor puro (no elige: la carga queda a su nombre).
+                'operarios' => $user->esConductorPuro() ? [] : app(ListOperariosDisponiblesAction::class)->execute()->all(),
                 'tipos_carga' => ['VALE', 'PREPAGO'],
                 'tipos_respaldo_digital' => ['FACTURA', 'NOTA', 'COMPROBANTE', 'OTRO'],
                 'estado_carga' => ['REGISTRADO', 'VERIFICADO', 'ANULADO'],
@@ -217,9 +221,12 @@ class ParametrosController extends Controller
      */
     private function coleccionVehiculos(User $user, ?Conductor $conductor, EloquentCollection $areasACargo): Collection
     {
+        // Sólo vehículos ACTIVOS: las asignaciones vigentes (a un conductor o
+        // a un área) no se cierran solas cuando un vehículo se da de baja.
         $propios = EloquentCollection::make(
             ($conductor ? $conductor->asignacionesActivas : collect())
                 ->merge($areasACargo->flatMap(fn ($area) => $area->vehiculosActivos))
+                ->where('estado_vehiculo', 'ACTIVO')
                 ->unique('id')
                 ->values()
                 ->all()

@@ -1088,4 +1088,40 @@ class CargaCombustibleControllerTest extends TestCase
 
         $this->assertSame($conductor->id, CargaCombustible::firstOrFail()->id_conductor);
     }
+
+    public function test_el_selector_de_vehiculos_muestra_codigo_placa_marca_y_modelo(): void
+    {
+        $this->crearParametrosEmpresa();
+        $vehiculo = Vehiculo::factory()->create([
+            'codigo' => 'VOL-01', 'nro_placa' => '1234ABC', 'marca' => 'Volvo', 'modelo' => 'FMX', 'anio' => 2020,
+        ]);
+        $sinModelo = Vehiculo::factory()->create([
+            'codigo' => 'CAM-02', 'nro_placa' => '5678DEF', 'marca' => 'Toyota', 'modelo' => null, 'anio' => null,
+        ]);
+
+        $this->get(route('cargas.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vehiculos', fn ($opciones) => collect($opciones)->firstWhere('id', $vehiculo->id)['label'] === 'VOL-01 — 1234ABC — Volvo FMX (2020)'
+                    // Lo que falta se omite, sin separadores sueltos.
+                    && collect($opciones)->firstWhere('id', $sinModelo->id)['label'] === 'CAM-02 — 5678DEF — Toyota')
+            );
+
+        // Al editar la carga se ve con el mismo formato.
+        $carga = CargaCombustible::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_conductor' => $this->crearConductor()->id,
+            'id_grifo' => $this->crearGrifo()->id,
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'litros' => 30,
+            'precio' => 3.74,
+            'kilometraje' => 1000,
+            'tipo_carga' => 'PREPAGO',
+            'fecha_carga' => now(),
+        ]);
+
+        $this->get(route('cargas.edit', $carga))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('vehiculoActual.label', 'VOL-01 — 1234ABC — Volvo FMX (2020)'));
+    }
 }

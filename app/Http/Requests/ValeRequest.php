@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\VehiculoSeleccionable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -59,6 +60,14 @@ class ValeRequest extends FormRequest
         if (is_string($fechaVencimiento) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVencimiento)) {
             $this->merge(['fecha_vencimiento' => "{$fechaVencimiento} 23:59:59"]);
         }
+
+        // El conductor puro no elige operario: el vale queda siempre a su
+        // nombre (web y API), se ignore lo que se haya enviado.
+        $conductorPropio = $this->user()?->esConductorPuro() ? $this->user()->persona?->conductor : null;
+
+        if ($this->isMethod('POST') && $conductorPropio) {
+            $this->merge(['id_conductor' => $conductorPropio->id]);
+        }
     }
 
     public function rules(): array
@@ -66,10 +75,13 @@ class ValeRequest extends FormRequest
         return [
             'litros' => ['required', 'numeric', 'min:0.01', 'max:9999.99'],
             'precio' => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
-            // Cualquier vehículo (también para un jefe de área, aunque no sea de
-            // sus áreas: a pedido del usuario, la asignación a áreas todavía no
-            // es confiable).
-            'id_vehiculo' => ['required', 'integer', 'exists:vehiculo,id'],
+            // Al emitir: cualquier vehículo ACTIVO para todo rol o combinación
+            // de roles (también un jefe de área, aunque no sea de sus áreas);
+            // el conductor puro, sólo los suyos (VehiculoSeleccionable). Al
+            // editar basta con que exista.
+            'id_vehiculo' => $this->isMethod('POST')
+                ? ['required', 'integer', new VehiculoSeleccionable($this->user())]
+                : ['required', 'integer', 'exists:vehiculo,id'],
             // Al emitir, cualquier conductor ACTIVO (esté o no asignado al
             // vehículo: la asignación todavía no es confiable). Al editar el
             // conductor ya está fijo, así que basta con que exista aunque

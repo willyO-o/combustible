@@ -114,6 +114,8 @@ class OperacionDiariaController extends Controller
             'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->esConductorPuro(),
+            // Rol conductor sin ficha de conductor: aviso en lugar del formulario vacío.
+            'sinFichaConductor' => $user->esConductorPuro() && ! $user->persona?->conductor,
             // Jefe de área/administrador/super-admin: cualquier fecha (regularizar); el resto, hoy o ayer.
             'puedeRegularizar' => $user->puedeRegularizarOperaciones(),
             'diasAtrasSinRegularizar' => OperacionStoreRequest::DIAS_ATRAS_SIN_REGULARIZAR,
@@ -262,9 +264,13 @@ class OperacionDiariaController extends Controller
      */
     private function vehiculosDisponibles(User $user, ?Vehiculo $incluirSiFalta = null): array
     {
+        // Cualquier rol o combinación de roles: todos los ACTIVOS. El conductor
+        // puro: sólo sus asignados y ACTIVOS (mismo criterio que valida
+        // VehiculoSeleccionable al registrar).
         $vehiculos = Vehiculo::select($this->columnasVehiculoOpt())
             ->with('tipoVehiculo:id,km_maximo_jornada,horometro_maximo_jornada')
             ->where('estado_vehiculo', 'ACTIVO')
+            ->when($user->esConductorPuro(), fn ($query) => $query->whereIn('id', $user->idsVehiculosAsignados()))
             ->get();
 
         if ($incluirSiFalta && ! $vehiculos->contains('id', $incluirSiFalta->id)) {

@@ -39,6 +39,8 @@ const props = defineProps({
     // para cualquier rol de gestión, que elige el operario entre todos los
     // conductores activos (prop operarios).
     mostrarSelectorConductor: Boolean,
+    // Rol conductor sin ficha de conductor: aviso en vez de selectores vacíos.
+    sinFichaConductor: { type: Boolean, default: false },
     // [{ id, label, meta }] todos los conductores activos (más el de la
     // operación en edición aunque ya no lo esté). Vacío para el conductor puro.
     operarios: { type: Array, default: () => [] },
@@ -566,6 +568,15 @@ onMounted(() => {
             <h1 class="page-title text-center fw-medium fs-18 mb-0">{{ props.conductor ? 'Editar' : 'Registrar' }} operación diaria</h1>
 
         </div>
+
+    <div v-if="props.sinFichaConductor" class="alert alert-warning d-flex align-items-start gap-2 mb-4" role="alert">
+        <i class="ri-error-warning-line fs-18" aria-hidden="true"></i>
+        <div>
+            <strong>Tu cuenta no tiene ficha de conductor.</strong>
+            Tienes el rol Conductor pero no estás registrado como operario, así que no hay vehículos a tu nombre.
+            Pide a un administrador que registre tu ficha de conductor y te asigne un vehículo.
+        </div>
+    </div>
 
         <form @submit.prevent="submit">
             <div class="row g-4">

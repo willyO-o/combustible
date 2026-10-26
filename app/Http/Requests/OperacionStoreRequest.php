@@ -7,6 +7,7 @@ use App\Models\OperacionDiaria;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use App\Rules\GreaterThanPreviousReading;
+use App\Rules\VehiculoSeleccionable;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
@@ -261,7 +262,12 @@ class OperacionStoreRequest extends FormRequest
     {
         // dd($this->method());
         return [
-            'id_vehiculo' => [$this->method() === 'POST' ? 'required' : 'sometimes', 'exists:vehiculo,id', $this->reglaVehiculoConArea()],
+            // Al registrar: vehículo ACTIVO para todo rol o combinación de
+            // roles; el conductor puro, sólo los suyos (VehiculoSeleccionable).
+            // Al editar el vehículo queda fijo (prepareForValidation()).
+            'id_vehiculo' => $this->method() === 'POST'
+                ? ['required', 'integer', new VehiculoSeleccionable($this->user()), $this->reglaVehiculoConArea()]
+                : ['sometimes', 'exists:vehiculo,id', $this->reglaVehiculoConArea()],
             // Los roles de gestión eligen el operario entre TODOS los
             // conductores ACTIVO (ya no sólo los asignados al vehículo). Es
             // obligatorio al crear salvo para el conductor puro, que no elige:

@@ -13,10 +13,14 @@ class ListVehiculosSeleccionablesAction
     /**
      * Vehículos que se ofrecen, ya precargados, en los selects de los
      * formularios (vales, cargas de combustible, solicitudes y órdenes de
-     * trabajo): TODOS los vehículos ACTIVO, para cualquier usuario que no sea
-     * conductor puro (a pedido del usuario, 2026-10-17: la asignación a áreas
-     * y conductores todavía no es confiable). El conductor puro no pasa por
-     * aquí: cada formulario le muestra sólo sus vehículos asignados.
+     * trabajo):
+     * - Cualquier rol o combinación de roles (administrador, jefe de área,
+     *   técnico, jefe + conductor, ...): TODOS los vehículos ACTIVO (a pedido
+     *   del usuario, la asignación a áreas y conductores todavía no es
+     *   confiable).
+     * - Conductor puro: sólo sus vehículos asignados y ACTIVOS
+     *   (User::idsVehiculosAsignados()). Mismo criterio que valida la regla
+     *   VehiculoSeleccionable al registrar.
      *
      * Los "propios" del usuario (los que tiene asignados como conductor y los
      * de las áreas que tiene a cargo como jefe) llevan meta.propio y van
@@ -31,10 +35,18 @@ class ListVehiculosSeleccionablesAction
      */
     public function execute(?User $user, ?int $incluirIdVehiculo = null): Collection
     {
+        $soloAsignados = $user?->esConductorPuro() ? $user->idsVehiculosAsignados() : null;
+
         $vehiculos = Vehiculo::query()
             ->select(['id', 'codigo', 'nro_placa', 'marca', 'modelo', 'anio', 'id_tipo_vehiculo', 'id_tipo_combustible', 'tipo_medicion'])
-            ->where(function ($query) use ($incluirIdVehiculo) {
-                $query->where('estado_vehiculo', 'ACTIVO');
+            ->where(function ($query) use ($incluirIdVehiculo, $soloAsignados) {
+                $query->where(function ($query) use ($soloAsignados) {
+                    $query->where('estado_vehiculo', 'ACTIVO');
+
+                    if ($soloAsignados !== null) {
+                        $query->whereIn('id', $soloAsignados);
+                    }
+                });
 
                 if ($incluirIdVehiculo) {
                     $query->orWhere('id', $incluirIdVehiculo);
@@ -52,7 +64,7 @@ class ListVehiculosSeleccionablesAction
 
                 return [
                     'id' => $vehiculo->id,
-                    'label' => $this->etiqueta($vehiculo),
+                    'label' => $vehiculo->etiquetaSeleccion(),
                     'meta' => [
                         'codigo' => $vehiculo->codigo,
                         'nro_placa' => $vehiculo->nro_placa,
@@ -79,13 +91,6 @@ class ListVehiculosSeleccionablesAction
                 fn ($a, $b) => strnatcasecmp((string) $a['meta']['codigo'], (string) $b['meta']['codigo']),
             ])
             ->values();
-    }
-
-    private function etiqueta(Vehiculo $vehiculo): string
-    {
-        $etiqueta = implode(' — ', array_filter([$vehiculo->codigo, $vehiculo->nro_placa, $vehiculo->marca]));
-
-        return $vehiculo->anio ? "{$etiqueta} ({$vehiculo->anio})" : $etiqueta;
     }
 
     /**

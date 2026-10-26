@@ -56,6 +56,19 @@ class Vehiculo extends Model implements Auditable
         return $this->belongsTo(TipoCombustible::class, 'id_tipo_combustible');
     }
 
+    /**
+     * Etiqueta del vehículo en los selectores de formularios (vales, cargas
+     * de combustible, solicitudes, ...): "código — placa — marca modelo
+     * (año)", omitiendo lo que falte. Ej. "VOL-01 — 1234ABC — Volvo FMX (2020)".
+     */
+    public function etiquetaSeleccion(): string
+    {
+        $marcaModelo = trim(implode(' ', array_filter([$this->marca, $this->modelo])));
+        $etiqueta = implode(' — ', array_filter([$this->codigo, $this->nro_placa, $marcaModelo]));
+
+        return $this->anio ? "{$etiqueta} ({$this->anio})" : $etiqueta;
+    }
+
     public function tipoVehiculo()
     {
         return $this->belongsTo(TipoVehiculo::class, 'id_tipo_vehiculo');
