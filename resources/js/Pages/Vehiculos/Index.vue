@@ -23,9 +23,11 @@ const breakpoints = useBreakpoints(breakpointsTailwind)
 const isMobile = breakpoints.smaller('lg')
 
 const filters = ref({
-    nro_placa: props.filters?.nro_placa ?? '',
-    codigo: props.filters?.codigo ?? '',
-    marca: props.filters?.marca ?? '',
+    // Buscador unificado: marca, modelo, placa y código a la vez (ver
+    // VehiculoController::consultaListado()). Un enlace viejo que traiga
+    // nro_placa/codigo/marca se vuelca aquí para no perder el filtro.
+    buscar: props.filters?.buscar
+        ?? [props.filters?.marca, props.filters?.nro_placa, props.filters?.codigo].filter(Boolean).join(' '),
     estado_vehiculo: props.filters?.estado_vehiculo ?? '',
     id_tipo_vehiculo: props.filters?.id_tipo_vehiculo ?? '',
     id_area: props.filters?.id_area ?? '',
@@ -40,22 +42,20 @@ watch(
             router.get(
                 route('vehiculos.index'),
                 {
-                    nro_placa: val.nro_placa || undefined,
-                    codigo: val.codigo || undefined,
-                    marca: val.marca || undefined,
+                    buscar: val.buscar?.trim() || undefined,
                     estado_vehiculo: val.estado_vehiculo || undefined,
                     id_tipo_vehiculo: val.id_tipo_vehiculo || undefined,
                     id_area: val.id_area || undefined,
                 },
                 { preserveState: true, replace: true },
             )
-        }, 350)
+        }, 700) // espera a que termine de escribir antes de buscar
     },
     { deep: true },
 )
 
 function clearFilters() {
-    filters.value = { nro_placa: '', codigo: '', marca: '', estado_vehiculo: '', id_tipo_vehiculo: '', id_area: '' }
+    filters.value = { buscar: '', estado_vehiculo: '', id_tipo_vehiculo: '', id_area: '' }
 }
 
 /* ------------------------------------------------------------------ *
@@ -218,21 +218,19 @@ const tipoAsignacionBadge = (tipo) =>
         </div>
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-sm-6 col-xl-3">
-                    <label class="form-label">Nro. Placa</label>
-                    <input v-model="filters.nro_placa" type="text" class="form-control"
-                        placeholder="Buscar por placa..." />
+                <div class="col-12 col-xl-6">
+                    <label for="buscar-vehiculo" class="form-label">Buscar</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="ri-search-line" aria-hidden="true"></i></span>
+                        <input id="buscar-vehiculo" v-model="filters.buscar" type="search" class="form-control"
+                            placeholder="Marca, modelo, placa o código..." autocomplete="off" />
+                        <button v-if="filters.buscar" type="button" class="btn btn-light" title="Borrar búsqueda"
+                            aria-label="Borrar búsqueda" @click="filters.buscar = ''">
+                            <i class="ri-close-line" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="col-sm-6 col-xl-3">
-                    <label class="form-label">Código</label>
-                    <input v-model="filters.codigo" type="text" class="form-control"
-                        placeholder="Buscar por código..." />
-                </div>
-                <div class="col-sm-6 col-xl-3">
-                    <label class="form-label">Marca</label>
-                    <input v-model="filters.marca" type="text" class="form-control" placeholder="Buscar por marca..." />
-                </div>
-                <div class="col-sm-6 col-xl-3">
+                <div class="col-sm-4 col-xl-2">
                     <label class="form-label">Tipo de Vehículo</label>
                     <select v-model="filters.id_tipo_vehiculo" class="form-select">
                         <option value="">Todos</option>
@@ -241,7 +239,7 @@ const tipoAsignacionBadge = (tipo) =>
                         </option>
                     </select>
                 </div>
-                <div class="col-sm-6 col-xl-3">
+                <div class="col-sm-4 col-xl-2">
                     <label class="form-label">Estado</label>
                     <select v-model="filters.estado_vehiculo" class="form-select">
                         <option value="">Todos</option>
@@ -250,7 +248,7 @@ const tipoAsignacionBadge = (tipo) =>
                         <option value="VENDIDO">VENDIDO</option>
                     </select>
                 </div>
-                <div class="col-sm-6 col-xl-3">
+                <div class="col-sm-4 col-xl-2">
                     <label class="form-label">Área</label>
                     <select v-model="filters.id_area" class="form-select">
                         <option value="">Todas</option>

@@ -960,4 +960,81 @@ class VehiculoControllerTest extends TestCase
         $this->get(route('vehiculos.reporte.pdf'))->assertRedirect(route('login'));
         $this->get(route('vehiculos.reporte.excel'))->assertRedirect(route('login'));
     }
+
+    /**
+     * @return array<int, int>
+     */
+    private function idsBuscados(string $buscar): array
+    {
+        $ids = [];
+
+        $this->actingAs($this->admin)->get(route('vehiculos.index', ['buscar' => $buscar]))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$ids) {
+                $ids = collect($page->toArray()['props']['vehiculos']['data'])->pluck('id')->sort()->values()->all();
+
+                return $page;
+            });
+
+        return $ids;
+    }
+
+    public function test_el_buscador_unificado_encuentra_por_marca_modelo_placa_o_codigo(): void
+    {
+        $volvo = Vehiculo::factory()->create(['marca' => 'Volvo', 'modelo' => 'FMX', 'nro_placa' => '1234ABC', 'codigo' => 'PM-VOL-0001']);
+        $toyota = Vehiculo::factory()->create(['marca' => 'Toyota', 'modelo' => null, 'nro_placa' => '048-ADM', 'codigo' => 'PM-AUT-0001']);
+        $sinPlaca = Vehiculo::factory()->create(['marca' => 'Caterpillar', 'modelo' => '950H', 'nro_placa' => null, 'codigo' => 'PM-CGF-0001']);
+
+        $this->assertSame([$volvo->id], $this->idsBuscados('volvo'), 'por marca, sin distinguir mayúsculas');
+        $this->assertSame([$sinPlaca->id], $this->idsBuscados('950'), 'por modelo');
+        $this->assertSame([$toyota->id], $this->idsBuscados('048'), 'por placa');
+        $this->assertSame([$volvo->id], $this->idsBuscados('PM-VOL'), 'por código');
+
+        // Varias palabras: cada una debe aparecer en alguno de los 4 campos.
+        $this->assertSame([$volvo->id], $this->idsBuscados('Volvo FMX'));
+        $this->assertSame([$toyota->id], $this->idsBuscados('  toyota   048  '));
+        $this->assertSame([], $this->idsBuscados('Volvo 048'));
+
+        // Un campo vacío (modelo o placa NULL) no impide encontrar por los otros.
+        $this->assertSame([$toyota->id], $this->idsBuscados('Toyota'));
+        $this->assertSame([$sinPlaca->id], $this->idsBuscados('Caterpillar'));
+
+        // "PM" está en los tres códigos.
+        $this->assertSame(collect([$volvo->id, $toyota->id, $sinPlaca->id])->sort()->values()->all(), $this->idsBuscados('PM'));
+    }
+
+    public function test_el_buscador_se_combina_con_los_demas_filtros_y_los_parametros_viejos_siguen_funcionando(): void
+    {
+        $activo = Vehiculo::factory()->create(['marca' => 'Volvo', 'nro_placa' => '1111AAA', 'estado_vehiculo' => 'ACTIVO']);
+        Vehiculo::factory()->create(['marca' => 'Volvo', 'nro_placa' => '2222BBB', 'estado_vehiculo' => 'RETIRADO']);
+
+        $this->actingAs($this->admin)->get(route('vehiculos.index', ['buscar' => 'volvo', 'estado_vehiculo' => 'ACTIVO']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('vehiculos.data', 1)
+                ->where('vehiculos.data.0.id', $activo->id)
+                ->where('filters.buscar', 'volvo'));
+
+        // Enlaces viejos con nro_placa siguen filtrando.
+        $this->actingAs($this->admin)->get(route('vehiculos.index', ['nro_placa' => '1111']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('vehiculos.data', 1)->where('vehiculos.data.0.id', $activo->id));
+    }
+
+    public function test_los_reportes_respetan_el_buscador_unificado(): void
+    {
+        Vehiculo::factory()->create(['marca' => 'Volvo', 'nro_placa' => '1111AAA']);
+        Vehiculo::factory()->create(['marca' => 'Toyota', 'nro_placa' => '2222BBB']);
+
+        $celdas = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('vehiculos.reporte.excel', ['buscar' => 'volvo']))->assertOk()->getContent()
+        )->flatten();
+
+        $this->assertTrue($celdas->contains('1111AAA'));
+        $this->assertFalse($celdas->contains('2222BBB'));
+        // El encabezado deja constancia de la búsqueda.
+        $this->assertTrue($celdas->contains(fn ($v) => is_string($v) && str_contains($v, 'volvo')));
+
+        $this->actingAs($this->admin)->get(route('vehiculos.reporte.pdf', ['buscar' => 'volvo']))->assertOk();
+    }
 }

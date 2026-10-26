@@ -28,7 +28,13 @@ class VehiculoController extends Controller
     /**
      * Filtros del listado; el PDF y el Excel reciben exactamente los mismos.
      */
-    private const FILTROS_LISTADO = ['nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo', 'id_area'];
+    /**
+     * `buscar` es el buscador unificado de la vista (marca, modelo, placa y
+     * código). `nro_placa`, `codigo` y `marca` se siguen aceptando por
+     * compatibilidad (enlaces o marcadores viejos), aunque la vista ya no los
+     * envía.
+     */
+    private const FILTROS_LISTADO = ['buscar', 'nro_placa', 'codigo', 'marca', 'estado_vehiculo', 'id_tipo_vehiculo', 'id_area'];
 
     public function index(Request $request): Response
     {
@@ -116,6 +122,25 @@ class VehiculoController extends Controller
     {
         $query = Vehiculo::with(['tipoCombustible', 'tipoVehiculo', 'conductorAsignado.persona', 'areasAsignadas']);
 
+        // Buscador unificado: cada palabra escrita debe aparecer en alguno de
+        // los 4 campos (marca, modelo, placa o código), así "Volvo FMX" o
+        // "Toyota 048" también encuentran el vehículo.
+        if ($request->filled('buscar')) {
+            $palabras = preg_split('/\s+/u', trim((string) $request->input('buscar')), -1, PREG_SPLIT_NO_EMPTY);
+
+            foreach ($palabras as $palabra) {
+                $query->where(function ($query) use ($palabra) {
+                    $termino = '%'.$palabra.'%';
+
+                    // COALESCE: un campo vacío (NULL, ej. vehículo sin modelo
+                    // o sin placa) se compara como texto vacío.
+                    $query->whereRaw("COALESCE(marca, '') LIKE ?", [$termino])
+                        ->orWhereRaw("COALESCE(modelo, '') LIKE ?", [$termino])
+                        ->orWhereRaw("COALESCE(nro_placa, '') LIKE ?", [$termino])
+                        ->orWhereRaw("COALESCE(codigo, '') LIKE ?", [$termino]);
+                });
+            }
+        }
         if ($request->filled('nro_placa')) {
             $query->where('nro_placa', 'like', '%'.$request->nro_placa.'%');
         }
@@ -192,6 +217,7 @@ class VehiculoController extends Controller
     private function filtrosAplicados(Request $request): array
     {
         return [
+            'Búsqueda (marca, modelo, placa o código)' => $request->filled('buscar') ? trim((string) $request->buscar) : null,
             'Placa' => $request->filled('nro_placa') ? (string) $request->nro_placa : null,
             'Código' => $request->filled('codigo') ? (string) $request->codigo : null,
             'Marca' => $request->filled('marca') ? (string) $request->marca : null,
