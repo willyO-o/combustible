@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 /**
  * SearchSelect — wrapper de @vueform/multiselect para búsqueda asíncrona.
  * Props:
@@ -103,7 +104,7 @@ watch(
 <template>
     <Multiselect ref="multiselectRef" :model-value="modelValue" @update:model-value="onSelected" @clear="onCleared"
         @change="onChange" @search-change="onSearchChange" :options="search" :object="object" :value-prop="valueProp"
-        :filter-results="false" :label="labelProp" :searchable="true" :min-chars="minCharsProp" :delay="300"
+        :filter-results="false" :label="labelProp" :searchable="true" :min-chars="minCharsProp" :delay="ESPERA_FILTROS_MS"
         :resolve-on-load="false" :placeholder="placeholder" no-results-text="No se encontraron resultados"
         :class="{ 'is-invalid-multiselect': invalid }">
         <template #nooptions>

@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { ref, watch, computed, onMounted } from 'vue'
 import { Head, Link, router, usePage, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -90,7 +91,7 @@ watch(filters, (val) => {
             tipo_mantenimiento: val.tipo_mantenimiento || undefined,
             id_vehiculo: val.id_vehiculo || undefined,
         }, { preserveState: true, replace: true })
-    }, 350)
+    }, ESPERA_FILTROS_MS)
 }, { deep: true })
 
 function clearFilters() {

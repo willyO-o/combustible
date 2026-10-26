@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -49,7 +50,7 @@ watch(filtros, (val) => {
             id_area: val.id_area || undefined,
             id_tipo_vehiculo: val.id_tipo_vehiculo || undefined,
         }, { preserveState: true, replace: true })
-    }, 500)
+    }, ESPERA_FILTROS_MS)
 }, { deep: true })
 
 // El tipo de combustible, el área y el tipo de vehículo acotan el select de

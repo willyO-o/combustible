@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { reactive, computed, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -46,7 +47,7 @@ watch(filtros, () => {
             preserveScroll: true,
             replace: true,
         })
-    }, 300)
+    }, ESPERA_FILTROS_MS)
 })
 
 function limpiarFiltros() {

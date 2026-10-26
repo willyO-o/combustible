@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { onMounted, ref, computed, nextTick, watch } from 'vue'
 import { Head, Link, router, useForm, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -49,7 +50,7 @@ watch(
                 },
                 { preserveState: true, replace: true },
             )
-        }, 700) // espera a que termine de escribir antes de buscar
+        }, ESPERA_FILTROS_MS) // espera a que termine de escribir antes de buscar
     },
     { deep: true },
 )

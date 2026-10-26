@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -37,7 +38,7 @@ watch(filtros, (val) => {
             fecha_hasta: val.fecha_hasta,
             id_vehiculo_externo: val.id_vehiculo_externo || undefined,
         }, { preserveState: true, replace: true })
-    }, 400)
+    }, ESPERA_FILTROS_MS)
 }, { deep: true })
 
 function generarPDF() {

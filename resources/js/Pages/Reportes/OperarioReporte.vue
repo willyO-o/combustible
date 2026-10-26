@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Multiselect from '@vueform/multiselect'
@@ -34,7 +35,7 @@ watch(filtros, (val) => {
             fecha_fin: val.fecha_fin,
             id_conductor: val.id_conductor || undefined,
         }, { preserveState: true, replace: true })
-    }, 500)
+    }, ESPERA_FILTROS_MS)
 }, { deep: true })
 
 /* ------------------------------------------------------------------ */

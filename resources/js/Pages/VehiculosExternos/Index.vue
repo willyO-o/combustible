@@ -1,15 +1,36 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
 defineOptions({ layout: Maindashboard })
 import VehiculoExternoFormModal from '@/Components/VehiculoExternoFormModal.vue'
 import { confirm as confirmSwal } from '@/Utils/alertUtil.js'
 import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 
 const props = defineProps({
     vehiculosExternos: Object,
+    filters: { type: Object, default: () => ({}) },
     flash: Object,
+})
+
+/* ------------------------------------------------------------------ */
+/*  Buscador: placa o propietario (VehiculoExternoController::index)   */
+/* ------------------------------------------------------------------ */
+// Un enlace existente con ?nro_placa= se vuelca aquí para no perder el filtro.
+const buscar = ref(props.filters?.buscar ?? props.filters?.nro_placa ?? '')
+const hayBusqueda = computed(() => buscar.value.trim() !== '')
+
+let debounceTimer = null
+watch(buscar, (valor) => {
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+        router.get(
+            route('vehiculos-externos.index'),
+            { buscar: valor.trim() || undefined },
+            { preserveState: true, replace: true },
+        )
+    }, ESPERA_FILTROS_MS)
 })
 
 // Debajo de "lg" (tablet en portrait y celular) se muestra un segundo
@@ -82,12 +103,21 @@ async function confirmDelete(vehiculoExterno) {
 
     <!-- Tabla -->
     <div class="card custom-card">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="card-title">
                 Listado
                 <span class="badge bg-primary-transparent text-primary ms-2">
                     {{ vehiculosExternos.total }} registros
                 </span>
+            </div>
+            <div class="input-group input-group-sm externos-buscador">
+                <span class="input-group-text"><i class="ri-search-line" aria-hidden="true"></i></span>
+                <input v-model="buscar" type="search" class="form-control" placeholder="Buscar por placa o propietario..."
+                    aria-label="Buscar por placa o propietario" autocomplete="off" />
+                <button v-if="hayBusqueda" type="button" class="btn btn-light" title="Borrar búsqueda"
+                    aria-label="Borrar búsqueda" @click="buscar = ''">
+                    <i class="ri-close-line" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
         <!-- Vista tabla: desktop -->
@@ -106,7 +136,7 @@ async function confirmDelete(vehiculoExterno) {
                         <tr v-if="vehiculosExternos.data.length === 0">
                             <td colspan="4" class="text-center py-5 text-muted">
                                 <i class="ri-truck-line fs-3 d-block mb-2"></i>
-                                No se encontraron vehículos externos
+                                {{ hayBusqueda ? 'Ningún vehículo externo coincide con la búsqueda.' : 'No se encontraron vehículos externos' }}
                             </td>
                         </tr>
                         <tr v-for="(vehiculoExterno, idx) in vehiculosExternos.data" :key="vehiculoExterno.id">
@@ -149,7 +179,7 @@ async function confirmDelete(vehiculoExterno) {
         <div v-else class="card-body p-2">
             <div v-if="vehiculosExternos.data.length === 0" class="text-center py-4 text-muted">
                 <i class="ri-truck-line fs-3 d-block mb-2"></i>
-                No se encontraron vehículos externos
+                {{ hayBusqueda ? 'Ningún vehículo externo coincide con la búsqueda.' : 'No se encontraron vehículos externos' }}
             </div>
 
             <InfiniteScroll v-else data="vehiculosExternos" only-next as="div" class="d-flex flex-column gap-2">

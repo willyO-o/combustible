@@ -2266,3 +2266,14 @@
         padding-inline-start: 0;
     }
 }
+
+/* Buscador del listado de Vehículos Externos (VehiculosExternos/Index.vue). */
+.externos-buscador {
+    width: 18rem;
+}
+
+@media (max-width: 575.98px) {
+    .externos-buscador {
+        width: 100%;
+    }
+}

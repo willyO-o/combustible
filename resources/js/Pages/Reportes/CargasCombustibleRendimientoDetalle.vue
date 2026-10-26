@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { etiquetaVehiculo } from '@/Utils/asignacionVehiculoUtil'
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
@@ -31,7 +32,7 @@ watch(filtros, (val) => {
             fecha_fin: val.fecha_fin,
             id_vehiculo: val.id_vehiculo || undefined,
         }, { preserveState: true, replace: true })
-    }, 400)
+    }, ESPERA_FILTROS_MS)
 }, { deep: true })
 
 const vehiculoSeleccionado = computed(() =>

@@ -17,6 +17,22 @@ class VehiculoExternoController extends Controller
     {
         $query = VehiculoExterno::query();
 
+        // Buscador unificado: cada palabra escrita debe aparecer en la placa o
+        // en el propietario ("toyota 1234" también encuentra). COALESCE: un
+        // propietario vacío (NULL) se compara como texto vacío.
+        if ($request->filled('buscar')) {
+            $palabras = preg_split('/\s+/u', trim((string) $request->input('buscar')), -1, PREG_SPLIT_NO_EMPTY);
+
+            foreach ($palabras as $palabra) {
+                $query->where(function ($query) use ($palabra) {
+                    $termino = '%'.$palabra.'%';
+
+                    $query->whereRaw("COALESCE(nro_placa, '') LIKE ?", [$termino])
+                        ->orWhereRaw("COALESCE(propietario, '') LIKE ?", [$termino]);
+                });
+            }
+        }
+        // Se sigue aceptando por compatibilidad (enlaces existentes).
         if ($request->filled('nro_placa')) {
             $query->where('nro_placa', 'like', '%'.$request->nro_placa.'%');
         }
@@ -29,7 +45,7 @@ class VehiculoExternoController extends Controller
             // metadata de merge que usa <InfiniteScroll> en el listado de
             // tarjetas (mobile). Ver .ai/rules/pages.md.
             'vehiculosExternos' => Inertia::scroll($vehiculosExternos),
-            'filters' => $request->only(['nro_placa']),
+            'filters' => $request->only(['buscar', 'nro_placa']),
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),

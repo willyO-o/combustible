@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -41,7 +42,7 @@ watch(filtros, (val) => {
             id_vehiculo_externo: val.id_vehiculo_externo || undefined,
             ambito: val.ambito !== 'todos' ? val.ambito : undefined,
         }, { preserveState: true, replace: true })
-    }, 500)
+    }, ESPERA_FILTROS_MS)
 }, { deep: true })
 
 function clearFilters() {

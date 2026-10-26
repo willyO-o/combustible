@@ -1,4 +1,5 @@
 <script setup>
+import { ESPERA_FILTROS_MS } from '@/Utils/filtroUtil'
 import { computed, ref, watch } from 'vue'
 import { Head, Link, router, InfiniteScroll } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -50,7 +51,7 @@ watch(
                 },
                 { preserveState: true, replace: true },
             )
-        }, 350)
+        }, ESPERA_FILTROS_MS)
     },
     { deep: true },
 )

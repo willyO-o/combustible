@@ -160,4 +160,55 @@ class VehiculoExternoControllerTest extends TestCase
 
         $this->assertSame(1, VehiculoExterno::where('nro_placa', '1234ABC')->count());
     }
+
+    /**
+     * @return array<int, int>
+     */
+    private function idsBuscados(array $parametros): array
+    {
+        $ids = [];
+
+        $this->get(route('vehiculos-externos.index', $parametros))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use (&$ids) {
+                $ids = collect($page->toArray()['props']['vehiculosExternos']['data'])->pluck('id')->sort()->values()->all();
+
+                return $page;
+            });
+
+        return $ids;
+    }
+
+    public function test_el_buscador_encuentra_por_placa_o_por_propietario(): void
+    {
+        $juan = VehiculoExterno::factory()->create(['nro_placa' => '1234-ABC', 'propietario' => 'Transportes Juan Pérez']);
+        $mamani = VehiculoExterno::factory()->create(['nro_placa' => '5678-XYZ', 'propietario' => 'Rosa Mamani']);
+        $sinPropietario = VehiculoExterno::factory()->create(['nro_placa' => '9999-SIN', 'propietario' => null]);
+
+        $this->assertSame([$juan->id], $this->idsBuscados(['buscar' => '1234']), 'por placa');
+        $this->assertSame([$mamani->id], $this->idsBuscados(['buscar' => 'mamani']), 'por propietario, sin distinguir mayúsculas');
+
+        // Varias palabras: cada una en la placa o en el propietario.
+        $this->assertSame([$juan->id], $this->idsBuscados(['buscar' => 'juan 1234']));
+        $this->assertSame([], $this->idsBuscados(['buscar' => 'juan 5678']));
+
+        // Sin propietario (NULL) se sigue encontrando por la placa.
+        $this->assertSame([$sinPropietario->id], $this->idsBuscados(['buscar' => '9999']));
+
+        // Búsqueda vacía o sólo espacios: todos.
+        $todos = collect([$juan->id, $mamani->id, $sinPropietario->id])->sort()->values()->all();
+        $this->assertSame($todos, $this->idsBuscados(['buscar' => '   ']));
+    }
+
+    public function test_el_buscador_devuelve_el_filtro_aplicado_y_el_parametro_viejo_sigue_funcionando(): void
+    {
+        $vehiculo = VehiculoExterno::factory()->create(['nro_placa' => '1234-ABC']);
+        VehiculoExterno::factory()->create(['nro_placa' => '5678-XYZ']);
+
+        $this->get(route('vehiculos-externos.index', ['buscar' => '1234']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('filters.buscar', '1234'));
+
+        $this->assertSame([$vehiculo->id], $this->idsBuscados(['nro_placa' => '1234']));
+    }
 }
