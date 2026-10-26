@@ -57,16 +57,23 @@ class Vehiculo extends Model implements Auditable
     }
 
     /**
-     * Etiqueta del vehículo en los selectores de formularios (vales, cargas
-     * de combustible, solicitudes, ...): "código — placa — marca modelo
-     * (año)", omitiendo lo que falte. Ej. "VOL-01 — 1234ABC — Volvo FMX (2020)".
+     * Etiqueta del vehículo en TODOS los selectores y filtros de vehículos
+     * (formularios de vales, cargas, operación diaria, solicitudes, órdenes,
+     * asignaciones y filtros de reportes): "marca modelo - placa - (código)",
+     * sin año, omitiendo lo que falte. Ej. "Volvo FMX - 1234ABC - (VOL-01)".
+     * El front la replica en etiquetaVehiculo() de
+     * resources/js/Utils/asignacionVehiculoUtil.js para los filtros que la
+     * arman en la vista: si cambia aquí, cambiarla allí también.
      */
     public function etiquetaSeleccion(): string
     {
         $marcaModelo = trim(implode(' ', array_filter([$this->marca, $this->modelo])));
-        $etiqueta = implode(' — ', array_filter([$this->codigo, $this->nro_placa, $marcaModelo]));
 
-        return $this->anio ? "{$etiqueta} ({$this->anio})" : $etiqueta;
+        return implode(' - ', array_filter([
+            $marcaModelo,
+            $this->nro_placa,
+            $this->codigo ? "({$this->codigo})" : null,
+        ]));
     }
 
     public function tipoVehiculo()

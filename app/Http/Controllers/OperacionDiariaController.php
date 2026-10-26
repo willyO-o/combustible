@@ -389,7 +389,7 @@ class OperacionDiariaController extends Controller
     {
         return [
             'id' => $vehiculo->id,
-            'label' => "{$vehiculo->codigo} — {$vehiculo->nro_placa} — {$vehiculo->marca} ({$vehiculo->anio})",
+            'label' => $vehiculo->etiquetaSeleccion(),
             'meta' => [
                 'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
                 'id_tipo_combustible' => $vehiculo->id_tipo_combustible,

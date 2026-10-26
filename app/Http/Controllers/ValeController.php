@@ -148,7 +148,7 @@ class ValeController extends Controller
         return Inertia::render('Vales/Create', [
             'vale' => $vale,
             // Enviamos el objeto completo para que el select muestre el valor actual
-            'vehiculoActual' => $vale->vehiculo ? ['id' => $vale->vehiculo->id,  'label' => "{$vale->vehiculo->codigo} — {$vale->vehiculo->nro_placa}".($vale->vehiculo->marca ? " — {$vale->vehiculo->marca}" : '')] : null,
+            'vehiculoActual' => $vale->vehiculo ? ['id' => $vale->vehiculo->id,  'label' => $vale->vehiculo->etiquetaSeleccion()] : null,
             'conductorActual' => $vale->conductor ? ['id' => $vale->conductor->id, 'label' => trim("{$vale->conductor->persona->nombre_completo}")." (CI: {$vale->conductor->persona->ci})"] : null,
             'tiposCombustible' => $tiposCombustible,
             'grifos' => $grifos,
@@ -242,7 +242,7 @@ class ValeController extends Controller
             ->get()
             ->map(fn ($v) => [
                 'id' => $v->id,
-                'label' => "{$v->codigo} —  {$v->nro_placa}".($v->marca ? " — {$v->marca}" : '').($v->anio ? " ({$v->anio})" : ''),
+                'label' => $v->etiquetaSeleccion(),
                 'meta' => [
                     'id_conductor' => $v->conductorAsignado ? $v->conductorAsignado->id : null,
                     // Titular + provisionales vigentes: el formulario de

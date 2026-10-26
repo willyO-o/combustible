@@ -126,7 +126,7 @@ class SolicitudMantenimientoController extends Controller
             ->values()
             ->map(fn (Vehiculo $vehiculo) => [
                 'id' => $vehiculo->id,
-                'label' => implode(' — ', array_filter([$vehiculo->codigo, $vehiculo->nro_placa, $vehiculo->marca])),
+                'label' => $vehiculo->etiquetaSeleccion(),
                 'meta' => [
                     'tipo_medicion' => $vehiculo->tipo_medicion,
                 ],

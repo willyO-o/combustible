@@ -1,4 +1,5 @@
 <script setup>
+import { etiquetaVehiculo } from '@/Utils/asignacionVehiculoUtil'
 import { ref, watch, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -166,7 +167,7 @@ const chartSeries = computed(() => [
                     <select v-model="filtros.id_vehiculo" class="form-select">
                         <option value="">— Seleccionar un vehículo —</option>
                         <option v-for="v in vehiculos" :key="v.id" :value="v.id">
-                            {{ v.codigo }} — {{ v.nro_placa }}{{ v.marca ? ' — ' + v.marca : '' }}{{ v.tipo_combustible ? ' · ' + v.tipo_combustible.tipo_combustible : '' }}
+                            {{ etiquetaVehiculo(v) }}{{ v.tipo_combustible ? ' · ' + v.tipo_combustible.tipo_combustible : '' }}
                         </option>
                     </select>
                 </div>

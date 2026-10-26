@@ -21,3 +21,16 @@ export const estadoAsignacionBadge = (estado) =>
 export const nombreVehiculo = (v) => [v.marca, v.modelo].filter(Boolean).join(' ') || '—'
 
 export const codigoPlaca = (v) => [v.codigo, v.nro_placa].filter(Boolean).join(' · ') || '—'
+
+/**
+ * Etiqueta de un vehículo en los selectores y filtros: "marca modelo - placa
+ * - (código)", sin año, omitiendo lo que falte. Ej. "Volvo FMX - 1234ABC -
+ * (VOL-01)". Réplica de Vehiculo::etiquetaSeleccion() (backend) para los
+ * filtros que arman la etiqueta en la vista: si cambia uno, cambiar el otro.
+ */
+export const etiquetaVehiculo = (v) =>
+    [
+        [v?.marca, v?.modelo].filter(Boolean).join(' '),
+        v?.nro_placa,
+        v?.codigo ? `(${v.codigo})` : null,
+    ].filter(Boolean).join(' - ')

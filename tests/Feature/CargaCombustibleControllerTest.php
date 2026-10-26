@@ -1089,7 +1089,7 @@ class CargaCombustibleControllerTest extends TestCase
         $this->assertSame($conductor->id, CargaCombustible::firstOrFail()->id_conductor);
     }
 
-    public function test_el_selector_de_vehiculos_muestra_codigo_placa_marca_y_modelo(): void
+    public function test_el_selector_de_vehiculos_muestra_marca_modelo_placa_y_codigo_sin_anio(): void
     {
         $this->crearParametrosEmpresa();
         $vehiculo = Vehiculo::factory()->create([
@@ -1102,9 +1102,9 @@ class CargaCombustibleControllerTest extends TestCase
         $this->get(route('cargas.create'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('vehiculos', fn ($opciones) => collect($opciones)->firstWhere('id', $vehiculo->id)['label'] === 'VOL-01 — 1234ABC — Volvo FMX (2020)'
+                ->where('vehiculos', fn ($opciones) => collect($opciones)->firstWhere('id', $vehiculo->id)['label'] === 'Volvo FMX - 1234ABC - (VOL-01)'
                     // Lo que falta se omite, sin separadores sueltos.
-                    && collect($opciones)->firstWhere('id', $sinModelo->id)['label'] === 'CAM-02 — 5678DEF — Toyota')
+                    && collect($opciones)->firstWhere('id', $sinModelo->id)['label'] === 'Toyota - 5678DEF - (CAM-02)')
             );
 
         // Al editar la carga se ve con el mismo formato.
@@ -1122,6 +1122,32 @@ class CargaCombustibleControllerTest extends TestCase
 
         $this->get(route('cargas.edit', $carga))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('vehiculoActual.label', 'VOL-01 — 1234ABC — Volvo FMX (2020)'));
+            ->assertInertia(fn (Assert $page) => $page->where('vehiculoActual.label', 'Volvo FMX - 1234ABC - (VOL-01)'));
+    }
+
+    public function test_la_etiqueta_de_vehiculo_omite_lo_que_falta_sin_separadores_sueltos(): void
+    {
+        $etiqueta = fn (array $datos) => (new Vehiculo($datos))->etiquetaSeleccion();
+
+        $this->assertSame('Volvo FMX - 1234ABC - (VOL-01)', $etiqueta(['marca' => 'Volvo', 'modelo' => 'FMX', 'nro_placa' => '1234ABC', 'codigo' => 'VOL-01', 'anio' => 2020]));
+        $this->assertSame('1234ABC - (VOL-01)', $etiqueta(['nro_placa' => '1234ABC', 'codigo' => 'VOL-01']));
+        $this->assertSame('Volvo - (VOL-01)', $etiqueta(['marca' => 'Volvo', 'codigo' => 'VOL-01']));
+        $this->assertSame('Volvo FMX - 1234ABC', $etiqueta(['marca' => 'Volvo', 'modelo' => 'FMX', 'nro_placa' => '1234ABC']));
+    }
+
+    public function test_el_mismo_formato_se_usa_en_operacion_diaria_y_en_el_buscador_de_vehiculos(): void
+    {
+        Vehiculo::factory()->create([
+            'codigo' => 'VOL-01', 'nro_placa' => '1234ABC', 'marca' => 'Volvo', 'modelo' => 'FMX', 'anio' => 2020,
+        ]);
+
+        $this->get(route('operacion-diaria.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('vehiculosAsignados', fn ($opciones) => collect($opciones)->pluck('label')->contains('Volvo FMX - 1234ABC - (VOL-01)')));
+
+        $this->getJson(route('search.vehiculos', ['q' => '1234']))
+            ->assertOk()
+            ->assertJsonFragment(['label' => 'Volvo FMX - 1234ABC - (VOL-01)']);
     }
 }

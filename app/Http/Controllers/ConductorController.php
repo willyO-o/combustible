@@ -605,6 +605,7 @@ class ConductorController extends Controller
                 'codigo' => $vehiculo->codigo,
                 'nro_placa' => $vehiculo->nro_placa,
                 'marca' => $vehiculo->marca,
+                'modelo' => $vehiculo->modelo,
                 'anio' => $vehiculo->anio,
                 'tipo_medicion' => $vehiculo->tipo_medicion,
                 'conductor_asignado' => $vehiculo->conductorAsignado?->persona

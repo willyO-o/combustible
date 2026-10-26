@@ -386,7 +386,7 @@ class CargasCombustibleReportController extends Controller
      */
     private function vehiculosParaFiltro(?int $idTipoCombustible = null, ?int $idArea = null, ?int $idTipoVehiculo = null)
     {
-        return Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
+        return Vehiculo::select('id', 'nro_placa', 'marca', 'modelo', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
             ->with('tipoCombustible:id,tipo_combustible')
             ->when($idTipoCombustible, fn ($q) => $q->where('id_tipo_combustible', $idTipoCombustible))
             ->when($idTipoVehiculo, fn ($q) => $q->where('id_tipo_vehiculo', $idTipoVehiculo))

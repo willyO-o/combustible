@@ -91,7 +91,7 @@ class Conductor extends Model implements Auditable
         return $this->asignacionesActivas->map(function ($asignacion) {
             return [
                 'id' => $asignacion->id,
-                'label' => "{$asignacion->codigo} — {$asignacion->nro_placa} —  {$asignacion->marca} ({$asignacion->anio})",
+                'label' => $asignacion->etiquetaSeleccion(),
                 'meta' => [
                     'id_tipo_vehiculo' => $asignacion->id_tipo_vehiculo,
                     'id_tipo_combustible' => $asignacion->id_tipo_combustible,

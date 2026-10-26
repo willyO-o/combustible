@@ -5,6 +5,7 @@ import Maindashboard from '@/Layouts/Maindashboard.vue'
 import Multiselect from '@vueform/multiselect'
 import DateRangeFilter from '@/Components/DateRangeFilter.vue'
 import BotonDescargarGrafico from '@/Components/BotonDescargarGrafico.vue'
+import { etiquetaVehiculo } from '@/Utils/asignacionVehiculoUtil'
 defineOptions({ layout: Maindashboard })
 
 const props = defineProps({
@@ -26,7 +27,7 @@ const filtros = ref({
 const vehiculoOptions = computed(() =>
     props.vehiculos.map((v) => ({
         value: v.id,
-        label: `${v.codigo} — ${v.nro_placa ?? ""}${v.marca ? ' — ' + v.marca : ''}`,
+        label: etiquetaVehiculo(v),
     })),
 )
 

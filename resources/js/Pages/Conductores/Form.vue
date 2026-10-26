@@ -1,4 +1,5 @@
 <script setup>
+import { etiquetaVehiculo } from '@/Utils/asignacionVehiculoUtil'
 import { computed, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import Maindashboard from '@/Layouts/Maindashboard.vue'
@@ -129,9 +130,7 @@ function onDocumentoArchivoChange(e, documento) {
 const vehiculosOpt = computed(() =>
     (props.vehiculos ?? []).map((v) => ({
         id: v.id,
-        label:
-            [v.codigo, v.nro_placa, v.marca].filter(Boolean).join(' — ') +
-            (v.anio ? ` (${v.anio})` : ''),
+        label: etiquetaVehiculo(v),
         tipo_medicion: v.tipo_medicion,
         conductor_asignado: v.conductor_asignado ?? null,
     })),
