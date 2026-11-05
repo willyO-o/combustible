@@ -1866,7 +1866,41 @@ class OperacionDiariaControllerTest extends TestCase
         return [$jefe, $operario, $vehiculo, $area];
     }
 
-    public function test_no_permite_dos_operaciones_del_mismo_vehiculo_el_mismo_dia(): void
+    /**
+     * Turno noche de 19:00 del día indicado a 05:00 del día siguiente.
+     *
+     * @return array{turno: string, fecha_inicio: string, fecha_fin: string}
+     */
+    private function turnoNocheDelDia(Carbon $dia): array
+    {
+        return [
+            'turno' => 'NOCHE',
+            'fecha_inicio' => $dia->copy()->setTime(19, 0)->format('Y-m-d\TH:i'),
+            'fecha_fin' => $dia->copy()->addDay()->setTime(5, 0)->format('Y-m-d\TH:i'),
+        ];
+    }
+
+    public function test_permite_turno_dia_y_noche_del_mismo_vehiculo_el_mismo_dia(): void
+    {
+        [$jefe, $operario, $vehiculo] = $this->escenarioJefeConVehiculo();
+
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        // Mismo vehículo y mismo día en el otro turno, por otro operario.
+        [, $otroOperario] = $this->crearConductorConUsuario();
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $otroOperario->id] + $this->turnoNocheDelDia(now()))
+        )->assertSessionHasNoErrors()->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertDatabaseCount('operacion_diaria', 2);
+        $this->assertSame(['DIA', 'NOCHE'], OperacionDiaria::orderBy('turno')->pluck('turno')->all());
+    }
+
+    public function test_no_permite_repetir_el_turno_del_mismo_vehiculo_el_mismo_dia(): void
     {
         [$jefe, $operario, $vehiculo, $area] = $this->escenarioJefeConVehiculo();
 
@@ -1874,22 +1908,32 @@ class OperacionDiariaControllerTest extends TestCase
             route('operacion-diaria.store'),
             $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
         )->assertRedirect(route('operacion-diaria.index'));
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->turnoNocheDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
 
-        // Mismo vehículo y mismo día, aunque a otra hora y por otro operario.
+        // Un tercer registro choca con el turno ya ocupado, sea cual sea la
+        // hora (no se compara la hora, sólo turno y fecha).
         [, $otroOperario] = $this->crearConductorConUsuario();
         $this->actingAs($jefe)->post(
             route('operacion-diaria.store'),
             $this->payloadOperacionValida($vehiculo, [
                 'id_conductor' => $otroOperario->id,
-                'turno' => 'NOCHE',
-                'fecha_inicio' => now()->setTime(19, 0)->format('Y-m-d\TH:i'),
-                'fecha_fin' => now()->addDay()->setTime(5, 0)->format('Y-m-d\TH:i'),
+                'turno' => 'DIA',
+                'fecha_inicio' => now()->setTime(13, 0)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->setTime(17, 0)->format('Y-m-d\TH:i'),
             ])
+        )->assertSessionHasErrors(['fecha_inicio' => 'El vehículo ya tiene registrado el turno DÍA del '.now()->format('d/m/Y').' (N° 1).']);
+
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $otroOperario->id] + $this->turnoNocheDelDia(now()))
         )->assertSessionHasErrors('fecha_inicio');
 
-        $this->assertDatabaseCount('operacion_diaria', 1);
+        $this->assertDatabaseCount('operacion_diaria', 2);
 
-        // Otro vehículo el mismo día sí se puede.
+        // Otro vehículo el mismo día y turno sí se puede.
         $otroVehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
         $this->asignarVehiculoAArea($otroVehiculo, $area);
         $this->actingAs($jefe)->post(
@@ -1897,7 +1941,77 @@ class OperacionDiariaControllerTest extends TestCase
             $this->payloadOperacionValida($otroVehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
         )->assertRedirect(route('operacion-diaria.index'));
 
+        $this->assertDatabaseCount('operacion_diaria', 3);
+    }
+
+    public function test_un_conductor_puede_registrar_ambos_turnos_de_su_vehiculo_el_mismo_dia(): void
+    {
+        [$user, $conductor] = $this->crearConductorConUsuario();
+        $vehiculo = Vehiculo::factory()->create(['tipo_medicion' => 'kilometraje']);
+        $this->asignarVehiculoAConductor($vehiculo, $conductor);
+        $this->asignarVehiculoAArea($vehiculo, Area::factory()->create());
+
+        $this->actingAs($user)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, $this->turnoNocheDelDia(now()->subDay()))
+        )->assertRedirect(route('operacion-diaria.index'));
+        $this->actingAs($user)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, $this->jornadaDelDia(now()->subDay()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
         $this->assertDatabaseCount('operacion_diaria', 2);
+    }
+
+    public function test_update_no_permite_cambiar_al_turno_que_ya_esta_ocupado_ese_dia(): void
+    {
+        [$jefe, $operario, $vehiculo] = $this->escenarioJefeConVehiculo();
+
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->turnoNocheDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $noche = OperacionDiaria::where('turno', 'NOCHE')->firstOrFail();
+
+        // Pasarla a DÍA chocaría con la de día ya registrada.
+        $this->actingAs($jefe)->put(
+            route('operacion-diaria.update', $noche),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id, 'turno' => 'DIA'] + $this->jornadaDelDia(now()))
+        )->assertSessionHasErrors('fecha_inicio');
+
+        $this->assertSame('NOCHE', $noche->fresh()->turno);
+
+        // Editarla conservando su turno no choca consigo misma.
+        $this->actingAs($jefe)->put(
+            route('operacion-diaria.update', $noche),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id, 'observaciones' => 'Relevo a las 19:10'] + $this->turnoNocheDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertSame('Relevo a las 19:10', $noche->fresh()->observaciones);
+    }
+
+    public function test_update_permite_cambiar_de_turno_si_el_otro_esta_libre(): void
+    {
+        [$jefe, $operario, $vehiculo] = $this->escenarioJefeConVehiculo();
+
+        $this->actingAs($jefe)->post(
+            route('operacion-diaria.store'),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->jornadaDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $operacion = OperacionDiaria::firstOrFail();
+
+        $this->actingAs($jefe)->put(
+            route('operacion-diaria.update', $operacion),
+            $this->payloadOperacionValida($vehiculo, ['id_conductor' => $operario->id] + $this->turnoNocheDelDia(now()))
+        )->assertRedirect(route('operacion-diaria.index'));
+
+        $this->assertSame('NOCHE', $operacion->fresh()->turno);
     }
 
     public function test_update_no_permite_mover_la_operacion_a_un_dia_que_ya_tiene_otra_del_vehiculo(): void

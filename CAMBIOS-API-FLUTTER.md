@@ -14,6 +14,22 @@ Este documento resume **todo lo que cambió en la API** en esta ronda. Está div
 
 ---
 
+## Actualización 2026-11-05 — Operación diaria: turno día y turno noche el mismo día (API 1.24.0)
+
+- Un vehículo puede tener **hasta dos operaciones por día**: una con `turno: DIA` y otra con
+  `turno: NOCHE` (día de `fecha_inicio`). No se valida la hora, sólo turno + fecha.
+- Repetir un turno ya registrado ese día responde `422` con `errors.fecha_inicio`
+  ("El vehículo ya tiene registrado el turno DÍA del …"). Mismo campo de error que antes.
+- El turno noche que cruza la medianoche pertenece al día en que **empieza** (`fecha_inicio`).
+
+**Checklist**
+
+- [ ] Asegurar que el formulario envíe el `turno` elegido por el operario (ya es obligatorio).
+- [ ] Si la app bloqueaba localmente una segunda operación del mismo vehículo el mismo día,
+  permitirla cuando el turno es distinto.
+
+---
+
 ## Actualización 2026-10-16 — Vales: conductor manual si el vehículo no tiene asignado (API 1.18.0)
 
 - `POST /vales`: `id_conductor` puede ser **cualquier conductor activo**, esté o no asignado al

@@ -57,17 +57,20 @@ class OperacionDiaria extends Model implements Auditable
     }
 
     /**
-     * Operación ya registrada para el vehículo el mismo día (por fecha de
-     * inicio): sólo se permite una operación diaria por vehículo y por día.
-     * $exceptoId excluye la propia operación al editar.
+     * Operación ya registrada para el vehículo en el mismo turno y día (día
+     * de fecha_inicio): se permite una operación por vehículo, día y turno,
+     * o sea hasta dos por día (DIA + NOCHE). No se compara la hora: el
+     * relevo entre turnos no es exacto. $exceptoId excluye la propia
+     * operación al editar.
      */
-    public static function delVehiculoEnElDia(int $idVehiculo, CarbonInterface $fechaInicio, ?int $exceptoId = null): ?self
+    public static function delVehiculoEnElTurno(int $idVehiculo, CarbonInterface $fechaInicio, string $turno, ?int $exceptoId = null): ?self
     {
         return self::query()
             ->where('id_vehiculo', $idVehiculo)
             ->whereDate('fecha_inicio', $fechaInicio->toDateString())
+            ->where('turno', $turno)
             ->when($exceptoId, fn ($query) => $query->whereKeyNot($exceptoId))
-            ->first(['id', 'nro_operacion', 'fecha_inicio']);
+            ->first(['id', 'nro_operacion', 'fecha_inicio', 'turno']);
     }
 
     public function getFechaIFAttribute()

@@ -127,8 +127,9 @@ class OperacionStoreRequest extends FormRequest
 
     /**
      * Reglas de la fecha de inicio (web y API comparten esta request):
-     * - Una sola operación diaria por vehículo y por día (excluye la propia
-     *   operación al editar).
+     * - Una sola operación por vehículo, día y turno: hasta dos por día
+     *   (DIA + NOCHE), sin comparar horas. Excluye la propia operación al
+     *   editar.
      * - jefe-area/administrador/super-admin pueden usar cualquier fecha (a
      *   pedido del usuario, para regularizar jornadas no registradas).
      * - El resto, sólo hoy o ayer (ayer cubre el turno noche y el registro al
@@ -219,10 +220,20 @@ class OperacionStoreRequest extends FormRequest
             }
         }
 
-        if ($idVehiculo && ($existente = OperacionDiaria::delVehiculoEnElDia($idVehiculo, $fechaInicio, $operacion?->id))) {
+        // Si el turno no es válido ya tiene su propio error (rules()).
+        $turno = $this->input('turno');
+
+        if (! in_array($turno, ['DIA', 'NOCHE'], true)) {
+            return;
+        }
+
+        // El error sigue en fecha_inicio (contrato de la API ya publicado).
+        if ($idVehiculo && ($existente = OperacionDiaria::delVehiculoEnElTurno($idVehiculo, $fechaInicio, $turno, $operacion?->id))) {
+            $nombreTurno = $turno === 'DIA' ? 'DÍA' : 'NOCHE';
+
             $validator->errors()->add(
                 'fecha_inicio',
-                "El vehículo ya tiene una operación diaria registrada el {$fechaInicio->format('d/m/Y')} (N° {$existente->nro_operacion})."
+                "El vehículo ya tiene registrado el turno {$nombreTurno} del {$fechaInicio->format('d/m/Y')} (N° {$existente->nro_operacion})."
             );
         }
     }

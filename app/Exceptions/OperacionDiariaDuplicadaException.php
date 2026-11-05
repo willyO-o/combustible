@@ -6,7 +6,7 @@ use Exception;
 
 class OperacionDiariaDuplicadaException extends Exception
 {
-    public function __construct(string $message = 'El vehículo ya tiene una operación diaria registrada en esa fecha.')
+    public function __construct(string $message = 'El vehículo ya tiene una operación diaria registrada en ese turno y fecha.')
     {
         parent::__construct($message);
     }

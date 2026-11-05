@@ -23,12 +23,16 @@ class UpdateOperacionDiariaAction
     {
         return DB::transaction(function () use ($operacionDiaria, $datos) {
 
-            // Mover la fecha de inicio a un día en que el vehículo ya tiene
-            // otra operación rompería la regla de una por vehículo y por día.
-            if (! empty($datos['fecha_inicio'])) {
+            // Mover la fecha o cambiar el turno a uno que el vehículo ya tiene
+            // ocupado ese día rompería la regla de una por vehículo, día y
+            // turno. Sin dato nuevo se toma el ya guardado.
+            if (! empty($datos['fecha_inicio']) || ! empty($datos['turno'])) {
                 Vehiculo::lockForUpdate()->find($operacionDiaria->id_vehiculo);
 
-                if (OperacionDiaria::delVehiculoEnElDia($operacionDiaria->id_vehiculo, Carbon::parse($datos['fecha_inicio']), $operacionDiaria->id)) {
+                $fechaInicio = ! empty($datos['fecha_inicio']) ? Carbon::parse($datos['fecha_inicio']) : $operacionDiaria->fecha_inicio;
+                $turno = $datos['turno'] ?? $operacionDiaria->turno;
+
+                if (OperacionDiaria::delVehiculoEnElTurno($operacionDiaria->id_vehiculo, $fechaInicio, $turno, $operacionDiaria->id)) {
                     throw new OperacionDiariaDuplicadaException;
                 }
             }

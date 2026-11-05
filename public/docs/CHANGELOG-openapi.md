@@ -2,6 +2,18 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.24.0 — 2026-11-05
+
+### Cambiado
+
+- `POST /operacion-diaria` y `PUT/PATCH /operacion-diaria/{id}`: la regla "una operación por vehículo
+  y por día" pasa a **una por vehículo, día y turno**. Un vehículo puede tener hasta dos operaciones
+  el mismo día (día de `fecha_inicio`): una `DIA` y una `NOCHE`. No se compara la hora (el relevo
+  entre turnos no es exacto). Repetir un turno ya registrado ese día sigue respondiendo `422` con el
+  error en `fecha_inicio`: "El vehículo ya tiene registrado el turno DÍA del dd/mm/aaaa (N° …)".
+  Al editar, cambiar el `turno` a uno ya ocupado ese día también responde `422`.
+- `GET /parametros`: `api_version` pasa a `1.24.0`.
+
 ## 1.23.0 — 2026-10-26
 
 ### Agregado

@@ -659,7 +659,7 @@ class OperacionDiariaControllerTest extends TestCase
         $this->assertSame($conductorAjeno->id, OperacionDiaria::firstOrFail()->id_conductor);
     }
 
-    public function test_store_devuelve_422_si_el_vehiculo_ya_tiene_una_operacion_ese_dia(): void
+    public function test_store_devuelve_422_si_el_vehiculo_ya_tiene_ese_turno_ese_dia(): void
     {
         [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
 
@@ -679,6 +679,41 @@ class OperacionDiariaControllerTest extends TestCase
             ->assertJsonValidationErrors('fecha_inicio');
 
         $this->assertDatabaseCount('operacion_diaria', 1);
+    }
+
+    public function test_store_permite_el_turno_noche_el_mismo_dia_que_el_turno_dia(): void
+    {
+        [$user, $conductor, $vehiculo] = $this->usuarioConVehiculoAsignado();
+
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+                'turno' => 'DIA',
+                'fecha_inicio' => now()->subDay()->setTime(8, 0)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->subDay()->setTime(18, 0)->format('Y-m-d\TH:i'),
+            ]))
+            ->assertCreated();
+
+        // El relevo no es exacto (18:05): no se compara la hora, sólo el turno.
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+                'turno' => 'NOCHE',
+                'fecha_inicio' => now()->subDay()->setTime(18, 5)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->setTime(5, 0)->format('Y-m-d\TH:i'),
+            ]))
+            ->assertCreated();
+
+        $this->assertDatabaseCount('operacion_diaria', 2);
+
+        $this->actingAs($user, 'api')
+            ->postJson(route('api.v1.operacion-diaria.store'), $this->payloadValido($conductor, $vehiculo, [
+                'turno' => 'NOCHE',
+                'fecha_inicio' => now()->subDay()->setTime(20, 0)->format('Y-m-d\TH:i'),
+                'fecha_fin' => now()->setTime(4, 0)->format('Y-m-d\TH:i'),
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('fecha_inicio');
+
+        $this->assertDatabaseCount('operacion_diaria', 2);
     }
 
     public function test_store_de_un_conductor_rechaza_fechas_anteriores_a_ayer(): void

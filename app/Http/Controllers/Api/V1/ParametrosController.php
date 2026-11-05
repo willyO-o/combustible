@@ -28,7 +28,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.23.0',
+            'api_version' => '1.24.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),

@@ -30,9 +30,10 @@ class CreateOperacionDiariaAction
                 // vehículo (doble clic, web + app a la vez): así la regla de
                 // una operación por vehículo y por día (ya validada en
                 // OperacionStoreRequest) no se puede saltar por concurrencia.
+                // La regla es una por vehículo, día y turno (DIA + NOCHE).
                 $vehiculo = Vehiculo::lockForUpdate()->findOrFail($datos['id_vehiculo']);
 
-                if (OperacionDiaria::delVehiculoEnElDia($vehiculo->id, Carbon::parse($datos['fecha_inicio']))) {
+                if (OperacionDiaria::delVehiculoEnElTurno($vehiculo->id, Carbon::parse($datos['fecha_inicio']), $datos['turno'])) {
                     throw new OperacionDiariaDuplicadaException;
                 }
 

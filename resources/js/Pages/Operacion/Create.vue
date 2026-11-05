@@ -82,6 +82,29 @@ const hoy = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60
 const inicioDeJornada = `${hoy}T${HORA_INGRESO}`
 const finDeJornada = `${hoy}T${HORA_SALIDA}`
 
+// Horario propuesto por turno (sólo una sugerencia editable; el servidor no
+// valida horas, sólo una operación por vehículo, día y turno). El turno
+// noche sale al día siguiente.
+const HORARIO_TURNO = {
+    DIA: { ingreso: HORA_INGRESO, salida: HORA_SALIDA, saleAlDiaSiguiente: false },
+    NOCHE: { ingreso: '19:00', salida: '05:00', saleAlDiaSiguiente: true },
+}
+// 'YYYY-MM-DD' + 1 día, sin pasar por la zona horaria local.
+const diaSiguiente = (fecha) => {
+    const d = new Date(`${fecha}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + 1)
+    return d.toISOString().slice(0, 10)
+}
+const horarioDelTurno = (turno, fecha) => {
+    const h = HORARIO_TURNO[turno]
+    return {
+        inicio: `${fecha}T${h.ingreso}`,
+        fin: `${h.saleAlDiaSiguiente ? diaSiguiente(fecha) : fecha}T${h.salida}`,
+    }
+}
+// 'YYYY-MM-DD HH:mm' o 'YYYY-MM-DDTHH:mm' -> 'YYYY-MM-DDTHH:mm'.
+const normalizarFechaHora = (v) => (v || '').replace(' ', 'T').slice(0, 16)
+
 // Límites del calendario de fecha de inicio: nunca después de hoy; sin rol
 // de gestión, tampoco antes de N días atrás. Al editar, el día ya guardado
 // sigue siendo elegible (si no, el calendario lo recortaría).
@@ -237,6 +260,27 @@ const horasTrabajadasCalculadas = computed(() => {
 watch(horasTrabajadasCalculadas, (val) => {
     form.horas_trabajadas = val ?? ''
 }, { immediate: true })
+
+// Al registrar, cambiar de turno propone su horario (Día 08:00–18:00, Noche
+// 19:00–05:00 del día siguiente) sobre la misma fecha de inicio. Sólo si las
+// horas siguen siendo las propuestas del turno anterior: si el usuario ya
+// las ajustó, no se tocan. En edición nunca se cambian.
+watch(() => form.turno, (turnoNuevo, turnoAnterior) => {
+    if (esEdicion.value || !HORARIO_TURNO[turnoNuevo] || !HORARIO_TURNO[turnoAnterior]) return
+
+    const fecha = normalizarFechaHora(form.fecha_inicio).slice(0, 10) || hoy
+    const anterior = horarioDelTurno(turnoAnterior, fecha)
+
+    if (normalizarFechaHora(form.fecha_inicio) !== anterior.inicio || normalizarFechaHora(form.fecha_fin) !== anterior.fin) return
+
+    const propuesto = horarioDelTurno(turnoNuevo, fecha)
+    form.fecha_inicio = propuesto.inicio
+    form.fecha_fin = propuesto.fin
+})
+
+// Hora que propone el calendario si el campo se vacía, según el turno.
+const horaIngresoSugerida = computed(() => HORARIO_TURNO[form.turno]?.ingreso ?? HORA_INGRESO)
+const horaSalidaSugerida = computed(() => HORARIO_TURNO[form.turno]?.salida ?? HORA_SALIDA)
 
 // Lecturas: '' / null (sin cargar) -> null; el resto ya llega saneado por
 // v-decimal ("1050.5") o desde el backend ("1050.50").
@@ -686,13 +730,13 @@ onMounted(() => {
                                         Fecha y hora inicio <span class="text-danger">*</span>
                                     </label>
                                     <DateTimeInput v-model="form.fecha_inicio" :invalid="!!form.errors.fecha_inicio"
-                                        :hora-sugerida="HORA_INGRESO" :min-date="minFechaInicio" :max-date="puedeRegularizar ? null : finDeHoy" />
+                                        :hora-sugerida="horaIngresoSugerida" :min-date="minFechaInicio" :max-date="puedeRegularizar ? null : finDeHoy" />
                                     <div v-if="form.errors.fecha_inicio" class="text-danger small mt-1">{{
                                         form.errors.fecha_inicio }}</div>
                                     <div v-else class="form-text">
                                         <template v-if="puedeRegularizar">Puedes registrar cualquier fecha para regularizar.</template>
                                         <template v-else>Sólo hoy o ayer.</template>
-                                        Una operación por vehículo y por día.
+                                        Hasta dos operaciones por vehículo y día: una por turno (día y noche).
                                     </div>
                                 </div>
                                 <div class="col-12">
@@ -700,7 +744,7 @@ onMounted(() => {
                                         Fecha y hora fin <span class="text-danger">*</span>
                                     </label>
                                     <DateTimeInput v-model="form.fecha_fin" :invalid="!!form.errors.fecha_fin"
-                                        :hora-sugerida="HORA_SALIDA" />
+                                        :hora-sugerida="horaSalidaSugerida" />
                                     <div v-if="form.errors.fecha_fin" class="text-danger small mt-1">{{
                                         form.errors.fecha_fin }}</div>
                                 </div>
