@@ -1312,6 +1312,7 @@ class Reportes extends exFPDF
             (string) ($i + 1),
             $v['codigo'] ?? null,
             $v['nro_placa'] ?? null,
+            $v['chasis'] ?? null,
             trim(($v['marca'] ?? '').' '.($v['modelo'] ?? '')),
             $v['anio'] ?? null,
             $v['tipo_vehiculo'] ?? null,
@@ -1335,9 +1336,10 @@ class Reportes extends exFPDF
             ],
             tituloTabla: 'VEHÍCULOS',
             columnas: [
-                ['#', 8, 'C'], ['CÓDIGO', 22, 'L'], ['PLACA', 22, 'L'], ['MARCA / MODELO', 40, 'L'],
-                ['AÑO', 12, 'C'], ['TIPO', 30, 'L'], ['COMBUSTIBLE', 22, 'L'], ['CAPACIDAD', 20, 'R'],
-                ['ÁREA ASIGNADA', 35, 'L'], ['OPERARIO', 36, 'L'], ['ESTADO', 16, 'C'],
+                // Anchos en mm: deben sumar 263 (carta horizontal).
+                ['#', 8, 'C'], ['CÓDIGO', 18, 'L'], ['PLACA', 18, 'L'], ['CHASIS', 30, 'L'], ['MARCA / MODELO', 34, 'L'],
+                ['AÑO', 12, 'C'], ['TIPO', 26, 'L'], ['COMBUSTIBLE', 18, 'L'], ['CAPACIDAD', 20, 'R'],
+                ['ÁREA ASIGNADA', 31, 'L'], ['OPERARIO', 32, 'L'], ['ESTADO', 16, 'C'],
             ],
             filas: $filas,
             mensajeVacio: 'No hay vehículos que coincidan con los filtros seleccionados.',
@@ -2113,11 +2115,17 @@ class Reportes extends exFPDF
         $this->SetXY($sx + 40, $sy + 9.5);
         $this->Cell($uw - 40, 6, $this->textoCalibri('Del '.date('d/m/Y', strtotime($fechaInicio)).' al '.date('d/m/Y', strtotime($fechaFin))), 0, 2, 'L');
 
-        if ($tipoCombustibleLabel) {
+        // Combustible y chasis (este último sólo si el vehículo lo tiene).
+        $lineaVehiculo = implode('   |   ', array_filter([
+            $tipoCombustibleLabel ? 'Combustible: '.$tipoCombustibleLabel : null,
+            $vehiculo->chasis ? 'Chasis: '.$vehiculo->chasis : null,
+        ]));
+
+        if ($lineaVehiculo !== '') {
             $this->SetFont('Calibri', 'BI', 8);
             $this->SetTextColor($verde[0], $verde[1], $verde[2]);
             $this->SetXY($sx + 40, $sy + 16);
-            $this->Cell($uw - 40, 5, $this->textoCalibri('Combustible: '.$tipoCombustibleLabel), 0, 2, 'L');
+            $this->Cell($uw - 40, 5, $this->textoCalibri($lineaVehiculo), 0, 2, 'L');
         }
 
         $currentY = $sy + $h1 + 2;
@@ -3171,7 +3179,8 @@ class Reportes extends exFPDF
         $this->SetTextColor($azul[0], $azul[1], $azul[2]);
         $this->SetXY($sx + 40, $sy + 15.5);
         $combustible = $vehiculo->tipoCombustible?->tipo_combustible ? '   |   '.$vehiculo->tipoCombustible->tipo_combustible : '';
-        $this->Cell($uw - 40, 5, $this->textoCalibri('Vehículo: '.$vehiculo->codigo.' - '.($vehiculo->nro_placa ?: 'Sin placa').'   |   '.trim($vehiculo->marca.' '.$vehiculo->modelo).$combustible), 0, 2, 'L');
+        $chasis = $vehiculo->chasis ? '   |   Chasis: '.$vehiculo->chasis : '';
+        $this->Cell($uw - 40, 5, $this->textoCalibri('Vehículo: '.$vehiculo->codigo.' - '.($vehiculo->nro_placa ?: 'Sin placa').'   |   '.trim($vehiculo->marca.' '.$vehiculo->modelo).$combustible.$chasis), 0, 2, 'L');
 
         $currentY = $sy + $h1 + 2;
         $currentY += $this->pintarInfoEmpresa($parametrosEmpresa, $sx, $currentY, $uw, $gris);

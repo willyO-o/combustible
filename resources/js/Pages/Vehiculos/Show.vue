@@ -192,6 +192,10 @@ const restanteTexto = (alerta) => {
                                 <span class="fw-medium">{{ vehiculo.nro_placa ?? 'N/A' }}</span>
                             </li>
                             <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
+                                <span class="text-muted fs-13">Chasis</span>
+                                <span class="fw-medium text-break text-end">{{ vehiculo.chasis ?? 'N/A' }}</span>
+                            </li>
+                            <li class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom">
                                 <span class="text-muted fs-13">Tipo de Vehículo</span>
                                 <span class="fw-medium">{{ vehiculo.tipo_vehiculo?.tipo_vehiculo ?? 'N/A' }}</span>
                             </li>

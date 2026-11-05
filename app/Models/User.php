@@ -114,6 +114,18 @@ class User extends Authenticatable implements Auditable, JWTSubject
     }
 
     /**
+     * Puede asignar vehículos a un área: el mismo criterio que el modal de
+     * asignación (permiso vehiculos.asignar-area de la ruta + rol que exige
+     * VehiculoAreaRequest). Lo usa también el registro de vehículos, que
+     * permite asignar el área en el mismo paso.
+     */
+    public function puedeAsignarAreaAVehiculos(): bool
+    {
+        return $this->can('vehiculos.asignar-area')
+            && $this->hasAnyRole(['super-admin', 'administrador', 'jefe-area']);
+    }
+
+    /**
      * Contraseña inicial por defecto de una cuenta nueva: "CI#Plusmetals".
      * Única fuente del formato (Personas, Usuarios y jefes de Área la usan
      * cuando no se escribe otra); el front la replica sólo para mostrarla en

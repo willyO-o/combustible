@@ -162,6 +162,7 @@ return [
         'capacidad_unidad' => 'Unidad de capacidad',
         'categoria' => 'Categoría',
         'celular' => 'Celular',
+        'chasis' => 'Nro. de chasis',
         'ci' => 'CI',
         'ciudad' => 'Ciudad',
         'codigo' => 'Código',

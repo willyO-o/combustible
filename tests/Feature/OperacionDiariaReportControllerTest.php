@@ -12,7 +12,9 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 use Tests\ConPermisosReales;
 use Tests\TestCase;
@@ -321,6 +323,43 @@ class OperacionDiariaReportControllerTest extends TestCase
 
         $response->assertOk();
         $this->assertStringStartsWith('PK', $response->getContent());
+    }
+
+    public function test_el_excel_de_uso_incluye_el_chasis_de_cada_vehiculo(): void
+    {
+        $conChasis = Vehiculo::factory()->conChasis('9BM958074KB123456')->create(['tipo_medicion' => 'kilometraje']);
+        $sinChasis = Vehiculo::factory()->create(['tipo_medicion' => 'horometro']);
+        $this->crearOperacion($conChasis, 3, ['kilometraje_inicio' => 1000, 'kilometraje_fin' => 1200]);
+        $this->crearOperacion($sinChasis, 3, ['horometro_inicio' => 10, 'horometro_fin' => 18]);
+
+        $filas = $this->filasDelExcel($this->get(route('operacion-diaria.reporte.uso.excel', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ]))->assertOk()->getContent());
+
+        $encabezado = $filas->first(fn ($f) => in_array('CHASIS', $f, true));
+        $this->assertNotNull($encabezado, 'Falta la columna CHASIS.');
+        $columna = array_search('CHASIS', $encabezado, true);
+
+        $this->assertSame('9BM958074KB123456', $filas->first(fn ($f) => in_array($conChasis->codigo, $f, true))[$columna]);
+        $this->assertNull($filas->first(fn ($f) => in_array($sinChasis->codigo, $f, true))[$columna]);
+    }
+
+    /**
+     * Filas de la primera hoja del .xlsx (valores sin formatear).
+     *
+     * @return Collection<int, array<int, mixed>>
+     */
+    private function filasDelExcel(string $contenido): Collection
+    {
+        $archivo = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+        file_put_contents($archivo, $contenido);
+
+        try {
+            return collect(IOFactory::load($archivo)->getActiveSheet()->toArray(null, true, false));
+        } finally {
+            @unlink($archivo);
+        }
     }
 
     public function test_el_excel_exige_un_rango_de_fechas(): void

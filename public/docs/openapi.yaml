@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.24.0"
+  version: "1.25.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.24.0"
+                api_version: "1.25.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -4025,7 +4025,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.24.0" }
+        api_version: { type: string, example: "1.25.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -5016,6 +5016,7 @@ components:
         id: { type: integer, example: 8 }
         uuid: { type: string, format: uuid, example: 3fa85f64-5717-4562-b3fc-2c963f66afa6 }
         nro_placa: { type: string, nullable: true, example: 1234-ABC }
+        chasis: { type: string, nullable: true, maxLength: 50, description: "Número de chasis (opcional, único, en mayúsculas). Desde 1.25.0.", example: 9BM958074KB123456 }
         codigo: { type: string, nullable: true, example: VOLQ-08 }
         anio: { type: string, nullable: true, example: "2018" }
         modelo: { type: string, nullable: true, example: FMX }

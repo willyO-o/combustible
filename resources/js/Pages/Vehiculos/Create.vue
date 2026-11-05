@@ -9,6 +9,10 @@ const props = defineProps({
     vehiculo:         Object,
     tiposCombustible: Array,
     tiposVehiculo:    Array,
+    // Asignación de área opcional al registrar (sólo quien puede asignar
+    // áreas; el servidor lo vuelve a validar). En edición no se envían.
+    puedeAsignarArea: { type: Boolean, default: false },
+    areas:            { type: Array, default: () => [] },
 })
 
 const isEditing = computed(() => !!props.vehiculo)
@@ -16,6 +20,7 @@ const isEditing = computed(() => !!props.vehiculo)
 const form = useForm({
     ...(isEditing.value ? { _method: 'PUT' } : {}),
     nro_placa:           props.vehiculo?.nro_placa ?? '',
+    chasis:              props.vehiculo?.chasis ?? '',
     codigo:              props.vehiculo?.codigo ?? '',
     anio:                props.vehiculo?.anio ?? '',
     marca:               props.vehiculo?.marca ?? '',
@@ -27,6 +32,29 @@ const form = useForm({
     fotografia:          null,
     capacidad:           props.vehiculo?.capacidad ?? '',
     capacidad_unidad:    props.vehiculo?.capacidad_unidad ?? '',
+    // Asignación de área (opcional, sólo al registrar).
+    id_area:             '',
+    estado_asignacion:   'ACTIVO',
+    fecha_culminacion:   '',
+    motivo_asignacion:   '',
+})
+
+// La tarjeta de área sólo aparece al registrar y para quien puede asignar.
+const mostrarAsignacionArea = computed(() => !isEditing.value && props.puedeAsignarArea)
+
+// Sin área elegida no se manda nada de la asignación (el vehículo queda sin
+// área, como antes); en edición nunca se manda.
+const CAMPOS_AREA = ['id_area', 'estado_asignacion', 'fecha_culminacion', 'motivo_asignacion']
+form.transform((data) => {
+    const datos = { ...data }
+
+    if (!mostrarAsignacionArea.value || !data.id_area) {
+        CAMPOS_AREA.forEach((campo) => delete datos[campo])
+    } else if (data.estado_asignacion !== 'PROVISIONAL') {
+        datos.fecha_culminacion = null
+    }
+
+    return datos
 })
 
 // Al elegir (o cambiar) el tipo de vehículo, si todavía no hay una unidad de
@@ -157,6 +185,24 @@ function submit() {
                                         @input="form.nro_placa = form.nro_placa.toUpperCase()"
                                     />
                                     <div v-if="form.errors.nro_placa" class="invalid-feedback">{{ form.errors.nro_placa }}</div>
+                                </div>
+
+                                <!-- Nro. Chasis (opcional, único; el servidor lo guarda en mayúsculas) -->
+                                <div class="col-sm-4">
+                                    <label class="form-label fw-medium">
+                                        Nro. Chasis
+                                    </label>
+                                    <input
+                                        v-model="form.chasis"
+                                        type="text"
+                                        class="form-control"
+                                        :class="{ 'is-invalid': form.errors.chasis }"
+                                        placeholder="Ej: 9BM958074KB123456 (opcional)"
+                                        maxlength="50"
+                                        style="text-transform:uppercase;"
+                                        @input="form.chasis = form.chasis.toUpperCase()"
+                                    />
+                                    <div v-if="form.errors.chasis" class="invalid-feedback">{{ form.errors.chasis }}</div>
                                 </div>
 
                                 <!-- Código contable -->
@@ -311,6 +357,68 @@ function submit() {
                                     <div v-if="form.errors.capacidad_unidad" class="invalid-feedback d-block">{{ form.errors.capacidad_unidad }}</div>
                                 </div>
 
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Asignación de área (opcional, sólo al registrar) -->
+                    <div v-if="mostrarAsignacionArea" class="card custom-card mt-4 mb-0">
+                        <div class="card-header justify-content-between">
+                            <div class="card-title">Asignación de Área</div>
+                            <span class="badge bg-light text-muted fw-normal">Opcional</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-sm-6">
+                                    <label for="vehiculo_id_area" class="form-label fw-medium">Área</label>
+                                    <select id="vehiculo_id_area" v-model="form.id_area" class="form-select"
+                                        :class="{ 'is-invalid': form.errors.id_area }">
+                                        <option value="">— Sin asignar por ahora —</option>
+                                        <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre_area }}</option>
+                                    </select>
+                                    <div v-if="form.errors.id_area" class="invalid-feedback">{{ form.errors.id_area }}</div>
+                                    <small v-else-if="!form.id_area" class="text-muted">
+                                        Sin área no se pueden registrar operaciones diarias de este vehículo.
+                                        También puedes asignarla después desde el listado.
+                                    </small>
+                                </div>
+
+                                <template v-if="form.id_area">
+                                    <div class="col-sm-6">
+                                        <label class="form-label fw-medium">
+                                            Tipo de Asignación <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="d-flex gap-4 mt-1">
+                                            <div class="form-check">
+                                                <input id="nuevo_vehiculo_area_activo" v-model="form.estado_asignacion"
+                                                    class="form-check-input" type="radio" value="ACTIVO" />
+                                                <label for="nuevo_vehiculo_area_activo" class="form-check-label">ACTIVO</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input id="nuevo_vehiculo_area_provisional" v-model="form.estado_asignacion"
+                                                    class="form-check-input" type="radio" value="PROVISIONAL" />
+                                                <label for="nuevo_vehiculo_area_provisional" class="form-check-label">PROVISIONAL</label>
+                                            </div>
+                                        </div>
+                                        <div v-if="form.errors.estado_asignacion" class="invalid-feedback d-block">{{ form.errors.estado_asignacion }}</div>
+                                        <small class="text-muted">Provisional: préstamo temporal a otra área.</small>
+                                    </div>
+
+                                    <div v-if="form.estado_asignacion === 'PROVISIONAL'" class="col-sm-6">
+                                        <label for="nuevo_vehiculo_fecha_culminacion" class="form-label fw-medium">Fecha de Finalización (opcional)</label>
+                                        <input id="nuevo_vehiculo_fecha_culminacion" v-model="form.fecha_culminacion" type="date"
+                                            class="form-control" :class="{ 'is-invalid': form.errors.fecha_culminacion }" />
+                                        <div v-if="form.errors.fecha_culminacion" class="invalid-feedback">{{ form.errors.fecha_culminacion }}</div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label for="nuevo_vehiculo_motivo" class="form-label fw-medium">Motivo</label>
+                                        <textarea id="nuevo_vehiculo_motivo" v-model="form.motivo_asignacion" class="form-control"
+                                            :class="{ 'is-invalid': form.errors.motivo_asignacion }" rows="2" maxlength="1000"
+                                            placeholder="Ej: equipo nuevo para la operación de la mina..."></textarea>
+                                        <div v-if="form.errors.motivo_asignacion" class="invalid-feedback">{{ form.errors.motivo_asignacion }}</div>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </div>

@@ -210,7 +210,7 @@ class OperacionDiariaReportController extends Controller
 
     private function vehiculoDetalle(int $idVehiculo): ?Vehiculo
     {
-        return Vehiculo::select('id', 'codigo', 'nro_placa', 'marca', 'modelo', 'anio', 'tipo_medicion', 'id_tipo_combustible')
+        return Vehiculo::select('id', 'codigo', 'nro_placa', 'chasis', 'marca', 'modelo', 'anio', 'tipo_medicion', 'id_tipo_combustible')
             ->with('tipoCombustible:id,tipo_combustible')
             ->find($idVehiculo);
     }
@@ -494,12 +494,13 @@ class OperacionDiariaReportController extends Controller
         // Una fila por vehículo: tipo_medicion y tipo_combustible son 1:1 con el
         // vehículo, así que entran al GROUP BY sin fragmentar el grupo.
         $vehiculos = $base()
-            ->groupBy('v.id', 'v.codigo', 'v.nro_placa', 'v.marca', 'v.tipo_medicion', 'tc.tipo_combustible')
+            ->groupBy('v.id', 'v.codigo', 'v.nro_placa', 'v.chasis', 'v.marca', 'v.tipo_medicion', 'tc.tipo_combustible')
             ->orderByRaw('SUM(od.horas_trabajadas) DESC')
             ->selectRaw("
                 v.id as id_vehiculo,
                 v.codigo,
                 v.nro_placa,
+                v.chasis,
                 v.marca,
                 v.tipo_medicion,
                 tc.tipo_combustible,
@@ -520,6 +521,7 @@ class OperacionDiariaReportController extends Controller
                 'id_vehiculo' => (int) $r->id_vehiculo,
                 'codigo' => $r->codigo,
                 'nro_placa' => $r->nro_placa,
+                'chasis' => $r->chasis,
                 'marca' => $r->marca,
                 'tipo_medicion' => $r->tipo_medicion,
                 'tipo_combustible' => $r->tipo_combustible,

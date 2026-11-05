@@ -18,6 +18,7 @@ use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 use Tests\ConPermisosReales;
 use Tests\TestCase;
@@ -102,6 +103,30 @@ class OperacionDiariaDetalleReportTest extends TestCase
             'tipo_valor' => $tipoValor,
             'unidad_medida' => $tipoValor === 'cantidad' ? $unidad : null,
         ]);
+    }
+
+    public function test_la_bitacora_en_excel_y_pdf_muestra_el_chasis_del_vehiculo(): void
+    {
+        $vehiculo = Vehiculo::factory()->conChasis('9BM958074KB123456')->create(['tipo_medicion' => 'kilometraje']);
+        $this->crearOperacion($vehiculo, $this->crearConductor(), now()->subDays(5)->format('Y-m-d'), ['kilometraje_inicio' => 100, 'kilometraje_fin' => 250]);
+
+        $contenido = $this->get(route('operacion-diaria.reporte.detalle.excel', $this->rango(['id_vehiculo' => $vehiculo->id])))
+            ->assertOk()
+            ->getContent();
+
+        $archivo = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+        file_put_contents($archivo, $contenido);
+
+        try {
+            $textos = collect(IOFactory::load($archivo)->getActiveSheet()->toArray(null, true, false))->flatten();
+        } finally {
+            @unlink($archivo);
+        }
+
+        $this->assertTrue($textos->contains(fn ($texto) => is_string($texto) && str_contains($texto, 'Chasis: 9BM958074KB123456')));
+
+        $pdf = $this->get(route('operacion-diaria.reporte.detalle.pdf', $this->rango(['id_vehiculo' => $vehiculo->id])))->assertOk();
+        $this->assertStringStartsWith('%PDF-', $pdf->getContent());
     }
 
     private function rango(array $extra = []): array

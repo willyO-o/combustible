@@ -224,7 +224,7 @@ const tipoAsignacionBadge = (tipo) =>
                     <div class="input-group">
                         <span class="input-group-text"><i class="ri-search-line" aria-hidden="true"></i></span>
                         <input id="buscar-vehiculo" v-model="filters.buscar" type="search" class="form-control"
-                            placeholder="Marca, modelo, placa o código..." autocomplete="off" />
+                            placeholder="Marca, modelo, placa, chasis o código..." autocomplete="off" />
                         <button v-if="filters.buscar" type="button" class="btn btn-light" title="Borrar búsqueda"
                             aria-label="Borrar búsqueda" @click="filters.buscar = ''">
                             <i class="ri-close-line" aria-hidden="true"></i>
@@ -295,6 +295,7 @@ const tipoAsignacionBadge = (tipo) =>
                         <tr>
                             <th>Vehiculo / Placa / Modelo</th>
                             <th>Codigo</th>
+                            <th>Chasis</th>
                             <th>Tipo Vehículo</th>
                             <th>Capacidad</th>
                             <th>Área Asignada</th>
@@ -305,7 +306,7 @@ const tipoAsignacionBadge = (tipo) =>
                     </thead>
                     <tbody>
                         <tr v-if="vehiculos.data.length === 0">
-                            <td colspan="9" class="text-center py-4 text-muted">
+                            <td colspan="10" class="text-center py-4 text-muted">
                                 <i class="ri-car-line fs-3 d-block mb-2"></i>
                                 No se encontraron vehículos
                             </td>
@@ -337,6 +338,7 @@ const tipoAsignacionBadge = (tipo) =>
 
                             </td>
                             <td>{{ vehiculo.codigo ?? '—' }}</td>
+                            <td><span class="small text-break">{{ vehiculo.chasis ?? '—' }}</span></td>
                             <td>
                                 <span class=" small text-wrap">
                                     {{ vehiculo.tipo_vehiculo?.tipo_vehiculo ?? '—' }}
@@ -436,6 +438,10 @@ const tipoAsignacionBadge = (tipo) =>
                         <div class="col-6">
                             <span class="text-muted d-block">Tipo Vehículo</span>
                             <span>{{ vehiculo.tipo_vehiculo?.tipo_vehiculo ?? '—' }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="text-muted d-block">Chasis</span>
+                            <span class="text-break">{{ vehiculo.chasis ?? '—' }}</span>
                         </div>
                         <div class="col-6">
                             <span class="text-muted d-block">Capacidad</span>

@@ -194,7 +194,7 @@ class CargasCombustibleReportController extends Controller
         $fechaFin = $request->input('fecha_fin');
         $idVehiculo = $request->integer('id_vehiculo');
 
-        $vehiculo = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
+        $vehiculo = Vehiculo::select('id', 'nro_placa', 'chasis', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
             ->with('tipoCombustible:id,tipo_combustible')
             ->findOrFail($idVehiculo);
         $detalle = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, [$idVehiculo], false);
@@ -224,7 +224,7 @@ class CargasCombustibleReportController extends Controller
         $fechaFin = $request->input('fecha_fin');
         $idVehiculo = $request->integer('id_vehiculo');
 
-        $vehiculo = Vehiculo::select('id', 'nro_placa', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
+        $vehiculo = Vehiculo::select('id', 'nro_placa', 'chasis', 'marca', 'codigo', 'tipo_medicion', 'id_tipo_combustible')
             ->with('tipoCombustible:id,tipo_combustible')
             ->findOrFail($idVehiculo);
         $detalle = $this->obtenerResumenRendimiento($fechaInicio, $fechaFin, [$idVehiculo], false);
@@ -270,6 +270,7 @@ class CargasCombustibleReportController extends Controller
             ->select([
                 'carga_combustible.id_vehiculo',
                 'v.nro_placa',
+                'v.chasis',
                 'v.marca',
                 'v.codigo',
                 'tc.tipo_combustible',
@@ -277,7 +278,7 @@ class CargasCombustibleReportController extends Controller
                 DB::raw('SUM(carga_combustible.litros * carga_combustible.precio) as total_costo'),
                 DB::raw('COUNT(carga_combustible.id) as cantidad_cargas'),
                 DB::raw('ROUND(AVG(carga_combustible.precio), 2) as precio_promedio'),
-            ])->groupBy('carga_combustible.id_vehiculo', 'v.nro_placa', 'v.marca', 'v.codigo', 'tc.tipo_combustible');
+            ])->groupBy('carga_combustible.id_vehiculo', 'v.nro_placa', 'v.chasis', 'v.marca', 'v.codigo', 'tc.tipo_combustible');
 
         $cargas = $query->get();
 
@@ -292,6 +293,7 @@ class CargasCombustibleReportController extends Controller
             return [
                 'id_vehiculo' => $primerCarga->id_vehiculo,
                 'nro_placa' => $primerCarga->nro_placa,
+                'chasis' => $primerCarga->chasis,
                 'marca' => $primerCarga->marca,
                 'codigo' => $primerCarga->codigo,
                 'tipo_combustible' => $primerCarga->tipo_combustible,
@@ -444,6 +446,7 @@ class CargasCombustibleReportController extends Controller
             v.id as id_vehiculo,
             v.codigo,
             v.nro_placa,
+            v.chasis,
             v.tipo_medicion,
             tc.tipo_combustible,
             cc.id as id_carga,
@@ -470,7 +473,7 @@ class CargasCombustibleReportController extends Controller
         // 2. CTE Detalle: Filtra por fechas y calcula el recorrido/rendimiento por cada carga
         $cteDetalle = DB::table('mediciones_base')
             ->selectRaw("
-            id_vehiculo, codigo, nro_placa, tipo_medicion, tipo_combustible, id_carga, fecha_carga, litros,
+            id_vehiculo, codigo, nro_placa, chasis, tipo_medicion, tipo_combustible, id_carga, fecha_carga, litros,
             medicion_anterior, medicion_actual,
             (medicion_actual - medicion_anterior) as recorrido,
             CASE
@@ -493,6 +496,7 @@ class CargasCombustibleReportController extends Controller
                 id_vehiculo,
                 codigo,
                 nro_placa,
+                chasis,
                 tipo_medicion,
                 tipo_combustible,
                 COUNT(id_carga) as total_cargas,
@@ -511,7 +515,7 @@ class CargasCombustibleReportController extends Controller
                     ELSE ''
                 END as unidad_medida
             ")
-                ->groupBy('id_vehiculo', 'codigo', 'nro_placa', 'tipo_medicion', 'tipo_combustible')
+                ->groupBy('id_vehiculo', 'codigo', 'nro_placa', 'chasis', 'tipo_medicion', 'tipo_combustible')
                 ->get();
 
             return $resultado;

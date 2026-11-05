@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Vehiculo\AsignarVehiculoAreaAction;
 use App\Http\Requests\VehiculoAreaRequest;
 use App\Http\Requests\VehiculoRequest;
 use App\Libraries\Reportes;
@@ -29,8 +30,8 @@ class VehiculoController extends Controller
      * Filtros del listado; el PDF y el Excel reciben exactamente los mismos.
      */
     /**
-     * `buscar` es el buscador unificado de la vista (marca, modelo, placa y
-     * código). `nro_placa`, `codigo` y `marca` se siguen aceptando por
+     * `buscar` es el buscador unificado de la vista (marca, modelo, placa,
+     * chasis y código). `nro_placa`, `codigo` y `marca` se siguen aceptando por
      * compatibilidad (enlaces o marcadores viejos), aunque la vista ya no los
      * envía.
      */
@@ -123,7 +124,7 @@ class VehiculoController extends Controller
         $query = Vehiculo::with(['tipoCombustible', 'tipoVehiculo', 'conductorAsignado.persona', 'areasAsignadas']);
 
         // Buscador unificado: cada palabra escrita debe aparecer en alguno de
-        // los 4 campos (marca, modelo, placa o código), así "Volvo FMX" o
+        // los 5 campos (marca, modelo, placa, chasis o código), así "Volvo FMX" o
         // "Toyota 048" también encuentran el vehículo.
         if ($request->filled('buscar')) {
             $palabras = preg_split('/\s+/u', trim((string) $request->input('buscar')), -1, PREG_SPLIT_NO_EMPTY);
@@ -137,6 +138,7 @@ class VehiculoController extends Controller
                     $query->whereRaw("COALESCE(marca, '') LIKE ?", [$termino])
                         ->orWhereRaw("COALESCE(modelo, '') LIKE ?", [$termino])
                         ->orWhereRaw("COALESCE(nro_placa, '') LIKE ?", [$termino])
+                        ->orWhereRaw("COALESCE(chasis, '') LIKE ?", [$termino])
                         ->orWhereRaw("COALESCE(codigo, '') LIKE ?", [$termino]);
                 });
             }
@@ -178,6 +180,7 @@ class VehiculoController extends Controller
             ->map(fn (Vehiculo $vehiculo) => [
                 'codigo' => $vehiculo->codigo,
                 'nro_placa' => $vehiculo->nro_placa,
+                'chasis' => $vehiculo->chasis,
                 'marca' => $vehiculo->marca,
                 'modelo' => $vehiculo->modelo,
                 'anio' => $vehiculo->anio,
@@ -217,7 +220,7 @@ class VehiculoController extends Controller
     private function filtrosAplicados(Request $request): array
     {
         return [
-            'Búsqueda (marca, modelo, placa o código)' => $request->filled('buscar') ? trim((string) $request->buscar) : null,
+            'Búsqueda (marca, modelo, placa, chasis o código)' => $request->filled('buscar') ? trim((string) $request->buscar) : null,
             'Placa' => $request->filled('nro_placa') ? (string) $request->nro_placa : null,
             'Código' => $request->filled('codigo') ? (string) $request->codigo : null,
             'Marca' => $request->filled('marca') ? (string) $request->marca : null,
@@ -227,10 +230,18 @@ class VehiculoController extends Controller
         ];
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $puedeAsignarArea = $request->user()->puedeAsignarAreaAVehiculos();
+
         return Inertia::render('Vehiculos/Create', [
             'vehiculo' => null,
+            // Asignación de área opcional en el mismo registro (sólo para
+            // quien puede asignar áreas; ver VehiculoRequest).
+            'puedeAsignarArea' => $puedeAsignarArea,
+            'areas' => $puedeAsignarArea
+                ? Area::where('estado_area', 'ACTIVO')->orderBy('nombre_area')->get(['id', 'nombre_area'])
+                : [],
             'tiposCombustible' => TipoCombustible::where('estado_tipo_combustible', 'ACTIVO')->orderBy('tipo_combustible')->get(['id', 'tipo_combustible']),
             // 'unidad_capacidad_sugerida' precarga el select de capacidad del
             // formulario al elegir el tipo (ver Vehiculos/Create.vue).
@@ -238,18 +249,42 @@ class VehiculoController extends Controller
         ]);
     }
 
-    public function store(VehiculoRequest $request): RedirectResponse
+    /**
+     * Registra el vehículo y, si se eligió un área, lo asigna en el mismo
+     * paso (misma transacción: si la asignación falla no queda el vehículo
+     * a medias, y se borra la foto ya subida).
+     */
+    public function store(VehiculoRequest $request, AsignarVehiculoAreaAction $asignarVehiculoAreaAction): RedirectResponse
     {
-        $data = $request->validated();
+        $data = $request->safe()->except(VehiculoRequest::CAMPOS_ASIGNACION_AREA);
+        $datosArea = $request->safe()->only(VehiculoRequest::CAMPOS_ASIGNACION_AREA);
 
         if ($request->hasFile('fotografia')) {
             $data['fotografia'] = $request->file('fotografia')->store('vehiculos', 'public');
         }
 
-        Vehiculo::create($data);
+        try {
+            DB::transaction(function () use ($data, $datosArea, $asignarVehiculoAreaAction) {
+                $vehiculo = Vehiculo::create($data);
+
+                if (! empty($datosArea['id_area'])) {
+                    $asignarVehiculoAreaAction->execute($vehiculo, $datosArea);
+                }
+            });
+        } catch (\Throwable $e) {
+            if (! empty($data['fotografia'])) {
+                Storage::disk('public')->delete($data['fotografia']);
+            }
+
+            throw $e;
+        }
+
+        $nombreArea = ! empty($datosArea['id_area']) ? Area::whereKey($datosArea['id_area'])->value('nombre_area') : null;
 
         return redirect()->route('vehiculos.index')
-            ->with('success', 'Vehículo registrado exitosamente.');
+            ->with('success', $nombreArea
+                ? "Vehículo registrado y asignado al área {$nombreArea} exitosamente."
+                : 'Vehículo registrado exitosamente.');
     }
 
     public function show(Request $request, Vehiculo $vehiculo): Response
@@ -350,33 +385,11 @@ class VehiculoController extends Controller
      * áreas de forma activa o provisional. La asignación activa/provisional
      * anterior de este vehículo (si la tiene, sin importar el área) queda
      * REASIGNADA con fecha_reasignacion=ahora; nunca conviven dos
-     * asignaciones activas para el mismo vehículo.
+     * asignaciones activas para el mismo vehículo (AsignarVehiculoAreaAction).
      */
-    public function asignarArea(VehiculoAreaRequest $request, Vehiculo $vehiculo): RedirectResponse
+    public function asignarArea(VehiculoAreaRequest $request, Vehiculo $vehiculo, AsignarVehiculoAreaAction $asignarVehiculoAreaAction): RedirectResponse
     {
-        DB::transaction(function () use ($request, $vehiculo) {
-            VehiculoArea::where('id_vehiculo', $vehiculo->id)
-                ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
-                ->where(function ($query) {
-                    $query->whereNull('fecha_culminacion')
-                        ->orWhere('fecha_culminacion', '>', now());
-                })
-                ->update([
-                    'estado_asignacion' => 'REASIGNADO',
-                    'fecha_reasignacion' => now(),
-                ]);
-
-            $esProvisional = $request->validated('estado_asignacion') === 'PROVISIONAL';
-
-            VehiculoArea::create([
-                'id_vehiculo' => $vehiculo->id,
-                'id_area' => $request->validated('id_area'),
-                'fecha_asignacion' => now(),
-                'fecha_culminacion' => $esProvisional ? $request->validated('fecha_culminacion') : null,
-                'estado_asignacion' => $request->validated('estado_asignacion'),
-                'motivo_asignacion' => $request->validated('motivo_asignacion'),
-            ]);
-        });
+        $asignarVehiculoAreaAction->execute($vehiculo, $request->validated());
 
         return redirect()->route('vehiculos.index')
             ->with('success', 'Vehículo asignado al área exitosamente.');

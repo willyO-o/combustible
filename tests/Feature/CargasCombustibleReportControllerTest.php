@@ -14,7 +14,9 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use App\Models\VehiculoArea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Inertia\Testing\AssertableInertia as Assert;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Role;
 use Tests\ConPermisosReales;
 use Tests\TestCase;
@@ -542,6 +544,71 @@ class CargasCombustibleReportControllerTest extends TestCase
             'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
             'fecha_fin' => now()->format('Y-m-d'),
         ]))->assertSessionHasErrors('id_vehiculo');
+    }
+
+    public function test_los_excel_de_cargas_y_rendimiento_incluyen_el_chasis_del_vehiculo(): void
+    {
+        $vehiculo = $this->crearVehiculoConDosCargas(['chasis' => '9BM958074KB123456']);
+        $rango = [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+        ];
+
+        foreach (['cargas-combustible.reporte.excel', 'cargas-combustible.reporte.rendimiento.excel'] as $ruta) {
+            $textos = $this->textosDelExcel($this->get(route($ruta, $rango))->assertOk()->getContent());
+
+            $this->assertTrue($textos->contains('CHASIS'), "Falta la columna CHASIS en {$ruta}.");
+            $this->assertTrue($textos->contains('9BM958074KB123456'), "Falta el chasis en {$ruta}.");
+        }
+
+        $textos = $this->textosDelExcel(
+            $this->get(route('cargas-combustible.reporte.rendimiento.detalle.excel', $rango + ['id_vehiculo' => $vehiculo->id]))->assertOk()->getContent()
+        );
+        $this->assertTrue($textos->contains(fn ($texto) => is_string($texto) && str_contains($texto, 'Chasis: 9BM958074KB123456')));
+    }
+
+    public function test_los_reportes_de_rendimiento_toleran_vehiculos_sin_chasis(): void
+    {
+        $vehiculo = $this->crearVehiculoConDosCargas();
+        $rango = [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => $vehiculo->id,
+        ];
+
+        $this->get(route('cargas-combustible.reporte.rendimiento.detalle.excel', $rango))->assertOk();
+        $this->assertStringStartsWith('%PDF-', $this->get(route('cargas-combustible.reporte.rendimiento.detalle.pdf', $rango))->assertOk()->getContent());
+    }
+
+    public function test_el_pdf_del_detalle_de_rendimiento_se_genera_con_chasis(): void
+    {
+        $vehiculo = $this->crearVehiculoConDosCargas(['chasis' => '9BM958074KB123456']);
+
+        $response = $this->get(route('cargas-combustible.reporte.rendimiento.detalle.pdf', [
+            'fecha_inicio' => now()->subMonth()->format('Y-m-d'),
+            'fecha_fin' => now()->format('Y-m-d'),
+            'id_vehiculo' => $vehiculo->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    /**
+     * Todos los textos de la primera hoja del .xlsx, en una lista plana.
+     *
+     * @return Collection<int, mixed>
+     */
+    private function textosDelExcel(string $contenido): Collection
+    {
+        $archivo = tempnam(sys_get_temp_dir(), 'xlsx').'.xlsx';
+        file_put_contents($archivo, $contenido);
+
+        try {
+            return collect(IOFactory::load($archivo)->getActiveSheet()->toArray(null, true, false))->flatten();
+        } finally {
+            @unlink($archivo);
+        }
     }
 
     /**

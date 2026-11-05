@@ -87,6 +87,7 @@ class ReportesExcel
         $columnas = [
             ['label' => 'CÓD. CONTABLE', 'ancho' => 18, 'align' => 'left'],
             ['label' => 'PLACA', 'ancho' => 14, 'align' => 'center'],
+            ['label' => 'CHASIS', 'ancho' => 22, 'align' => 'left'],
             ['label' => 'MARCA', 'ancho' => 22, 'align' => 'left'],
             ['label' => 'TOTAL LITROS', 'ancho' => 14, 'align' => 'right', 'formato' => self::FORMATO_DECIMAL],
             ['label' => 'TOTAL COSTO (Bs.)', 'ancho' => 18, 'align' => 'right', 'formato' => self::FORMATO_MONEDA],
@@ -114,6 +115,7 @@ class ReportesExcel
         $filas = $vehiculos->map(fn ($v) => [
             $v['codigo'] ?? '—',
             $v['nro_placa'] ?? '—',
+            $v['chasis'] ?? null,
             $v['marca'] ?? '—',
             (float) ($v['total_litros'] ?? 0),
             (float) ($v['total_costo'] ?? 0),
@@ -122,7 +124,7 @@ class ReportesExcel
         ]);
 
         $this->pintarTabla($hoja, $fila, $columnas, $filas, [
-            'TOTALES', '', '',
+            'TOTALES', '', '', '',
             $totalLitros,
             $totalCosto,
             $cantidadCargas,
@@ -151,6 +153,7 @@ class ReportesExcel
         $columnas = [
             ['label' => 'CÓDIGO', 'ancho' => 16, 'align' => 'left'],
             ['label' => 'PLACA', 'ancho' => 14, 'align' => 'center'],
+            ['label' => 'CHASIS', 'ancho' => 22, 'align' => 'left'],
             ['label' => 'COMBUSTIBLE', 'ancho' => 16, 'align' => 'center'],
             ['label' => 'TIPO MEDICIÓN', 'ancho' => 16, 'align' => 'center'],
             ['label' => 'CARGAS', 'ancho' => 10, 'align' => 'center', 'formato' => self::FORMATO_ENTERO],
@@ -192,6 +195,7 @@ class ReportesExcel
             return [
                 $r->codigo,
                 $r->nro_placa,
+                $r->chasis ?? null,
                 $r->tipo_combustible,
                 $r->tipo_medicion === 'horometro' ? 'Horómetro' : 'Kilometraje',
                 (int) $r->total_cargas,
@@ -204,7 +208,7 @@ class ReportesExcel
 
         // El rendimiento no se totaliza: km/L y L/h no son comparables entre sí.
         $this->pintarTabla($hoja, $fila, $columnas, $filas, [
-            'TOTALES', '', '', '',
+            'TOTALES', '', '', '', '',
             $totalCargas,
             $totalLitros,
             $totalRecorrido,
@@ -252,7 +256,8 @@ class ReportesExcel
             'DETALLE DE RENDIMIENTO DE COMBUSTIBLE',
             'Del '.$this->fecha($fechaInicio).' al '.$this->fecha($fechaFin),
             array_filter([
-                'Vehículo: '.$vehiculo->codigo.' - '.($vehiculo->nro_placa ?: 'Sin placa').'   |   '.$vehiculo->marca,
+                'Vehículo: '.$vehiculo->codigo.' - '.($vehiculo->nro_placa ?: 'Sin placa').'   |   '.$vehiculo->marca
+                    .($vehiculo->chasis ? '   |   Chasis: '.$vehiculo->chasis : ''),
                 $vehiculo->tipoCombustible?->tipo_combustible
                     ? 'Combustible: '.$vehiculo->tipoCombustible->tipo_combustible.'   |   Medición: '.($esHorometro ? 'Horómetro' : 'Kilometraje')
                     : null,
@@ -505,6 +510,7 @@ class ReportesExcel
         $columnas = [
             ['label' => 'CÓDIGO', 'ancho' => 16, 'align' => 'left'],
             ['label' => 'PLACA', 'ancho' => 14, 'align' => 'center'],
+            ['label' => 'CHASIS', 'ancho' => 22, 'align' => 'left'],
             ['label' => 'COMBUSTIBLE', 'ancho' => 16, 'align' => 'center'],
             ['label' => 'MEDICIÓN', 'ancho' => 14, 'align' => 'center'],
             ['label' => 'OPERACIONES', 'ancho' => 13, 'align' => 'center', 'formato' => self::FORMATO_ENTERO],
@@ -544,6 +550,7 @@ class ReportesExcel
         $filas = $vehiculos->map(fn ($v) => [
             $v['codigo'] ?? '—',
             $v['nro_placa'] ?? '—',
+            $v['chasis'] ?? null,
             $v['tipo_combustible'] ?? '—',
             ($v['tipo_medicion'] ?? null) === 'kilometraje' ? 'Kilometraje' : 'Horómetro',
             (int) ($v['total_operaciones'] ?? 0),
@@ -560,7 +567,7 @@ class ReportesExcel
         // El promedio y el recorrido no se totalizan por columna: km y horas de
         // horómetro no son la misma unidad (van separados en las tarjetas).
         $this->pintarTabla($hoja, $fila, $columnas, $filas, [
-            'TOTALES', '', '', '',
+            'TOTALES', '', '', '', '',
             (int) $totales['total_operaciones'],
             '',
             (float) $totales['total_horas'],
@@ -652,7 +659,8 @@ class ReportesExcel
             $hoja,
             'DETALLE DE HORAS TRABAJADAS Y CONSUMO DE COMBUSTIBLE',
             'Del '.$this->fecha($fechaInicio).' al '.$this->fecha($fechaFin),
-            ['Vehículo: '.$vehiculo->codigo.' - '.($vehiculo->nro_placa ?: 'Sin placa').'   |   '.trim($vehiculo->marca.' '.$vehiculo->modelo).$combustible],
+            ['Vehículo: '.$vehiculo->codigo.' - '.($vehiculo->nro_placa ?: 'Sin placa').'   |   '.trim($vehiculo->marca.' '.$vehiculo->modelo).$combustible
+                .($vehiculo->chasis ? '   |   Chasis: '.$vehiculo->chasis : '')],
             count($columnas),
         );
 
@@ -766,6 +774,7 @@ class ReportesExcel
             ['label' => '#', 'ancho' => 6, 'align' => 'center', 'formato' => self::FORMATO_ENTERO],
             ['label' => 'CÓDIGO', 'ancho' => 14, 'align' => 'left'],
             ['label' => 'PLACA', 'ancho' => 13, 'align' => 'left'],
+            ['label' => 'CHASIS', 'ancho' => 22, 'align' => 'left'],
             ['label' => 'MARCA', 'ancho' => 16, 'align' => 'left'],
             ['label' => 'MODELO', 'ancho' => 16, 'align' => 'left'],
             ['label' => 'AÑO', 'ancho' => 8, 'align' => 'center', 'formato' => '0'],
@@ -801,6 +810,7 @@ class ReportesExcel
             $i + 1,
             $v['codigo'] ?? null,
             $v['nro_placa'] ?? null,
+            $v['chasis'] ?? null,
             $v['marca'] ?? null,
             $v['modelo'] ?? null,
             // escribirValor() lo guarda como número sólo si es numérico; un

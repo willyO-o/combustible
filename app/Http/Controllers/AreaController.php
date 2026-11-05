@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Areas\ListHistorialVehiculosAreaAction;
 use App\Actions\Areas\ListVehiculosVigentesAreaAction;
+use App\Actions\Vehiculo\AsignarVehiculoAreaAction;
 use App\Http\Requests\AreaRequest;
 use App\Http\Requests\EncargadoAreaRequest;
 use App\Http\Requests\VehiculoAreaRequest;
@@ -130,37 +131,15 @@ class AreaController extends Controller
 
     /**
      * Reasigna un vehículo a un área desde la ficha del área. Misma lógica
-     * que VehiculoController::asignarArea() (cierra como REASIGNADA la
+     * (AsignarVehiculoAreaAction) que VehiculoController::asignarArea() (cierra como REASIGNADA la
      * asignación vigente del vehículo —sin importar el área— y crea la
      * nueva), pero es una acción separada porque aquélla redirige a
      * vehiculos.index y sacaría al usuario de la ficha del área (mismo
      * criterio que VehiculoController::finalizarAsignacionConductor()).
      */
-    public function reasignarVehiculo(VehiculoAreaRequest $request, Area $area, Vehiculo $vehiculo): RedirectResponse
+    public function reasignarVehiculo(VehiculoAreaRequest $request, Area $area, Vehiculo $vehiculo, AsignarVehiculoAreaAction $asignarVehiculoAreaAction): RedirectResponse
     {
-        DB::transaction(function () use ($request, $vehiculo) {
-            VehiculoArea::where('id_vehiculo', $vehiculo->id)
-                ->whereIn('estado_asignacion', ['ACTIVO', 'PROVISIONAL'])
-                ->where(function ($query) {
-                    $query->whereNull('fecha_culminacion')
-                        ->orWhere('fecha_culminacion', '>', now());
-                })
-                ->update([
-                    'estado_asignacion' => 'REASIGNADO',
-                    'fecha_reasignacion' => now(),
-                ]);
-
-            $esProvisional = $request->validated('estado_asignacion') === 'PROVISIONAL';
-
-            VehiculoArea::create([
-                'id_vehiculo' => $vehiculo->id,
-                'id_area' => $request->validated('id_area'),
-                'fecha_asignacion' => now(),
-                'fecha_culminacion' => $esProvisional ? $request->validated('fecha_culminacion') : null,
-                'estado_asignacion' => $request->validated('estado_asignacion'),
-                'motivo_asignacion' => $request->validated('motivo_asignacion'),
-            ]);
-        });
+        $asignarVehiculoAreaAction->execute($vehiculo, $request->validated());
 
         return redirect()->route('areas.show', $area)
             ->with('success', 'Asignación de vehículo actualizada exitosamente.');

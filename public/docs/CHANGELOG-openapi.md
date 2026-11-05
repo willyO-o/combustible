@@ -2,6 +2,15 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.25.0 — 2026-11-05
+
+### Agregado
+
+- Esquema `Vehiculo` (vehículo completo): nuevo campo `chasis` (string, nullable, máx. 50). Número
+  de chasis opcional, único entre vehículos no eliminados y guardado en mayúsculas. Los vehículos
+  existentes lo traen en `null`. Es un campo nuevo: los clientes actuales no necesitan cambios.
+- `GET /parametros`: `api_version` pasa a `1.25.0`.
+
 ## 1.24.0 — 2026-11-05
 
 ### Cambiado

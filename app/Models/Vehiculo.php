@@ -11,6 +11,7 @@ use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'nro_placa',
+    'chasis',
     'codigo',
     'anio',
     'marca',

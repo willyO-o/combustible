@@ -28,4 +28,14 @@ class VehiculoFactory extends Factory
             'tipo_medicion' => 'kilometraje',
         ];
     }
+
+    /**
+     * Vehículo con número de chasis (el campo es opcional, por defecto null).
+     */
+    public function conChasis(?string $chasis = null): static
+    {
+        return $this->state(fn () => [
+            'chasis' => $chasis ?? strtoupper(fake()->unique()->bothify('?##??#####?######')),
+        ]);
+    }
 }

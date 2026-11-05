@@ -579,6 +579,414 @@ class VehiculoControllerTest extends TestCase
     }
 
     /**
+     * Datos mínimos válidos para registrar (POST) o editar (PUT) un vehículo.
+     *
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    private function payloadVehiculo(array $extra = []): array
+    {
+        return array_merge([
+            'nro_placa' => null,
+            'estado_vehiculo' => 'ACTIVO',
+            'tipo_medicion' => 'kilometraje',
+            'id_tipo_combustible' => TipoCombustible::factory()->create()->id,
+            'id_tipo_vehiculo' => TipoVehiculo::factory()->create()->id,
+            'fotografia' => UploadedFile::fake()->image('vehiculo.jpg'),
+        ], $extra);
+    }
+
+    /**
+     * Usuario que puede registrar vehículos pero NO asignarlos a un área.
+     */
+    private function usuarioSinPermisoDeAsignarArea(): User
+    {
+        $rol = Role::firstOrCreate(['name' => 'registrador-vehiculos', 'guard_name' => 'web']);
+        $rol->syncPermissions(['vehiculos.ver', 'vehiculos.crear', 'vehiculos.editar']);
+
+        $usuario = User::factory()->create();
+        $usuario->assignRole($rol);
+
+        return $usuario;
+    }
+
+    public function test_create_ofrece_solo_las_areas_activas_a_quien_puede_asignar(): void
+    {
+        $activa = Area::factory()->create(['nombre_area' => 'Mina Norte']);
+        Area::factory()->create(['estado_area' => 'INACTIVO']);
+
+        $this->actingAs($this->admin)->get(route('vehiculos.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Vehiculos/Create')
+                ->where('puedeAsignarArea', true)
+                ->has('areas', 1)
+                ->where('areas.0.id', $activa->id)
+            );
+
+        $jefe = User::factory()->create();
+        $jefe->assignRole('jefe-area');
+        $this->actingAs($jefe)->get(route('vehiculos.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('puedeAsignarArea', true)->has('areas', 1));
+    }
+
+    public function test_create_no_ofrece_areas_a_quien_no_puede_asignarlas(): void
+    {
+        Area::factory()->create();
+
+        $this->actingAs($this->usuarioSinPermisoDeAsignarArea())->get(route('vehiculos.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('puedeAsignarArea', false)->has('areas', 0));
+    }
+
+    public function test_registrar_un_vehiculo_con_area_lo_deja_asignado_en_el_mismo_paso(): void
+    {
+        $area = Area::factory()->create(['nombre_area' => 'Mina Norte']);
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo([
+                'codigo' => 'NUEVO-01',
+                'id_area' => $area->id,
+                'estado_asignacion' => 'ACTIVO',
+                'fecha_culminacion' => null,
+                'motivo_asignacion' => 'Equipo nuevo para la mina',
+            ]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('vehiculos.index'))
+            ->assertSessionHas('success', 'Vehículo registrado y asignado al área Mina Norte exitosamente.');
+
+        $vehiculo = Vehiculo::where('codigo', 'NUEVO-01')->firstOrFail();
+
+        $this->assertDatabaseCount('vehiculo_area', 1);
+        $this->assertDatabaseHas('vehiculo_area', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $area->id,
+            'estado_asignacion' => 'ACTIVO',
+            'fecha_culminacion' => null,
+            'motivo_asignacion' => 'Equipo nuevo para la mina',
+        ]);
+        // Queda vigente: es el área que usan operación diaria, vales, etc.
+        $this->assertSame($area->id, $vehiculo->areasAsignadas()->first()?->id);
+    }
+
+    public function test_registrar_con_area_provisional_guarda_la_fecha_de_finalizacion(): void
+    {
+        $area = Area::factory()->create();
+        $hasta = now()->addMonth()->toDateString();
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo([
+                'codigo' => 'PREST-01',
+                'id_area' => $area->id,
+                'estado_asignacion' => 'PROVISIONAL',
+                'fecha_culminacion' => $hasta,
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $asignacion = VehiculoArea::firstOrFail();
+        $this->assertSame('PROVISIONAL', $asignacion->estado_asignacion);
+        $this->assertSame($hasta, $asignacion->fecha_culminacion->toDateString());
+    }
+
+    public function test_registrar_sin_area_funciona_como_antes(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo([
+                'codigo' => 'SIN-AREA',
+                // El formulario manda el tipo por defecto aunque no se elija área.
+                'id_area' => '',
+                'estado_asignacion' => 'ACTIVO',
+            ]))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Vehículo registrado exitosamente.');
+
+        $this->assertDatabaseHas('vehiculo', ['codigo' => 'SIN-AREA']);
+        $this->assertDatabaseCount('vehiculo_area', 0);
+    }
+
+    public function test_registrar_con_un_area_inactiva_no_crea_el_vehiculo(): void
+    {
+        $inactiva = Area::factory()->create(['estado_area' => 'INACTIVO']);
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo([
+                'id_area' => $inactiva->id,
+                'estado_asignacion' => 'ACTIVO',
+            ]))
+            ->assertSessionHasErrors(['id_area' => 'El área seleccionada no existe o no está activa.']);
+
+        $this->assertDatabaseCount('vehiculo', 0);
+        $this->assertDatabaseCount('vehiculo_area', 0);
+    }
+
+    public function test_registrar_con_area_valida_el_tipo_y_la_fecha_de_finalizacion(): void
+    {
+        $area = Area::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['id_area' => $area->id]))
+            ->assertSessionHasErrors('estado_asignacion');
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo([
+                'id_area' => $area->id,
+                'estado_asignacion' => 'ACTIVO',
+                'fecha_culminacion' => now()->addWeek()->toDateString(),
+            ]))
+            ->assertSessionHasErrors('fecha_culminacion');
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo([
+                'id_area' => $area->id,
+                'estado_asignacion' => 'PROVISIONAL',
+                'fecha_culminacion' => now()->subDay()->toDateString(),
+            ]))
+            ->assertSessionHasErrors('fecha_culminacion');
+
+        $this->assertDatabaseCount('vehiculo', 0);
+        Storage::disk('public')->assertDirectoryEmpty('vehiculos');
+    }
+
+    public function test_quien_no_puede_asignar_areas_registra_el_vehiculo_sin_area(): void
+    {
+        $usuario = $this->usuarioSinPermisoDeAsignarArea();
+        $area = Area::factory()->create();
+
+        $this->actingAs($usuario)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo([
+                'id_area' => $area->id,
+                'estado_asignacion' => 'ACTIVO',
+            ]))
+            ->assertSessionHasErrors(['id_area' => 'No tienes permiso para asignar vehículos a un área.']);
+        $this->assertDatabaseCount('vehiculo', 0);
+
+        $this->actingAs($usuario)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['codigo' => 'SOLO-VEH']))
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('vehiculo', ['codigo' => 'SOLO-VEH']);
+        $this->assertDatabaseCount('vehiculo_area', 0);
+    }
+
+    public function test_editar_un_vehiculo_ignora_los_campos_de_asignacion_de_area(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $area = Area::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->put(route('vehiculos.update', $vehiculo), $this->payloadVehiculo([
+                'nro_placa' => $vehiculo->nro_placa,
+                'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+                'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+                'fotografia' => null,
+                'modelo' => 'FMX',
+                'id_area' => $area->id,
+                'estado_asignacion' => 'ACTIVO',
+            ]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('vehiculos.index'));
+
+        $this->assertSame('FMX', $vehiculo->fresh()->modelo);
+        $this->assertDatabaseCount('vehiculo_area', 0);
+    }
+
+    public function test_asignar_area_desde_el_listado_cierra_la_asignacion_vigente_y_crea_la_nueva(): void
+    {
+        $vehiculo = Vehiculo::factory()->create();
+        $anterior = Area::factory()->create();
+        $nueva = Area::factory()->create();
+        $previa = VehiculoArea::create([
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $anterior->id,
+            'fecha_asignacion' => now()->subMonth(),
+            'estado_asignacion' => 'ACTIVO',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.areas.asignar', $vehiculo), [
+                'id_area' => $nueva->id,
+                'estado_asignacion' => 'PROVISIONAL',
+                'fecha_culminacion' => now()->addWeek()->toDateString(),
+                'motivo_asignacion' => 'Préstamo',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('vehiculos.index'));
+
+        $this->assertSame('REASIGNADO', $previa->fresh()->estado_asignacion);
+        $this->assertNotNull($previa->fresh()->fecha_reasignacion);
+        $this->assertDatabaseHas('vehiculo_area', [
+            'id_vehiculo' => $vehiculo->id,
+            'id_area' => $nueva->id,
+            'estado_asignacion' => 'PROVISIONAL',
+            'motivo_asignacion' => 'Préstamo',
+        ]);
+        $this->assertSame($nueva->id, $vehiculo->areasAsignadas()->first()?->id);
+    }
+
+    public function test_crea_un_vehiculo_con_chasis_en_mayusculas_y_sin_espacios(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['codigo' => 'VOL-50', 'chasis' => '  yv2rt40a5kb123456 ']))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('vehiculos.index'));
+
+        $this->assertDatabaseHas('vehiculo', ['codigo' => 'VOL-50', 'chasis' => 'YV2RT40A5KB123456']);
+    }
+
+    public function test_el_chasis_es_opcional_y_vacio_se_guarda_como_null(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['codigo' => 'SIN-CH-1']))
+            ->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['codigo' => 'SIN-CH-2', 'chasis' => '   ']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull(Vehiculo::where('codigo', 'SIN-CH-1')->value('chasis'));
+        $this->assertNull(Vehiculo::where('codigo', 'SIN-CH-2')->value('chasis'));
+    }
+
+    public function test_el_chasis_debe_ser_unico_sin_importar_mayusculas(): void
+    {
+        Vehiculo::factory()->conChasis('9BM958074KB123456')->create();
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['chasis' => '9bm958074kb123456']))
+            ->assertSessionHasErrors('chasis');
+
+        $this->assertSame(1, Vehiculo::where('chasis', '9BM958074KB123456')->count());
+    }
+
+    public function test_el_chasis_de_un_vehiculo_eliminado_se_puede_reutilizar(): void
+    {
+        Vehiculo::factory()->conChasis('9BM958074KB123456')->create()->delete();
+
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['codigo' => 'REUSO', 'chasis' => '9BM958074KB123456']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('vehiculo', ['codigo' => 'REUSO', 'chasis' => '9BM958074KB123456', 'deleted_at' => null]);
+    }
+
+    public function test_el_chasis_no_puede_superar_50_caracteres(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('vehiculos.store'), $this->payloadVehiculo(['chasis' => str_repeat('A', 51)]))
+            ->assertSessionHasErrors('chasis');
+
+        $this->assertDatabaseCount('vehiculo', 0);
+    }
+
+    public function test_editar_permite_conservar_cambiar_y_quitar_el_chasis(): void
+    {
+        $vehiculo = Vehiculo::factory()->conChasis('CHASIS-ORIGINAL')->create();
+        $datos = fn (array $extra) => $this->payloadVehiculo([
+            'nro_placa' => $vehiculo->nro_placa,
+            'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+            'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+            'fotografia' => null,
+        ] + $extra);
+
+        // Conservar el propio chasis no choca con la regla de único.
+        $this->actingAs($this->admin)
+            ->put(route('vehiculos.update', $vehiculo), $datos(['chasis' => 'CHASIS-ORIGINAL', 'modelo' => 'FMX']))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('CHASIS-ORIGINAL', $vehiculo->fresh()->chasis);
+        $this->assertSame('FMX', $vehiculo->fresh()->modelo);
+
+        // Sin la clave chasis en el envío, no se toca.
+        $this->actingAs($this->admin)
+            ->put(route('vehiculos.update', $vehiculo), $datos(['modelo' => 'FH']))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('CHASIS-ORIGINAL', $vehiculo->fresh()->chasis);
+
+        $this->actingAs($this->admin)
+            ->put(route('vehiculos.update', $vehiculo), $datos(['chasis' => 'chasis-nuevo']))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('CHASIS-NUEVO', $vehiculo->fresh()->chasis);
+
+        $this->actingAs($this->admin)
+            ->put(route('vehiculos.update', $vehiculo), $datos(['chasis' => '']))
+            ->assertSessionHasNoErrors();
+        $this->assertNull($vehiculo->fresh()->chasis);
+    }
+
+    public function test_editar_no_permite_usar_el_chasis_de_otro_vehiculo(): void
+    {
+        Vehiculo::factory()->conChasis('CHASIS-OCUPADO')->create();
+        $vehiculo = Vehiculo::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->put(route('vehiculos.update', $vehiculo), $this->payloadVehiculo([
+                'nro_placa' => $vehiculo->nro_placa,
+                'id_tipo_combustible' => $vehiculo->id_tipo_combustible,
+                'id_tipo_vehiculo' => $vehiculo->id_tipo_vehiculo,
+                'fotografia' => null,
+                'chasis' => 'chasis-ocupado',
+            ]))
+            ->assertSessionHasErrors('chasis');
+
+        $this->assertNull($vehiculo->fresh()->chasis);
+    }
+
+    public function test_el_buscador_del_listado_encuentra_vehiculos_por_chasis(): void
+    {
+        $buscado = Vehiculo::factory()->conChasis('9BM958074KB123456')->create();
+        Vehiculo::factory()->conChasis('YV2RT40A5KB654321')->create();
+        Vehiculo::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->get(route('vehiculos.index', ['buscar' => 'kb1234']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Vehiculos/Index')
+                ->has('vehiculos.data', 1)
+                ->where('vehiculos.data.0.id', $buscado->id)
+                ->where('vehiculos.data.0.chasis', '9BM958074KB123456')
+            );
+    }
+
+    public function test_show_y_edit_incluyen_el_chasis(): void
+    {
+        $vehiculo = Vehiculo::factory()->conChasis('9BM958074KB123456')->create();
+
+        $this->actingAs($this->admin)->get(route('vehiculos.show', $vehiculo))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('vehiculo.chasis', '9BM958074KB123456'));
+
+        $this->actingAs($this->admin)->get(route('vehiculos.edit', $vehiculo))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('vehiculo.chasis', '9BM958074KB123456'));
+    }
+
+    public function test_el_pdf_del_listado_muestra_el_chasis(): void
+    {
+        Vehiculo::factory()->conChasis('9BM958074KB123456')->create();
+        Vehiculo::factory()->create();
+
+        $response = $this->actingAs($this->admin)->get(route('vehiculos.reporte.pdf'));
+
+        $response->assertOk();
+        $texto = $this->textoDelPdf($response->getContent());
+        $this->assertStringContainsString('CHASIS', $texto);
+        $this->assertStringContainsString('9BM958074KB123456', $texto);
+    }
+
+    public function test_el_buscador_por_chasis_tambien_filtra_el_excel(): void
+    {
+        Vehiculo::factory()->conChasis('9BM958074KB123456')->create(['codigo' => 'CON-CHASIS']);
+        Vehiculo::factory()->create(['codigo' => 'OTRO']);
+
+        $celdas = $this->celdasDelExcel(
+            $this->actingAs($this->admin)->get(route('vehiculos.reporte.excel', ['buscar' => '9BM958']))->assertOk()->getContent()
+        );
+
+        $this->assertTrue($celdas->flatten()->contains('CON-CHASIS'));
+        $this->assertFalse($celdas->flatten()->contains('OTRO'));
+        $this->assertTrue($celdas->flatten()->contains('Filtro aplicado: Búsqueda (marca, modelo, placa, chasis o código): 9BM958'));
+    }
+
+    /**
      * Botón "Finalizar" del historial de asignaciones (Vehiculos/Show.vue):
      * misma acción que ConductorController::finalizarAsignacion(), pero
      * redirige de vuelta a la ficha del vehículo en vez de a conductores.index.
@@ -724,6 +1132,7 @@ class VehiculoControllerTest extends TestCase
         $area = Area::factory()->create(['nombre_area' => 'Transporte Pesado']);
         $vehiculo = Vehiculo::factory()->create([
             'nro_placa' => '4321XYZ',
+            'chasis' => 'YV2RT40A5KB123456',
             'codigo' => 'VOL-01',
             'marca' => 'Volvo',
             'modelo' => 'FMX',
@@ -755,17 +1164,17 @@ class VehiculoControllerTest extends TestCase
 
         $this->assertNotNull($fila, 'El Excel no contiene la fila del vehículo.');
         $this->assertSame(
-            ['VOL-01', '4321XYZ', 'Volvo', 'FMX'],
-            array_slice($fila, 1, 4),
+            ['VOL-01', '4321XYZ', 'YV2RT40A5KB123456', 'Volvo', 'FMX'],
+            array_slice($fila, 1, 5),
         );
-        $this->assertSame(2019.0, (float) $fila[5]);
-        $this->assertIsNumeric($fila[5], 'El año debe escribirse como número.');
-        $this->assertSame(15.5, (float) $fila[8]);
-        $this->assertIsFloat($fila[8], 'La capacidad debe escribirse como número.');
-        $this->assertSame('m3', $fila[9]);
-        $this->assertSame('Transporte Pesado (Provisional)', $fila[10]);
-        $this->assertSame($conductor->persona->nombre_completo, $fila[11]);
-        $this->assertSame('ACTIVO', $fila[12]);
+        $this->assertSame(2019.0, (float) $fila[6]);
+        $this->assertIsNumeric($fila[6], 'El año debe escribirse como número.');
+        $this->assertSame(15.5, (float) $fila[9]);
+        $this->assertIsFloat($fila[9], 'La capacidad debe escribirse como número.');
+        $this->assertSame('m3', $fila[10]);
+        $this->assertSame('Transporte Pesado (Provisional)', $fila[11]);
+        $this->assertSame($conductor->persona->nombre_completo, $fila[12]);
+        $this->assertSame('ACTIVO', $fila[13]);
     }
 
     /**
@@ -866,8 +1275,8 @@ class VehiculoControllerTest extends TestCase
         )->first(fn ($f) => in_array('VACIO-01', $f, true));
 
         $this->assertNotNull($fila);
-        // placa, marca, modelo, año, capacidad, unidad, área y operario.
-        foreach ([2, 3, 4, 5, 8, 9, 10, 11] as $columna) {
+        // placa, chasis, marca, modelo, año, capacidad, unidad, área y operario.
+        foreach ([2, 3, 4, 5, 6, 9, 10, 11, 12] as $columna) {
             $this->assertNull($fila[$columna], "La columna {$columna} debería quedar en blanco.");
         }
     }
@@ -902,7 +1311,7 @@ class VehiculoControllerTest extends TestCase
             $this->actingAs($this->admin)->get(route('vehiculos.reporte.excel'))->assertOk()->getContent()
         )->first(fn ($f) => in_array('OPE-01', $f, true));
 
-        $this->assertSame('Juan Quispe', $fila[11]);
+        $this->assertSame('Juan Quispe', $fila[12]);
     }
 
     /**
@@ -931,7 +1340,7 @@ class VehiculoControllerTest extends TestCase
 
         $this->assertNotNull($fila, 'El Excel debe abrirse y conservar el texto válido.');
         // Se guarda como texto, nunca como fórmula.
-        $this->assertSame('=SUMA(A1:A2)', $fila[11]);
+        $this->assertSame('=SUMA(A1:A2)', $fila[12]);
     }
 
     public function test_si_falla_un_reporte_vuelve_al_listado_con_los_filtros_y_un_aviso(): void
