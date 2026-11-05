@@ -2,6 +2,24 @@
 
 Cambios de la documentación de la API respecto a la versión anterior.
 
+## 1.26.0 — 2026-11-05
+
+### Agregado
+
+- `GET /parametros/colecciones` → `operaciones_diarias.regla_fecha`: qué `fecha_inicio` puede
+  enviar el usuario (modo `transicion`/`estricto`, `libre`, `dias_atras`, `estricto_desde` y sus
+  `habilitaciones` vigentes), para limitar el calendario de la app.
+- Notificación nueva `regularizacion_habilitada` (campana y push): el encargado habilitó al usuario
+  a registrar operaciones de días pasados. `data`: `desde`, `hasta`, `vigente_hasta`, `url`.
+
+### Cambiado
+
+- `POST /operacion-diaria` y `PUT/PATCH /operacion-diaria/{id}` → `fecha_inicio`: además del modo
+  transición (lo de siempre), existe el modo **estricto** que activa el encargado: todos sólo
+  **hoy** o **ayer con `turno = NOCHE`**. Los días anteriores requieren una habilitación del
+  encargado para ese usuario. El error sigue siendo `422` en `fecha_inicio`.
+- `GET /parametros`: `api_version` pasa a `1.26.0`.
+
 ## 1.25.0 — 2026-11-05
 
 ### Agregado

@@ -49,6 +49,9 @@ class PermisosRutasWebTest extends TestCase
     {
         $sinPermiso = $this->rutasWebAutenticadas()
             ->reject(fn (RutaRegistrada $ruta) => in_array($ruta->getName(), self::RUTAS_SIN_PERMISO, true))
+            // Protegidas por correo del .env en vez de permiso (ver
+            // SoloEncargadoDeRegularizacion): también cuentan como protegidas.
+            ->reject(fn (RutaRegistrada $ruta) => in_array('encargado-regularizacion', $ruta->gatherMiddleware(), true))
             ->reject(fn (RutaRegistrada $ruta) => $this->permisosDe($ruta) !== [])
             ->map(fn (RutaRegistrada $ruta) => implode('|', $ruta->methods()).' '.($ruta->getName() ?? $ruta->uri()))
             ->values()

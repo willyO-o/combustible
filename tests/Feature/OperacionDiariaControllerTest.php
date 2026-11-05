@@ -2167,10 +2167,13 @@ class OperacionDiariaControllerTest extends TestCase
         [$conductorUser] = $this->crearConductorConUsuario();
 
         $this->actingAs($jefe)->get(route('operacion-diaria.create'))
-            ->assertInertia(fn (Assert $page) => $page->where('puedeRegularizar', true)->where('diasAtrasSinRegularizar', 1));
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('reglaFecha.modo', 'transicion')
+                ->where('reglaFecha.libre', true)
+                ->where('reglaFecha.dias_atras', 1));
 
         $this->actingAs($conductorUser)->get(route('operacion-diaria.create'))
-            ->assertInertia(fn (Assert $page) => $page->where('puedeRegularizar', false));
+            ->assertInertia(fn (Assert $page) => $page->where('reglaFecha.libre', false)->where('reglaFecha.habilitaciones', []));
     }
 
     /**

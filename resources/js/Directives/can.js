@@ -5,7 +5,8 @@
  *   v-can="'vales.crear'"                         // Requiere un permiso.
  *   v-can="['vales.crear', 'vales.editar']"       // Requiere cualquiera (OR).
  *   v-can.all="['vales.crear', 'vales.editar']"   // Requiere todos (AND).
- *   Los usuarios con el rol "super-admin" siempre tienen acceso.
+ *   Los usuarios con el rol "super-admin" siempre tienen acceso, salvo a los
+ *   PERMISOS_EXCLUSIVOS (ver abajo).
  *
  * La directiva solo mejora la interfaz. Las rutas y acciones del backend deben
  * seguir protegidas mediante middleware o Policies de Laravel.
@@ -23,18 +24,37 @@ const can = {
 const page = usePage();
 
 /**
+ * Permisos que el super-admin NO recibe por defecto: no son de Roles, el
+ * servidor los comparte sólo a quien corresponde (p.ej. el encargado de
+ * regularización del .env, ver SoloEncargadoDeRegularizacion::PERMISO_INTERFAZ).
+ */
+const PERMISOS_EXCLUSIVOS = ['operacion-diaria.regularizacion.gestionar'];
+
+/**
  * Misma regla que v-can, para usarla en el script (p.ej. elegir a dónde
  * lleva un enlace según el permiso). Cualquiera de los permisos basta.
  */
 export function tienePermiso(value) {
-    if (isCurrentUserSuperAdmin()) {
-        return true;
+    return estaAutorizado(normalizePermissions(value), false);
+}
+
+/**
+ * El super-admin tiene todo excepto los permisos exclusivos, que se
+ * comprueban siempre contra los permisos compartidos.
+ */
+function estaAutorizado(requiredPermissions, requiresAll) {
+    const currentPermissions = getCurrentPermissions();
+    const isSuperAdmin = isCurrentUserSuperAdmin();
+    const tiene = (permission) => currentPermissions.includes(permission)
+        || (isSuperAdmin && !PERMISOS_EXCLUSIVOS.includes(permission));
+
+    if (requiredPermissions.length === 0) {
+        // El super-admin no requiere permisos individuales, incluso cuando el
+        // elemento de navegación todavía no declara una propiedad permission.
+        return isSuperAdmin;
     }
 
-    const requiredPermissions = normalizePermissions(value);
-    const currentPermissions = getCurrentPermissions();
-
-    return requiredPermissions.some((permission) => currentPermissions.includes(permission));
+    return requiresAll ? requiredPermissions.every(tiene) : requiredPermissions.some(tiene);
 }
 
 function isCurrentUserSuperAdmin() {
@@ -45,25 +65,9 @@ function isCurrentUserSuperAdmin() {
 }
 
 function updateVisibility(element, binding) {
-    const requiredPermissions = normalizePermissions(binding.value);
-    const isSuperAdmin = isCurrentUserSuperAdmin();
-
-    // El super-admin no requiere permisos individuales, incluso cuando el
-    // elemento de navegación todavía no declara una propiedad permission.
-    if (isSuperAdmin) {
-        element.hidden = false;
-        return;
-    }
-
-    const currentPermissions = getCurrentPermissions();
-    const requiresAll = binding.modifiers.all === true;
-
-    const isAuthorized = isSuperAdmin || (requiresAll
-        ? requiredPermissions.every((permission) => currentPermissions.includes(permission))
-        : requiredPermissions.some((permission) => currentPermissions.includes(permission)));
-
-    // Un valor vacío o inválido nunca concede acceso por accidente.
-    element.hidden = requiredPermissions.length === 0 || !isAuthorized;
+    // Un valor vacío o inválido nunca concede acceso por accidente (salvo al
+    // super-admin, ver estaAutorizado()).
+    element.hidden = !estaAutorizado(normalizePermissions(binding.value), binding.modifiers.all === true);
 }
 
 function normalizePermissions(value) {

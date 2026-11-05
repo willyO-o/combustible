@@ -41,6 +41,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/**/*.php | .ai/rules/http.md |
 | vite.config.js,public/.htaccess,resources/js/app.js | .ai/rules/js-2.md |
 | app/Models/Vehiculo.php,app/Models/TipoVehiculo.php,app/Http/Requests/VehiculoRequest.php,app/Http/Requests/TipoVehiculoRequest.php,app/Http/Controllers/VehiculoController.php,resources/js/Pages/Vehiculos/**,resources/js/Pages/TiposVehiculo/**,resources/js/Components/UnidadCapacidadSelect.vue | .ai/rules/js-components.md |
+| app/Http/Requests/OperacionStoreRequest.php,app/Actions/OperacionDiaria/*.php,app/Http/Controllers/RegularizacionOperacionController.php,app/Http/Middleware/SoloEncargadoDeRegularizacion.php,app/Models/HabilitacionRegularizacion.php,app/Models/ParametrosEmpresa.php,resources/js/Pages/Operacion/*.vue,resources/js/Directives/can.js,config/operacion_diaria.php | .ai/rules/js-directives.md |
 | resources/js/app.js,resources/js/Pages/**/*.vue,vite.config.js | .ai/rules/js-js-pages.md |
 | app/Http/Controllers/CargaMaterialController.php,app/Libraries/Reportes.php,resources/js/Pages/ControlCargas/*.vue | .ai/rules/js-pages-control-cargas.md |
 | app/Actions/OperacionDiaria/*.php,app/Http/Controllers/OperacionDiariaController.php,resources/js/Pages/Operacion/Create.vue | .ai/rules/js-pages-operacion.md |

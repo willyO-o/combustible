@@ -75,6 +75,13 @@ class NotificacionFormatter
                 'Se abrió el flete N° '.($data['nro'] ?? '').'.',
                 'ri-truck-line',
             ],
+            'regularizacion_habilitada' => [
+                'Regularización habilitada',
+                ($data['desde'] ?? '') === ($data['hasta'] ?? '')
+                    ? 'Puedes registrar operaciones del '.($data['desde'] ?? '').' hasta el '.($data['vigente_hasta'] ?? '').'.'
+                    : 'Puedes registrar operaciones del '.($data['desde'] ?? '').' al '.($data['hasta'] ?? '').' hasta el '.($data['vigente_hasta'] ?? '').'.',
+                'ri-calendar-check-line',
+            ],
             default => [
                 'Notificación',
                 $data['mensaje'] ?? '',

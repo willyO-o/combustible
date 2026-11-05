@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\OperacionDiaria\CreateOperacionDiariaAction;
 use App\Actions\OperacionDiaria\ListOperacionesDiariasAction;
 use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
+use App\Actions\OperacionDiaria\ObtenerReglaFechaOperacionAction;
 use App\Actions\OperacionDiaria\UpdateOperacionDiariaAction;
 use App\Http\Requests\OperacionStoreRequest;
 use App\Libraries\Reportes;
@@ -103,7 +104,7 @@ class OperacionDiariaController extends Controller
      * cualquier rol puede hacerlo, pero el listado de vehículos para elegir
      * depende del rol (ver vehiculosDisponibles()).
      */
-    public function create(ListOperariosDisponiblesAction $listOperarios)
+    public function create(ListOperariosDisponiblesAction $listOperarios, ObtenerReglaFechaOperacionAction $obtenerReglaFecha)
     {
         $user = request()->user();
 
@@ -116,9 +117,9 @@ class OperacionDiariaController extends Controller
             'mostrarSelectorConductor' => ! $user->esConductorPuro(),
             // Rol conductor sin ficha de conductor: aviso en lugar del formulario vacío.
             'sinFichaConductor' => $user->esConductorPuro() && ! $user->persona?->conductor,
-            // Jefe de área/administrador/super-admin: cualquier fecha (regularizar); el resto, hoy o ayer.
-            'puedeRegularizar' => $user->puedeRegularizarOperaciones(),
-            'diasAtrasSinRegularizar' => OperacionStoreRequest::DIAS_ATRAS_SIN_REGULARIZAR,
+            // Qué días puede registrar (modo transición/estricto +
+            // habilitaciones del encargado); la autoridad es OperacionStoreRequest.
+            'reglaFecha' => $obtenerReglaFecha->execute($user),
             'operarios' => $this->operariosDisponibles($user, $listOperarios),
         ]);
     }
@@ -202,7 +203,7 @@ class OperacionDiariaController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(OperacionDiaria $operacionDiaria, ListOperariosDisponiblesAction $listOperarios)
+    public function edit(OperacionDiaria $operacionDiaria, ListOperariosDisponiblesAction $listOperarios, ObtenerReglaFechaOperacionAction $obtenerReglaFecha)
     {
         if ($operacionDiaria->estado === 'VERIFICADO') {
             return redirect()->route('operacion-diaria.show', $operacionDiaria)
@@ -224,9 +225,7 @@ class OperacionDiariaController extends Controller
             'materiales' => $this->materiales(),
             'tiposMantenimiento' => $this->tiposMantenimientoOperacionDiaria(),
             'mostrarSelectorConductor' => ! $user->esConductorPuro(),
-            // Jefe de área/administrador/super-admin: cualquier fecha (regularizar); el resto, hoy o ayer.
-            'puedeRegularizar' => $user->puedeRegularizarOperaciones(),
-            'diasAtrasSinRegularizar' => OperacionStoreRequest::DIAS_ATRAS_SIN_REGULARIZAR,
+            'reglaFecha' => $obtenerReglaFecha->execute($user),
             // El operario original se incluye aunque ya no esté activo, si no
             // el combo lo descartaría y se perdería al guardar.
             'operarios' => $this->operariosDisponibles($user, $listOperarios, $operacionDiaria->id_conductor),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\OperacionDiaria\ListOperariosDisponiblesAction;
+use App\Actions\OperacionDiaria\ObtenerReglaFechaOperacionAction;
 use App\Http\Controllers\Controller;
 use App\Models\Actividad;
 use App\Models\Conductor;
@@ -28,7 +29,7 @@ class ParametrosController extends Controller
     public function index(Request $request): JsonResponse
     {
         $parametros = [
-            'api_version' => '1.25.0',
+            'api_version' => '1.26.0',
             'app_name' => config('app.name'),
             'app_env' => config('app.env'),
             'app_debug' => config('app.debug'),
@@ -155,6 +156,10 @@ class ParametrosController extends Controller
                     ->where('ambito', 'operacion_diaria')
                     ->orderBy('tipo_mantenimiento')
                     ->get(['id', 'tipo_mantenimiento', 'tipo_valor', 'unidad_medida']),
+                // Qué fechas de inicio puede registrar el usuario (modo
+                // transición/estricto + habilitaciones del encargado), para
+                // limitar el calendario de la app. La valida igual el servidor.
+                'regla_fecha' => app(ObtenerReglaFechaOperacionAction::class)->execute($user),
             ],
             'control_cargas' => fn () => [
                 // Catálogo de materiales transportados en cada viaje (cola,

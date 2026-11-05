@@ -40,7 +40,7 @@ info:
     | tecnico-mantenimiento | tecnico1@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | tecnico-mantenimiento | tecnico2@gmail.com       | `tecnico123`    | Solo las órdenes de trabajo que tiene asignadas |
     | super-admin           | super-admin@gmail.com    | `superadmin123` | Sin restricción |
-  version: "1.25.0"
+  version: "1.26.0"
   contact:
     name: Equipo de Desarrollo — SIGET
   license:
@@ -474,7 +474,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParametrosGenerales'
               example:
-                api_version: "1.25.0"
+                api_version: "1.26.0"
                 app_name: SIGET
                 app_env: production
                 app_debug: false
@@ -779,9 +779,16 @@ paths:
           por día, una `DIA` y una `NOCHE` (desde 1.24.0). No se compara la hora: el turno noche
           puede empezar a cualquier hora (p. ej. 18:05 aunque el de día termine 18:10). Si ese turno
           ya está registrado, responde `422` con el error en `fecha_inicio`.
-        - `fecha_inicio`: `jefe-area`, `administrador` y `super-admin` pueden enviar **cualquier
-          fecha** (regularización). El resto de usuarios sólo **hoy o ayer**, nunca una fecha
-          futura (`422` en `fecha_inicio`).
+        - `fecha_inicio` según el modo (desde 1.26.0, ver `operaciones_diarias.regla_fecha` en
+          `GET /parametros/colecciones`):
+          - **Transición**: `jefe-area`, `administrador` y `super-admin` envían **cualquier
+            fecha** (regularización); el resto sólo **hoy o ayer**, nunca una fecha futura.
+          - **Estricto**: **todos** sólo **hoy**, o **ayer con `turno = NOCHE`**; nunca una fecha
+            futura.
+          - En ambos modos, una **habilitación vigente** del encargado de regularización suma sus
+            días (pasados) a lo permitido, sólo para ese usuario.
+          - Si no se cumple: `422` en `fecha_inicio` con el motivo (p. ej. "De ayer sólo se puede
+            registrar el turno noche…"). Al editar sin cambiar el día no se aplica.
         - Si el vehículo tiene `tipo_medicion = horometro`, cada actividad realizada debe indicar
           `lugar`. Si tiene `tipo_medicion = kilometraje`, cada actividad debe indicar `origen`
           **y** `destino` (p. ej. actividades de transporte).
@@ -4025,7 +4032,7 @@ components:
     ParametrosGenerales:
       type: object
       properties:
-        api_version: { type: string, example: "1.25.0" }
+        api_version: { type: string, example: "1.26.0" }
         app_name: { type: string, example: SIGET }
         app_env: { type: string, example: production }
         app_debug: { type: boolean, example: false }
@@ -4292,6 +4299,37 @@ components:
                       tipo_mantenimiento: { type: string, example: Combustible cargado }
                       tipo_valor: { type: string, enum: [cantidad, booleano], nullable: true, example: cantidad }
                       unidad_medida: { type: string, nullable: true, description: "Sólo para `tipo_valor = cantidad`.", example: Litros }
+                regla_fecha:
+                  type: object
+                  description: |
+                    Qué `fecha_inicio` puede enviar el usuario autenticado (desde 1.26.0), para
+                    limitar el calendario de la app. El servidor la valida igual.
+                    - `modo = transicion`: si `libre`, cualquier fecha; si no, hasta `dias_atras`
+                      días atrás (hoy o ayer), nunca futura.
+                    - `modo = estricto`: sólo hoy; ayer sólo con `turno = NOCHE`; nunca futura.
+                    - Además, en ambos modos, los días de cada `habilitaciones[]` (siempre pasados)
+                      mientras no llegue `vigente_hasta`.
+                  properties:
+                    modo: { type: string, enum: [transicion, estricto], example: estricto }
+                    estricto_desde:
+                      type: string
+                      format: date
+                      nullable: true
+                      description: Día desde el que rige (o regirá, si es futuro) el modo estricto. `null` = transición sin fecha.
+                      example: "2026-12-01"
+                    libre: { type: boolean, description: "Transición + rol de gestión: cualquier fecha.", example: false }
+                    dias_atras: { type: integer, example: 1 }
+                    habilitaciones:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id: { type: integer, example: 3 }
+                          desde: { type: string, format: date, example: "2026-11-02" }
+                          hasta: { type: string, format: date, example: "2026-11-04" }
+                          vigente_hasta: { type: string, format: date-time, example: "2026-11-06T18:00:00-04:00" }
+                          otorgada_por: { type: string, nullable: true, example: Juan Pérez }
+                          motivo: { type: string, example: El operario olvidó registrar el turno del 03/11. }
             control_cargas:
               type: object
               description: |
@@ -4489,10 +4527,10 @@ components:
           format: date-time
           description: |
             Una operación por vehículo, día (el día de esta fecha) y `turno`: hasta dos por día
-            (DIA + NOCHE), sin comparar horas. jefe-area,
-            administrador y super-admin pueden enviar cualquier fecha (regularización); el resto,
-            sólo hoy o ayer y nunca una fecha futura. Al editar sin cambiar el día no se aplica el
-            límite de hoy/ayer. Error en cualquier caso: `422` en `fecha_inicio`.
+            (DIA + NOCHE), sin comparar horas. Días permitidos según
+            `operaciones_diarias.regla_fecha` (modo transición/estricto + habilitaciones del
+            encargado, ver `POST /operacion-diaria`). Al editar sin cambiar el día no se aplica el
+            límite. Error en cualquier caso: `422` en `fecha_inicio`.
           example: "2026-08-13 07:00"
         fecha_fin:
           type: string
@@ -4587,10 +4625,10 @@ components:
           format: date-time
           description: |
             Una operación por vehículo, día (el día de esta fecha) y `turno`: hasta dos por día
-            (DIA + NOCHE), sin comparar horas. jefe-area,
-            administrador y super-admin pueden enviar cualquier fecha (regularización); el resto,
-            sólo hoy o ayer y nunca una fecha futura. Al editar sin cambiar el día no se aplica el
-            límite de hoy/ayer. Error en cualquier caso: `422` en `fecha_inicio`.
+            (DIA + NOCHE), sin comparar horas. Días permitidos según
+            `operaciones_diarias.regla_fecha` (modo transición/estricto + habilitaciones del
+            encargado, ver `POST /operacion-diaria`). Al editar sin cambiar el día no se aplica el
+            límite. Error en cualquier caso: `422` en `fecha_inicio`.
           example: "2026-08-13 07:00"
         fecha_fin:
           type: string

@@ -20,6 +20,7 @@ use App\Http\Controllers\OrdenTrabajoController;
 use App\Http\Controllers\ParametrosEmpresaController;
 use App\Http\Controllers\PersonaController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RegularizacionOperacionController;
 use App\Http\Controllers\RepuestoController;
 use App\Http\Controllers\RolController;
 use App\Http\Controllers\SolicitudMantenimientoController;
@@ -473,6 +474,19 @@ Route::middleware('auth')->group(function () {
     //  Actividades de los operadores de transporte
     Route::post('operacion-diaria/verificar', [OperacionDiariaController::class, 'verificarOperacion'])->name('operacion-diaria.verificar')
         ->middleware('permission:operacion-diaria.verificar');
+    // Regularización de operaciones diarias: sólo los encargados del .env
+    // (OPERACION_REGULARIZACION_ENCARGADOS), sin permiso de Roles. Antes del
+    // resource: si no, "operacion-diaria/regularizacion" caería en show().
+    Route::prefix('operacion-diaria/regularizacion')
+        ->name('operacion-diaria.regularizacion.')
+        ->middleware('encargado-regularizacion')
+        ->controller(RegularizacionOperacionController::class)
+        ->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::put('modo', 'actualizarModo')->name('modo');
+            Route::post('habilitaciones', 'store')->name('habilitaciones.store');
+            Route::patch('habilitaciones/{habilitacion}/revocar', 'revocar')->name('habilitaciones.revocar');
+        });
     Route::resource('operacion-diaria', OperacionDiariaController::class)
         ->parameters(['operacion-diaria' => 'operacionDiaria'])
         ->middlewareFor(['index', 'show'], 'permission:operacion-diaria.ver')

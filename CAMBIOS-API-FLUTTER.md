@@ -14,6 +14,26 @@ Este documento resume **todo lo que cambió en la API** en esta ronda. Está div
 
 ---
 
+## Actualización 2026-11-05 — Operación diaria: modo estricto y habilitaciones de regularización (API 1.26.0)
+
+- El encargado de regularización puede activar el **modo estricto**: entonces **todos** (también
+  jefes y administradores) sólo registran operaciones de **hoy**, o de **ayer con `turno: NOCHE`**.
+  Hasta que lo active, todo sigue igual (modo transición).
+- Para días anteriores, el encargado **habilita** a un usuario por un tiempo; ese usuario recibe una
+  notificación `regularizacion_habilitada` (campana + push).
+- Fecha no permitida: `422` con `errors.fecha_inicio` (mensaje listo para mostrar).
+- `GET /parametros/colecciones?incluir=operaciones_diarias` trae `operaciones_diarias.regla_fecha`
+  (`modo`, `libre`, `dias_atras`, `estricto_desde`, `habilitaciones[]`).
+
+**Checklist**
+
+- [ ] Limitar el calendario de `fecha_inicio` con `regla_fecha` (en estricto: hoy; ayer sólo si el
+  turno es Noche; más los días de `habilitaciones[]`).
+- [ ] Mostrar el aviso de la notificación `regularizacion_habilitada` (abrir el formulario de
+  operación diaria).
+
+---
+
 ## Actualización 2026-11-05 — Operación diaria: turno día y turno noche el mismo día (API 1.24.0)
 
 - Un vehículo puede tener **hasta dos operaciones por día**: una con `turno: DIA` y otra con

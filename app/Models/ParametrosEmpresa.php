@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\ParametrosVale;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,8 @@ use OwenIt\Auditing\Contracts\Auditable;
     'nit_empresa',
     'logo_empresa',
     'parametros_vale',
-    'estado'
+    'estado',
+    'regularizacion_estricta_desde',
 )]
 class ParametrosEmpresa extends Model implements Auditable
 {
@@ -29,7 +31,26 @@ class ParametrosEmpresa extends Model implements Auditable
     {
         return [
             'parametros_vale' => ParametrosVale::class,
+            'regularizacion_estricta_desde' => 'date',
         ];
+    }
+
+    /**
+     * Día desde el que rige el modo estricto de la operación diaria (sólo el
+     * día actual, o la noche de ayer), o null si sigue el modo transición.
+     * Sin fila de parámetros = transición (comportamiento anterior).
+     */
+    public static function regularizacionEstrictaDesde(): ?CarbonInterface
+    {
+        return self::query()->first(['id', 'regularizacion_estricta_desde'])?->regularizacion_estricta_desde;
+    }
+
+    /**
+     * El modo estricto ya rige hoy (activado a mano o llegó la fecha programada).
+     */
+    public static function regularizacionEstrictaVigente(): bool
+    {
+        return self::regularizacionEstrictaDesde()?->lte(today()) ?? false;
     }
 
     protected static function booted(): void

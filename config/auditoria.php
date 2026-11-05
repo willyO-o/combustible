@@ -13,6 +13,7 @@ use App\Models\DocumentoConductor;
 use App\Models\EncargadoArea;
 use App\Models\Grifo;
 use App\Models\GrupoVehiculo;
+use App\Models\HabilitacionRegularizacion;
 use App\Models\IntervaloMantenimientoTipo;
 use App\Models\MantenimientoOperacionDiaria;
 use App\Models\Material;
@@ -105,6 +106,7 @@ return [
         GrupoVehiculo::class => ['label' => 'Grupos de vehículo', 'icono' => 'ri-stack-line', 'descriptor' => ['grupo_vehiculo']],
         RespaldoDigital::class => ['label' => 'Respaldos digitales', 'icono' => 'ri-image-line', 'descriptor' => ['tipo_respaldo', 'tipo_archivo']],
         Dispositivo::class => ['label' => 'Dispositivos', 'icono' => 'ri-smartphone-line', 'descriptor' => ['plataforma', 'id_usuario']],
+        HabilitacionRegularizacion::class => ['label' => 'Habilitaciones de regularización', 'icono' => 'ri-calendar-check-line', 'descriptor' => ['id_usuario', 'fecha_desde', 'fecha_hasta']],
         ParametrosEmpresa::class => ['label' => 'Parámetros de la empresa', 'icono' => 'ri-settings-3-line', 'descriptor' => ['nombre_empresa']],
     ],
 
@@ -129,6 +131,8 @@ return [
         'id_usuario_ejecuta' => ['modelo' => User::class, 'campos' => ['name']],
         'id_usuario_registra' => ['modelo' => User::class, 'campos' => ['name']],
         'id_usuario_registro' => ['modelo' => User::class, 'campos' => ['name']],
+        'id_usuario_otorga' => ['modelo' => User::class, 'campos' => ['name']],
+        'id_usuario_revoca' => ['modelo' => User::class, 'campos' => ['name']],
         'id_area' => ['modelo' => Area::class, 'campos' => ['nombre_area']],
         'id_grifo' => ['modelo' => Grifo::class, 'campos' => ['razon_social']],
         'id_taller' => ['modelo' => Taller::class, 'campos' => ['razon_social']],
@@ -209,9 +213,11 @@ return [
         'fecha_carga' => 'Fecha de carga',
         'fecha_cierre' => 'Fecha de cierre',
         'fecha_culminacion' => 'Fecha de culminación',
+        'fecha_desde' => 'Desde',
         'fecha_ejecucion' => 'Fecha de ejecución',
         'fecha_emision' => 'Fecha de emisión',
         'fecha_fin' => 'Fecha de fin',
+        'fecha_hasta' => 'Hasta',
         'fecha_hora_carga' => 'Fecha y hora de carga',
         'fecha_inicio' => 'Fecha de inicio',
         'fecha_nacimiento' => 'Fecha de nacimiento',
@@ -257,6 +263,8 @@ return [
         'id_usuario_emite' => 'Usuario que emite',
         'id_usuario_registra' => 'Usuario que registra',
         'id_usuario_registro' => 'Usuario que registra',
+        'id_usuario_otorga' => 'Habilitado por',
+        'id_usuario_revoca' => 'Revocado por',
         'id_vale' => 'Vale',
         'id_vehiculo' => 'Vehículo',
         'id_vehiculo_externo' => 'Vehículo externo',
@@ -276,6 +284,9 @@ return [
         'monto_pago' => 'Monto del pago',
         'motivo' => 'Motivo',
         'motivo_asignacion' => 'Motivo de la asignación',
+        'regularizacion_estricta_desde' => 'Modo estricto desde',
+        'revocada_at' => 'Revocada el',
+        'vigente_hasta' => 'Vigente hasta',
         'name' => 'Nombre',
         'nit' => 'NIT',
         'nit_empresa' => 'NIT de la empresa',

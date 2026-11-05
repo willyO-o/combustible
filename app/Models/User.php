@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
@@ -69,6 +70,43 @@ class User extends Authenticatable implements Auditable, JWTSubject
     }
 
     /**
+     * Habilitaciones para regularizar operaciones diarias de días pasados
+     * otorgadas a este usuario (vigentes, vencidas y revocadas).
+     *
+     * @return HasMany<HabilitacionRegularizacion, $this>
+     */
+    public function habilitacionesRegularizacion(): HasMany
+    {
+        return $this->hasMany(HabilitacionRegularizacion::class, 'id_usuario');
+    }
+
+    /**
+     * Nombre para mostrar: el de su persona sin espacios sobrantes (aunque
+     * falte un apellido) o, si no tiene persona, el name de la cuenta.
+     */
+    public function nombreVisible(): string
+    {
+        $persona = $this->persona;
+        $nombre = $persona ? trim(implode(' ', array_filter([$persona->nombres, $persona->paterno, $persona->materno]))) : '';
+
+        return $nombre !== '' ? $nombre : (string) $this->name;
+    }
+
+    /**
+     * Su correo figura en OPERACION_REGULARIZACION_ENCARGADOS: activa el modo
+     * estricto y habilita regularizaciones. No depende de roles ni permisos,
+     * así que el super-admin tampoco lo es si su correo no está en la lista.
+     */
+    public function esEncargadoDeRegularizacion(): bool
+    {
+        return in_array(
+            mb_strtolower(trim((string) $this->email)),
+            config('operacion_diaria.regularizacion.encargados', []),
+            true,
+        );
+    }
+
+    /**
      * Conductor sin ningún rol de gestión. Un usuario que además es
      * jefe-area, administrador o super-admin no queda limitado a sus propios
      * registros: el rol de gestión prevalece sobre conductor.
@@ -104,9 +142,10 @@ class User extends Authenticatable implements Auditable, JWTSubject
     }
 
     /**
-     * Jefe de área, administrador o super-admin: pueden registrar operaciones
-     * diarias con cualquier fecha anterior para regularizar jornadas no
-     * registradas. El resto sólo hoy o ayer (ver OperacionStoreRequest).
+     * Jefe de área, administrador o super-admin: en el modo transición
+     * pueden registrar operaciones diarias con cualquier fecha para
+     * regularizar. En el modo estricto ya no alcanza con el rol: hace falta
+     * una habilitación del encargado (ver ObtenerReglaFechaOperacionAction).
      */
     public function puedeRegularizarOperaciones(): bool
     {

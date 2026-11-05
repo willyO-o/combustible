@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Actions\OperacionDiaria\ObtenerReglaFechaOperacionAction;
 use App\Models\MantenimientoOperacionDiaria;
 use App\Models\OperacionDiaria;
 use App\Models\Vehiculo;
@@ -19,8 +20,8 @@ use Illuminate\Validation\Rule;
 class OperacionStoreRequest extends FormRequest
 {
     /**
-     * Días hacia atrás que puede registrar un usuario sin rol de gestión
-     * (1 = hoy o ayer). Fechas anteriores sólo con User::puedeRegularizarOperaciones().
+     * Modo transición: días hacia atrás que puede registrar un usuario sin
+     * rol de gestión (1 = hoy o ayer). Ver ObtenerReglaFechaOperacionAction.
      */
     public const DIAS_ATRAS_SIN_REGULARIZAR = 1;
 
@@ -126,17 +127,6 @@ class OperacionStoreRequest extends FormRequest
     }
 
     /**
-     * Reglas de la fecha de inicio (web y API comparten esta request):
-     * - Una sola operación por vehículo, día y turno: hasta dos por día
-     *   (DIA + NOCHE), sin comparar horas. Excluye la propia operación al
-     *   editar.
-     * - jefe-area/administrador/super-admin pueden usar cualquier fecha (a
-     *   pedido del usuario, para regularizar jornadas no registradas).
-     * - El resto, sólo hoy o ayer (ayer cubre el turno noche y el registro al
-     *   día siguiente), nunca una fecha futura. Al editar, si el día no cambia
-     *   no se exige este límite: la operación ya existía.
-     */
-    /**
      * La lectura de una jornada no puede superar el tope del tipo de
      * vehículo (TipoVehiculo::km_maximo_jornada / horometro_maximo_jornada,
      * el que corresponde a su tipo_medicion). Frena errores de tipeo como un
@@ -194,36 +184,33 @@ class OperacionStoreRequest extends FormRequest
         return number_format($valor, $decimales, ',', '.');
     }
 
+    /**
+     * Reglas de la fecha de inicio (web y API comparten esta request):
+     * - Qué días puede registrar el usuario: ObtenerReglaFechaOperacionAction
+     *   (modo transición/estricto + habilitaciones del encargado). Al editar,
+     *   si el día no cambia no se exige: la operación ya existía.
+     * - Una sola operación por vehículo, día y turno: hasta dos por día
+     *   (DIA + NOCHE), sin comparar horas. Excluye la propia operación al
+     *   editar.
+     */
     private function validarFechaInicio(Validator $validator): void
     {
         $fechaInicio = Carbon::parse($this->input('fecha_inicio'));
         $operacion = $this->route('operacionDiaria');
         $idVehiculo = (int) ($this->input('id_vehiculo') ?? $operacion?->id_vehiculo);
-
-        $mismoDiaQueLaOperacion = $operacion?->fecha_inicio?->isSameDay($fechaInicio) ?? false;
-        $fechaMinima = now()->subDays(self::DIAS_ATRAS_SIN_REGULARIZAR)->startOfDay();
-
-        if (! $mismoDiaQueLaOperacion && ! $this->user()?->puedeRegularizarOperaciones()) {
-            if ($fechaInicio->greaterThan(now()->endOfDay())) {
-                $validator->errors()->add('fecha_inicio', 'La fecha de inicio no puede ser posterior a hoy.');
-
-                return;
-            }
-
-            if ($fechaInicio->lessThan($fechaMinima)) {
-                $validator->errors()->add(
-                    'fecha_inicio',
-                    'Sólo puedes registrar operaciones de hoy o de ayer. Para regularizar una fecha anterior, solicítalo a tu jefe de área.'
-                );
-
-                return;
-            }
-        }
-
         // Si el turno no es válido ya tiene su propio error (rules()).
         $turno = $this->input('turno');
+        $turnoValido = in_array($turno, ['DIA', 'NOCHE'], true);
 
-        if (! in_array($turno, ['DIA', 'NOCHE'], true)) {
+        $mismoDiaQueLaOperacion = $operacion?->fecha_inicio?->isSameDay($fechaInicio) ?? false;
+
+        if (! $mismoDiaQueLaOperacion && ($error = $this->errorDeDiaNoPermitido($fechaInicio, $turnoValido ? $turno : null))) {
+            $validator->errors()->add('fecha_inicio', $error);
+
+            return;
+        }
+
+        if (! $turnoValido) {
             return;
         }
 
@@ -236,6 +223,53 @@ class OperacionStoreRequest extends FormRequest
                 "El vehículo ya tiene registrado el turno {$nombreTurno} del {$fechaInicio->format('d/m/Y')} (N° {$existente->nro_operacion})."
             );
         }
+    }
+
+    /**
+     * null si el usuario puede registrar ese día; si no, el mensaje de error.
+     * Las habilitaciones del encargado valen en ambos modos y para cualquier
+     * rol; sin ellas manda el modo (ver ObtenerReglaFechaOperacionAction).
+     */
+    private function errorDeDiaNoPermitido(Carbon $fechaInicio, ?string $turno): ?string
+    {
+        $usuario = $this->user();
+
+        if (! $usuario) {
+            return 'Sólo puedes registrar operaciones de hoy.';
+        }
+
+        $regla = app(ObtenerReglaFechaOperacionAction::class)->execute($usuario);
+        $dia = $fechaInicio->copy()->startOfDay();
+        $hoy = today();
+
+        $habilitado = collect($regla['habilitaciones'])->contains(
+            fn (array $habilitacion) => $dia->betweenIncluded(Carbon::parse($habilitacion['desde']), Carbon::parse($habilitacion['hasta']))
+        );
+
+        if ($habilitado || $regla['libre']) {
+            return null;
+        }
+
+        if ($dia->greaterThan($hoy)) {
+            return 'La fecha de inicio no puede ser posterior a hoy.';
+        }
+
+        if ($regla['modo'] === 'transicion') {
+            return $dia->lessThan($hoy->copy()->subDays($regla['dias_atras']))
+                ? 'Sólo puedes registrar operaciones de hoy o de ayer. Para regularizar una fecha anterior, solicítalo a tu jefe de área.'
+                : null;
+        }
+
+        // Modo estricto: hoy, o la noche que empezó ayer.
+        $esAyer = $dia->equalTo($hoy->copy()->subDay());
+
+        if ($dia->equalTo($hoy) || ($esAyer && $turno === 'NOCHE')) {
+            return null;
+        }
+
+        return $esAyer
+            ? 'De ayer sólo se puede registrar el turno noche. Para regularizar el turno día del '.$dia->format('d/m/Y').', solicita una habilitación al encargado de regularización.'
+            : 'Sólo puedes registrar operaciones de hoy (o el turno noche de ayer). Para regularizar el '.$dia->format('d/m/Y').', solicita una habilitación al encargado de regularización.';
     }
 
     /**

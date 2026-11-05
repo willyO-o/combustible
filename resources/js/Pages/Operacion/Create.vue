@@ -44,12 +44,15 @@ const props = defineProps({
     // [{ id, label, meta }] todos los conductores activos (más el de la
     // operación en edición aunque ya no lo esté). Vacío para el conductor puro.
     operarios: { type: Array, default: () => [] },
-    // true para jefe-area/administrador/super-admin: pueden registrar con
-    // cualquier fecha (regularizar). El resto, sólo los últimos
-    // diasAtrasSinRegularizar días (hoy o ayer). Lo valida el servidor
-    // (OperacionStoreRequest); aquí sólo limita el calendario y avisa.
-    puedeRegularizar: { type: Boolean, default: false },
-    diasAtrasSinRegularizar: { type: Number, default: 1 },
+    // Qué días puede registrar el usuario (ObtenerReglaFechaOperacionAction):
+    // modo 'transicion'|'estricto', libre (cualquier fecha), dias_atras y las
+    // habilitaciones vigentes del encargado [{ desde, hasta, vigente_hasta,
+    // otorgada_por }]. La autoridad es el servidor (OperacionStoreRequest);
+    // aquí sólo se limita el calendario y se avisa.
+    reglaFecha: {
+        type: Object,
+        default: () => ({ modo: 'transicion', estricto_desde: null, libre: false, dias_atras: 1, habilitaciones: [] }),
+    },
 })
 
 const vehiculosAsignadosOpt = ref(props.vehiculosAsignados || [])
@@ -105,16 +108,27 @@ const horarioDelTurno = (turno, fecha) => {
 // 'YYYY-MM-DD HH:mm' o 'YYYY-MM-DDTHH:mm' -> 'YYYY-MM-DDTHH:mm'.
 const normalizarFechaHora = (v) => (v || '').replace(' ', 'T').slice(0, 16)
 
-// Límites del calendario de fecha de inicio: nunca después de hoy; sin rol
-// de gestión, tampoco antes de N días atrás. Al editar, el día ya guardado
-// sigue siendo elegible (si no, el calendario lo recortaría).
+// Límites del calendario de fecha de inicio (ver prop reglaFecha): nunca
+// después de hoy salvo regularización libre; hacia atrás, los días del modo
+// (en estricto, ayer sólo en turno noche) o el primer día habilitado por el
+// encargado. Al editar, el día ya guardado sigue siendo elegible (si no, el
+// calendario lo recortaría).
+const regla = computed(() => props.reglaFecha)
+const esEstricto = computed(() => regla.value.modo === 'estricto')
+const habilitaciones = computed(() => regla.value.habilitaciones ?? [])
 const finDeHoy = new Date(new Date().setHours(23, 59, 59, 999))
 const minFechaInicio = computed(() => {
-    if (props.puedeRegularizar) return null
+    if (regla.value.libre) return null
 
+    const diasAtras = esEstricto.value && form.turno !== 'NOCHE' ? 0 : regla.value.dias_atras
     const minimo = new Date()
-    minimo.setDate(minimo.getDate() - props.diasAtrasSinRegularizar)
+    minimo.setDate(minimo.getDate() - diasAtras)
     minimo.setHours(0, 0, 0, 0)
+
+    habilitaciones.value.forEach((h) => {
+        const desde = new Date(`${h.desde}T00:00:00`)
+        if (desde < minimo) minimo.setTime(desde.getTime())
+    })
 
     const guardada = props.operacion?.fecha_i_f ? new Date(props.operacion.fecha_i_f.replace(' ', 'T')) : null
     if (guardada && !isNaN(guardada) && guardada < minimo) {
@@ -124,6 +138,18 @@ const minFechaInicio = computed(() => {
 
     return minimo
 })
+// 'YYYY-MM-DD' -> 'dd/mm/aaaa'; ISO -> 'dd/mm/aaaa HH:mm' (hora local).
+const fechaDiaCorta = (iso) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '')
+const fechaHoraCorta = (iso) => {
+    const d = new Date(iso)
+    if (isNaN(d)) return ''
+    const dos = (n) => String(n).padStart(2, '0')
+    return `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()} ${dos(d.getHours())}:${dos(d.getMinutes())}`
+}
+const rangoHabilitacion = (h) => (h.desde === h.hasta
+    ? fechaDiaCorta(h.desde)
+    : `${fechaDiaCorta(h.desde)} al ${fechaDiaCorta(h.hasta)}`)
+
 const turnoDefault = function () {
     const hour = new Date().getHours()
 
@@ -730,13 +756,25 @@ onMounted(() => {
                                         Fecha y hora inicio <span class="text-danger">*</span>
                                     </label>
                                     <DateTimeInput v-model="form.fecha_inicio" :invalid="!!form.errors.fecha_inicio"
-                                        :hora-sugerida="horaIngresoSugerida" :min-date="minFechaInicio" :max-date="puedeRegularizar ? null : finDeHoy" />
+                                        :hora-sugerida="horaIngresoSugerida" :min-date="minFechaInicio" :max-date="regla.libre ? null : finDeHoy" />
                                     <div v-if="form.errors.fecha_inicio" class="text-danger small mt-1">{{
                                         form.errors.fecha_inicio }}</div>
                                     <div v-else class="form-text">
-                                        <template v-if="puedeRegularizar">Puedes registrar cualquier fecha para regularizar.</template>
+                                        <template v-if="regla.libre">Puedes registrar cualquier fecha para regularizar.</template>
+                                        <template v-else-if="esEstricto">Sólo hoy, o el turno noche de ayer.</template>
                                         <template v-else>Sólo hoy o ayer.</template>
                                         Hasta dos operaciones por vehículo y día: una por turno (día y noche).
+                                        <span v-if="!esEstricto && regla.estricto_desde" class="d-block mt-1">
+                                            <i class="ri-information-line me-1" aria-hidden="true"></i>Desde el
+                                            {{ fechaDiaCorta(regla.estricto_desde) }} sólo se podrá registrar el día actual (o el turno noche de ayer).
+                                        </span>
+                                    </div>
+                                    <div v-for="h in habilitaciones" :key="h.id" class="op-habilitacion mt-2">
+                                        <i class="ri-calendar-check-line" aria-hidden="true"></i>
+                                        <span>
+                                            Regularización habilitada del <strong>{{ rangoHabilitacion(h) }}</strong>,
+                                            hasta el {{ fechaHoraCorta(h.vigente_hasta) }}<template v-if="h.otorgada_por"> (autorizó {{ h.otorgada_por }})</template>.
+                                        </span>
                                     </div>
                                 </div>
                                 <div class="col-12">

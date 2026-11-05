@@ -1,0 +1,9 @@
+---
+paths:
+  - 'app/Http/Requests/OperacionStoreRequest.php,app/Actions/OperacionDiaria/*.php,app/Http/Controllers/RegularizacionOperacionController.php,app/Http/Middleware/SoloEncargadoDeRegularizacion.php,app/Models/HabilitacionRegularizacion.php,app/Models/ParametrosEmpresa.php,resources/js/Pages/Operacion/*.vue,resources/js/Directives/can.js,config/operacion_diaria.php'
+---
+
+# Js Directives
+
+## Operación diaria: modo transición/estricto + habilitaciones del encargado (.env)
+Desde 2026-11-05 REEMPLAZA "jefes cualquier fecha / resto hoy o ayer" como regla fija. Única fuente: ObtenerReglaFechaOperacionAction (la usan OperacionStoreRequest::errorDeDiaNoPermitido, props reglaFecha de Operacion/Create.vue y API colecciones.operaciones_diarias.regla_fecha). Modo = parametros_empresa.regularizacion_estricta_desde (null o futura = TRANSICIÓN: comportamiento anterior intacto; <= hoy = ESTRICTO: todos, incl. jefes/admin/super-admin, sólo hoy o ayer con turno NOCHE, nunca futuro). HabilitacionRegularizacion (por usuario, días fecha_desde..fecha_hasta siempre pasados, vigente_hasta, revocada_at) suma días en AMBOS modos. Editar sin cambiar el día sigue sin límite. Encargados = OPERACION_REGULARIZACION_ENCARGADOS (correos por coma, config/operacion_diaria.php, User::esEncargadoDeRegularizacion()); NO es permiso de Roles: ni el super-admin entra (middleware alias 'encargado-regularizacion'). Menú: permiso SÓLO de interfaz 'operacion-diaria.regularizacion.gestionar' que HandleInertiaRequests agrega al encargado y que can.js trata como PERMISOS_EXCLUSIVOS (el super-admin no lo hereda). Habilitar -> RegularizacionHabilitada -> notificación 'regularizacion_habilitada' (database+FCM). Tests: tests/Feature/RegularizacionOperacionTest.php. API 1.26.0. Tras cambiar el .env en prod: config:cache.

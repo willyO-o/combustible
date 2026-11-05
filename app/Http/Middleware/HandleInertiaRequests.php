@@ -36,7 +36,12 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->load('persona'),
                 'permissions' => fn () => $request->user()
-                    ? $request->user()->getAllPermissions()->pluck('name')->values()
+                    ? $request->user()->getAllPermissions()->pluck('name')
+                        ->when(
+                            $request->user()->esEncargadoDeRegularizacion(),
+                            fn ($permisos) => $permisos->push(SoloEncargadoDeRegularizacion::PERMISO_INTERFAZ),
+                        )
+                        ->values()
                     : [],
                 'roles' => fn () => $request->user()
                     ? $request->user()->getRoleNames()->values()

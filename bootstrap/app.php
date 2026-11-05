@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\SoloEncargadoDeRegularizacion;
 use App\Http\Middleware\VerificarSesionDePestana;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -31,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // separados por "|"; el super-admin pasa siempre (Gate::before).
         $middleware->alias([
             'permission' => PermissionMiddleware::class,
+            // Encargados de regularización del .env (no es un permiso: ni el
+            // super-admin pasa si su correo no está en la lista).
+            'encargado-regularizacion' => SoloEncargadoDeRegularizacion::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

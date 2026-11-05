@@ -47,10 +47,12 @@ export const MENUITEMS: (MenuItem | { menutitle: string })[] = [
 
 
   {
-    title: 'Actividades Operativas', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['operacion-diaria.ver', 'operacion-diaria.crear', 'operacion-diaria.informe'],
+    title: 'Actividades Operativas', icon: Svgicons.MantenimientoIcon, type: 'sub', active: false, selected: false, dirchange: false, permission: ['operacion-diaria.ver', 'operacion-diaria.crear', 'operacion-diaria.informe', 'operacion-diaria.regularizacion.gestionar'],
     children: [
       { path: '/operacion-diaria', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Actividades', permission: 'operacion-diaria.ver' },
       { path: '/operacion-diaria/create', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Registrar Actividad', permission: 'operacion-diaria.crear' },
+      // Sólo el encargado del .env (permiso exclusivo de interfaz, ver Directives/can.js).
+      { path: '/operacion-diaria/regularizacion', icon: Svgicons.SolicitudMantenimientoIcon, type: 'link', active: false, selected: false, dirchange: false, title: 'Regularización', permission: 'operacion-diaria.regularizacion.gestionar' },
     ],
   },
   {

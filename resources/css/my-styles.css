@@ -2277,3 +2277,89 @@
         width: 100%;
     }
 }
+
+/* ==================================================================
+   Regularización de operaciones (Operacion/Regularizacion.vue)
+   Tokens del tema: funcionan igual en claro y oscuro.
+   ================================================================== */
+.reg-modo {
+    --reg-modo-rgb: var(--primary-rgb);
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--default-border);
+    border-radius: 0.5rem;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.reg-modo--activo {
+    border-color: rgba(var(--reg-modo-rgb), 0.45);
+    background-color: rgba(var(--reg-modo-rgb), 0.06);
+}
+
+/* Transición = ámbar. Como texto el ámbar del tema no llega a 4.5:1 sobre
+   fondo claro: se mezcla con el color de texto (igual que .op-calc). */
+.reg-modo--transicion {
+    --reg-modo-rgb: var(--warning-rgb);
+}
+
+.reg-page .text-warning {
+    color: var(--default-text-color) !important;
+    color: color-mix(in srgb, rgb(var(--warning-rgb)) 55%, var(--default-text-color)) !important;
+}
+
+.reg-resumen {
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.5rem;
+    background-color: rgba(var(--primary-rgb), 0.06);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.reg-num {
+    font-variant-numeric: tabular-nums;
+}
+
+.reg-tabla td {
+    vertical-align: middle;
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+}
+
+.reg-motivo {
+    min-width: 14rem;
+    max-width: 22rem;
+    white-space: normal;
+}
+
+.reg-vacio {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+}
+
+.reg-vacio > i {
+    font-size: 1.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+
+/* Aviso de habilitación de regularización vigente bajo la fecha de inicio
+   (Operacion/Create.vue). */
+.op-habilitacion {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background-color: rgba(var(--primary-rgb), 0.07);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.op-habilitacion > i {
+    color: var(--primary-color);
+    font-size: 1rem;
+    line-height: 1.2;
+}
